@@ -1,5 +1,5 @@
 # Oneshot pruning sample
-[简体中文](examples/pruner/oneshot/README_zh-CN.md)
+[简体中文](README_zh-CN.md)
 
 ## Introduction
 OneShot pruning is the collective name for structured channel pruning of L1, L2, FPGM, etc. (which can be switched by configuration via metrics in the config file), and is a fast and versatile pruning solution.
@@ -34,7 +34,7 @@ As for the model, you just need to replace the model built by OneshotPruner obje
 ## Frequently Asked Questions
 
 Because of the high complexity and frequent updates of PyTorch, we cannot ensure that all cases are covered through automated testing. When you encounter problems
-You can check out the [FAQ](docs/FAQ.md), or join the Q&A group in DingTalk via the QR Code below.
+You can check out the [FAQ](../../../docs/FAQ.md), or join the Q&A group in DingTalk via the QR Code below.
 
-![img.png](docs/qa.png)
+![img.png](../../../docs/qa.png)
 

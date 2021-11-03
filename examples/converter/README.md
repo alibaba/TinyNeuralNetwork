@@ -1,5 +1,5 @@
 ## Examples for model conversion
-[简体中文](examples/converter/README_zh-CN.md)
+[简体中文](README_zh-CN.md)
 
 ## Background
 
@@ -31,6 +31,6 @@ For the former one, you may refer to `convert.py`. And, for the latter one, you 
 ## Frequently Asked Questions
 
 Because of the high complexity and frequent updates of PyTorch, we cannot ensure that all cases are covered through automated testing. When you encounter problems
-You can check out the [FAQ](docs/FAQ.md), or join the Q&A group in DingTalk via the QR Code below.
+You can check out the [FAQ](../../docs/FAQ.md), or join the Q&A group in DingTalk via the QR Code below.
 
-![img.png](docs/qa.png)
+![img.png](../../docs/qa.png)

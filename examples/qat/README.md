@@ -1,5 +1,5 @@
 # Quantization-aware Training
-[简体中文](examples/qat/README_zh-CN.md)
+[简体中文](README_zh-CN.md)
 
 TinyNeuralNetwork uses PyTorch ([PyTorch Quantization-aware Training Tutorial](https://pytorch.org/tutorials/advanced/static_quantization_tutorial.html#quantization-aware-training) )
 as the backend for quantization-aware training and focuses on optimizing its usability (**Please use PyTorch 1.6 and later due to the frequent updates of quantization part**).
@@ -21,6 +21,6 @@ as the backend for quantization-aware training and focuses on optimizing its usa
 ## Frequently Asked Questions
 
 Because of the high complexity and frequent updates of PyTorch, we cannot ensure that all cases are covered through automated testing. When you encounter problems
-You can check out the [FAQ](docs/FAQ.md), or join the Q&A group in DingTalk via the QR Code below.
+You can check out the [FAQ](../../docs/FAQ.md), or join the Q&A group in DingTalk via the QR Code below.
 
-![img.png](docs/qa.png)
+![img.png](../../docs/qa.png)

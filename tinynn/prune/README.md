@@ -1,5 +1,5 @@
 # Model pruning
-[简体中文](tinynn/prune/README_zh-CN.md)
+[简体中文](README_zh-CN.md)
 
 ## CIFAR10
 

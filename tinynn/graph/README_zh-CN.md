@@ -1,5 +1,5 @@
 # 计算图捕获工具
-[English](tinynn/graph/README.md)
+[English](README.md)
 
 ## 背景
 

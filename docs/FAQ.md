@@ -1,5 +1,5 @@
 # FAQ
-[简体中文](docs/FAQ_zh-CN.md)
+[简体中文](FAQ_zh-CN.md)
 
 ## Pruning
 #### How do I modify the pruning rate of a single operator?

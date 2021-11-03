@@ -1,5 +1,5 @@
 # 模型剪枝
-[English](tinynn/prune/README.md)
+[English](README.md)
 
 ## CIFAR10
 

@@ -1,5 +1,5 @@
 # Introduction
-[简体中文](tinynn/graph/README_zh-CN.md)
+[简体中文](README_zh-CN.md)
 
 Graph tracer for PyTorch. 
 

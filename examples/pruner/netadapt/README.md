@@ -1,5 +1,5 @@
 # NetAdapt pruning sample
-[简体中文](examples/pruner/netadapt/README_zh-CN.md)
+[简体中文](README_zh-CN.md)
 
 NetAdapt is a model pruning algorithm mentioned in the paper [NetAdapt: Platform-Aware Neural Network Adaptation for Mobile Applications](https://openaccess.thecvf.com/content_ECCV_2018/papers/Tien-Ju_Yang_NetAdapt_Platform-Aware_Neural_ECCV_2018_paper.pdf).
 TinyNeuralNetwork optimizes its generality and ease of use based on the implementation of [MIT](https://github.com/denru01/netadapt).
@@ -50,6 +50,6 @@ As for the model, you just need to replace the model built by NetAdaptPruner obj
 ## Frequently Asked Questions
 
 Because of the high complexity and frequent updates of PyTorch, we cannot ensure that all cases are covered through automated testing. When you encounter problems
-You can check out the [FAQ](docs/FAQ.md), or join the Q&A group in DingTalk via the QR Code below.
+You can check out the [FAQ](../../../docs/FAQ.md), or join the Q&A group in DingTalk via the QR Code below.
 
-![img.png](docs/qa.png)
+![img.png](../../../docs/qa.png)

@@ -1,5 +1,5 @@
 # 量化训练
-[English](examples/qat/README.md)
+[English](README.md)
 
 TinyNeuralNetwork采用PyTorch的量化训练（[PyTorch 量化训练教程](https://pytorch.org/tutorials/advanced/static_quantization_tutorial.html#quantization-aware-training) ）
 模块作为后端，但着重优化了其易用性（ **尽量使用PyTorch 1.6及以后的版本，量化这块迭代很快** ）。
@@ -22,6 +22,6 @@ TinyNeuralNetwork采用PyTorch的量化训练（[PyTorch 量化训练教程](htt
 ## 常见问题
 
 由于PyTorch具有极高的编码自由度，我们无法确保所有的Case都能自动化覆盖，当你遇到问题时，
-可以查看[《常见问题解答》](docs/FAQ.md) ， 或者加入答疑群
+可以查看[《常见问题解答》](../../docs/FAQ_zh-CN.md) ， 或者加入答疑群
 
-![img.png](docs/qa.png)
+![img.png](../../docs/qa.png)

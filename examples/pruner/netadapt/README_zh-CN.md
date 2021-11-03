@@ -1,5 +1,5 @@
 # NetAdapt剪枝样例
-[English](examples/pruner/netadapt/README.md)
+[English](README.md)
 
 NetAdapt 剪枝是论文 [NetAdapt: Platform-Aware Neural Network Adaptation for Mobile Applications](https://openaccess.thecvf.com/content_ECCV_2018/papers/Tien-Ju_Yang_NetAdapt_Platform-Aware_Neural_ECCV_2018_paper.pdf) 中提到的一种模型剪枝算法。
 TinyNeuralNetwork在 [MIT](https://github.com/denru01/netadapt) 实现的基础上优化了其通用性和易用性。
@@ -79,6 +79,6 @@ TinyNeuralNetwork在 [MIT](https://github.com/denru01/netadapt) 实现的基础�
 ## 常见问题
 
 由于PyTorch具有极高的编码自由度，我们无法确保所有的Case都能自动化覆盖，当你遇到问题时，
-可以查看[《常见问题解答》](doc/FAQ.md) ， 或者加入答疑群
+可以查看[《常见问题解答》](../../../docs/FAQ_zh-CN.md) ， 或者加入答疑群
 
-![img.png](docs/qa.png)
+![img.png](../../../docs/qa.png)

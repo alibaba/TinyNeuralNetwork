@@ -1,5 +1,5 @@
 # 模型转换样例
-[English](tinynn/converter/README.md)
+[English](README.md)
 
 ## 背景
 
@@ -25,20 +25,20 @@
 5. 纯Python编写，易于维护
 
 ## 代码结构
-+ [operators](tinynn/converter/operators): 转换器的大部分组件
-    + [tflite](tinynn/converter/operators/tflite) : TFLite相关的类
-        + [base.py](tinynn/converter/operators/tflite/base.py) : TFLite基础数据结构
-        + [custom.py](tinynn/converter/operators/tflite/custom.py) : TFLite自定义算子
-        + [generated_ops.py](tinynn/converter/operators/tflite/generated_ops.py) : 从TFLite schema生成的Wrapper类
-        + [transformable.py](tinynn/converter/operators/tflite/transformable.py) : 可转换算子，如BatchNorm、Conv2d等由多个TFLite算子组成的复合算子
-    + [torch](tinynn/converter/operators/torch) : PyTorch相关的类
-        + [base.py](tinynn/converter/operators/torch/base.py) : TorchScript解析所需的基础数据结构
-        + [aten_schema.py](tinynn/converter/operators/torch/aten_schema.py) : 从ATen schema生成的Wrapper类
-        + [quantized_schema.py](tinynn/converter/operators/torch/quantized_schema.py) : 从Quantized schema生成的Wrapper类
-        + [aten.py](tinynn/converter/operators/torch/aten.py) : ATen相关算子的翻译
-        + [quantized.py](tinynn/converter/operators/torch/quantized.py) : Quantized相关算子的翻译
-    + [base.py](tinynn/converter/operators/base.py) : 通用算子的定义
-    + [graph.py](tinynn/converter/operators/graph.py) : 计算图相关的基础设施
-    + [op_version.py](tinynn/converter/operators/op_version.py) : 设置算子版本
-    + [optimize.py](tinynn/converter/operators/optimize.py) : 计算图优化
-+ [base](tinynn/converter/base.py): 入口类TFLiteConverter
++ [operators](operators): 转换器的大部分组件
+    + [tflite](operators/tflite) : TFLite相关的类
+        + [base.py](operators/tflite/base.py) : TFLite基础数据结构
+        + [custom.py](operators/tflite/custom.py) : TFLite自定义算子
+        + [generated_ops.py](operators/tflite/generated_ops.py) : 从TFLite schema生成的Wrapper类
+        + [transformable.py](operators/tflite/transformable.py) : 可转换算子，如BatchNorm、Conv2d等由多个TFLite算子组成的复合算子
+    + [torch](operators/torch) : PyTorch相关的类
+        + [base.py](operators/torch/base.py) : TorchScript解析所需的基础数据结构
+        + [aten_schema.py](operators/torch/aten_schema.py) : 从ATen schema生成的Wrapper类
+        + [quantized_schema.py](operators/torch/quantized_schema.py) : 从Quantized schema生成的Wrapper类
+        + [aten.py](operators/torch/aten.py) : ATen相关算子的翻译
+        + [quantized.py](operators/torch/quantized.py) : Quantized相关算子的翻译
+    + [base.py](operators/base.py) : 通用算子的定义
+    + [graph.py](operators/graph.py) : 计算图相关的基础设施
+    + [op_version.py](operators/op_version.py) : 设置算子版本
+    + [optimize.py](operators/optimize.py) : 计算图优化
++ [base](base.py): 入口类TFLiteConverter

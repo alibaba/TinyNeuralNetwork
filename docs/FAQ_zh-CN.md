@@ -1,5 +1,5 @@
 # FAQ
-[English](docs/FAQ.md)
+[English](FAQ.md)
 
 ## 剪枝
 #### 如何修改单个OP的剪枝率？

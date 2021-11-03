@@ -1,5 +1,5 @@
 # 模型转换样例
-[English](examples/converter/README.md)
+[English](README.md)
 
 ## 背景
 
@@ -32,6 +32,6 @@
 ## 常见问题
 
 由于PyTorch具有极高的编码自由度，我们无法确保所有的Case都能自动化覆盖，当你遇到问题时，
-可以查看[《常见问题解答》](docs/FAQ.md) ， 或者加入答疑群
+可以查看[《常见问题解答》](../../docs/FAQ_zh-CN.md) ， 或者加入答疑群
 
-![img.png](docs/qa.png)
+![img.png](../../docs/qa.png)

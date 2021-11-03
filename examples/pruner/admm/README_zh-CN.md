@@ -1,5 +1,5 @@
 # ADMM剪枝样例
-[English](examples/pruner/admm/README.md)
+[English](README.md)
 
 ADMM 剪枝是论文 [A Systematic DNN Weight Pruning Framework using Alternating Direction Method of Multipliers](https://arxiv.org/abs/1804.03294) 中提到的一种模型剪枝算法。
 
@@ -39,7 +39,7 @@ ADMM 剪枝是论文 [A Systematic DNN Weight Pruning Framework using Alternatin
 ## 常见问题
 
 由于PyTorch具有极高的编码自由度，我们无法确保所有的Case都能自动化覆盖，当你遇到问题时，
-可以查看[《常见问题解答》](doc/FAQ.md) ， 或者加入答疑群
+可以查看[《常见问题解答》](../../../docs/FAQ_zh-CN.md) ， 或者加入答疑群
 
-![img.png](docs/qa.png)
+![img.png](../../../docs/qa.png)
 
