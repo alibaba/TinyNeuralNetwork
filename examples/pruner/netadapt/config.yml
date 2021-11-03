@@ -1,0 +1,8 @@
+budget_type: flops
+budget_ratio: 0.75
+budget_reduce_rate_init: 0.025
+budget_reduce_rate_decay: 0.96
+metrics: l2_norm
+netadapt_max_iter: 100
+netadapt_max_rounds: 500
+netadapt_lr: 0.001

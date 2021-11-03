@@ -1,0 +1,6 @@
+numpy>=1.18.5
+PyYAML>=5.3.1
+ruamel.yaml>=0.16.12
+futures3>=1.0.0; python_version < '3.7'
+python-igraph>=0.9.6
+tflite==2.3.0

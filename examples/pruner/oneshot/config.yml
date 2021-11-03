@@ -1,0 +1,2 @@
+sparsity: 0.25
+metrics: l2_norm # The available metrics are listed in `tinynn/graph/modifier.py`， such as l1_norm、fpgm

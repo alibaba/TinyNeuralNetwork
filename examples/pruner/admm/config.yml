@@ -1,0 +1,6 @@
+sparsity: 0.75
+metrics: l2_norm
+admm_iterations: 12
+admm_epoch: 15
+rho: 0.001
+admm_lr: 0.01
