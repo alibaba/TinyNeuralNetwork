@@ -2041,8 +2041,8 @@ def trace(module: torch.nn.Module, dummy_input: torch.Tensor, eliminate_dead_gra
     except Exception:
         traceback.print_exc()
         if current_graph() is not None:
-            log.error('inputs:', [n.unique_name for n in current_graph().input_nodes])
-            log.error('forwards:', [n.unique_name for n in current_graph().forward_nodes])
-            log.error('outputs: ', [n.unique_name for n in current_graph().output_nodes])
-            log.error('constants: ', [n.unique_name for n in current_graph().constant_nodes])
+            log.error(f'inputs: {[n.unique_name for n in current_graph().input_nodes]}')
+            log.error(f'forwards: {[n.unique_name for n in current_graph().forward_nodes]}')
+            log.error(f'outputs: {[n.unique_name for n in current_graph().output_nodes]}')
+            log.error(f'constants: {[n.unique_name for n in current_graph().constant_nodes]}')
         quit()
