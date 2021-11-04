@@ -354,8 +354,9 @@ class OperatorConverter(ABC):
             pad_tensor = self.create_attr_tensor(np.array(pad, dtype='int32'))
             pad_input = ops[fill_nan_index - 1].outputs[0]
             if pad_input.quantization is not None:
-                constant_arr = tfl.FakeQuantTensor(
-                    np.zeros(1), pad_input.quantization.scale, pad_input.quantization.zero_point)
+                constant_arr = tfl.FakeQuantTensor(np.zeros(1, dtype=pad_input.dtype),
+                                                   pad_input.quantization.scale,
+                                                   pad_input.quantization.zero_point)
             else:
                 constant_arr = np.array([nan], dtype='float32')
             constant_tensor = self.create_attr_tensor(constant_arr)
