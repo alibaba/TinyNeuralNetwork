@@ -100,7 +100,7 @@ def train(model, context: DLContext, train_func: typing.Callable[[torch.nn.Modul
                 model.apply(torch.quantization.disable_observer)
             elif context.epoch == context.max_epoch // 3 * 2:
                 log.info("freeze batch norm mean and variance estimates")
-                model.apply(torch.quantization.disable_observer)
+                model.apply(torch.nn.intrinsic.qat.freeze_bn_stats)
 
         # only validate and save model in the main process
         if main_process:

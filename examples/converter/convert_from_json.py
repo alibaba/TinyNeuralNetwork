@@ -53,8 +53,7 @@ def main_worker(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--path', metavar='DIR',
-                        default='/root/tinynn/qat_model.json', help='path to the config (.json)')
+    parser.add_argument('--path', metavar='DIR', default=None, help='path to the config (.json)')
 
     args = parser.parse_args()
     main_worker(args)

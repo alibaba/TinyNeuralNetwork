@@ -62,6 +62,7 @@ def main_worker(args):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank])
 
     context = DLContext()
+    context.device = device
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224,
                                                               args.batch_size, args.workers, distributed)
     validate(model, context)

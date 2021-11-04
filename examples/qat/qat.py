@@ -42,7 +42,7 @@ def main_worker(args):
     # Use DataParallel to speed up training when possible
     if torch.cuda.device_count() > 1:
         qat_model = nn.DataParallel(qat_model)
-    
+
     # Move model to the appropriate device
     device = get_device()
     qat_model.to(device=device)

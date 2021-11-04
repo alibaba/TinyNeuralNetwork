@@ -10,11 +10,9 @@ class FakeQuantizeBFloat16(Module):
         super(FakeQuantizeBFloat16, self).__init__()
         self.register_buffer('fake_quant_enabled', torch.tensor([1], dtype=torch.uint8))
 
-    @torch.jit.export
     def enable_fake_quant(self, enabled=True):
         self.fake_quant_enabled[0] = 1 if enabled else 0
 
-    @torch.jit.export
     def disable_fake_quant(self):
         self.enable_fake_quant(False)
 

@@ -11,7 +11,7 @@ sys.path.append('../../../')
 from examples.models.cifar10 import mobilenet
 from tinynn.prune import NetAdaptPruner
 from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate
-from tinynn.util.train_util import DLContext, train
+from tinynn.util.train_util import DLContext, get_device, train
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 
@@ -71,8 +71,11 @@ def main_worker(args):
     if args.distributed:
         model = torch.nn.parallel.DataParallel(model)
 
+    device = get_device()
+    model.to(device=device)
+
     context = DLContext()
-    context.device = torch.device("cuda")
+    context.device = device
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
     validate(model, context)
 
