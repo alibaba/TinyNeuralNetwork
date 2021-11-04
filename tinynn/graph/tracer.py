@@ -898,6 +898,7 @@ def gen_module_constrctor_line(module):
     skip_props = {'torch.nn.modules.rnn.RNN_mode',
                   'torch.nn.modules.rnn.LSTM_mode',
                   'torch.nn.modules.rnn.GRU_mode', }
+    unknown_pairs = set()
     if hasattr(class_type, '__constants__') and hasattr(actual_class_type, '__init__'):
         known_constants = set(class_type.__constants__)
         arg_info = get_constructor_args(actual_class_type)
@@ -909,8 +910,9 @@ def gen_module_constrctor_line(module):
                 continue
             if prop_name not in known_constants:
                 if custom_key not in custom_prop_func:
-                    log.warning(
-                        f'Argument "{prop_name}" of the constructor of {class_name} is not a known constant, skipping')
+                    if custom_key not in unknown_pairs:
+                        unknown_pairs.add(custom_key)
+                        log.warning(f'Argument "{prop_name}" of the constructor of {class_name} is not a known constant, skipping')
                     continue
             if custom_key in skip_props:
                 continue
