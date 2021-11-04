@@ -1294,6 +1294,24 @@ class ATenHardsigmoidOperator(ATenHardsigmoidSchema):
             graph_converter.add_operator(op)
 
 
+class ATenSiluOperator(ATenSiluSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        ops = []
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        sigmoid_x = self.create_transform_tensor(torch.sigmoid(torch.from_numpy(input_tensor.tensor)).numpy())
+        ops.append(tfl.LogisticOperator([input_tensor], [sigmoid_x]))
+
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        ops.append(tfl.MulOperator([input_tensor, sigmoid_x], outputs))
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
+
 class ATenVarOperator(ATenVarSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)

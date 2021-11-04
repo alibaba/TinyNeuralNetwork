@@ -98,6 +98,8 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::hardswish_": ATenHardswishOperator,
                                                                 "aten::hardsigmoid": ATenHardsigmoidOperator,
                                                                 "aten::hardsigmoid_": ATenHardsigmoidOperator,
+                                                                "aten::silu": ATenSiluOperator,
+                                                                "aten::silu_": ATenSiluOperator,
                                                                 "aten::std": ATenStdOperator,
                                                                 "aten::var": ATenVarOperator,
                                                                 "aten::split": ATenSplitOperator,
