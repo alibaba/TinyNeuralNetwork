@@ -81,7 +81,7 @@ def main_worker(args):
 
     # Fine tune
     context.max_epoch = 220
-    context.criterion = nn.BCEWithLogitsLoss().cuda()
+    context.criterion = nn.BCEWithLogitsLoss()
     context.optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=5e-4)
     context.scheduler = optim.lr_scheduler.CosineAnnealingLR(context.optimizer, T_max=context.max_epoch + 1, eta_min=0)
 

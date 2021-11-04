@@ -44,7 +44,7 @@ def main_worker(args):
     context.device = device
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224,
                                                               args.batch_size, args.workers, distributed)
-    context.criterion = nn.CrossEntropyLoss().cuda()
+    context.criterion = nn.CrossEntropyLoss()
     context.optimizer = torch.optim.SGD(model.parameters(), config['admm_lr'], momentum=0.9, weight_decay=2.5e-4)
     context.train_func = train_one_epoch
     context.validate_func = validate
@@ -69,7 +69,7 @@ def main_worker(args):
 
     # fine tune
     context.max_epoch = 220
-    context.criterion = nn.CrossEntropyLoss().cuda()
+    context.criterion = nn.CrossEntropyLoss()
     context.optimizer = torch.optim.SGD(model.parameters(), 0.01, momentum=0.9, weight_decay=2.5e-4)
     context.scheduler = optim.lr_scheduler.CosineAnnealingLR(context.optimizer, T_max=context.max_epoch + 1, eta_min=0)
 
