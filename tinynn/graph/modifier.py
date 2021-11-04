@@ -779,22 +779,27 @@ class ElementWiseChannelModifier(ChannelModifier):
         if self.unique_name() in leaf_names:
             return
 
+        center_changed = [center_name]
+
         if len(self.in_idx_map.map_dict) > 1:
             max_group = 0
+
             for k, v in self.in_idx_map.map_dict.items():
                 max_group = len(v) if len(v) > max_group else max_group
+
+            for k, v in self.in_idx_map.map_dict.items():
+                if len(v) != max_group:
+                    center_changed.append(k)
 
             justify_group(self.in_idx_map.get_grouped_idx(max_group), self.in_idx_map)
             justify_group(self.ot_idx_map.get_grouped_idx(max_group), self.ot_idx_map)
 
         for n in self.node.next_nodes:
             if n.unique_name in sub_graph_dict.keys():
-
-                # TODO: Broadcast only when the group information changes
-                for k, v in self.ot_idx_map.map_dict.items():
+                for center in center_changed:
                     sub_graph_dict[n.unique_name].idx_forward(self.unique_name(),
-                                                              k,
-                                                              v,
+                                                              center,
+                                                              self.ot_idx_map.map_dict[center],
                                                               sub_graph_dict,
                                                               leaf_names)
 
@@ -1178,6 +1183,8 @@ def get_subgraph(graph: TraceGraph, node: TraceNode):
     for n in graph.forward_nodes + graph.output_nodes + graph.constant_nodes:
         delattr(n, "modifier")
 
+    sub_graph = sorted(sub_graph, key=lambda i: i.node.forward_order)
+
     return sub_graph
 
 
@@ -1300,10 +1307,16 @@ def calc_remove_idx(idx_map, importance, graph_sparsity, unique_name):
             start_pos = end_pos = tmp_end
 
         pos_list = deduplicate_range(pos_list)
+
+        pos_i = []
+        pos_idx = []
         for i, idx in enumerate(v[0]):
             if idx == -1:
                 continue
-            importance_sum[i] += importance[k][idx]
+            pos_i.append(i)
+            pos_idx.append(idx)
+
+        importance_sum[pos_i] += importance[k][pos_idx]
 
     for pos in pos_list:
         start, end = pos
