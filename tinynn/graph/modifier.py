@@ -306,9 +306,10 @@ class ChannelModifier(Modifier):
         return 1
 
     def register_mask(self, importance, graph_sparsity):
-        remove_idx = calc_remove_idx(self.in_idx_map, importance, graph_sparsity, self.unique_name())
-        self.masker().set_in_remove_idx(remove_idx)
-        self.masker().set_ot_remove_idx(remove_idx)
+        if self.masker() is not None:
+            remove_idx = calc_remove_idx(self.in_idx_map, importance, graph_sparsity, self.unique_name())
+            self.masker().set_in_remove_idx(remove_idx)
+            self.masker().set_ot_remove_idx(remove_idx)
 
     def traversal(self, input_modify, output_modify, sub_graph):
         """ Traverse the entire subgraph that depends on each other """
