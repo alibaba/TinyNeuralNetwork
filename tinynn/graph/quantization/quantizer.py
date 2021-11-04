@@ -691,10 +691,13 @@ class QATQuantizer(object):
             if cur_class == ConstantNode:
                 return False
             elif cur_class == TraceFunction:
-                return cur_module.kind in ('pow', 'truediv', 'sqrt', 'atan2', 'atan', 'sin', 'cos', 'hardsigmoid')
+                return cur_module.kind in ('pow', 'truediv', 'sqrt', 'atan2', 'atan', 'sin', 'cos', 'hardsigmoid', 'silu')
             else:
-                if torch.__version__.startswith('1.6.'):
+                if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
                     if cur_class == nn.ConvTranspose2d:
+                        return True
+                else:
+                    if cur_class == nn.SiLU:
                         return True
                 return cur_class in (nn.LSTM, nn.RNN, nn.GRU)
 
