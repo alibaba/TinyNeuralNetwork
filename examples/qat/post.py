@@ -51,7 +51,7 @@ def main_worker(args):
     context = DLContext()
     context.device = device
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
-    context.max_iteration = 2
+    context.max_iteration = 100
 
     # Post quantization calibration
     calibrate(model, context)
@@ -73,7 +73,7 @@ def main_worker(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-path', metavar='DIR', default="~/datasets/cifar10", help='path to dataset')
+    parser.add_argument('--data-path', metavar='DIR', default="/data/datasets/cifar10", help='path to dataset')
     parser.add_argument('--config', type=str, default=os.path.join(CURRENT_PATH, 'config.yml'))
     parser.add_argument('--workers', type=int, default=8)
     parser.add_argument('--batch-size', type=int, default=128)
