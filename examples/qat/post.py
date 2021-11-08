@@ -35,7 +35,7 @@ def main_worker(args):
         # The `is_input_quantized` in the previous line is a flag on the input tensors whether they are quantized or not,
         # which can be None (False for all inputs) or a list of booleans that corresponds to the inputs.
 
-        quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'force_overwrite': False})
+        quantizer = PostQuantizer(model, dummy_input, work_dir='out')
         qat_model = quantizer.quantize()
 
     print(qat_model)
