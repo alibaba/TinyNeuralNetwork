@@ -1,6 +1,7 @@
 import copy
 import logging
 import os
+import queue
 import typing
 
 from distutils.version import LooseVersion, StrictVersion
@@ -152,11 +153,16 @@ class QATQuantizer(object):
 
         """
 
+        qat_analysis_queue = queue.Queue()
+        visited = set()
+
         def _qat_analysis(node: TraceNode, quantized: bool):
             # Find quantized subgraphs in the whole computation graph
 
-            if node.quantized:
+            if node.unique_name in visited:
                 return
+
+            visited.add(node.unique_name)
 
             if node in graph.output_nodes:
                 return
@@ -171,16 +177,20 @@ class QATQuantizer(object):
                 log.debug(f"[QUANTIZED]{node.unique_name}:{quantized}")
 
             for n in node.next_nodes:
-                _qat_analysis(n, quantized)
+                qat_analysis_queue.put((n, quantized))
 
         if is_input_quantized is not None:
             assert len(is_input_quantized) == len(graph.input_nodes)
 
             for n, q in zip(graph.input_nodes, is_input_quantized):
-                _qat_analysis(n, q)
+                qat_analysis_queue.put((n, q))
         else:
             for n in graph.input_nodes:
-                _qat_analysis(n, False)
+                qat_analysis_queue.put((n, False))
+
+        while not qat_analysis_queue.empty():
+            node, quantized = qat_analysis_queue.get()
+            _qat_analysis(node, quantized)
 
         for n in graph.constant_nodes:
             _qat_analysis(n, not n.module.dtype == 'torch.float32')
