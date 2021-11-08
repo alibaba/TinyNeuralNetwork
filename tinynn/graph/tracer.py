@@ -1467,7 +1467,7 @@ class TraceGraph(object):
             "init_block": init_block,
             "forward_block": forward_block,
             "name_block": model_name,
-            "load_weight_block": "" if output_weight_path is None else f"    model.load_state_dict(torch.load('{output_weight_path}s'))",
+            "load_weight_block": "" if output_weight_path is None else f"    model.load_state_dict(torch.load('{output_weight_path}'))",
             "input_block": input_block,
             "input_names": ", ".join([f"dummy_input_{i}" for i in range(len(self.input_nodes))])
         }
