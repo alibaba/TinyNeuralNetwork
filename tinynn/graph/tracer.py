@@ -145,6 +145,9 @@ module_constructor_signatures = {}
 # Original values of tracked objects
 original_values_for_tracked_objects = {}
 
+# Original module class names
+importable_module_names = {}
+
 
 class TraceNode(object):
     """ A basic data structure to represent a node in the computation graph """
@@ -718,6 +721,7 @@ def fetch_modules(config: typing.Optional[str] = None):
                 if hasattr(scope, module_name):
                     module = getattr(scope, module_name)
                     modules.append(module)
+                    importable_module_names[module] = f'{ns}.{module_name}'
                     if hasattr(module, '__init__'):
                         constructor = module.__init__
                         module_constructor_signatures[module] = inspect.signature(constructor).parameters.values()
@@ -759,13 +763,27 @@ def fetch_funcs(config: typing.Optional[str] = None):
             for module_name in module_names:
                 if hasattr(scope, module_name):
                     modules.append(module_name)
+                    importable_module_names[getattr(scope, module_name)] = f'{ns}.{module_name}'
             new_dict[scope] = modules
     return new_dict
 
 
-def qualified_name(module, item: typing.Optional[str] = None):
-    if hasattr(module, '__module__'):
+def qualified_name(module, item: typing.Optional[str] = None, short: bool = False):
+    if module in importable_module_names:
+        obj_key = importable_module_names[module]
+    elif hasattr(module, '__module__'):
         obj_key = f'{module.__module__}.{module.__name__}'
+        if short:
+            mod = module.__module__
+            name = module.__name__
+            pos = [i for i, x in enumerate(mod) if x == '.']
+            for i in pos:
+                ns = mod[:i]
+                if ns in sys.modules:
+                    cur_mod = sys.modules[ns]
+                    if hasattr(cur_mod, name) and getattr(cur_mod, name) == module:
+                        obj_key = f'{ns}.{name}'
+                        break
     else:
         obj_key = module.__name__
     if item is not None:
@@ -793,13 +811,13 @@ def patch_modules(objects, names, gens):
     pre_patched_values = {}
     for obj in objects:
         for name, gen in zip(names, gens):
-            key = qualified_name(obj, name)
+            key = qualified_name(obj, name, short=True)
             pre_patched_values[key] = getattr(obj, name)
             setattr(obj, name, gen(pre_patched_values[key], key))
     yield objects
     for obj in objects:
         for name in names:
-            key = qualified_name(obj, name)
+            key = qualified_name(obj, name, short=True)
             pre_patched_value = pre_patched_values[key]
             setattr(obj, name, pre_patched_value)
 

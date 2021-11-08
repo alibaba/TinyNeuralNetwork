@@ -562,7 +562,7 @@ class QATQuantizer(object):
             graph.module_original_name_dict[id(float_functional)] = module_name
 
             float_functional_cls = type(float_functional)
-            module_constructor_lines[id(float_functional)] = f'{qualified_name(float_functional_cls)}()'
+            module_constructor_lines[id(float_functional)] = f'{qualified_name(float_functional_cls, short=True)}()'
 
             new_node = TraceNode(float_functional, cur_graph=graph)
             graph.nodes_map[new_node.unique_name] = new_node
