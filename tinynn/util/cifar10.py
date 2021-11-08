@@ -260,3 +260,39 @@ def validate(model, context: DLContext) -> float:
 
         print(f'Validation Acc@1 {avg_acc.avg:.3f}')
     return avg_acc.avg
+
+
+def calibrate(model, context: DLContext):
+    """ Calibrates the fake-quantized model
+
+    Args:
+        model: The model to be validated
+        context (DLContext): The context object
+
+    """
+
+    model.to(device=context.device)
+    model.eval()
+
+    avg_batch_time = AverageMeter()
+
+    with torch.no_grad():
+        end = time.time()
+        for i, (image, _) in enumerate(context.val_loader):
+
+            if context.max_iteration is not None and i >= context.max_iteration:
+                break
+
+            image = image.to(device=context.device)
+
+            model(image)
+
+            # measure elapsed time
+            avg_batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % 10 == 0:
+                print(f'Calibrate: [{i}/{len(context.val_loader)}]\t'
+                      f'Time {avg_batch_time.avg:.5f}\t')
+
+            context.iteration += 1

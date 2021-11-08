@@ -142,19 +142,15 @@ class QATQuantizer(object):
 
         return qat_model
 
-    def prepare_qat(self, graph: TraceGraph, is_input_quantized: typing.Optional[typing.Tuple[bool]] = None, backend: str = 'qnnpack') -> torch.nn.Module:
-        """ Prepare model for QAT training
+    def prepare_qat_prep(self, graph: TraceGraph, is_input_quantized: typing.Optional[typing.Tuple[bool]] = None, backend: str = 'qnnpack'):
+        """ Some common logic before calling torch.quantization.prepare[_qat]
 
         Args:
             graph (TraceGraph): The computation graph of the model
             is_input_quantized (typing.Union[typing.Tuple[bool]], optional): Whether the input tensor(s) is (are) quantized. Defaults to None.
             backend (str, optional): The backend of quantization. Defaults to 'qnnpack'.
 
-        Returns:
-            torch.nn.Module: The QAT-ready model
         """
-
-        graph.module.train()
 
         def _qat_analysis(node: TraceNode, quantized: bool):
             # Find quantized subgraphs in the whole computation graph
@@ -275,6 +271,22 @@ class QATQuantizer(object):
         qconfig = torch_q.get_default_qat_qconfig(backend)
         torch.backends.quantized.engine = backend
         graph.module.qconfig = qconfig
+
+    def prepare_qat(self, graph: TraceGraph, is_input_quantized: typing.Optional[typing.Tuple[bool]] = None, backend: str = 'qnnpack') -> torch.nn.Module:
+        """ Prepare model for QAT training
+
+        Args:
+            graph (TraceGraph): The computation graph of the model
+            is_input_quantized (typing.Union[typing.Tuple[bool]], optional): Whether the input tensor(s) is (are) quantized. Defaults to None.
+            backend (str, optional): The backend of quantization. Defaults to 'qnnpack'.
+
+        Returns:
+            torch.nn.Module: The QAT-ready model
+        """
+
+        graph.module.train()
+
+        self.prepare_qat_prep(graph, is_input_quantized, backend)
 
         # Unfornately, the suggested way below will try to fuse all the modules
         # even if some of the nodes are not in a quantized computation graph.
@@ -776,3 +788,66 @@ class BF16Quantizer(QATQuantizer):
         torch_q.prepare_qat(self.model, inplace=True)
 
         return self.model
+
+class PostQuantizer(QATQuantizer):
+    rewrite_graph: bool
+    force_overwrite: bool
+    is_input_quantized: typing.Optional[typing.Tuple[bool]]
+    backend: str
+    remove_weights_after_load: bool
+
+    def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
+        """ Constructs a new PostQuantizer object
+
+        Args:
+            model: The model to be quantized
+            dummy_input: A viable input to the model
+            work_dir (typing.Optional[str], optional): The working directory in which the intermediate files will be generated. \
+                Defaults to None, in which case "output" will be used.
+            config (typing.Optional[dict]): Options for the quantizer
+        """
+
+        super().__init__(model, dummy_input, work_dir, config)
+
+    def prepare_qat(self, graph: TraceGraph, is_input_quantized: typing.Optional[typing.Tuple[bool]] = None, backend: str = 'qnnpack') -> torch.nn.Module:
+        """ Prepare model for QAT training
+
+        Args:
+            graph (TraceGraph): The computation graph of the model
+            is_input_quantized (typing.Union[typing.Tuple[bool]], optional): Whether the input tensor(s) is (are) quantized. Defaults to None.
+            backend (str, optional): The backend of quantization. Defaults to 'qnnpack'.
+
+        Returns:
+            torch.nn.Module: The QAT-ready model
+        """
+
+        graph.module.eval()
+
+        self.prepare_qat_prep(graph, is_input_quantized, backend)
+
+        # Unfornately, the suggested way below will try to fuse all the modules
+        # even if some of the nodes are not in a quantized computation graph.
+        # So we wrote some alternatives for the function.
+        #   torch.quantization.prepare(graph.module, inplace=True)
+
+        if hasattr(torch_q, 'get_default_qat_module_mappings'):
+            mapping = torch_q.get_default_qat_module_mappings()
+        elif hasattr(torch_q, 'get_qat_module_mappings'):
+            mapping = torch_q.get_qat_module_mappings()
+        else:
+            mapping = torch_q.DEFAULT_QAT_MODULE_MAPPING
+
+        if LooseVersion(torch.__version__) < LooseVersion("1.7.0"):
+            torch_q.prepare(graph.module, inplace=True)
+        else:
+            torch_q.prepare(graph.module, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
+        for n in graph.forward_nodes:
+            if not n.quantized:
+                if hasattr(n.module, "_forward_hooks"):
+                    if len(n.module._forward_hooks) > 0:
+                        n.module._forward_hooks.popitem()
+                if hasattr(n.module, "qconfig"):
+                    delattr(n.module, "qconfig")
+                if hasattr(n.module, "activation_post_process"):
+                    delattr(n.module, "activation_post_process")
+        return graph.module
