@@ -152,3 +152,11 @@ torch.quantization:
 - QuantStub
 - DeQuantStub
 - QuantWrapper
+torchvision.ops:
+- DeformConv2d
+- RoIAlign
+- RoIPool
+- PSRoIAlign
+- PSRoIPool
+- MultiScaleRoIAlign
+- StochasticDepth

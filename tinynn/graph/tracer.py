@@ -5,6 +5,7 @@ import inspect
 import io
 import logging
 import os
+import sys
 import traceback
 import typing
 
@@ -716,7 +717,10 @@ def fetch_modules(config: typing.Optional[str] = None):
     with open(config, 'r') as f:
         module_dict = yaml.load(f, yaml.SafeLoader)
         for ns, module_names in module_dict.items():
-            scope = importlib.import_module(ns)
+            try:
+                scope = importlib.import_module(ns)
+            except ImportError:
+                pass
             for module_name in module_names:
                 if hasattr(scope, module_name):
                     module = getattr(scope, module_name)
@@ -1274,6 +1278,9 @@ class TraceGraph(object):
         # Generated code
         self.code = "None"
 
+        # Used namespaces
+        self.used_namespaces = set()
+
     def all_nodes(self) -> typing.List[TraceNode]:
         """ Returns all the nodes in a computation graph during forward process """
         return self.input_nodes + self.forward_nodes + self.output_nodes + self.constant_nodes
@@ -1367,18 +1374,22 @@ class TraceGraph(object):
 
             generated_node.append(node.unique_name)
             if id(node.module) in module_constructor_lines:
+                root_ns = qualified_name(node.type()).split('.')[0]
+                self.used_namespaces.add(root_ns)
                 orig_constructor_line = module_constructor_lines[id(node.module)]
                 line = f'        self.{node.unique_name} = {orig_constructor_line}'
                 lines.append(line)
             elif type(node.module) == ConstantNode:
                 # Parameter generation
+                self.used_namespaces.add('torch')
                 line = f'        self.register_parameter("{node.unique_name}", torch.nn.Parameter(torch.empty({node.module.shape}, dtype={node.module.dtype})))'
                 lines.append(line)
             elif type(node.module) != TraceFunction:
                 # Generate the module even if the constructor is not caught
                 log.info(
                     f'the constructor of the module {node.unique_name} of type {type(node.module).__name__} is not traced, trying the experimental way')
-                line = f'        self.{node.unique_name} = {gen_module_constrctor_line(node.module)}'
+                root_ns = qualified_name(node.type()).split('.')[0]
+                self.used_namespaces.add(root_ns)
                 lines.append(line)
 
         block = "\n".join(lines)
@@ -1433,6 +1444,8 @@ class TraceGraph(object):
         import_block = """import torch\nimport torch.nn\nimport torch.functional\nimport torch.nn.functional"""
         if self.quantized is True:
             import_block += '\nimport torch.quantization\nimport torch.nn.quantized'
+        additional_ns = sorted(self.used_namespaces - set(['torch']))
+        import_block += ''.join([f'\nimport {ns}' for ns in additional_ns])
         return import_block
 
     def __gen_input_code(self) -> str:
