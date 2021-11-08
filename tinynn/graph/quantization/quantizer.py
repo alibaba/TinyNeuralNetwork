@@ -757,6 +757,8 @@ class QATQuantizer(object):
 
                 graph.insert_between(prev_node, node, fake_dequant, move_idx=True)
 
+        graph.quantized = True
+
 
 class BF16Quantizer(QATQuantizer):
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
