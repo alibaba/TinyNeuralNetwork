@@ -3,8 +3,8 @@ import copy
 import importlib
 import inspect
 import io
-import logging
 import os
+import re
 import sys
 import traceback
 import typing
@@ -516,14 +516,65 @@ def new_setattr_gen(orig_setattr, key: str):
                 if related and name not in class_type.__constants__:
                     related = False
                 if related:
+                    class_name = '.'.join(key.split('.')[:-1])
                     log.warning(
-                        f'The constant property `{name}` of {qualified_name(class_type)} is changed. We need to drop the original constructor line.')
+                        f'The constant property `{name}` of {class_name} is changed. We need to drop the original constructor line.')
                     module_constructor_traced.remove(id(obj))
                     del module_constructor_lines[id(obj)]
             return orig_setattr(obj, name, value)
         log.debug(f'{key} after with block, lock: {lock}')
 
     return new_setattr
+
+
+def new_module_getattr_gen(orig_getattr, key: str, res: typing.Dict[str, bool]):
+    log.debug(f'registered module getattr wrapper: {key}')
+
+    def new_getattr(obj, name):
+        log.debug(f'{key} in module getattr function wrapper')
+
+        result = orig_getattr(obj, name)
+        result_is_str = isinstance(result, str)
+        is_dict = name == '__dict__'
+        related = result_is_str or is_dict
+
+        # If the following conditions are satisfied
+        #   a. the type of the result is `str` or the key is `__dict__`
+        #   b. the 2nd last frame is on the `extra_repr` function or `__repr__` function
+        #   c. the line is not starting with `if `
+        # then we should patch the variable.
+
+        if related:
+            last_frame = inspect.currentframe().f_back
+            func_name = last_frame.f_code.co_name
+            related = False
+            if func_name in ('extra_repr', '__repr__'):
+                if is_dict:
+                    related = True
+                else:
+                    fn = last_frame.f_code.co_filename
+                    ln = last_frame.f_lineno
+                    res_key = f'{fn}_{ln}'
+                    if res_key in res:
+                        related = res[res_key]
+                    else:
+                        lines = inspect.getframeinfo(last_frame)[3]
+                        related = not re.match(r' *if .*', lines[0])
+                        res[res_key] = related
+        if related:
+            if result_is_str:
+                return f'"{result}"'
+            elif is_dict:
+                orig = result
+                result = {}
+                for k, v in orig.items():
+                    if type(v) == str and (not k.startswith('__') and not k.endswith('__')):
+                        result[k] = f'"{orig[k]}"'
+                    else:
+                        result[k] = v
+        return result
+
+    return new_getattr
 
 
 def new_getattr_gen(orig_getattr, key: str, is_class: bool):
@@ -797,11 +848,11 @@ def qualified_name(module, item: typing.Optional[str] = None, short: bool = Fals
 
 
 @contextlib.contextmanager
-def patch(object, name, gen):
+def patch(object, name, gen, *args, **kwargs):
     """ Temporarily monkeypatches an object. """
 
     pre_patched_value = getattr(object, name)
-    setattr(object, name, gen(pre_patched_value))
+    setattr(object, name, gen(pre_patched_value, *args, **kwargs))
     yield object
     setattr(object, name, pre_patched_value)
 
@@ -872,92 +923,18 @@ def get_constructor_args(actual_class_type):
         return inspect.signature(actual_class_type.__init__).parameters.values()
 
 
-def gen_module_constrctor_line(module):
+def gen_module_constrctor_line(module, mod_cache=None):
     """ Generates the constructor line for a loaded module """
-    class_type = type(module)
-    class_name = f'{class_type.__module__}.{class_type.__name__}'
-
-    # Sometimes the class is a child class that doesn't have an actual __init__ functions
-    # So we need to search the base classes as well
-    actual_class_type = class_type
-    while True:
-        normal_arg_found = False
-        positional_arg_found = False
-        arg_info = get_constructor_args(actual_class_type)
-        for i, p in enumerate(arg_info):
-            # Skip first element
-            if i == 0:
-                continue
-
-            # Skip *args and **kwargs
-            if p.kind == inspect.Parameter.VAR_POSITIONAL:
-                positional_arg_found = True
-                continue
-
-            if p.kind == inspect.Parameter.VAR_KEYWORD and positional_arg_found:
-                continue
-
-            # If a normal argument is found, then it should be okay
-            normal_arg_found = True
-            break
-
-        # Search in the base class if we didn't find one in the current class type
-        if not normal_arg_found:
-            if len(actual_class_type.__bases__) > 0:
-                actual_class_type = actual_class_type.__bases__[0]
-            else:
-                # We couldn't find one so we restore to the default type here
-                actual_class_type = class_type
-                break
+    name = qualified_name(type(module), short=True)
+    if mod_cache:
+        mod_cache = {}
+    module_cls = type(module)
+    with patch(module_cls, '__getattribute__', new_module_getattr_gen, name, mod_cache):
+        if getattr(module_cls, '__repr__') == getattr(torch.nn.Module, '__repr__'):
+            return f'{name}({module.extra_repr()})', mod_cache
         else:
-            break
-
-    arg_str = ''
-    custom_prop_func = {'torch.nn.modules.conv.Conv2d_bias': lambda x: x is not None,
-                        'torch.nn.modules.linear.Linear_bias': lambda x: x is not None,
-                        'torch.nn.modules.conv.ConvTranspose2d_bias': lambda x: x is not None,
-                        'torch.nn.modules.conv.Conv1d_bias': lambda x: x is not None, }
-    skip_props = {'torch.nn.modules.rnn.RNN_mode',
-                  'torch.nn.modules.rnn.LSTM_mode',
-                  'torch.nn.modules.rnn.GRU_mode', }
-    unknown_pairs = set()
-    if hasattr(class_type, '__constants__') and hasattr(actual_class_type, '__init__'):
-        known_constants = set(class_type.__constants__)
-        arg_info = get_constructor_args(actual_class_type)
-        args = []
-        for p in arg_info:
-            prop_name = p.name
-            custom_key = f'{class_name}_{prop_name}'
-            if prop_name == 'self':
-                continue
-            if prop_name not in known_constants:
-                if custom_key not in custom_prop_func:
-                    if custom_key not in unknown_pairs:
-                        unknown_pairs.add(custom_key)
-                        log.warning(f'Argument "{prop_name}" of the constructor of {class_name} is not a known constant, skipping')
-                    continue
-            if custom_key in skip_props:
-                continue
-            prop_value = getattr(module, prop_name)
-            if custom_key in custom_prop_func:
-                prop_value = custom_prop_func[custom_key](prop_value)
-            # Appending positional args
-            if p.default is p.empty:
-                args.append(f'{prop_value}')
-            else:
-                # Appending keyword args
-                default_value = p.default
-                # Skip the arg if it has the same value with the default one
-                if default_value == prop_value:
-                    continue
-                if type(prop_value) == str:
-                    prop_value_str = f'"{prop_value}"'
-                else:
-                    prop_value_str = prop_value
-                args.append(f'{prop_name}={prop_value_str}')
-        # Argument string concatenation
-        arg_str = ', '.join(args)
-    return f'{class_name}({arg_str})'
+            ns = '.'.join(name.split('.')[:-1])
+            return f'{ns}.{repr(module)}', mod_cache
 
 
 def add_input_node(node: TraceNode, output_tensors):
@@ -1367,6 +1344,7 @@ class TraceGraph(object):
         """ Generates the code for the init function for a `nn.Module` """
         generated_node = []
         lines = []
+        mod_cache_dict = dict()
         for node in self.constant_nodes + self.forward_nodes + self.other_init_nodes:
             if node.unique_name in generated_node:
                 log.info(f"skip dumplicate node code gen {node.unique_name}")
@@ -1390,7 +1368,10 @@ class TraceGraph(object):
                     f'the constructor of the module {node.unique_name} of type {type(node.module).__name__} is not traced, trying the experimental way')
                 root_ns = qualified_name(node.type()).split('.')[0]
                 self.used_namespaces.add(root_ns)
+                orig_constructor_line, mod_cache = gen_module_constrctor_line(node.module, mod_cache_dict)
+                line = f'        self.{node.unique_name} = {orig_constructor_line}'
                 lines.append(line)
+                mod_cache_dict.update(mod_cache)
 
         block = "\n".join(lines)
         return block
