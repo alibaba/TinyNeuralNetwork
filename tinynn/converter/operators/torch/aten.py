@@ -1501,3 +1501,40 @@ class ATenChunkOperator(ATenChunkSchema):
             graph_converter.add_operator(tfl.SplitVOperator([input_tensor, split_tensor, dim_tensor], outputs, chunks))
         else:
             graph_converter.add_operator(tfl.SplitOperator([dim_tensor, input_tensor], outputs, chunks))
+
+
+class ATenPixelShuffleOperator(ATenPixelShuffleSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        upscale_factor = self.input_tensors[1]
+        ops = []
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        ops.append(tfl.DepthToSpaceOperator([input_tensor], outputs, upscale_factor))
+
+        ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
+class ATenPixelUnshuffleOperator(ATenPixelUnshuffleSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        downscale_factor = self.input_tensors[1]
+        ops = []
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        ops.append(tfl.SpaceToDepthOperator([input_tensor], outputs, downscale_factor))
+
+        ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
+
+        for op in ops:
+            graph_converter.add_operator(op)

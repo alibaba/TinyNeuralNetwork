@@ -104,6 +104,8 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::var": ATenVarOperator,
                                                                 "aten::split": ATenSplitOperator,
                                                                 "aten::split_with_sizes": ATenSplitWithSizesOperator,
+                                                                "aten::pixel_shuffle": ATenPixelShuffleOperator,
+                                                                "aten::pixel_unshuffle": ATenPixelUnshuffleOperator,
 
                                                                 # quantized
                                                                 "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,
