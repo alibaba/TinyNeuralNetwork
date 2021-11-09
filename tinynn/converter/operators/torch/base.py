@@ -365,7 +365,7 @@ class OperatorConverter(ABC):
             pad_out = self.create_transform_tensor(pad_array, quantization=pad_input.quantization)
             ops[fill_nan_index].inputs[0] = pad_out
 
-            pad_op = tfl.PadOperator([pad_input, pad_tensor, constant_tensor], [pad_out])
+            pad_op = tfl.Padv2Operator([pad_input, pad_tensor, constant_tensor], [pad_out])
             ops.insert(fill_nan_index, pad_op)
 
 
