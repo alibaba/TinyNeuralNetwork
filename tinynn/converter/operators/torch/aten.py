@@ -682,7 +682,9 @@ class ATenStackOperator(ATenStackSchema):
             dim += self.input_tensors[0][0].ndim + 1
 
         names = graph_converter.get_list_expanded_names(self.input_names[0])
-        orig_inputs = self.to_tfl_tensors(names, self.input_tensors[0], graph_converter=graph_converter)
+        orig_inputs = self.to_tfl_tensors(names, self.input_tensors[0],
+                                          graph_converter=graph_converter,
+                                          non_existent_as_buffer=True)
         inputs = [self.create_transform_tensor(np.expand_dims(orig_inputs[i].tensor, dim))
                   for i in range(len(orig_inputs))]
         attrs = [self.create_attr_tensor(np.array(t.shape, dtype='int32')) for t in inputs]
@@ -709,7 +711,9 @@ class ATenCatOperator(ATenCatSchema):
             dim += self.input_tensors[0][0].ndim
 
         names = graph_converter.get_list_expanded_names(self.input_names[0])
-        inputs = self.to_tfl_tensors(names, self.input_tensors[0], graph_converter=graph_converter)
+        inputs = self.to_tfl_tensors(names, self.input_tensors[0],
+                                     graph_converter=graph_converter,
+                                     non_existent_as_buffer=True)
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
         graph_converter.add_operator(tfl.ConcatenationOperator(inputs, outputs, dim))
@@ -1203,7 +1207,9 @@ class ATenIndexOperator(ATenIndexSchema):
         tensors = [self.input_tensors[0][0]]
 
         inputs = [self.find_or_create_input(0, graph_converter)] + \
-            self.to_tfl_tensors(names, tensors, graph_converter=graph_converter)
+            self.to_tfl_tensors(names, tensors,
+                                graph_converter=graph_converter,
+                                non_existent_as_buffer=True)
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
         graph_converter.add_operator(tfl.GatherOperator(inputs, outputs, axis=0))
@@ -1522,6 +1528,7 @@ class ATenPixelShuffleOperator(ATenPixelShuffleSchema):
 
         for op in ops:
             graph_converter.add_operator(op)
+
 
 class ATenPixelUnshuffleOperator(ATenPixelUnshuffleSchema):
     def parse(self, node, attrs, args, graph_converter):

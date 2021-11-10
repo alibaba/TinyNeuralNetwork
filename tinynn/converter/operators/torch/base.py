@@ -138,7 +138,7 @@ class OperatorConverter(ABC):
         else:
             self.output_tensors.extend(o)
 
-    def to_tfl_tensors(self, names, tensors, has_buffers=None, graph_converter=None) -> typing.List[tfl.Tensor]:
+    def to_tfl_tensors(self, names, tensors, has_buffers=None, graph_converter=None, non_existent_as_buffer=False) -> typing.List[tfl.Tensor]:
         tfl_tensors = []
         if has_buffers is None:
             has_buffers = [None] * len(tensors)
@@ -150,7 +150,7 @@ class OperatorConverter(ABC):
                 if graph_converter is not None and n in graph_converter.tensor_map:
                     t = graph_converter.tensor_map[n]
                 else:
-                    t = tfl.Tensor(t, n, has_buffer=False)
+                    t = tfl.Tensor(t, n, has_buffer=non_existent_as_buffer)
             else:
                 t = tfl.Tensor(t, n, has_buffer=b)
             tfl_tensors.append(t)
