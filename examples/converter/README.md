@@ -28,6 +28,12 @@ You may either perform conversion from models directly, or from the json configu
 
 For the former one, you may refer to `convert.py`. And, for the latter one, you may refer to `convert_from_json.py`.
 
+## Deployment options
+a. NNAPI for CPU/GPU/NPU/XNNPACK (Android 8.1+, for quantized computational graphs, Android 10 and above is required)
+b. For most devices, you can manually compile TFLite (C/C++) or use `tensorflow.lite.Interpreter` (Python)
+c. For embedded devices, you can use TFLite Micro or other hardware-related inference engines
+d. Generic inference engines with support of importing from the TFLite format (e.g MNN) can also be used
+
 ## Frequently Asked Questions
 
 Because of the high complexity and frequent updates of PyTorch, we cannot ensure that all cases are covered through automated testing. When you encounter problems
