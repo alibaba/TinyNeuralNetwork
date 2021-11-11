@@ -1252,7 +1252,7 @@ class ATenRepeatOperator(ATenRepeatSchema):
             if len(repeats) > len(input_shape):
                 new_shape = [1] * (len(repeats) - len(input_shape)) + list(input_shape)
                 new_shape_arr = np.array(new_shape, dtype='int32')
-                reshaped = self.create_transform_tensor(np.reshape(input_tensor, new_shape_arr))
+                reshaped = self.create_transform_tensor(np.reshape(input_tensor.tensor, new_shape_arr))
                 actual_input = reshaped
                 ops.append(tfl.ReshapeOperator([input_tensor], [reshaped], new_shape_arr))
             repeat_tensor = self.create_attr_tensor(np.array(repeats, dtype='int32'))
@@ -1636,7 +1636,7 @@ class ATenExpandOperator(ATenExpandSchema):
             if len(output_shape) > len(input_shape):
                 new_shape = [1] * (len(output_shape) - len(input_shape)) + list(input_shape)
                 new_shape_arr = np.array(new_shape, dtype='int32')
-                reshaped = self.create_transform_tensor(np.reshape(input_tensor, new_shape_arr))
+                reshaped = self.create_transform_tensor(np.reshape(input_tensor.tensor, new_shape_arr))
                 actual_input = reshaped
                 ops.append(tfl.ReshapeOperator([input_tensor], [reshaped], new_shape_arr))
 
@@ -1658,6 +1658,8 @@ class ATenGatherOperator(ATenGatherSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
 
+        # torch.gather requires index tensor of type `torch.int64`
+        self.input_tensors[2] = self.input_tensors[2].to(dtype=torch.int64)
         self.run(node)
 
         input_tensor = self.find_or_create_input(0, graph_converter)
