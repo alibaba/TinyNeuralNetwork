@@ -99,8 +99,8 @@ class TFLiteConverter(object):
                                       self.dump_jit_model_path, self.tflite_path, self.dump_config_path)
 
     def init_lowered_module(self):
-        assert (self.model.training is False or
-                isinstance(self.model, torch.jit.ScriptFunction) or
+        assert (isinstance(self.model, torch.jit.ScriptFunction) or
+                self.model.training is False or
                 str(next(self.model.graph.inputs()).type()) == '__torch__.PlaceholderModule'), 'Model is in training model'
 
         graph = self.model.graph
