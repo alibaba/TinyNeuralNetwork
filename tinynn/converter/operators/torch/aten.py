@@ -1547,3 +1547,108 @@ class ATenPixelUnshuffleOperator(ATenPixelUnshuffleSchema):
 
         for op in ops:
             graph_converter.add_operator(op)
+
+
+class ATenArgmaxOperator(ATenArgmaxSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        dim, keep_dim = self.input_tensors[1:3]
+
+        # Downcast to int32
+        self.output_tensors[0] = self.output_tensors[0].to(dtype=torch.int32)
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
+
+        if dim < 0:
+            dim += input_tensor.tensor.ndim
+
+        dim_tensor = self.create_attr_tensor([dim], dtype='int32')
+
+        ops = []
+        if keep_dim in (False, 0):
+            ops.append(tfl.ArgMaxOperator([input_tensor, dim_tensor], [output_tensor], tfl_schema.TensorType.INT32))
+        else:
+            transform = self.create_transform_tensor(np.squeeze(output_tensor, dim))
+            ops.append(tfl.ArgMaxOperator([input_tensor, dim_tensor], [transform], tfl_schema.TensorType.INT32))
+
+            shape_tensor = self.create_attr_tensor(np.array(output_tensor.shape, dtype='int32'))
+            ops.append(tfl.ReshapeOperator([transform, shape_tensor], [output_tensor], shape_tensor.tensor))
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
+
+class ATenArgminOperator(ATenArgminSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        dim, keep_dim = self.input_tensors[1:3]
+
+        # Downcast to int32
+        self.output_tensors[0] = self.output_tensors[0].to(dtype=torch.int32)
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
+
+        if dim < 0:
+            dim += input_tensor.tensor.ndim
+
+        dim_tensor = self.create_attr_tensor([dim], dtype='int32')
+
+        ops = []
+        if keep_dim in (False, 0):
+            ops.append(tfl.ArgMinOperator([input_tensor, dim_tensor], [output_tensor], tfl_schema.TensorType.INT32))
+        else:
+            transform = self.create_transform_tensor(np.squeeze(output_tensor, dim))
+            ops.append(tfl.ArgMinOperator([input_tensor, dim_tensor], [transform], tfl_schema.TensorType.INT32))
+
+            shape_tensor = self.create_attr_tensor(np.array(output_tensor.shape, dtype='int32'))
+            ops.append(tfl.ReshapeOperator([transform, shape_tensor], [output_tensor], shape_tensor.tensor))
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
+
+class ATenExpandOperator(ATenExpandSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        actual_input = input_tensor
+
+        if input_tensor.buffer is None:
+            outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+            input_shape = input_tensor.shape
+            output_shape = outputs[0].shape
+
+            # No-OP if input tensor is already of desired sizes
+            if output_shape == input_shape:
+                return
+
+            ops = []
+            new_shape = input_shape
+            actual_input = input_tensor
+            if len(output_shape) > len(input_shape):
+                new_shape = [1] * (len(output_shape) - len(input_shape)) + list(input_shape)
+                new_shape_arr = np.array(new_shape, dtype='int32')
+                reshaped = self.create_transform_tensor(np.reshape(input_tensor, new_shape_arr))
+                actual_input = reshaped
+                ops.append(tfl.ReshapeOperator([input_tensor], [reshaped], new_shape_arr))
+
+            repeats = []
+            for x, y in zip(new_shape, output_shape):
+                if x != y:
+                    repeats.append(y)
+                else:
+                    repeats.append(1)
+
+            repeat_tensor = self.create_attr_tensor(np.array(repeats, dtype='int32'))
+            ops.append(tfl.TileOperator([actual_input, repeat_tensor], outputs))
+
+            for op in ops:
+                graph_converter.add_operator(op)
