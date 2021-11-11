@@ -822,20 +822,11 @@ class GraphOptimizer(object):
 
             ops = []
 
-            input_as_2d = self.create_transform_tensor(input_tensor.tensor[0])
-            input_2d_shape = self.create_attr_tensor(np.array(input_as_2d.shape, dtype='int32'))
-            ops.append(tfl.ReshapeOperator([input_tensor, input_2d_shape], [input_as_2d], input_2d_shape.tensor))
-
             weight_t = self.create_transform_tensor(np.transpose(weight_tensor.tensor))
             weight_perm = self.create_attr_tensor(np.array([1, 0], dtype='int32'))
             ops.append(tfl.TransposeOperator([weight_tensor, weight_perm], [weight_t]))
-
-            output_as_2d = self.create_transform_tensor(output_tensor.tensor[0])
-            ops.append(tfl.FullyConnectedOperator([input_as_2d, weight_t, bias_tensor], [
-                       output_as_2d], fusedActivationFunction=add.fusedActivationFunction))
-
-            output_3d_shape = self.create_attr_tensor(np.array(output_tensor.shape, dtype='int32'))
-            ops.append(tfl.ReshapeOperator([output_as_2d, output_3d_shape], [output_tensor], output_3d_shape.tensor))
+            ops.append(tfl.FullyConnectedOperator([input_tensor, weight_t, bias_tensor], [
+                       output_tensor], fusedActivationFunction=add.fusedActivationFunction, keepNumDims=True))
 
             for op in ops:
                 self.graph.add_operator(op, transform=True)
