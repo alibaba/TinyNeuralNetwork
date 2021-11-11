@@ -31,8 +31,11 @@
 
 ## 后续部署方案
 a. NNAPI for CPU/GPU/NPU/XNNPACK (Android 8.1以上，对于量化计算图，需要Android 10及以上)
+
 b. 对于大多数设备，可以手工编译 TFLite (C/C++) 或者使用 `tensorflow.lite.Interpreter` (Python)
+
 c. 对于嵌入式设备，可以使用 TFLite Micro 或者其他硬件相关的推理引擎
+
 d. 也可以使用 MNN 等支持从 TFLite 格式导入的通用推理引擎
 
 ## 常见问题
