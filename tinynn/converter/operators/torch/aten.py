@@ -1652,3 +1652,24 @@ class ATenExpandOperator(ATenExpandSchema):
 
             for op in ops:
                 graph_converter.add_operator(op)
+
+
+class ATenGatherOperator(ATenGatherSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
+        dim, index = self.input_tensors[1:3]
+        if dim < 0:
+            dim += input_tensor.tensor.ndim
+
+        fake_input = torch.arange(input_tensor.tensor.size).reshape(input_tensor.shape)
+        fake_output = torch.gather(fake_input, dim, index)
+
+        indices = torch.nonzero(fake_input >= 0)[fake_output].to(dtype=torch.int32)
+        indices_tensor = self.create_attr_tensor(indices)
+
+        graph_converter.add_operator(tfl.GatherNdOperator([input_tensor, indices_tensor], [output_tensor]))
