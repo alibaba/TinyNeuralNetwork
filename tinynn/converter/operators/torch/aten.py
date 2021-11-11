@@ -1565,7 +1565,7 @@ class ATenArgmaxOperator(ATenArgmaxSchema):
         if dim < 0:
             dim += input_tensor.tensor.ndim
 
-        dim_tensor = self.create_attr_tensor([dim], dtype='int32')
+        dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
 
         ops = []
         if keep_dim in (False, 0):
@@ -1597,7 +1597,7 @@ class ATenArgminOperator(ATenArgminSchema):
         if dim < 0:
             dim += input_tensor.tensor.ndim
 
-        dim_tensor = self.create_attr_tensor([dim], dtype='int32')
+        dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
 
         ops = []
         if keep_dim in (False, 0):
