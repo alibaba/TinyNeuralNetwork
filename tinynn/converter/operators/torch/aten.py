@@ -1724,6 +1724,7 @@ class ATenGatherOperator(ATenGatherSchema):
         super().parse(node, attrs, args, graph_converter)
 
         # torch.gather requires index tensor of type `torch.int64`
+        orig_type = self.input_tensors[2].dtype
         self.input_tensors[2] = self.input_tensors[2].to(dtype=torch.int64)
         self.run(node)
 
@@ -1737,6 +1738,23 @@ class ATenGatherOperator(ATenGatherSchema):
         fake_output = torch.gather(fake_input, dim, index)
 
         indices = torch.nonzero(fake_input >= 0)[fake_output].to(dtype=torch.int32)
-        indices_tensor = self.create_attr_tensor(indices)
+
+        self.input_tensors[2] = self.input_tensors[2].to(dtype=orig_type)
+        index_tensor = self.find_or_create_input(2, graph_converter)
+        if index_tensor.buffer is None:
+            indices_per_dim = torch.split(indices, 1, dim=-1)
+            indices_tensors = [self.create_attr_tensor(t) for t in indices_per_dim]
+
+            index_shape = list(index_tensor.shape) + [1]
+            axis = len(index_shape) - 1
+            shape_tensor = self.create_attr_tensor(np.array(index_shape, dtype='int32'))
+            index_reshaped = self.create_transform_tensor(np.reshape(index_tensor.tensor, index_shape))
+            graph_converter.add_operator(tfl.ReshapeOperator([index_tensor, shape_tensor], [index_reshaped], index_shape))
+
+            indices_tensors[dim] = index_reshaped
+            indices_tensor = self.create_transform_tensor(np.concatenate([x.tensor for x in indices_tensors], axis=-1))
+            graph_converter.add_operator(tfl.ConcatenationOperator(indices_tensors, [indices_tensor], axis=axis))
+        else:
+            indices_tensor = self.create_attr_tensor(indices)
 
         graph_converter.add_operator(tfl.GatherNdOperator([input_tensor, indices_tensor], [output_tensor]))
