@@ -371,11 +371,17 @@ class GraphOptimizer(object):
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
 
         # Try to fuse the edges
-        filtered_pairs = fuse_connected_edges(filtered_pairs)
+        fused_pairs = fuse_connected_edges(filtered_pairs)
 
         # Only TRANSPOSE->RESHAPE->TRANSPOSE is supported here
-        filtered_pairs = [seq for seq in filtered_pairs if len(
-            seq) == 3 and seq[0]['node_type'] == ExtendedOperator.TRANSPOSE]
+        filtered_pairs = []
+        for seq in fused_pairs:
+            seq_len = len(seq)
+            transpose_first = seq[0]['node_type'] == ExtendedOperator.TRANSPOSE
+            if seq_len >= 3 and transpose_first:
+                filtered_pairs.append(seq[:3])
+            elif seq_len >= 4:
+                filtered_pairs.append(seq[1:4])
 
         def _skip_pred(seq):
             mid_node = seq[1]
