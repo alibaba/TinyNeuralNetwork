@@ -592,6 +592,10 @@ class GraphOptimizer(object):
                 new_dim = np.where(inv_perm_arr == old_dim)[0][0]
                 new_dim_tensor = self.create_attr_tensor(np.array([new_dim], dtype='int32'))
                 actions.append((self.graph.replace_operator_input, (node, 0, new_dim_tensor, True)))
+            elif node['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2):
+                old_pad = op.inputs[1].tensor
+                new_pad = self.create_attr_tensor(old_pad[inv_perm_arr])
+                actions.append((self.graph.replace_operator_input, (node, 1, new_pad, True)))
 
             for edge in next_edges:
                 source = tensor_node_dict[edge['name']]
@@ -1052,7 +1056,9 @@ def is_elementwise_binary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
             len(op.inputs) >= 2 and
             op.inputs[0].tensor.ndim == op.inputs[1].tensor.ndim) \
         or (op_code in (ExtendedOperator.SPLIT,
-                        ExtendedOperator.SPLIT_V))
+                        ExtendedOperator.SPLIT_V,
+                        ExtendedOperator.PAD,
+                        ExtendedOperator.PADV2))
 
 
 def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph):
