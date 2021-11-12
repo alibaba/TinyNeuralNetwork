@@ -364,17 +364,29 @@ class ATenSubOperator(ATenSubSchema):
 
         inp = self.input_tensors[0]
         other = self.input_tensors[1]
+        out = self.output_tensors[0]
         alpha = self.input_tensors[-1]
         assert alpha == 1
 
-        if type(other) == torch.Tensor:
-            if inp.dtype != other.dtype:
-                casted = other.to(dtype=inp.dtype)
-                other_t = self.find_or_create_input(1, graph_converter)
-                new_other = self.create_transform_tensor(casted)
+        if out.dtype != inp.dtype:
+            casted = inp.clone().to(dtype=out.dtype)
+            inp_t = self.find_or_create_input(0, graph_converter)
+            if inp_t.buffer is None:
+                new_inp = self.create_transform_tensor(casted)
                 graph_converter.add_operator(tfl.CastOperator(
-                    [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[inp.dtype]))
-                self.input_names[1] = new_other.name
+                    [inp_t], [new_inp], tfl.torch_tflite_dtype_mappings[inp.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+                self.input_names[0] = new_inp.name
+            self.input_tensors[0] = casted
+
+        if type(other) == torch.Tensor:
+            if out.dtype != other.dtype:
+                casted = other.clone().to(dtype=out.dtype)
+                other_t = self.find_or_create_input(1, graph_converter)
+                if other_t.buffer is None:
+                    new_other = self.create_transform_tensor(casted)
+                    graph_converter.add_operator(tfl.CastOperator(
+                        [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+                    self.input_names[1] = new_other.name
                 self.input_tensors[1] = casted
             self.elementwise_binary(tfl.SubOperator, graph_converter)
         elif type(other) in (int, float, bool):
@@ -410,15 +422,27 @@ class ATenMulOperator(ATenMulSchema):
 
         inp = self.input_tensors[0]
         other = self.input_tensors[1]
+        out = self.output_tensors[0]
+
+        if out.dtype != inp.dtype:
+            casted = inp.clone().to(dtype=out.dtype)
+            inp_t = self.find_or_create_input(0, graph_converter)
+            if inp_t.buffer is None:
+                new_inp = self.create_transform_tensor(casted)
+                graph_converter.add_operator(tfl.CastOperator(
+                    [inp_t], [new_inp], tfl.torch_tflite_dtype_mappings[inp.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+                self.input_names[0] = new_inp.name
+            self.input_tensors[0] = casted
 
         if type(other) == torch.Tensor:
-            if inp.dtype != other.dtype:
-                casted = other.to(dtype=inp.dtype)
+            if out.dtype != other.dtype:
+                casted = other.clone().to(dtype=out.dtype)
                 other_t = self.find_or_create_input(1, graph_converter)
-                new_other = self.create_transform_tensor(casted)
-                graph_converter.add_operator(tfl.CastOperator(
-                    [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[inp.dtype]))
-                self.input_names[1] = new_other.name
+                if other_t.buffer is None:
+                    new_other = self.create_transform_tensor(casted)
+                    graph_converter.add_operator(tfl.CastOperator(
+                        [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+                    self.input_names[1] = new_other.name
                 self.input_tensors[1] = casted
             self.elementwise_binary(tfl.MulOperator, graph_converter)
         elif type(other) in (int, float):
@@ -480,15 +504,27 @@ class ATenDivOperator(ATenDivSchema):
 
         inp = self.input_tensors[0]
         other = self.input_tensors[1]
+        out = self.output_tensors[0]
+
+        if out.dtype != inp.dtype:
+            casted = inp.clone().to(dtype=out.dtype)
+            inp_t = self.find_or_create_input(0, graph_converter)
+            if inp_t.buffer is None:
+                new_inp = self.create_transform_tensor(casted)
+                graph_converter.add_operator(tfl.CastOperator(
+                    [inp_t], [new_inp], tfl.torch_tflite_dtype_mappings[inp.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+                self.input_names[0] = new_inp.name
+            self.input_tensors[0] = casted
 
         if type(other) == torch.Tensor:
-            if inp.dtype != other.dtype:
-                casted = other.to(dtype=inp.dtype)
+            if out.dtype != other.dtype:
+                casted = other.clone().to(dtype=out.dtype)
                 other_t = self.find_or_create_input(1, graph_converter)
-                new_other = self.create_transform_tensor(casted)
-                graph_converter.add_operator(tfl.CastOperator(
-                    [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[inp.dtype]))
-                self.input_names[1] = new_other.name
+                if other_t.buffer is None:
+                    new_other = self.create_transform_tensor(casted)
+                    graph_converter.add_operator(tfl.CastOperator(
+                        [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+                    self.input_names[1] = new_other.name
                 self.input_tensors[1] = casted
             self.elementwise_binary(tfl.DivOperator, graph_converter)
         elif type(other) in (int, float):
@@ -932,16 +968,28 @@ class ATenAddOperator(ATenAddSchema):
         inp = self.input_tensors[0]
         other = self.input_tensors[1]
         alpha = self.input_tensors[-1]
+        out = self.output_tensors[0]
         assert alpha == 1
 
-        if type(other) == torch.Tensor:
-            if inp.dtype != other.dtype:
-                casted = other.to(dtype=inp.dtype)
-                other_t = self.find_or_create_input(1, graph_converter)
-                new_other = self.create_transform_tensor(casted)
+        if out.dtype != inp.dtype:
+            casted = inp.clone().to(dtype=out.dtype)
+            inp_t = self.find_or_create_input(0, graph_converter)
+            if inp_t.buffer is None:
+                new_inp = self.create_transform_tensor(casted)
                 graph_converter.add_operator(tfl.CastOperator(
-                    [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[inp.dtype]))
-                self.input_names[1] = new_other.name
+                    [inp_t], [new_inp], tfl.torch_tflite_dtype_mappings[inp.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+                self.input_names[0] = new_inp.name
+            self.input_tensors[0] = casted
+
+        if type(other) == torch.Tensor:
+            if out.dtype != other.dtype:
+                casted = other.clone().to(dtype=out.dtype)
+                other_t = self.find_or_create_input(1, graph_converter)
+                if other_t.buffer is None:
+                    new_other = self.create_transform_tensor(casted)
+                    graph_converter.add_operator(tfl.CastOperator(
+                        [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+                    self.input_names[1] = new_other.name
                 self.input_tensors[1] = casted
             self.elementwise_binary(tfl.AddOperator, graph_converter)
         elif type(other) in (int, float, bool):
