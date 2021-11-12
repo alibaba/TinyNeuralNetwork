@@ -264,7 +264,7 @@ class GraphOptimizer(object):
                             warnings.warn('Non constant node removed, something must be wrong there')
                             log.warning('-' * 30)
                             log.warning('Info of the deleted node:')
-                            log.warning('vertex:', vertex)
+                            log.warning(f'vertex: {vertex}')
                             # edge = self.graph.graph.es.select(name=vertex['outputs'][0])
                             # assert edge is None, f'The edge {vertex["outputs"][0]} exists but the connection to the vertex {vertex["name"]} is broken, \
                             #     probably there have some conflicts in the names of the nodes'
