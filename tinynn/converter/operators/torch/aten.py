@@ -1248,19 +1248,36 @@ class ATenIndexOperator(ATenIndexSchema):
 
         self.run(node)
         indices = self.input_tensors[1]
-        assert len(indices) == 1
-        assert indices[0].dtype in (torch.int64, torch.int32)
 
-        names = [graph_converter.get_list_expanded_names(self.input_names[1])]
-        tensors = [self.input_tensors[0][0]]
+        filtered_dims = [i for i, idx in enumerate(indices) if idx is not None]
+        assert all((indices[i].dtype in (torch.int64, torch.int32) for i in filtered_dims))
+        assert len(filtered_dims) == 1, "Multiple indices for aten::index is not supported"
 
-        inputs = [self.find_or_create_input(0, graph_converter)] + \
-            self.to_tfl_tensors(names, tensors,
-                                graph_converter=graph_converter,
-                                non_existent_as_buffer=True)
+        try:
+            names = [graph_converter.get_list_expanded_names(self.input_names[1])]
+        except KeyError:
+            names = [self.get_unique_attr_name() for _ in indices]
+
+        filtered_names = [names[i] for i in filtered_dims]
+        filtered_tensors = [indices[i].to(dtype=torch.int32) for i in filtered_dims]
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        indice_tensors = self.to_tfl_tensors(filtered_names, filtered_tensors,
+                                             graph_converter=graph_converter,
+                                             non_existent_as_buffer=True)
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
-        graph_converter.add_operator(tfl.GatherOperator(inputs, outputs, axis=0))
+        actual_input = input_tensor
+        actual_output = None
+        for i, (dim, idx) in enumerate(zip(filtered_dims, indice_tensors)):
+            if i == len(filtered_dims) - 1:
+                actual_output = outputs[0]
+            else:
+                actual_output = self.create_transform_tensor(np.take(actual_input.tensor, idx.tensor, axis=dim))
+
+            graph_converter.add_operator(tfl.GatherOperator([actual_input, idx], [actual_output], axis=dim))
+
+            actual_input = actual_output
 
 
 class ATenLogSoftmaxOperator(ATenLogSoftmaxSchema):
