@@ -389,6 +389,8 @@ def get_prop_from_node(node, prop, assert_type=None, return_type=False):
                 v = v.to(dtype=torch.float32)
         elif node.output().type().isSubtypeOf(torch._C.ListType.ofInts()) or node.output().type().isSubtypeOf(torch._C.ListType.ofFloats()):
             v = node.output().toIValue()
+        elif vk == 'ival':
+            v = node.output().toIValue()
         else:
             log.warning(f'Skip unsupported constant generation for {output_name}, type: {vk}')
             raise StopIteration
