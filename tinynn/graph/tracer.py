@@ -55,6 +55,9 @@ class GlobalData(object):
             return self.get_value()
         elif len(args) == 1:
             return self.set_value(*args)
+        else:
+            raise ValueError(f'length of input data must in [0,1],\
+                but got length: {len(args)} --> args: {args}')
 
     def __bool__(self):
         """ Returns the actual boolean value of the inner object """
