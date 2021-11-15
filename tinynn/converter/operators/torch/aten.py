@@ -1790,3 +1790,26 @@ class ATenGatherOperator(ATenGatherSchema):
             indices_tensor = self.create_attr_tensor(indices)
 
         graph_converter.add_operator(tfl.GatherNdOperator([input_tensor, indices_tensor], [output_tensor]))
+
+
+class ATenGeluOperator(ATenGeluSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        ops = []
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        constant_tensor = self.create_attr_tensor(np.array([1.702], dtype='float32'))
+        sigmoid_in = self.create_transform_tensor(input_tensor.tensor * constant_tensor.tensor)
+        ops.append(tfl.MulOperator([input_tensor, constant_tensor], [sigmoid_in]))
+
+        sigmoid_out = self.create_transform_tensor(torch.sigmoid(torch.from_numpy(input_tensor.tensor)).numpy())
+        ops.append(tfl.LogisticOperator([sigmoid_in], [sigmoid_out]))
+
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        ops.append(tfl.MulOperator([sigmoid_out, input_tensor], outputs))
+
+        for op in ops:
+            graph_converter.add_operator(op)

@@ -110,6 +110,8 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::argmin": ATenArgminOperator,
                                                                 "aten::expand": ATenExpandOperator,
                                                                 "aten::gather": ATenGatherOperator,
+                                                                "aten::gelu": ATenGeluOperator,
+                                                                "aten::gelu_": ATenGeluOperator,
 
                                                                 # quantized
                                                                 "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,
