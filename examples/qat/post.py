@@ -54,7 +54,7 @@ def main_worker(args):
     context.max_iteration = 100
 
     # Post quantization calibration
-    calibrate(model, context)
+    calibrate(qat_model, context)
 
     with torch.no_grad():
         qat_model.eval()
