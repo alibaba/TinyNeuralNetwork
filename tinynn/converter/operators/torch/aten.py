@@ -1587,9 +1587,26 @@ class ATenPixelShuffleOperator(ATenPixelShuffleSchema):
 
         input_tensor = self.find_or_create_input(0, graph_converter)
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+
+        # The implementation of tf.depth_to_space and torch.pixel_shuffle is not the same.
+        # The former one splits the output channel with (block_size, block_size, new_channel_size),
+        # while the latter one with (new_channel_size, block_size, block_size).
+        # Since TFLite has no support for transposes for >5D tensors, we need to use `tf.gather`
+        # to reorder the elements in the channel dimension.
+
         ops.append(tfl.DepthToSpaceOperator([input_tensor], outputs, upscale_factor))
 
         ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
+
+        c = input_tensor.shape[1]
+        bs = upscale_factor
+        perm = np.arange(c).reshape(c // (bs ** 2), bs, bs).transpose(1, 2, 0).flatten()
+        if not np.all(np.sort(perm) == perm):
+            reordered = self.create_transform_tensor(ops[0].outputs[0].tensor[:, :, :, perm])
+            indices = self.create_attr_tensor(perm.astype('int32'))
+            prev_op = tfl.GatherOperator([ops[0].outputs[0], indices], [reordered], axis=3)
+            ops[1].inputs[0] = reordered
+            ops.insert(1, prev_op)
 
         for op in ops:
             graph_converter.add_operator(op)
@@ -1606,9 +1623,27 @@ class ATenPixelUnshuffleOperator(ATenPixelUnshuffleSchema):
 
         input_tensor = self.find_or_create_input(0, graph_converter)
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+
+        # The implementation of tf.space_to_depth and torch.pixel_unshuffle is not the same.
+        # The former one splits the output channel with (block_size, block_size, new_channel_size),
+        # while the latter one with (new_channel_size, block_size, block_size).
+        # Since TFLite has no support for transposes for >5D tensors, we need to use `tf.gather`
+        # to reorder the elements in the channel dimension.
         ops.append(tfl.SpaceToDepthOperator([input_tensor], outputs, downscale_factor))
 
         ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
+
+        c = input_tensor.shape[1]
+        bs = downscale_factor
+        perm = np.arange(c * (bs ** 2)).reshape(bs, bs, c).transpose(2, 0, 1).flatten()
+        if not np.all(np.sort(perm) == perm):
+            print(perm)
+            print(input_tensor.shape)
+            reordered = self.create_transform_tensor(ops[1].outputs[0].tensor[:, :, :, perm])
+            indices = self.create_attr_tensor(perm.astype('int32'))
+            prev_op = tfl.GatherOperator([ops[1].outputs[0], indices], [reordered], axis=3)
+            ops[2].inputs[0] = reordered
+            ops.insert(2, prev_op)
 
         for op in ops:
             graph_converter.add_operator(op)
