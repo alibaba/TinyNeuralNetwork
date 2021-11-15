@@ -610,6 +610,11 @@ class ConvTransChannelModifier(ConvChannelModifier):
 
 
 class LinearChannelModifier(ChannelModifier):
+    def in_channel(self):
+        return self.node.module.in_features
+
+    def ot_channel(self):
+        return self.node.module.out_features
 
     def modify_input(self, remove_idx):
         linear = self.node.module

@@ -918,6 +918,28 @@ class ModifierTester(unittest.TestCase):
         for i in range(10):
             test_func()
 
+    def test_multi_dim_fc(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super(TestModel, self).__init__()
+                self.fc0 = nn.Linear(8, 32)
+                self.fc1 = nn.Linear(32, 32)
+
+            def forward(self, x):
+                fc0 = self.fc0(x)
+                fc1 = self.fc1(fc0)
+                return fc1
+
+        model = TestModel()
+
+        pruner = OneShotChannelPruner(model, torch.rand((16, 16, 8)), {"sparsity": 0.5, "metrics": "l2_norm"})
+        pruner.prune()
+        model(torch.rand((16, 8)))
+
+        assert model.fc0.out_features == 16
+        assert model.fc1.in_features == 16
+        assert model.fc1.out_features == 32
+
 
 if __name__ == '__main__':
     unittest.main()
