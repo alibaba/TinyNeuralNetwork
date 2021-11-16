@@ -22,7 +22,8 @@ class TFLiteConverter(object):
                  input_transpose: typing.Optional[typing.Union[bool, typing.Iterable[bool]]] = None,
                  dump_jit_model_path: typing.Optional[str] = None,
                  dump_dummy_input_path: typing.Optional[str] = None,
-                 dump_config_path: typing.Optional[str] = None) -> None:
+                 dump_config_path: typing.Optional[str] = None,
+                 asymmetric: bool = True) -> None:
         """ The TFLiteConverter class
 
         Args:
@@ -31,10 +32,10 @@ class TFLiteConverter(object):
             tflite_path (str): Path to use for exporting
             input_transpose (typing.Optional[typing.Union[bool, typing.Iterable[bool]]], optional): Whether to transpose the input(s). \
                  Defaults to None(True for 4d-input, False otherwise).
-            dump_jit_model_path (typing.Optional[str]): The path for dumping the jit model
-            dump_dummy_input_path (typing.Optional[str]): The path for dumping the dummy input
-            dump_config_path (typing.Optional[str]): The path for dumping the json config
-            verbose: Show all log
+            dump_jit_model_path (typing.Optional[str]): The path for dumping the jit model. Defaults to None
+            dump_dummy_input_path (typing.Optional[str]): The path for dumping the dummy input. Defaults to None
+            dump_config_path (typing.Optional[str]): The path for dumping the json config. Defaults to None
+            asymmetric (bool): Asymmetric quantization. Defaults to True
         """
 
         self.model = model
@@ -50,6 +51,7 @@ class TFLiteConverter(object):
 
         self.tflite_path = tflite_path
         self.input_transpose = input_transpose
+        self.asymmetric = asymmetric
 
         self.dump_jit_model_path = dump_jit_model_path
         self.dump_dummy_input_path = dump_dummy_input_path
@@ -156,7 +158,7 @@ class TFLiteConverter(object):
         self.common_graph.input_transpose.extend(self.input_transpose)
         tensors = []
         for i, node in enumerate(graph_inputs):
-            tensors.append(Tensor(self.dummy_input[i], node, has_buffer=False))
+            tensors.append(Tensor(self.dummy_input[i], node, has_buffer=False, asymmetric=self.asymmetric))
         self.common_graph.add_nodes(tensors, ExtendedOperator.INPUT_NODE)
 
     def init_inputs(self):
@@ -194,7 +196,7 @@ class TFLiteConverter(object):
             output_tensors = []
 
             converter_type = OPERATOR_CONVERTER_DICT.get(k, NoTrackOperator)
-            converter = converter_type(node, self.tensor_map)
+            converter = converter_type(node, self.tensor_map, self.asymmetric)
             # Don't track the operator if all the input nodes are not tracked unless it is in the prim namespace
             if not k.startswith('prim::') and converter_type != NoTrackOperator:
                 no_track_flag = True
@@ -210,7 +212,7 @@ class TFLiteConverter(object):
                         break
                 if no_track_flag:
                     converter_type = NoTrackOperator
-                    converter = converter_type(node, self.tensor_map)
+                    converter = converter_type(node, self.tensor_map, self.asymmetric)
             if k != 'prim::Constant':
                 log.debug(f'{k} {converter.input_names} -> {converter.output_names} {converter_type.__name__}')
             # Don't fetch attrs and schemas for non-tracking nodes

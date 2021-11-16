@@ -17,7 +17,7 @@ log = get_logger(__name__, 'INFO')
 
 
 class OperatorConverter(ABC):
-    def __init__(self, node, tensor_map) -> None:
+    def __init__(self, node, tensor_map, asymmetric=True) -> None:
         self.input_names = self.get_input_names(node)
         self.output_names = self.get_output_names(node)
         self.input_tensors = self.get_input_tensors(tensor_map)
@@ -25,6 +25,7 @@ class OperatorConverter(ABC):
         self.ops = []
         self.attr_count = 0
         self.transform_count = 0
+        self.asymmetric = asymmetric
 
     @abstractmethod
     def parse(self, node, attrs, args, graph_converter):
@@ -150,9 +151,9 @@ class OperatorConverter(ABC):
                 if graph_converter is not None and n in graph_converter.tensor_map:
                     t = graph_converter.tensor_map[n]
                 else:
-                    t = tfl.Tensor(t, n, has_buffer=non_existent_as_buffer)
+                    t = tfl.Tensor(t, n, has_buffer=non_existent_as_buffer, asymmetric=self.asymmetric)
             else:
-                t = tfl.Tensor(t, n, has_buffer=b)
+                t = tfl.Tensor(t, n, has_buffer=b, asymmetric=self.asymmetric)
             tfl_tensors.append(t)
         return tfl_tensors
 
@@ -165,7 +166,7 @@ class OperatorConverter(ABC):
         #     ' when you encounter this message, it means some ops in the computation graph is not supported'''
 
         tensor = self.input_tensors[idx]
-        return tfl.Tensor(tensor, name, has_buffer=True)
+        return tfl.Tensor(tensor, name, has_buffer=True, asymmetric=self.asymmetric)
 
     def get_unique_attr_name(self):
         if self.attr_count == 0:
@@ -186,12 +187,12 @@ class OperatorConverter(ABC):
     def create_transform_tensor(self, tensor, name=None, quantization=None):
         if name is None:
             name = self.get_unique_transform_name()
-        return tfl.Tensor(tensor, name, has_buffer=False, quantization=quantization)
+        return tfl.Tensor(tensor, name, has_buffer=False, quantization=quantization, asymmetric=self.asymmetric)
 
     def create_attr_tensor(self, tensor, name=None):
         if name is None:
             name = self.get_unique_attr_name()
-        return tfl.Tensor(tensor, name, has_buffer=True)
+        return tfl.Tensor(tensor, name, has_buffer=True, asymmetric=self.asymmetric)
 
     def unpack_params(self, params):
         result = {}
@@ -367,6 +368,25 @@ class OperatorConverter(ABC):
 
             pad_op = tfl.Padv2Operator([pad_input, pad_tensor, constant_tensor], [pad_out])
             ops.insert(fill_nan_index, pad_op)
+
+    def quantize_scalar_tensor(self, tensor: torch.Tensor):
+        assert tensor.numel() == 1
+        assert torch.dtype == torch.float32
+        if not tensor.is_nonzero():
+            if self.asymmetric:
+                return torch.quantize_per_tensor(tensor, 0.5, 128, torch.quint8)
+            else:
+                return torch.quantize_per_tensor(tensor, 0.5, 0, torch.qint8)
+        elif (torch.sign(tensor) < 0).all():
+            if self.asymmetric:
+                return torch.quantize_per_tensor(tensor, -tensor[0] / 127, 255, torch.quint8)
+            else:
+                return torch.quantize_per_tensor(tensor, -tensor[0] / 127, 0, torch.qint8)
+        else:
+            if self.asymmetric:
+                return torch.quantize_per_tensor(tensor, tensor[0] / 127, 0, torch.quint8)
+            else:
+                return torch.quantize_per_tensor(tensor, tensor[0] / 127, 0, torch.qint8)
 
 
 def get_prop_from_node(node, prop, assert_type=None, return_type=False):

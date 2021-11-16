@@ -140,7 +140,8 @@ class Tensor(object):
     tfl_tensor: int
 
     def __init__(self, tensor: typing.Iterable, name: str, quantization: QuantizationParameters = None,
-                 has_buffer: bool = True, dtype: str = None, is_variable: bool = False):
+                 has_buffer: bool = True, dtype: str = None, is_variable: bool = False,
+                 asymmetric: bool = True):
         self.quantization = None
         self.name = name
         self.index = 0
@@ -156,12 +157,20 @@ class Tensor(object):
             assert tensor.is_contiguous, "Tensor should be contiguous"
             if tensor.dtype == torch.quint8:
                 self.tensor = torch.int_repr(tensor.detach()).numpy()
-                self.quantization = QuantizationParameters(tensor.q_scale(), tensor.q_zero_point())
+                if asymmetric:
+                    self.quantization = QuantizationParameters(tensor.q_scale(), tensor.q_zero_point())
+                else:
+                    assert tensor.q_zero_point() == 128
+                    self.tensor = (self.tensor.astype(np.int32) - 128).astype(np.int8)
+                    self.quantization = QuantizationParameters(tensor.q_scale(), 0)
             elif tensor.dtype == torch.qint8:
-                assert tensor.q_zero_point() == 0
-                self.tensor = torch.int_repr(tensor.detach()).numpy().view(np.uint8)
-                self.tensor += 128
-                self.quantization = QuantizationParameters(tensor.q_scale(), 128)
+                self.tensor = torch.int_repr(tensor.detach()).numpy()
+                if asymmetric:
+                    assert tensor.q_zero_point() == 0
+                    self.tensor = self.tensor.view(np.uint8) + 128
+                    self.quantization = QuantizationParameters(tensor.q_scale(), 128)
+                else:
+                    self.quantization = QuantizationParameters(tensor.q_scale(), tensor.q_zero_point())
             else:
                 self.tensor = tensor.detach().numpy()
         elif type(tensor) == torch.Size:

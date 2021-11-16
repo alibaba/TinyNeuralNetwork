@@ -41,13 +41,7 @@ class QuantizedMulOperator(QuantizedMulSchema):
             assert type(other) in (int, float)
             other_tensor = torch.tensor([other], dtype=torch.float)
             self.input_names[1] = self.get_unique_attr_name()
-            if not other_tensor.is_nonzero():
-                self.input_tensors[1] = torch.quantize_per_tensor(other_tensor, 0.5, 128, torch.quint8)
-            elif (torch.sign(other_tensor) < 0).all():
-                self.input_tensors[1] = torch.quantize_per_tensor(
-                    other_tensor, -other_tensor[0] / 127, 255, torch.quint8)
-            else:
-                self.input_tensors[1] = torch.quantize_per_tensor(other_tensor, other_tensor[0] / 127, 0, torch.quint8)
+            self.input_tensors[1] = self.quantize_scalar_tensor(other_tensor)
             self.elementwise_binary(tfl.MulOperator, graph_converter)
 
 
@@ -86,7 +80,10 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
         # Bias handling
         bias_scale = input_tensor.quantization.scale * weight_tensor.quantization.scale
         if transpose:
-            bias = self.quantize(bias, bias_scale, 0, dtype=torch.uint8)
+            if self.asymmetric:
+                bias = self.quantize(bias, bias_scale, 0, dtype=torch.uint8)
+            else:
+                bias = self.quantize(bias, bias_scale, 0, dtype=torch.int8)
         else:
             bias = self.quantize(bias, bias_scale, 0, dtype=torch.int32)
 
@@ -235,11 +232,7 @@ class QuantizedAddOperator(QuantizedAddSchema):
         else:
             other_tensor = torch.tensor([other], dtype=torch.float)
             self.input_names[1] = self.get_unique_attr_name()
-            if (torch.sign(other_tensor) < 0).all():
-                self.input_tensors[1] = torch.quantize_per_tensor(
-                    other_tensor, -other_tensor[0] / 127, 255, torch.quint8)
-            else:
-                self.input_tensors[1] = torch.quantize_per_tensor(other_tensor, other_tensor[0] / 127, 0, torch.quint8)
+            self.input_tensors[1] = self.quantize_scalar_tensor(other_tensor)
             self.elementwise_binary(tfl.AddOperator, graph_converter)
 
     def parse(self, node, attrs, args, graph_converter):
