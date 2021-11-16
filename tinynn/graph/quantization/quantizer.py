@@ -53,6 +53,7 @@ class QATQuantizer(object):
     is_input_quantized: typing.Optional[typing.Tuple[bool]]
     backend: str
     remove_weights_after_load: bool
+    asymmetric: bool
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new QATQuantizer object
@@ -80,7 +81,8 @@ class QATQuantizer(object):
     def parse_config(self, config: dict):
         default_values = {'rewrite_graph': True, 'force_overwrite': True,
                           'is_input_quantized': None, 'backend': 'qnnpack',
-                          'remove_weights_after_load': False}
+                          'remove_weights_after_load': False, 
+                          'asymmetric': True}
 
         if config is None:
             config = dict()
@@ -279,6 +281,11 @@ class QATQuantizer(object):
 
         log.info('setting qat backend and call prepare_qat')
         qconfig = torch_q.get_default_qat_qconfig(backend)
+        if not self.asymmetric:
+            sym_fq = torch_q.FakeQuantize.with_args(observer=torch_q.MovingAverageMinMaxObserver, quant_min=0, quant_max=255,
+                                                   dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
+            qconfig = torch_q.QConfig(sym_fq, qconfig.weight)
+
         torch.backends.quantized.engine = backend
         graph.module.qconfig = qconfig
 
