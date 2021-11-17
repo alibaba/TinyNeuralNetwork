@@ -385,6 +385,8 @@ class TraceFunction(object):
                 else:
                     # Constant generation
                     log.warning('Constant generation is experimental and may yield error')
+                    if isinstance(a, torch.nn.Parameter):
+                        convert_to_parameter = True
                     if a.numel() > 50 and a.is_floating_point():
                         convert_to_parameter = True
                     raw_data = a.tolist()
@@ -415,13 +417,8 @@ class TraceFunction(object):
                 elif type(a) in (torch.Tensor, torch.nn.Parameter) or \
                         (type(a) in (torch.dtype, torch.device, torch.Size) and
                          id(a) in current_graph().tensor_pre_node_dict):
-                    aa = a
-                    convert_to_parameter = False
-                    if type(a) == torch.nn.Parameter:
-                        aa = a.data
-                        convert_to_parameter = True
-                    self.prev_tensors.append(aa)
-                    new_arg.append(_tensor_name(aa, convert_to_parameter))
+                    self.prev_tensors.append(a)
+                    new_arg.append(_tensor_name(a))
                 elif type(a) in (str, torch.device):
                     new_arg.append(f"\'{a}\'")
                 elif type(a) in (int, float, bool, torch.dtype):
@@ -958,7 +955,11 @@ def add_input_node(node: TraceNode, output_tensors):
 def add_constant_node(node: TraceNode, output_tensor):
     """ Adds a constant node to the current computation graph """
     assert node is not None
-    node.next_tensors = [output_tensor]
+    actual_tensor = output_tensor
+    if isinstance(output_tensor, torch.nn.Parameter):
+        actual_tensor = output_tensor.data
+
+    node.next_tensors = [actual_tensor]
 
     current_graph().tensor_pre_node_dict[id(output_tensor)] = node.unique_name
 
@@ -1003,9 +1004,9 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
     node.next_tensors.extend(output_tensors)
 
     for i, t in enumerate(input_tensors):
-        assert type(t) in (torch.dtype, torch.device, torch.Size, torch.Tensor), \
+        assert type(t) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), \
             f'Input #{i} of {node.unique_name}({node.type()}) should be one of the following type \
-            [torch.dtype, torch.device, torch.Size, torch.Tensor], but got {type(t)}'
+            [torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter], but got {type(t)}'
         if id(t) not in current_graph().tensor_pre_node_dict:
             if not t.is_leaf:
                 log.error(f'Connection is lost when generating code for {node.unique_name} of type {node.full_name()}')
@@ -1013,6 +1014,8 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
                 # constant tensor generation
                 log.warning('Constant generation is experimental and may yield error')
                 convert_to_parameter = False
+                if isinstance(t, torch.nn.Parameter):
+                    convert_to_parameter = True
                 if t.numel() > 50 and t.is_floating_point():
                     convert_to_parameter = True
                 raw_data = t.tolist()
@@ -1027,6 +1030,8 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
             node.prev_indices.append(pre_node_index)
         else:
             node.prev_indices.append(None)
+        if isinstance(t, torch.nn.Parameter):
+            node.prev_tensors[i] = node.prev_tensors[i].data
 
     for i, t in enumerate(output_tensors):
         if type(t) in (list, tuple):

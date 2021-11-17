@@ -4,6 +4,7 @@ out/
 .idea/
 .vscode/
 debugging/
+tests/models/
 
 
 # Byte-compiled / optimized / DLL files
