@@ -1091,8 +1091,7 @@ def is_bmm_add_edge(edge: ig.Edge, graph_converter: ig.Graph):
     target_vertex = graph_converter.vs[edge.target]
     return source_vertex['node_type'] == ExtendedOperator.BATCH_MATMUL \
         and target_vertex['node_type'] == ExtendedOperator.ADD \
-        and source_vertex['op'].inputs[0].tensor.ndim == 3 \
-        and source_vertex['op'].inputs[0].shape[0] == 1 \
+        and source_vertex['op'].inputs[0].tensor.ndim >= 3 \
         and source_vertex['op'].inputs[1].tensor.ndim == 2 \
         and target_vertex['op'].inputs[1].tensor.ndim == 1 \
         and target_vertex['op'].inputs[1].shape[0] == source_vertex['op'].inputs[1].shape[-1] \
