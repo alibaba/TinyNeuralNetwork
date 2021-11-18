@@ -821,6 +821,26 @@ class ATenCosOperator(ATenCosSchema):
         self.elementwise_unary(tfl.CosOperator, graph_converter)
 
 
+class ATenConv2dOperator(ATenConv2dSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        input, weight, bias, stride, padding, dilation, groups = self.input_tensors[:7]
+        if bias is None:
+            end_index = 2
+        else:
+            end_index = 3
+
+        output_padding = [0] * 2
+
+        inputs = [self.find_or_create_input(i, graph_converter) for i in range(end_index)]
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+
+        graph_converter.add_operator(tfl.GenericConvOperator(
+            inputs, outputs, stride, padding, dilation, output_padding, groups))
+
 class ATenConvolutionOperator(ATenConvolutionSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)

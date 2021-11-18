@@ -14,6 +14,8 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "prim::GetAttr": PrimGetAttrConverter,
                                                                 "prim::ConstantChunk": PrimConstantChunkConverter,
                                                                 "prim::NumToTensor": PrimNumToTensorConverter,
+                                                                "prim::If": PrimIfConverter,
+                                                                "aten::__getitem__": PrimGetItemConverter,
 
                                                                 # aten
                                                                 "aten::t": ATenTOperator,
@@ -28,6 +30,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::leaky_relu_": ATenLeakyReluOperator,
                                                                 "aten::elu": ATenEluOperator,
                                                                 "aten::elu_": ATenEluOperator,
+                                                                "aten::conv2d": ATenConv2dOperator,
                                                                 "aten::_convolution": ATenConvolutionOperator,
                                                                 "aten::batch_norm": ATenBatchNormOperator,
                                                                 "aten::avg_pool2d": ATenAvgPool2dOperator,

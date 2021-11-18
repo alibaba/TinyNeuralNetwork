@@ -81,6 +81,32 @@ class PrimNumToTensorConverter(PrimOperatorConverter):
         self.output_tensors.append(t)
 
 
+class PrimIfConverter(PrimOperatorConverter):
+    def parse(self, node, attrs, args, graph_converter):
+        assert len(self.input_tensors) == 1
+        assert isinstance(self.input_tensors[0], (bool, int))
+        assert len(self.output_names) == 0
+
+        cond_var_name = self.input_names[0]
+        assert cond_var_name not in graph_converter.tensor_map, 'Dynamic control flow is not supported'
+
+        blocks = list(node.blocks())
+        assert len(blocks) == 2
+
+        if self.input_tensors[0] in (True, 1):
+            self.output_nodes.extend(blocks[0].nodes())
+        else:
+            self.output_nodes.extend(blocks[1].nodes())
+
+
+class PrimGetItemConverter(PrimOperatorConverter):
+    def parse(self, node, attrs, args, graph_converter):
+        input_tensor = self.input_tensors[0]
+        idx = self.input_tensors[1]
+
+        self.output_tensors.append(input_tensor[idx])
+
+
 class PrimConstantChunkConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         chunks, chunks_type = attrs.get('chunks', (None, None))

@@ -1,3 +1,4 @@
+import collections
 import io
 import typing
 import torch
@@ -190,8 +191,10 @@ class TFLiteConverter(object):
 
     def init_operations(self):
         log.debug('Initialize operators...')
-        all_nodes = list(self.graph.nodes())
-        for node in all_nodes:
+        node_queue = collections.deque(self.graph.nodes())
+        while node_queue:
+            node = node_queue.popleft()
+
             k = node.kind()
             output_tensors = []
 
@@ -227,8 +230,11 @@ class TFLiteConverter(object):
                 args = None
             converter.parse(node, attrs, args, self.common_graph)
             outputs = converter.output_names
+            new_nodes = converter.output_nodes
             if output_tensors is not None:
                 output_tensors.extend(converter.get_output_tensors())
+            if len(new_nodes) > 0:
+                node_queue.extendleft(reversed(new_nodes))
 
             assert len(output_tensors) == len(outputs)
             for t, name in zip(output_tensors, outputs):

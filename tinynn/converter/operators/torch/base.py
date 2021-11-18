@@ -22,6 +22,7 @@ class OperatorConverter(ABC):
         self.output_names = self.get_output_names(node)
         self.input_tensors = self.get_input_tensors(tensor_map)
         self.output_tensors = []
+        self.output_nodes = []
         self.ops = []
         self.attr_count = 0
         self.transform_count = 0

@@ -151,6 +151,9 @@ class Tensor(object):
             self.quantization = QuantizationParameters(tensor.scale, tensor.zero_point)
             tensor = tensor.tensor
 
+        if isinstance(tensor, torch.nn.Parameter):
+            tensor = tensor.data
+
         if type(tensor).__module__ == 'numpy':
             self.tensor = tensor
         elif type(tensor) == torch.Tensor:
