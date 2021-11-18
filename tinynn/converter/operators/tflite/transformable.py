@@ -75,7 +75,7 @@ class BatchNormOperator(TransformableOperator):
 
     output_index = 0
 
-    def __init__(self, inputs: typing.List['Tensor'], outputs: typing.List['Tensor'], eps: float, quantization: typing.Union[QuantizationParameters] = None,
+    def __init__(self, inputs: typing.List['Tensor'], outputs: typing.List['Tensor'], eps: float, quantization: typing.Optional[QuantizationParameters] = None,
                  fusedActivationFunction=tflite.ActivationFunctionType.NONE):
         super().__init__(ExtendedOperator.BATCH_NORM, inputs, outputs, 1)
         self.eps = eps
