@@ -82,7 +82,7 @@ class OperatorConverter(ABC):
         return dict(zip(names, range(len(self.input_tensors))))
 
     def unimplemented(self, node, attrs, args):
-        log.debug('node: {node}')
+        log.debug(f'node: {node}')
         log.debug('inputs:')
         for name, tensors in zip(self.input_names, self.input_tensors):
             if type(tensors) not in (list, tuple):
