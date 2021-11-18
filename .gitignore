@@ -2,6 +2,7 @@
 tmp/
 out/
 .idea/
+.mypy_cache/
 .vscode/
 debugging/
 tests/models/

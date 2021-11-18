@@ -78,7 +78,7 @@ class QATQuantizer(object):
 
         self.parse_config(config)
 
-    def parse_config(self, config: dict):
+    def parse_config(self, config: typing.Optional[dict]):
         default_values = {'rewrite_graph': True, 'force_overwrite': True,
                           'is_input_quantized': None, 'backend': 'qnnpack',
                           'remove_weights_after_load': False, 
