@@ -2,7 +2,7 @@ import torch
 
 import numpy as np
 
-from . import OperatorConverter, get_prop_from_node
+from . import PrimOperatorConverter
 from .. import tflite as tfl
 
 from tinynn.util.util import get_logger
@@ -10,7 +10,7 @@ from tinynn.util.util import get_logger
 log = get_logger(__name__, 'INFO')
 
 
-class PrimConstantConverter(OperatorConverter):
+class PrimConstantConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         if attrs is not None:
             v, vk = attrs.get('value', (None, None))
@@ -21,18 +21,18 @@ class PrimConstantConverter(OperatorConverter):
             self.output_tensors = None
 
 
-class PrimTupleConstructConverter(OperatorConverter):
+class PrimTupleConstructConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         self.output_tensors.append(tuple(self.input_tensors))
 
 
-class PrimListConstructConverter(OperatorConverter):
+class PrimListConstructConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         self.output_tensors.append(list(self.input_tensors))
         graph_converter.add_iterable_pair(self.input_names, self.output_names, 'output')
 
 
-class PrimListUnpackConverter(OperatorConverter):
+class PrimListUnpackConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         assert(type(self.input_tensors[0]) in (list, tuple))
         assert(len(self.input_tensors[0]) == len(self.output_names))
@@ -55,7 +55,7 @@ class PrimListUnpackConverter(OperatorConverter):
             pass
 
 
-class PrimGetAttrConverter(OperatorConverter):
+class PrimGetAttrConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         name, name_type = attrs.get('name', (None, None))
         if name is not None and name_type == 's':
@@ -65,7 +65,7 @@ class PrimGetAttrConverter(OperatorConverter):
             assert False, f"prim::GetAttr({self.output_names[0]}) needs attribute `name` with type str"
 
 
-class PrimNumToTensorConverter(OperatorConverter):
+class PrimNumToTensorConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         assert(type(self.input_tensors[0]) in (int, float))
         assert(len(self.input_tensors) == len(self.output_names))
@@ -81,7 +81,7 @@ class PrimNumToTensorConverter(OperatorConverter):
         self.output_tensors.append(t)
 
 
-class PrimConstantChunkConverter(OperatorConverter):
+class PrimConstantChunkConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         chunks, chunks_type = attrs.get('chunks', (None, None))
         dim, dim_type = attrs.get('dim', (None, None))

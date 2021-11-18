@@ -460,3 +460,9 @@ class NoTrackOperator(OperatorConverter):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+
+
+class PrimOperatorConverter(OperatorConverter):
+    # prim::* ops needs custom implementation
+    def run(self, node):
+        pass

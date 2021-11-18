@@ -197,8 +197,8 @@ class TFLiteConverter(object):
 
             converter_type = OPERATOR_CONVERTER_DICT.get(k, NoTrackOperator)
             converter = converter_type(node, self.tensor_map, self.asymmetric)
-            # Don't track the operator if all the input nodes are not tracked unless it is in the prim namespace
-            if not k.startswith('prim::') and converter_type != NoTrackOperator:
+            # Don't track the operator if all the input nodes are not tracked unless it has custom implementation (e.g prim::* ops)
+            if converter_type.run == NoTrackOperator.run and converter_type != NoTrackOperator:
                 no_track_flag = True
                 for n in converter.input_names:
                     if self.common_graph.has_nested_names(n):
