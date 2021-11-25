@@ -151,8 +151,8 @@ def justify_group(leaf_dict, idx_map):
 
 class Modifier(object):
     node: TraceNode
-    weight_mask: torch.Tensor
-    bias_mask: torch.Tensor
+    weight_mask: typing.Dict[str, torch.Tensor]
+    bias_mask: typing.Dict[str, torch.Tensor]
     input_modify_: bool
     output_modify_: bool
 
@@ -160,6 +160,8 @@ class Modifier(object):
         self.node = node
         self.input_modify_ = False
         self.output_modify_ = False
+        self.weight_mask = dict()
+        self.bias_mask = dict()
         self.reset_mask()
 
     def enable_mask(self):
@@ -171,10 +173,12 @@ class Modifier(object):
             self.masker().disable()
 
     def reset_mask(self):
+        self.weight_mask.clear()
+        self.bias_mask.clear()
         if hasattr(self.module(), "weight"):
-            self.weight_mask = torch.ones_like(self.module().weight)
+            self.weight_mask["weight"] = torch.ones_like(self.module().weight)
         if hasattr(self.module(), "bias"):
-            self.bias_mask = torch.ones_like(self.module().bias) if type(
+            self.bias_mask["bias"] = torch.ones_like(self.module().bias) if type(
                 self.module().bias) is torch.nn.Parameter else None
 
     def traversal(self, input_modify: bool, output_modify: bool, sub_graph):
@@ -422,22 +426,23 @@ class ConvChannelModifier(ChannelModifier):
 
         if is_dw_conv(self.module()):
             remove_idx = calc_remove_idx(self.in_idx_map, importance, graph_sparsity, self.unique_name())
-            self.weight_mask[remove_idx, :, ] = 0
+            self.weight_mask["weight"][remove_idx, :, ] = 0
             self.masker().set_in_remove_idx(remove_idx)
             self.masker().set_ot_remove_idx(remove_idx)
 
             # dw conv中bias一定改变
-            if self.bias_mask is not None:
-                self.bias_mask[remove_idx] = 0
-                self.masker().register_mask("bias", self.bias_mask)
+            bias_mask = self.bias_mask.get("bias", None)
+            if bias_mask is not None:
+                bias_mask[remove_idx] = 0
+                self.masker().register_mask("bias", bias_mask)
         else:
             if self.input_modify_:
                 remove_idx = calc_remove_idx(self.in_idx_map, importance, graph_sparsity, self.unique_name())
                 group = self.group()
                 remove_idx.sort()
                 if group != 1:
-                    num_g_out = self.weight_mask.shape[0] // group
-                    weight_2 = self.weight_mask.shape[1]
+                    num_g_out = self.weight_mask["weight"].shape[0] // group
+                    weight_2 = self.weight_mask["weight"].shape[1]
                     start_in = end_in = 0
                     for i in range(group):
                         end_in += weight_2
@@ -446,30 +451,31 @@ class ConvChannelModifier(ChannelModifier):
                             if start_in <= idx < end_in:
                                 g_remove_idx.append(idx)
                         g_remove_idx = [(idx - weight_2 * i) for idx in g_remove_idx]
-                        self.weight_mask[num_g_out * i:num_g_out * (i + 1), g_remove_idx, ] = 0
+                        self.weight_mask["weight"][num_g_out * i:num_g_out * (i + 1), g_remove_idx, ] = 0
                         start_in = end_in
                 else:
-                    self.weight_mask[:, remove_idx, ] = 0
+                    self.weight_mask["weight"][:, remove_idx, ] = 0
                 self.masker().set_in_remove_idx(remove_idx)
             if self.output_modify_:
                 remove_idx = calc_remove_idx(self.ot_idx_map, importance, graph_sparsity, self.unique_name())
                 self.register_out_mask(remove_idx)
 
-        self.masker().register_mask("weight", self.weight_mask)
+        self.masker().register_mask("weight", self.weight_mask["weight"])
 
     def register_out_mask(self, remove_idx):
-        self.weight_mask[remove_idx, :, ] = 0
+        self.weight_mask["weight"][remove_idx, :, ] = 0
         self.masker().set_ot_remove_idx(remove_idx)
 
-        if self.bias_mask is not None:
-            self.bias_mask[remove_idx] = 0
-            self.masker().register_mask("bias", self.bias_mask)
+        bias_mask = self.bias_mask.get("bias", None)
+        if bias_mask is not None:
+            bias_mask[remove_idx] = 0
+            self.masker().register_mask("bias", bias_mask)
 
     def modify_input(self, remove_idx):
         conv = self.node.module
 
         if is_dw_conv(self.module()):
-            preserve_idx = complementary_list([i for i in range(self.weight_mask.shape[0])], remove_idx)
+            preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[0])], remove_idx)
 
             if conv.groups != len(preserve_idx):
                 log.info(f'[DW_CONV] {self.unique_name()}: input {conv.in_channels} -> {len(preserve_idx)}')
@@ -484,16 +490,16 @@ class ConvChannelModifier(ChannelModifier):
         else:
             group = self.group()
             if group != 1:
-                if conv.in_channels == (self.weight_mask.shape[1]) * group - len(remove_idx):
+                if conv.in_channels == (self.weight_mask["weight"].shape[1]) * group - len(remove_idx):
                     return
                 num_g_remove_idx = len(remove_idx) // group
-                num_g_out = self.weight_mask.shape[0] // group
-                weight_2 = self.weight_mask.shape[1]
+                num_g_out = self.weight_mask["weight"].shape[0] // group
+                weight_2 = self.weight_mask["weight"].shape[1]
                 conv_weight = None
                 for i in range(group):
                     g_remove_idx = remove_idx[num_g_remove_idx * i:num_g_remove_idx * (i + 1)]
                     g_remove_idx = [idx - weight_2 * i for idx in g_remove_idx]
-                    preserve_idx = complementary_list([j for j in range(self.weight_mask.shape[1])], g_remove_idx)
+                    preserve_idx = complementary_list([j for j in range(self.weight_mask["weight"].shape[1])], g_remove_idx)
                     weight = conv.weight[num_g_out * i:num_g_out * (i + 1), preserve_idx, ]
                     if conv_weight is None:
                         conv_weight = weight
@@ -505,7 +511,7 @@ class ConvChannelModifier(ChannelModifier):
                 conv.in_channels = remove_channel
 
             else:
-                preserve_idx = complementary_list([i for i in range(self.weight_mask.shape[1])], remove_idx)
+                preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[1])], remove_idx)
                 if conv.in_channels != len(preserve_idx):
                     log.info(f'[CONV] {self.unique_name()}: input {conv.in_channels} -> {len(preserve_idx)}')
                     conv.weight = torch.nn.Parameter(conv.weight[:, preserve_idx, ])
@@ -514,7 +520,7 @@ class ConvChannelModifier(ChannelModifier):
     def modify_output(self, remove_idx):
         conv = self.node.module
 
-        preserve_idx = complementary_list([i for i in range(self.weight_mask.shape[0])], remove_idx)
+        preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[0])], remove_idx)
 
         if is_dw_conv(self.module()):
             if conv.groups != len(preserve_idx):
@@ -572,23 +578,24 @@ class ConvTransChannelModifier(ConvChannelModifier):
     def register_mask(self, importance, graph_sparsity):
         if self.input_modify_:
             remove_idx = calc_remove_idx(self.in_idx_map, importance, graph_sparsity, self.unique_name())
-            self.weight_mask[remove_idx, :, ] = 0
+            self.weight_mask["weight"][remove_idx, :, ] = 0
             self.masker().set_in_remove_idx(remove_idx)
         if self.output_modify_:
             remove_idx = calc_remove_idx(self.ot_idx_map, importance, graph_sparsity, self.unique_name())
-            self.weight_mask[:, remove_idx, ] = 0
+            self.weight_mask["weight"][:, remove_idx, ] = 0
             self.masker().set_ot_remove_idx(remove_idx)
 
             # 普通conv中bias仅在output改变时改变
-            if self.bias_mask is not None:
-                self.bias_mask[remove_idx] = 0
-                self.masker().register_mask("bias", self.bias_mask)
+            bias_mask = self.bias_mask.get("bias", None)
+            if bias_mask is not None:
+                bias_mask[remove_idx] = 0
+                self.masker().register_mask("bias", bias_mask)
 
-        self.masker().register_mask("weight", self.weight_mask)
+        self.masker().register_mask("weight", self.weight_mask["weight"])
 
     def modify_input(self, remove_idx):
         conv = self.node.module
-        preserve_idx = complementary_list([i for i in range(self.weight_mask.shape[0])], remove_idx)
+        preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[0])], remove_idx)
 
         if conv.in_channels != len(preserve_idx):
             log.info(f'[TRANS_CONV2D] {self.unique_name()}: input {conv.in_channels} -> {len(preserve_idx)}')
@@ -597,7 +604,7 @@ class ConvTransChannelModifier(ConvChannelModifier):
 
     def modify_output(self, remove_idx):
         conv = self.node.module
-        preserve_idx = complementary_list([i for i in range(self.weight_mask.shape[1])], remove_idx)
+        preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[1])], remove_idx)
 
         if conv.out_channels != len(preserve_idx):
             log.info(f'[TRANS_CONV2D] {self.unique_name()}: output {conv.out_channels} -> {len(preserve_idx)}')
@@ -618,7 +625,7 @@ class LinearChannelModifier(ChannelModifier):
 
     def modify_input(self, remove_idx):
         linear = self.node.module
-        preserve_idx = complementary_list([i for i in range(self.weight_mask.shape[1])], remove_idx)
+        preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[1])], remove_idx)
 
         if linear.weight.shape[1] != len(preserve_idx):
             log.info(f'[FC] {self.unique_name()}: input {linear.in_features} -> {len(preserve_idx)}')
@@ -627,7 +634,7 @@ class LinearChannelModifier(ChannelModifier):
 
     def modify_output(self, remove_idx):
         linear = self.node.module
-        preserve_idx = complementary_list([i for i in range(self.weight_mask.shape[0])], remove_idx)
+        preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[0])], remove_idx)
 
         if linear.weight.shape[0] != len(preserve_idx):
             log.info(f'[FC] {self.unique_name()}: output {linear.out_features} -> {len(preserve_idx)}')
@@ -640,18 +647,20 @@ class LinearChannelModifier(ChannelModifier):
     def register_mask(self, importance, graph_sparsity):
         if self.input_modify_:
             remove_idx = calc_remove_idx(self.in_idx_map, importance, graph_sparsity, self.unique_name())
-            self.weight_mask[:, remove_idx] = 0
+            self.weight_mask["weight"][:, remove_idx] = 0
             self.masker().set_in_remove_idx(remove_idx)
 
         if self.output_modify_:
             remove_idx = calc_remove_idx(self.ot_idx_map, importance, graph_sparsity, self.unique_name())
-            self.weight_mask[remove_idx, :] = 0
+            self.weight_mask["weight"][remove_idx, :] = 0
             self.masker().set_ot_remove_idx(remove_idx)
-            if self.bias_mask is not None and self.output_modify_ is not None:
-                self.bias_mask[remove_idx] = 0
-                self.masker().register_mask("bias", self.bias_mask)
 
-        self.masker().register_mask("weight", self.weight_mask)
+            bias_mask = self.bias_mask.get("bias", None)
+            if bias_mask is not None:
+                bias_mask[remove_idx] = 0
+                self.masker().register_mask("bias", bias_mask)
+
+        self.masker().register_mask("weight", self.weight_mask["weight"])
 
     def traversal(self, input_modify, output_modify, sub_graph):
         if self not in sub_graph:
@@ -697,13 +706,13 @@ class PReLUChannelModifier(ChannelModifier):
         self.masker().set_in_remove_idx(remove_idx)
         self.masker().set_ot_remove_idx(remove_idx)
 
-        self.weight_mask[remove_idx] = 0
+        self.weight_mask["weight"][remove_idx] = 0
 
-        self.masker().register_mask("weight", self.weight_mask)
+        self.masker().register_mask("weight", self.weight_mask["weight"])
 
     def modify_input(self, remove_idx):
         bn = self.node.module
-        preserve_idx = complementary_list([i for i in range(self.weight_mask.shape[0])], remove_idx)
+        preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[0])], remove_idx)
 
         if bn.weight.shape[0] != len(preserve_idx):
             log.info(f'[PRELU] {self.unique_name()}: channel {bn.num_parameters} -> {len(preserve_idx)}')
@@ -717,14 +726,15 @@ class BatchNormChannelModifier(ChannelModifier):
         self.masker().set_in_remove_idx(remove_idx)
         self.masker().set_ot_remove_idx(remove_idx)
 
-        self.weight_mask[remove_idx] = 0
+        self.weight_mask["weight"][remove_idx] = 0
+        self.bias_mask["bias"] = self.weight_mask["weight"]
 
-        self.masker().register_mask("weight", self.weight_mask)
-        self.masker().register_mask("bias", self.weight_mask)
+        self.masker().register_mask("weight", self.weight_mask["weight"])
+        self.masker().register_mask("bias", self.bias_mask["bias"])
 
     def modify_input(self, remove_idx):
         bn = self.node.module
-        preserve_idx = complementary_list([i for i in range(self.weight_mask.shape[0])], remove_idx)
+        preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[0])], remove_idx)
 
         if bn.weight.shape[0] != len(preserve_idx):
             log.info(f'[BN] {self.unique_name()}: channel {bn.num_features} -> {len(preserve_idx)}')
@@ -739,7 +749,7 @@ class BatchNormChannelModifier(ChannelModifier):
 class LayerNormChannelModifier(BatchNormChannelModifier):
     def modify_input(self, remove_idx):
         ln = self.node.module
-        preserve_idx = complementary_list([i for i in range(self.weight_mask.shape[0])], remove_idx)
+        preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[0])], remove_idx)
 
         if ln.weight.shape[0] != len(preserve_idx):
             log.info(f'[LN] {self.unique_name()}: channel {ln.normalized_shape[0]} -> {len(preserve_idx)}')
