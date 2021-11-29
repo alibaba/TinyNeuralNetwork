@@ -120,7 +120,7 @@ class OneShotChannelPruner(BasePruner):
             for m in sub_graph:
                 # 仅有output发生变化的中心节点参与Importance计算（主动变化）
                 if m.node in self.center_nodes and m.output_modify_:
-                    importance[m.unique_name()] = self.metric_func(m.module().weight, m.module())
+                    importance[m.unique_name()] = modifier.weight_metric(self.metric_func, m.module())
 
             modifier.register_sub_masker(sub_graph, importance, self.sparsity)
 

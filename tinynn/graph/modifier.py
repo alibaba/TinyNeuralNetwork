@@ -15,6 +15,13 @@ from tinynn.graph.tracer import TraceGraph, TraceNode
 log = get_logger(__name__)
 
 
+def weight_metric(metric_func, module):
+    if type(module) in [nn.Linear, nn.Conv2d, nn.Conv1d, nn.ConvTranspose2d, nn.ConvTranspose1d]:
+        return metric_func(module.weight, module)
+    else:
+        raise AttributeError(f'{type(module).__name__} is not supported for importance calculation')
+
+
 def random(tensor, module):
     if type(module) in [nn.Linear, nn.Conv2d, nn.Conv1d]:
         return torch.randperm(tensor.shape[0])
