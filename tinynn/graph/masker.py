@@ -75,6 +75,9 @@ class ChannelMasker(Masker):
         # Output channel to be deleted
         self.ot_remove_idx = None
 
+        # Custom channel to be deleted
+        self.custom_remove_idx = None
+
     def set_in_remove_idx(self, in_remove_idx):
         if self.in_remove_idx is not None:
             self.in_remove_idx.extend(deepcopy(in_remove_idx))
@@ -88,6 +91,13 @@ class ChannelMasker(Masker):
             self.ot_remove_idx.sort()
         else:
             self.ot_remove_idx = deepcopy(ot_remove_idx)
+
+    def set_custom_remove_idx(self, custom_remove_idx):
+        if self.custom_remove_idx is not None:
+            self.custom_remove_idx.extend(deepcopy(custom_remove_idx))
+            self.custom_remove_idx.sort()
+        else:
+            self.custom_remove_idx = deepcopy(custom_remove_idx)
 
     def serialization(self):
         return self.unique_name, [self.masks, self.in_remove_idx, self.ot_remove_idx]
