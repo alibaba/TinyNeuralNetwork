@@ -944,6 +944,116 @@ class ModifierTester(unittest.TestCase):
         assert model.fc1.in_features == 16
         assert model.fc1.out_features == 32
 
+    def test_rnn(self):
+        rnn_in_size = 28
+        rnn_hidden_size = 128
+        fc_out_channel = 10
+
+        class TestModel(nn.Module):
+            def __init__(self, *args, **kwargs):
+                super(TestModel, self).__init__()
+
+                assert 'cell_type' in kwargs
+
+                cell_type = kwargs.pop('cell_type')
+                assert cell_type in (nn.RNN, nn.GRU, nn.LSTM)
+
+                bidirectional = kwargs.get('bidirectional', False)
+                num_directions = 2 if bidirectional else 1
+                fc_in_channel = rnn_hidden_size * num_directions
+
+                if 'proj_size' in kwargs:
+                    fc_in_channel = kwargs['proj_size'] * num_directions
+
+                self.rnn = cell_type(rnn_in_size, rnn_hidden_size, *args, **kwargs)
+                self.fc = nn.Linear(fc_in_channel, fc_out_channel)
+
+            def forward(self, x):
+                rnn, _ = self.rnn(x)
+                fc = self.fc(rnn)
+                return fc
+
+        for cell_type in (nn.RNN, nn.GRU, nn.LSTM):
+            for num_layers in (1, 2):
+                for bidirectional in (False, True):
+                    for batch_first in (False, True):
+                        for proj_size in (0, 120):
+
+                            if cell_type != nn.LSTM and proj_size > 0:
+                                continue
+
+                            kwargs = {'num_layers': num_layers,
+                                      'bidirectional': bidirectional,
+                                      'batch_first': batch_first,
+                                      'cell_type': cell_type
+                                      }
+
+                            if proj_size > 0:
+                                if LooseVersion(torch.__version__) >= LooseVersion('1.8.0'):
+                                    kwargs.update({'proj_size': proj_size})
+                                else:
+                                    continue
+
+                            filtered_args = {k: v for k, v in kwargs.items() if k != 'cell_type'}
+                            print(f'\nTesting {cell_type.__name__} with {filtered_args}')
+
+                            model = TestModel(**kwargs)
+
+                            pruner = OneShotChannelPruner(model, torch.rand((3, 3, rnn_in_size)),
+                                                          {"sparsity": 0.5,
+                                                           "metrics": "l2_norm"})
+                            pruner.prune()
+                            model(torch.rand((3, 3, rnn_in_size)))
+
+                            assert model.rnn.hidden_size == 64
+
+    def test_lstm_proj_add_fc(self):
+        if LooseVersion(torch.__version__) < LooseVersion('1.8.0'):
+            raise SkipTest("LSTM with projection is not supported in PyTorch < 1.8")
+
+        rnn_in_size = 28
+        rnn_hidden_size = 128
+        fc_out_channel = 10
+        proj_size = 120
+
+        class TestModel(nn.Module):
+            def __init__(self, *args, **kwargs):
+                super(TestModel, self).__init__()
+
+                bidirectional = kwargs.get('bidirectional', False)
+                num_directions = 2 if bidirectional else 1
+                fc_in_channel = proj_size * num_directions
+
+                self.rnn = nn.LSTM(rnn_in_size, rnn_hidden_size, proj_size=proj_size, *args, **kwargs)
+                self.fc0 = nn.Linear(rnn_in_size, fc_in_channel)
+                self.fc1 = nn.Linear(fc_in_channel, fc_out_channel)
+
+            def forward(self, x):
+                rnn, _ = self.rnn(x)
+                fc0 = self.fc0(x) + rnn
+                fc1 = self.fc1(fc0)
+                return fc1
+
+        for num_layers in (1, 2):
+            for bidirectional in (False, True):
+
+                kwargs = {'num_layers': num_layers,
+                          'bidirectional': bidirectional,
+                          }
+
+                print(f'\nTesting with {kwargs}')
+
+                model = TestModel(**kwargs)
+
+                model(torch.rand((3, 3, rnn_in_size)))
+
+                pruner = OneShotChannelPruner(model, torch.rand((3, 3, rnn_in_size)),
+                                              {"sparsity": 0.5,
+                                               "metrics": "l2_norm"})
+                pruner.prune()
+
+                model(torch.rand((3, 3, rnn_in_size)))
+
 
 if __name__ == '__main__':
     unittest.main()

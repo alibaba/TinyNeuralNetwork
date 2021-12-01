@@ -39,12 +39,14 @@ class OneShotChannelPruner(BasePruner):
         self.center_nodes = []
         self.sparsity = {}
         self.parse_config()
-        self.exclude_ops = [nn.LSTM]
+        self.exclude_ops = []
+        self.exclude_op_preds = [lambda n: n.type() in (nn.RNN, nn.GRU, nn.LSTM) and len(n.prev_tensors) > 1]
 
         for n in self.graph.forward_nodes:
             # Only prune the specific operators
-            if (n.type() in [nn.Conv2d, nn.ConvTranspose2d, nn.Conv1d, nn.ConvTranspose1d] and not is_dw_conv(
-                    n.module)) or (n.type() in [nn.Linear]):
+            if (n.type() in [nn.Conv2d, nn.ConvTranspose2d, nn.Conv1d, nn.ConvTranspose1d]
+                    and not is_dw_conv(n.module)) or (n.type() in [nn.Linear]) \
+                    or (n.type() in [nn.RNN, nn.GRU, nn.LSTM] and len(n.prev_tensors) == 1):
                 self.center_nodes.append(n)
                 if n.unique_name not in self.sparsity:
                     self.sparsity[n.unique_name] = self.default_sparsity
@@ -66,6 +68,11 @@ class OneShotChannelPruner(BasePruner):
                 if m.node.type() in self.exclude_ops:
                     exclude = True
                     break
+
+                for pred in self.exclude_op_preds:
+                    if pred(m.node) is True:
+                        exclude = True
+                        break
 
             if exclude:
                 for m in sub_graph:

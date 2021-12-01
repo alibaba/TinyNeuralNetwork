@@ -18,6 +18,56 @@ log = get_logger(__name__)
 def update_weight_metric(importance, metric_func, module, name):
     if type(module) in [nn.Linear, nn.Conv2d, nn.Conv1d, nn.ConvTranspose2d, nn.ConvTranspose1d]:
         importance[name] = metric_func(module.weight, module)
+    elif type(module) in [nn.GRU, nn.LSTM, nn.RNN]:
+        num_directions = 2 if module.bidirectional else 1
+        has_proj = hasattr(module, 'proj_size') and module.proj_size > 0
+
+        gs = gate_size(module)
+
+        weights = []
+
+        if has_proj:
+            for i in range(module.num_layers):
+                weight_hrs = []
+
+                for j in range(num_directions):
+                    suffix = '_reverse' if j > 0 else ''
+                    weight_hr = getattr(module, f'weight_hr_l{i}{suffix}')
+                    weight_hrs.append(weight_hr)
+
+                weights.append(torch.cat(weight_hrs, dim=0))
+
+            importance[name] = metric_func(weights, module)
+
+            weights.clear()
+            name = f'{name}:h'
+
+        for i in range(module.num_layers):
+            weight_ihs = []
+            weight_hhs = []
+
+            for j in range(num_directions):
+                suffix = '_reverse' if j > 0 else ''
+                weight_ih = getattr(module, f'weight_ih_l{i}{suffix}')
+                weight_hh = getattr(module, f'weight_hh_l{i}{suffix}')
+
+                weight_ihs.append(weight_ih)
+                weight_hhs.append(weight_hh)
+
+            if gs == 1:
+                weights.append(torch.cat(weight_ihs, dim=0))
+                weights.append(torch.cat(weight_hhs, dim=0))
+            else:
+                w_ih_splits = zip(*[torch.unbind(x.view(gs, module.hidden_size, -1)) for x in weight_ihs])
+                w_hh_splits = zip(*[torch.unbind(x.view(gs, module.hidden_size, -1)) for x in weight_hhs])
+
+                ih_gate_weights = [torch.cat(x) for x in w_ih_splits]
+                hh_gate_weights = [torch.cat(x) for x in w_hh_splits]
+
+                weights.extend(ih_gate_weights)
+                weights.extend(hh_gate_weights)
+
+            importance[name] = metric_func(weights, module)
     else:
         raise AttributeError(f'{type(module).__name__}({name}) is not supported for importance calculation')
 
@@ -27,6 +77,9 @@ def random(tensor, module):
         return torch.randperm(tensor.shape[0])
     if type(module) in [nn.ConvTranspose2d, nn.ConvTranspose1d]:
         return torch.randperm(tensor.shape[1])
+    if type(module) in [nn.GRU, nn.LSTM, nn.RNN]:
+        assert isinstance(tensor, (tuple, list))
+        return torch.randperm(tensor[0].shape[1])
 
 
 def l1_norm(tensor, module):
@@ -41,6 +94,9 @@ def l1_norm(tensor, module):
         return torch.norm(tensor, p=1, dim=[0, 2, 3])
     if type(module) in [nn.ConvTranspose1d]:
         return torch.norm(tensor, p=1, dim=[0, 2])
+    if type(module) in [nn.GRU, nn.LSTM, nn.RNN]:
+        assert isinstance(tensor, (tuple, list))
+        return torch.sum(torch.stack([torch.norm(t, p=1, dim=[1]) for t in tensor]), dim=0)
 
 
 def l2_norm(tensor, module):
@@ -55,6 +111,9 @@ def l2_norm(tensor, module):
         return torch.norm(tensor, p=2, dim=[0, 2, 3])
     if type(module) in [nn.ConvTranspose1d]:
         return torch.norm(tensor, p=2, dim=[0, 2])
+    if type(module) in [nn.GRU, nn.LSTM, nn.RNN]:
+        assert isinstance(tensor, (tuple, list))
+        return torch.sum(torch.stack([torch.norm(t, p=2, dim=[1]) for t in tensor]), dim=0)
 
 
 def fpgm(tensor, module):
@@ -77,6 +136,18 @@ def is_dw_conv(module):
 def lcm(denominators):
     """ least common multiple """
     return reduce(lambda a, b: a * b // math.gcd(a, b), denominators)
+
+
+def gate_size(module: nn.Module) -> int:
+    """ the gate size of the recurrent modules """
+    if isinstance(module, nn.RNN):
+        return 1
+    elif isinstance(module, nn.GRU):
+        return 3
+    elif isinstance(module, nn.LSTM):
+        return 4
+    else:
+        raise AttributeError(f'gate size of {type(module)} is unknown')
 
 
 def complementary_list(a, b):
@@ -707,6 +778,345 @@ class LinearChannelModifier(ChannelModifier):
                                                               leaf_names)
 
 
+class RNNChannelModifier(ChannelModifier):
+    def __init__(self, node: TraceNode = None):
+        super().__init__(node=node)
+
+        self.h_idx_map = IdxMap()
+
+    def in_channel(self):
+        return self.node.module.input_size
+
+    def ot_channel(self, has_proj=None):
+        if has_proj is None:
+            has_proj = hasattr(self.node.module, 'proj_size') and self.node.module.proj_size > 0
+        
+        if has_proj:
+            out_size = self.node.module.proj_size
+        else:
+            out_size = self.node.module.hidden_size
+        num_directions = 2 if self.node.module.bidirectional else 1
+        return out_size * num_directions
+
+    def group(self):
+        if not self.output_modify_:
+            return 1
+
+        num_directions = 2 if self.node.module.bidirectional else 1
+        return num_directions
+
+    def modify_input(self, remove_idx):
+        rnn = self.node.module
+        assert len(self.node.prev_tensors) == 1, 'RNNs with hidden state inputs are not supported'
+        preserve_idx = complementary_list([i for i in range(self.weight_mask['weight_ih_l0'].shape[1])], remove_idx)
+
+        if rnn.weight_ih_l0.shape[1] != len(preserve_idx):
+            log.info(f'[RNN] {self.unique_name()}: input {rnn.input_size} -> {len(preserve_idx)}')
+
+            rnn.weight_ih_l0 = torch.nn.Parameter(rnn.weight_ih_l0[:, preserve_idx])
+            rnn.input_size = len(preserve_idx)
+
+    def tile_indices_with_gate_size(self, indices, gate_size, offset):
+        broadcasted = [indices] * gate_size
+        return [offset * idx + i for idx, x in enumerate(broadcasted) for i in x]
+
+    def split_indices_with_directions(self, indices, offset, num_directions):
+        split_pos = len(indices) // num_directions
+        idx_bwd = [i - offset for i in indices[split_pos:]]
+        idx_fwd = indices[:split_pos]
+        return idx_fwd, idx_bwd
+
+    def modify_output(self, remove_idx):
+        rnn = self.node.module
+
+        num_directions = 2 if rnn.bidirectional else 1
+        has_proj = hasattr(self.module(), 'proj_size') and self.module().proj_size > 0
+        gs = gate_size(rnn)
+        if num_directions > 1:
+            offset = rnn.hidden_size
+            remove_idx_fwd, remove_idx_bwd = self.split_indices_with_directions(remove_idx, offset, num_directions)
+
+        if gs > 1:
+            offset = rnn.hidden_size
+            if num_directions > 1:
+                remove_idx_bwd_gs = self.tile_indices_with_gate_size(remove_idx_bwd, gs, offset)
+                remove_idx_fwd_gs = self.tile_indices_with_gate_size(remove_idx_fwd, gs, offset)
+            else:
+                remove_idx_gs = self.tile_indices_with_gate_size(remove_idx, gs, offset)
+
+        remove_idx_proj = None
+        if has_proj:
+            remove_idx_proj = self.masker().custom_remove_idx
+            if remove_idx_proj is not None:
+                offset = rnn.proj_size
+                remove_idx_proj_fwd, remove_idx_proj_bwd = self.split_indices_with_directions(remove_idx_proj, offset, num_directions)
+
+        for i in range(rnn.num_layers):
+            for j in range(num_directions):
+                suffix = '_reverse' if j > 0 else ''
+                desc = f'layer{suffix} hidden #{i}'
+
+                weight_ih = getattr(rnn, f'weight_ih_l{i}{suffix}')
+                weight_hh = getattr(rnn, f'weight_hh_l{i}{suffix}')
+                weight_hr = getattr(rnn, f'weight_hr_l{i}{suffix}', None)
+
+                bias_ih = getattr(rnn, f'bias_ih_l{i}{suffix}', None)
+                bias_hh = getattr(rnn, f'bias_hh_l{i}{suffix}', None)
+
+                remove_idx_r = remove_idx
+                remove_idx_c = remove_idx
+                remove_idx_pc = None
+                if num_directions > 1:
+                    if j > 0:
+                        if gs > 1:
+                            remove_idx_r = remove_idx_bwd_gs
+                        else:
+                            remove_idx_r = remove_idx_bwd
+                        remove_idx_c = remove_idx_bwd
+                        if has_proj:
+                            remove_idx_pc = remove_idx_proj_bwd
+                    else:
+                        if gs > 1:
+                            remove_idx_r = remove_idx_fwd_gs
+                        else:
+                            remove_idx_r = remove_idx_fwd
+                        remove_idx_c = remove_idx_fwd
+                        if has_proj:
+                            remove_idx_pc = remove_idx_proj_fwd
+                elif gs > 1:
+                    remove_idx_r = remove_idx_gs
+                    remove_idx_pc = remove_idx_proj
+
+                preserve_idx_ih_r = complementary_list(
+                    [j for j in range(self.weight_mask[f'weight_ih_l{i}{suffix}'].shape[0])], remove_idx_r)
+                preserve_idx_hh_r = complementary_list(
+                    [j for j in range(self.weight_mask[f'weight_hh_l{i}{suffix}'].shape[0])], remove_idx_r)
+
+                if weight_hr is None:
+                    preserve_idx_hh_c = complementary_list(
+                        [j for j in range(self.weight_mask[f'weight_hh_l{i}{suffix}'].shape[1])], remove_idx_c)
+                else:
+                    preserve_idx_hh_c = complementary_list(
+                        [j for j in range(self.weight_mask[f'weight_hh_l{i}{suffix}'].shape[1])], remove_idx_pc)
+                    preserve_idx_hr_c = complementary_list(
+                        [j for j in range(self.weight_mask[f'weight_hr_l{i}{suffix}'].shape[1])], remove_idx_c)
+
+                preserve_idx_ih_c = None
+                if i != 0 and preserve_idx_ih_c is None:
+                    if weight_hr is not None:
+                        preserve_idx_ih_c = complementary_list(
+                            [j for j in range(self.weight_mask[f'weight_ih_l{i}{suffix}'].shape[1])], remove_idx_proj)
+                    else:
+                        preserve_idx_ih_c = preserve_idx_ih_r
+                        if num_directions > 1 or gs > 1:
+                            preserve_idx_ih_c = complementary_list(
+                                [j for j in range(self.weight_mask[f'weight_ih_l{i}{suffix}'].shape[1])], remove_idx)
+
+                if weight_ih.shape[0] != len(preserve_idx_ih_r):
+                    if i != 0 and weight_ih.shape[1] != len(preserve_idx_ih_c):
+                        desc_i = f'layer{suffix} input #{i}'
+                        log.info(f'[RNN] {self.unique_name()}: {desc_i} {weight_ih.shape[1]} -> {len(preserve_idx_ih_c)}')
+
+                    log.info(
+                        f'[RNN] {self.unique_name()}: {desc} {rnn.hidden_size * gs} -> {len(preserve_idx_ih_r)}')
+
+                    if i != 0:
+                        new_w = weight_ih[preserve_idx_ih_r, :][:, preserve_idx_ih_c]
+                        setattr(rnn, f'weight_ih_l{i}{suffix}', torch.nn.Parameter(new_w))
+                    else:
+                        setattr(rnn, f'weight_ih_l{i}{suffix}', torch.nn.Parameter(weight_ih[preserve_idx_ih_r, :]))
+
+                    if bias_ih is not None:
+                        setattr(rnn, f'bias_ih_l{i}{suffix}', torch.nn.Parameter(bias_ih[preserve_idx_ih_r]))
+
+                desc = f'layer{suffix} output #{i}'
+                if weight_hh.shape[0] != len(preserve_idx_hh_r) or weight_hh.shape[1] != len(preserve_idx_hh_c):
+                    log.info(
+                        f'[RNN] {self.unique_name()}: {desc} {rnn.hidden_size * gs} -> {len(preserve_idx_hh_r)}')
+
+                    if weight_hr is None:
+                        setattr(rnn, f'weight_hh_l{i}{suffix}', torch.nn.Parameter(
+                            weight_hh[preserve_idx_hh_r, :][:, preserve_idx_hh_c]))
+                    else:
+                        setattr(rnn, f'weight_hh_l{i}{suffix}', torch.nn.Parameter(
+                            weight_hh[preserve_idx_hh_r, :][:, preserve_idx_hh_c]))
+                        setattr(rnn, f'weight_hr_l{i}{suffix}', torch.nn.Parameter(
+                            weight_hr[preserve_idx_hh_c, :][:, preserve_idx_hr_c]))
+
+                    if bias_hh is not None:
+                        setattr(rnn, f'bias_hh_l{i}{suffix}', torch.nn.Parameter(bias_hh[preserve_idx_hh_r]))
+
+        if weight_hr is None:
+            rnn.hidden_size = len(preserve_idx_hh_c)
+        else:
+            rnn.proj_size = len(preserve_idx_hh_c)
+            rnn.hidden_size = len(preserve_idx_hr_c)
+
+    def register_mask(self, importance, graph_sparsity):
+        gs = gate_size(self.module())
+        num_directions = 2 if self.module().bidirectional else 1
+        has_proj = hasattr(self.module(), 'proj_size') and self.module().proj_size > 0
+
+        if self.input_modify_:
+            remove_idx = calc_remove_idx(self.in_idx_map, importance, graph_sparsity, self.unique_name())
+            self.weight_mask['weight_ih_l0'][:, remove_idx] = 0
+            self.masker().set_in_remove_idx(remove_idx)
+
+        if self.output_modify_:
+            if has_proj:
+                u_name = self.unique_name()
+                hu_name = f'{u_name}:h'
+
+                idx = list(range(0, self.ot_channel(has_proj=False)))
+                self.h_idx_map.set_idx(hu_name, [idx])
+                leaf_dict = self.h_idx_map.get_grouped_idx(self.group())
+                justify_group(leaf_dict, self.h_idx_map)
+
+                remove_idx = calc_remove_idx(self.h_idx_map, importance, graph_sparsity, hu_name)
+                remove_idx_proj = calc_remove_idx(self.ot_idx_map, importance, graph_sparsity, self.unique_name())
+            else:
+                remove_idx = calc_remove_idx(self.ot_idx_map, importance, graph_sparsity, self.unique_name())
+                remove_idx_proj = None
+
+            remove_idx_bwd = None
+            remove_idx_fwd = None
+            remove_idx_proj_bwd = None
+            remove_idx_proj_fwd = None
+            if num_directions > 1:
+                offset = self.module().hidden_size
+                remove_idx_fwd, remove_idx_bwd = self.split_indices_with_directions(remove_idx, offset, num_directions)
+                if remove_idx_proj is not None:
+                    offset = self.module().proj_size
+                    remove_idx_proj_fwd, remove_idx_proj_bwd = self.split_indices_with_directions(remove_idx_proj, offset, num_directions)
+                    assert len(remove_idx_proj_fwd) == len(remove_idx_proj_bwd)
+
+            if gs > 1:
+                offset = self.module().hidden_size
+                if num_directions > 1:
+                    remove_idx_bwd_gs = self.tile_indices_with_gate_size(remove_idx_bwd, gs, offset)
+                    remove_idx_fwd_gs = self.tile_indices_with_gate_size(remove_idx_fwd, gs, offset)
+                else:
+                    remove_idx_gs = self.tile_indices_with_gate_size(remove_idx, gs, offset)
+
+            for n in self.weight_mask:
+                remove_idx_r = remove_idx
+                remove_idx_c = remove_idx
+                remove_idx_pc = None
+                if num_directions > 1:
+                    if n.endswith('_reverse'):
+                        if gs > 1:
+                            remove_idx_r = remove_idx_bwd_gs
+                        else:
+                            remove_idx_r = remove_idx_bwd
+                        remove_idx_c = remove_idx_bwd
+                        if has_proj:
+                            remove_idx_pc = remove_idx_proj_bwd
+                    else:
+                        if gs > 1:
+                            remove_idx_r = remove_idx_fwd_gs
+                        else:
+                            remove_idx_r = remove_idx_fwd
+                        remove_idx_c = remove_idx_fwd
+                        if has_proj:
+                            remove_idx_pc = remove_idx_proj_fwd
+                elif gs > 1:
+                    remove_idx_r = remove_idx_gs
+                    remove_idx_pc = remove_idx_proj
+
+                if n.startswith('weight_ih_l0'):
+                    self.weight_mask[n][remove_idx_r, :] = 0
+                elif n.startswith('weight_ih'):
+                    self.weight_mask[n][remove_idx_r, :] = 0
+                    if remove_idx_proj is None:
+                        self.weight_mask[n][:, remove_idx] = 0
+                    else:
+                        self.weight_mask[n][:, remove_idx_proj] = 0
+                    self.masker().register_mask(n, self.weight_mask[n])
+                elif n.startswith('weight_hh'):
+                    self.weight_mask[n][remove_idx_r, :] = 0
+                    if remove_idx_pc is None:
+                        self.weight_mask[n][:, remove_idx_c] = 0
+                    else:
+                        self.weight_mask[n][:, remove_idx_pc] = 0
+                    self.masker().register_mask(n, self.weight_mask[n])
+                elif n.startswith('weight_hr'):
+                    if remove_idx_pc is not None:
+                        self.weight_mask[n][remove_idx_pc, :] = 0
+                    self.weight_mask[n][:, remove_idx_c] = 0
+                    self.masker().register_mask(n, self.weight_mask[n])
+
+            for n in self.bias_mask:
+                remove_idx_ = remove_idx
+                if num_directions > 1:
+                    if n.endswith('_reverse'):
+                        if gs > 1:
+                            remove_idx_ = remove_idx_bwd_gs
+                        else:
+                            remove_idx_ = remove_idx_bwd
+                    else:
+                        if gs > 1:
+                            remove_idx_ = remove_idx_fwd_gs
+                        else:
+                            remove_idx_ = remove_idx_fwd
+                elif gs > 1:
+                    remove_idx_ = remove_idx_gs
+                self.bias_mask[n][remove_idx_] = 0
+                self.masker().register_mask(n, self.bias_mask[n])
+            self.masker().set_ot_remove_idx(remove_idx)
+
+            if remove_idx_proj is not None:
+                self.masker().set_custom_remove_idx(remove_idx_proj)
+
+        self.masker().register_mask('weight_ih_l0', self.weight_mask['weight_ih_l0'])
+
+    def reset_mask(self):
+        self.weight_mask.clear()
+        self.bias_mask.clear()
+
+        for n, p in self.module().named_parameters():
+            if n.startswith('weight'):
+                self.weight_mask[n] = torch.ones_like(p)
+            elif n.startswith('bias'):
+                self.bias_mask[n] = torch.ones_like(p)
+
+    def traversal(self, input_modify, output_modify, sub_graph):
+        if self not in sub_graph:
+            sub_graph.append(self)
+        else:
+            self.input_modify_ |= input_modify
+            self.output_modify_ |= output_modify
+            return self
+
+        self.input_modify_ = input_modify
+        self.output_modify_ = output_modify
+
+        assert (((input_modify and output_modify) is False) and ((input_modify or output_modify) is True))
+
+        if output_modify:
+            for n in self.node.next_nodes:
+                n.modifier.traversal(True, False, sub_graph)
+
+        return self
+
+    def idx_forward(self, pre_name, center_name, idxes, sub_graph_dict, leaf_names):
+        if self.input_modify_:
+            self.in_idx_map.set_idx(center_name, idxes)
+
+        if self.output_modify_:
+            self.ot_idx_map.set_idx(center_name, idxes)
+
+            if self.unique_name() in leaf_names:
+                return
+
+            for n in self.node.next_nodes:
+                if n.unique_name in sub_graph_dict.keys():
+                    sub_graph_dict[n.unique_name].idx_forward(self.unique_name(),
+                                                              center_name,
+                                                              idxes,
+                                                              sub_graph_dict,
+                                                              leaf_names)
+
+
 class PReLUChannelModifier(ChannelModifier):
     def register_mask(self, importance, graph_sparsity):
         remove_idx = calc_remove_idx(self.in_idx_map, importance, graph_sparsity, self.unique_name())
@@ -1180,6 +1590,9 @@ MODIFIERS = {
     nn.PReLU: PReLUChannelModifier,
     nn.LayerNorm: LayerNormChannelModifier,
     "split": SplitChannelModifier,
+    nn.RNN: RNNChannelModifier,
+    nn.GRU: RNNChannelModifier,
+    nn.LSTM: RNNChannelModifier,
 }
 
 
