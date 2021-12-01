@@ -1,14 +1,18 @@
+import random
 import unittest
 
+from distutils.version import LooseVersion
+from operator import add, mul, sub, truediv
+from unittest.case import SkipTest
+
+import numpy as np
 import torch
 import torch.nn as nn
-from tinynn.prune.oneshot_pruner import OneShotChannelPruner
-from interval import Interval
 import torch.nn.functional as F
-import random
-from operator import add, mul, sub, truediv
-import numpy as np
+
+from interval import Interval
 from tinynn.graph.modifier import l2_norm
+from tinynn.prune.oneshot_pruner import OneShotChannelPruner
 
 
 def removed_idx_group_check(removed_idx, total_idx_len, removed_idx_len, group, offset=0):
