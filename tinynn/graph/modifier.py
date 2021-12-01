@@ -15,11 +15,11 @@ from tinynn.graph.tracer import TraceGraph, TraceNode
 log = get_logger(__name__)
 
 
-def weight_metric(metric_func, module):
+def update_weight_metric(importance, metric_func, module, name):
     if type(module) in [nn.Linear, nn.Conv2d, nn.Conv1d, nn.ConvTranspose2d, nn.ConvTranspose1d]:
-        return metric_func(module.weight, module)
+        importance[name] = metric_func(module.weight, module)
     else:
-        raise AttributeError(f'{type(module).__name__} is not supported for importance calculation')
+        raise AttributeError(f'{type(module).__name__}({name}) is not supported for importance calculation')
 
 
 def random(tensor, module):
