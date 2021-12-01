@@ -931,9 +931,11 @@ def gen_module_constrctor_line(module, mod_cache=None):
         iargs = ignored_args[name]
         for arg in iargs:
             if isinstance(arg, int):
-                del args[arg]
+                if arg >= 0 and arg < len(args):
+                    del args[arg]
             elif isinstance(arg, str):
-                del kwargs[arg]
+                if arg in kwargs:
+                    del kwargs[arg]
             else:
                 raise AttributeError(f'Unknown type {type(arg)} in ignored args')
             pos_args = ', '.join(args)
@@ -957,7 +959,8 @@ def gen_module_constrctor_line(module, mod_cache=None):
         end_pos = result.rfind(')')
         head = result[:start_pos + 1]
         tail = result[end_pos:]
-        result = head + eval(f'_skip_ignored_args("{name}", {result[start_pos+1:end_pos]})') + tail
+        mid = result[start_pos + 1:end_pos]
+        result = head + eval(f'_skip_ignored_args("{name}", {mid})') + tail
 
     return result, mod_cache
 
