@@ -925,16 +925,41 @@ def get_constructor_args(actual_class_type):
 
 def gen_module_constrctor_line(module, mod_cache=None):
     """ Generates the constructor line for a loaded module """
+    ignored_args = {'torch.nn.ZeroPad2d': ['value']}
+
+    def _skip_ignored_args(name, *args, **kwargs):
+        iargs = ignored_args[name]
+        for arg in iargs:
+            if isinstance(arg, int):
+                del args[arg]
+            elif isinstance(arg, str):
+                del kwargs[arg]
+            else:
+                raise AttributeError(f'Unknown type {type(arg)} in ignored args')
+            pos_args = ', '.join(args)
+            kw_args = ', '.join([f'{k}="{v}"' if isinstance(v, str) else f'{k}={v}' for k, v in kwargs.items()])
+        return pos_args + kw_args
+
     name = qualified_name(type(module), short=True)
+
     if mod_cache:
         mod_cache = {}
     module_cls = type(module)
     with patch(module_cls, '__getattribute__', new_module_getattr_gen, name, mod_cache):
         if getattr(module_cls, '__repr__') == getattr(torch.nn.Module, '__repr__'):
-            return f'{name}({module.extra_repr()})', mod_cache
+            result = f'{name}({module.extra_repr()})'
         else:
             ns = '.'.join(name.split('.')[:-1])
-            return f'{ns}.{repr(module)}', mod_cache
+            result = f'{ns}.{repr(module)}'
+
+    if name in ignored_args:
+        start_pos = result.find('(')
+        end_pos = result.rfind(')')
+        head = result[:start_pos + 1]
+        tail = result[end_pos:]
+        result = head + eval(f'_skip_ignored_args("{name}", {result[start_pos+1:end_pos]})') + tail
+
+    return result, mod_cache
 
 
 def add_input_node(node: TraceNode, output_tensors):
