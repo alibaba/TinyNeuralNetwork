@@ -171,7 +171,7 @@ class ATenConstantPadNdOperator(ATenConstantPadNdSchema):
 
         inputs = [input_tensor, pad_tensor]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-        if type(constant_value) != int or constant_value != 0:
+        if constant_value not in (0, 0.0):
             inputs.append(self.create_attr_tensor(np.array([constant_value], dtype='float32')))
             graph_converter.add_operator(tfl.Padv2Operator(inputs, outputs))
         else:
