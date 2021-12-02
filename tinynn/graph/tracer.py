@@ -498,6 +498,17 @@ def no_catch():
         lock(False)
 
 
+def args_as_string(args, kwargs):
+    """ String representation of the args and the keyword args """
+    cleaned_args = [f'"{arg}"' if type(arg) == str else str(arg) for arg in args]
+    args_content = ', '.join(cleaned_args)
+    kwargs_content = ', '.join((f'{k}="{v}"' if type(
+        v) is str else f'{k}={v}' for k, v in kwargs.items()))
+    args_connector = '' if args_content == '' or kwargs_content == '' else ', '
+    full_args_content = f'{args_content}{args_connector}{kwargs_content}'
+    return full_args_content
+
+
 def new_setattr_gen(orig_setattr, key: str):
     """ Wrapper function for the __setattr__ functions of the modules in PyTorch """
     log.debug(f'registered module setattr wrapper: {key}')
@@ -670,12 +681,7 @@ def new_init_gen(orig_init, key: str):
                     log.warning(f'  Keyword args: {kwargs}')
                 else:
                     log.info(f'Constructor of {class_fullname} registered')
-                    cleaned_args = [f'"{arg}"' if type(arg) == str else str(arg) for arg in args]
-                    args_content = ', '.join(cleaned_args)
-                    kwargs_content = ', '.join((f'{k}="{v}"' if type(
-                        v) is str else f'{k}={v}' for k, v in kwargs.items()))
-                    args_connector = '' if args_content == '' or kwargs_content == '' else ', '
-                    full_args_content = f'{args_content}{args_connector}{kwargs_content}'
+                    full_args_content = args_as_string(args, kwargs)
                     orig_constructor_line = f'{class_fullname}({full_args_content})'
                     module_constructor_lines[id(obj)] = orig_constructor_line
             orig_init(obj, *args, **kwargs)
@@ -938,9 +944,7 @@ def gen_module_constrctor_line(module, mod_cache=None):
                     del kwargs[arg]
             else:
                 raise AttributeError(f'Unknown type {type(arg)} in ignored args')
-            pos_args = ', '.join(args)
-            kw_args = ', '.join([f'{k}="{v}"' if isinstance(v, str) else f'{k}={v}' for k, v in kwargs.items()])
-        return pos_args + kw_args
+        return args_as_string(args, kwargs)
 
     name = qualified_name(type(module), short=True)
 
