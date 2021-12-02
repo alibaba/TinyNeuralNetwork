@@ -119,10 +119,6 @@ torch.nn:
 - Unfold
 - Fold
 - AdaptiveLogSoftmaxWithLoss
-- TransformerEncoder
-- TransformerDecoder
-- TransformerEncoderLayer
-- TransformerDecoderLayer
 - Transformer
 - LazyLinear
 - LazyConv1d
@@ -147,7 +143,6 @@ torch.nn:
 - ChannelShuffle
 - UninitializedParameter
 - UninitializedBuffer
-- DataParallel
 torch.quantization:
 - QuantStub
 - DeQuantStub

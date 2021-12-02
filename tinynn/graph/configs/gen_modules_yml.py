@@ -27,7 +27,13 @@ for k in torch.nn.__dict__:
         # Skip container modules
         if '.container' in c.__module__:
             continue
-        if c.__name__ in ('Parameter', 'Module'):
+        if c.__name__ in ('Parameter',
+                          'Module',
+                          'DataParallel',
+                          'TransformerEncoder',
+                          'TransformerDecoder',
+                          'TransformerEncoderLayer',
+                          'TransformerDecoderLayer'):
             continue
         final_dict.setdefault('torch.nn', [])
         final_dict['torch.nn'].append(k)
