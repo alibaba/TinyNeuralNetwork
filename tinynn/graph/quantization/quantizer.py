@@ -81,7 +81,7 @@ class QATQuantizer(object):
     def parse_config(self, config: typing.Optional[dict]):
         default_values = {'rewrite_graph': True, 'force_overwrite': True,
                           'is_input_quantized': None, 'backend': 'qnnpack',
-                          'remove_weights_after_load': False, 
+                          'remove_weights_after_load': False,
                           'asymmetric': True}
 
         if config is None:
@@ -283,7 +283,7 @@ class QATQuantizer(object):
         qconfig = torch_q.get_default_qat_qconfig(backend)
         if not self.asymmetric:
             sym_fq = torch_q.FakeQuantize.with_args(observer=torch_q.MovingAverageMinMaxObserver, quant_min=0, quant_max=255,
-                                                   dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
+                                                    dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
             qconfig = torch_q.QConfig(sym_fq, qconfig.weight)
 
         torch.backends.quantized.engine = backend
@@ -713,6 +713,31 @@ class QATQuantizer(object):
             module_constructor_lines[id(new_dropout)] = f'{qualified_name(dropout_cls)}({arg_str})'
             graph.replace_node_module(node, new_dropout)
 
+        # Add contiguous nodes for partially-supported OPs
+        # Some of the operations support quantization, but they only accept contiguous input tensors.
+        def _is_partially_quantizable(node, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if cur_class == ConstantNode:
+                return False
+            elif cur_class == TraceFunction:
+                return cur_module.kind in ('pad', )
+            else:
+                return cur_class in (nn.ConstantPad1d, nn.ConstantPad2d, nn.ConstantPad3d, nn.ZeroPad2d)
+
+        partially_supported_nodes = graph.filter_forward_nodes(_is_partially_quantizable)
+        for idx, node in enumerate(partially_supported_nodes):
+            assert len(node.prev_nodes) == 1
+            for n in node.prev_nodes:
+                shared_tensors = list(set(node.prev_tensors).intersection(set(n.next_tensors)))
+                if len(shared_tensors) > 1:
+                    log.error('rewrite supports torch.stack with nodes with exact one input')
+                    assert False
+                with override_current_trace_graph(graph):
+                    trace_func = TraceFunction('torch.Tensor.contiguous', True).parse_args(shared_tensors[0])
+                next_tensors = [x.contiguous() for x in shared_tensors]
+                graph.insert_between(n, node, trace_func, next_tensors)
+
         # Add quant/dequant nodes for non-quantizable OPs
         def _is_not_quantizable(node, custom_data):
             cur_module = node.module
@@ -807,6 +832,7 @@ class BF16Quantizer(QATQuantizer):
         torch_q.prepare_qat(self.model, inplace=True)
 
         return self.model
+
 
 class PostQuantizer(QATQuantizer):
     rewrite_graph: bool
