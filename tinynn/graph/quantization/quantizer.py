@@ -731,7 +731,7 @@ class QATQuantizer(object):
             for n in node.prev_nodes:
                 shared_tensors = list(set(node.prev_tensors).intersection(set(n.next_tensors)))
                 if len(shared_tensors) > 1:
-                    log.error('rewrite supports torch.stack with nodes with exact one input')
+                    log.error('rewrite for partially-supported ops supports with nodes with exact one input')
                     assert False
                 with override_current_trace_graph(graph):
                     trace_func = TraceFunction('torch.Tensor.contiguous', True).parse_args(shared_tensors[0])
