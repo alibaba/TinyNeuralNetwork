@@ -172,7 +172,18 @@ class ATenConstantPadNdOperator(ATenConstantPadNdSchema):
         inputs = [input_tensor, pad_tensor]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
         if constant_value not in (0, 0.0):
-            inputs.append(self.create_attr_tensor(np.array([constant_value], dtype='float32')))
+            output = outputs[0]
+            if output.quantization is None:
+                constant_arr = np.array([constant_value], dtype='float32')
+            else:
+                float_arr = torch.tensor([constant_value], dtype=torch.float32)
+                constant_arr = torch.quantize_per_tensor(float_arr,
+                                                         output.quantization.scale,
+                                                         output.quantization.zero_point,
+                                                         torch.quint8)
+
+            inputs.append(self.create_attr_tensor(constant_arr))
+
             graph_converter.add_operator(tfl.Padv2Operator(inputs, outputs))
         else:
             graph_converter.add_operator(tfl.PadOperator(inputs, outputs))
@@ -840,6 +851,7 @@ class ATenConv2dOperator(ATenConv2dSchema):
 
         graph_converter.add_operator(tfl.GenericConvOperator(
             inputs, outputs, stride, padding, dilation, output_padding, groups))
+
 
 class ATenConvolutionOperator(ATenConvolutionSchema):
     def parse(self, node, attrs, args, graph_converter):
