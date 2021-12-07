@@ -99,7 +99,13 @@ class QATQuantizer(object):
         """
 
         # We need a model in training mode so that QAT could take place
-        self.model.cpu()
+        device = None
+        try:
+            first_param = next(self.model.parameters())
+            device = first_param.device
+        except StopIteration:
+            pass
+
         self.model.train()
 
         # After tracing the model, we will get a TraceGraph object
@@ -127,6 +133,9 @@ class QATQuantizer(object):
             # Import the new model
             rewritten_model = import_from_path(model_ns, model_code_path, model_name_qat)()
             rewritten_model.load_state_dict(torch.load(model_weights_path))
+
+            if device is not None:
+                rewritten_model.to(device=device)
 
             # Remove the weights file to save space
             if self.remove_weights_after_load:
