@@ -1185,7 +1185,7 @@ def hook_modules(module):
                 else:
                     log.warning(
                         "Only tensors or list, tuple of tensors are supported when nested in a class, dict, list or tuple")
-        elif type(outputs) == dict:
+        elif isinstance(outputs, dict):
             for k, v in outputs.items():
                 if type(v) == torch.Tensor or (type(v) in (list, tuple) and all((type(x) == torch.Tensor for x in v))):
                     node = TraceNode(TraceFunction("output"))
