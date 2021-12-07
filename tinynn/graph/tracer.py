@@ -1105,7 +1105,7 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
     for i, t in enumerate(output_tensors):
         if type(t) in (list, tuple):
             for j, rt in enumerate(t):
-                assert type(rt) in (torch.dtype, torch.device, torch.Size, torch.Tensor), \
+                assert type(rt) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), \
                     f'Output [{i}][{j}] of {node.unique_name}({node.type()}) should be one of the following type \
                     [torch.dtype, torch.device, torch.Size, torch.Tensor], but got {type(rt)}'
                 current_graph().tensor_pre_node_dict[id(rt)] = node.unique_name
@@ -1113,7 +1113,7 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
                     log.debug(f'set pre_index tensor {i}, {j}')
                     current_graph().tensor_pre_index_dict[id(rt)] = [i, j]
         else:
-            assert type(t) in (torch.dtype, torch.device, torch.Size, torch.Tensor), \
+            assert type(t) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), \
                 f'Output #{i} of {node.unique_name}({node.type()}) should be one of the following type \
                 [torch.dtype, torch.device, torch.Size, torch.Tensor], but got {type(t)}'
             current_graph().tensor_pre_node_dict[id(t)] = node.unique_name
