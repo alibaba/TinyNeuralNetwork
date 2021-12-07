@@ -322,7 +322,7 @@ class ConstantNode(object):
 class TraceFunction(object):
     """ A data structure for traced functions """
 
-    def __init__(self, full_name: str, is_class: bool = False, is_property: bool = False):
+    def __init__(self, full_name: str, is_class: bool = False, is_property: bool = False, prefix: typing.Optional[str] = None):
         super().__init__()
 
         # The base name of the function
@@ -353,8 +353,11 @@ class TraceFunction(object):
         else:
             current_graph().global_functions[self.kind] += 1
 
+        if prefix is None:
+            prefix = ""
+
         # Unique name
-        self.unique_name = "_".join([self.kind, str(current_graph().global_functions[self.kind])])
+        self.unique_name = prefix + "_".join([self.kind, str(current_graph().global_functions[self.kind])])
 
         # The input tensors of the function
         self.prev_tensors = []
@@ -1364,7 +1367,7 @@ class TraceGraph(object):
         """ Builds a computation graph """
         if self.inited:
             return
-        
+
         with no_catch() as res:
             device = get_module_device(self.module)
 

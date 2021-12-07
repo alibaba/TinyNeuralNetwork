@@ -488,8 +488,7 @@ class QATQuantizer(object):
                 output_tensor = input_tensor * -1
 
                 with override_current_trace_graph(graph):
-                    trace_func = TraceFunction(new_fullname, True).parse_args(input_tensor, -1)
-                    graph.insert_after(input_node, trace_func, [output_tensor])
+                    trace_func = TraceFunction(new_fullname, True, prefix='fuse_').parse_args(input_tensor, -1)
 
                     node.module.func_type = '__add__'
                     node.module.kind = 'add'
@@ -513,7 +512,7 @@ class QATQuantizer(object):
                     other_arg = int(node.module.args_string_no_self)
 
                 with override_current_trace_graph(graph):
-                    trace_func = TraceFunction(new_fullname, True).parse_args(input_tensor, -1)
+                    trace_func = TraceFunction(new_fullname, True, prefix='fuse_').parse_args(input_tensor, -1)
                     graph.insert_before(node, trace_func, [output_tensor])
 
                     node.module.func_type = '__radd__'
@@ -550,7 +549,7 @@ class QATQuantizer(object):
                     log.error('rewrite supports torch.stack with nodes with exact one input')
                     assert False
                 with override_current_trace_graph(graph):
-                    trace_func = TraceFunction('torch.unsqueeze').parse_args(shared_tensors[0], dim)
+                    trace_func = TraceFunction('torch.unsqueeze', prefix='fuse_').parse_args(shared_tensors[0], dim)
                 next_tensors = [torch.unsqueeze(x, dim) for x in shared_tensors]
                 graph.insert_between(n, node, trace_func, next_tensors)
 
@@ -740,7 +739,8 @@ class QATQuantizer(object):
                     log.error('rewrite for partially-supported ops supports with nodes with exact one input')
                     assert False
                 with override_current_trace_graph(graph):
-                    trace_func = TraceFunction('torch.Tensor.contiguous', True).parse_args(shared_tensors[0])
+                    trace_func = TraceFunction('torch.Tensor.contiguous', True,
+                                               prefix='fuse_').parse_args(shared_tensors[0])
                 next_tensors = [x.contiguous() for x in shared_tensors]
                 graph.insert_between(n, node, trace_func, next_tensors)
 
