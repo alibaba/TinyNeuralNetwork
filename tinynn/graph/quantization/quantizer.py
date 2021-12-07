@@ -489,6 +489,7 @@ class QATQuantizer(object):
 
                 with override_current_trace_graph(graph):
                     trace_func = TraceFunction(new_fullname, True, prefix='fuse_').parse_args(input_tensor, -1)
+                    graph.insert_between(input_node, node, trace_func, [output_tensor])
 
                     node.module.func_type = '__add__'
                     node.module.kind = 'add'
@@ -503,6 +504,7 @@ class QATQuantizer(object):
                 new_fullname_parts = copy.deepcopy(full_name_parts)
                 new_fullname_parts[-1] = '__mul__'
                 new_fullname = '.'.join(new_fullname_parts)
+                input_node = node.prev_nodes[0]
                 input_tensor = node.prev_tensors[0]
                 output_tensor = input_tensor * -1
 
@@ -513,7 +515,7 @@ class QATQuantizer(object):
 
                 with override_current_trace_graph(graph):
                     trace_func = TraceFunction(new_fullname, True, prefix='fuse_').parse_args(input_tensor, -1)
-                    graph.insert_before(node, trace_func, [output_tensor])
+                    graph.insert_between(input_node, node, trace_func, [output_tensor])
 
                     node.module.func_type = '__radd__'
                     node.module.kind = 'add'
