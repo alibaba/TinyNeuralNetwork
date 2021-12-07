@@ -15,14 +15,17 @@ import torch.nn.qat as nnqat
 import torch.nn.quantized as nnq
 import torch.nn.quantized.dynamic as nnqd
 import torch.quantization as torch_q
+
 from torch.nn.parallel.data_parallel import DataParallel
 from torch.nn.parallel.distributed import DistributedDataParallel
-from tinynn.graph.tracer import (ConstantNode, TraceFunction, TraceGraph, TraceNode,
-                                 module_constructor_lines, override_current_trace_graph,
-                                 qualified_name, trace)
-from tinynn.graph.quantization.modules import QPReLU
-from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16
 
+from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16
+from tinynn.graph.quantization.modules import QPReLU
+from tinynn.graph.tracer import (ConstantNode, TraceFunction, TraceGraph,
+                                 TraceNode, module_constructor_lines,
+                                 override_current_trace_graph, qualified_name,
+                                 trace)
+from tinynn.util.train_util import get_module_device
 from tinynn.util.util import import_from_path
 
 # Fusable OPs for Quantize Aware Training
@@ -99,13 +102,6 @@ class QATQuantizer(object):
         """
 
         # We need a model in training mode so that QAT could take place
-        device = None
-        try:
-            first_param = next(self.model.parameters())
-            device = first_param.device
-        except StopIteration:
-            pass
-
         self.model.train()
 
         # After tracing the model, we will get a TraceGraph object
@@ -134,6 +130,7 @@ class QATQuantizer(object):
             rewritten_model = import_from_path(model_ns, model_code_path, model_name_qat)()
             rewritten_model.load_state_dict(torch.load(model_weights_path))
 
+            device = get_module_device(self.model)
             if device is not None:
                 rewritten_model.to(device=device)
 

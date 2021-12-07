@@ -13,9 +13,11 @@ import torch
 import torch.nn as nn
 import yaml
 import numpy as np
+
 from torch.nn.parallel.data_parallel import DataParallel
 from torch.nn.parallel.distributed import DistributedDataParallel
 
+from tinynn.util.train_util import get_module_device
 from tinynn.util.util import get_logger, import_from_path, tensors2ndarray
 from ._utils import patch_getitem, revert_getitem
 
@@ -1362,6 +1364,10 @@ class TraceGraph(object):
         """ Builds a computation graph """
         if self.inited:
             return
+        
+        with no_catch() as res:
+            device = get_module_device(self.module)
+
         with self.__numbering_context():
             if type(self.dummy_input) == torch.Tensor:
                 actual_input = [self.dummy_input]
@@ -1377,6 +1383,8 @@ class TraceGraph(object):
                     new_input = dummy_input.detach().clone()
                     if new_input.is_floating_point():
                         new_input.requires_grad = True
+                    if new_input.device != device:
+                        new_input = new_input.to(device=device)
                     actual_input[i] = new_input
 
             original_state_dict = copy.deepcopy(self.module.state_dict())

@@ -7,12 +7,14 @@ from pprint import pformat
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from tinynn.graph.tracer import TraceGraph, model_tracer, trace
-from tinynn.graph.modifier import is_dw_conv
-from tinynn.util.train_util import DLContext
-from tinynn.util.util import conditional, get_actual_type, get_logger
+
 from torch.nn.parallel.data_parallel import DataParallel
 from torch.nn.parallel.distributed import DistributedDataParallel
+
+from tinynn.graph.modifier import is_dw_conv
+from tinynn.graph.tracer import TraceGraph, model_tracer, trace
+from tinynn.util.train_util import DLContext, get_module_device
+from tinynn.util.util import conditional, get_actual_type, get_logger
 
 try:
     import ruamel_yaml as yaml
@@ -155,12 +157,7 @@ class BasePruner(ABC):
                 model = self.model
 
             with model_tracer():
-                old_device = None
-                try:
-                    first_param = next(model.parameters())
-                    old_device = first_param.device
-                except StopIteration:
-                    pass
+                old_device = get_module_device(model)
 
                 model.cpu()
                 graph = trace(model, self.dummy_input)

@@ -141,3 +141,25 @@ def get_device() -> torch.device:
     else:
         device = torch.device("cpu")
     return device
+
+
+def get_module_device(module: torch.nn.Module) -> typing.Optional[torch.device]:
+    """ Gets the device of the module
+
+    Args:
+        module (torch.nn.Module): The given module
+
+    Returns:
+        typing.Optional[torch.device]: The device of the module
+    """
+
+    assert isinstance(module, torch.nn.Module)
+
+    device = None
+    try:
+        first_param = next(module.parameters())
+        device = first_param.device
+    except StopIteration:
+        pass
+
+    return device
