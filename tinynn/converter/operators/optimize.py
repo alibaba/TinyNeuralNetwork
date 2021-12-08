@@ -53,6 +53,11 @@ class GraphOptimizer(object):
         remove_ids = []
         actions = []
         for conv, bn, tensor in filtered_pairs:
+            bn_activ = bn['op'].fusedActivationFunction
+            conv_activ = getattr(conv['op'], 'fusedActivationFunction', None)
+            if conv_activ is None and bn_activ != ActivationFunctionType.NONE:
+                continue
+
             # Find out the output of the batch-norm nodes
             new_output = bn['outputs'][0]
             assert new_output in self.graph.tensor_map
@@ -67,8 +72,6 @@ class GraphOptimizer(object):
             tensor['name'] = bn['outputs'][0]
             tensor['label'] = bn['outputs'][0]
 
-            bn_activ = bn['op'].fusedActivationFunction
-            conv_activ = conv['op'].fusedActivationFunction
             if bn_activ != ActivationFunctionType.NONE and conv_activ == ActivationFunctionType.NONE:
                 conv['op'].fusedActivationFunction = bn_activ
 
