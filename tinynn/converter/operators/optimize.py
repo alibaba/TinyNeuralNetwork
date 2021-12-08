@@ -973,6 +973,9 @@ class GraphOptimizer(object):
             self.fuse_simple_reshape_pass()
             self.fuse_simple_transpose_pass()
 
+        # Fuse activation
+        self.fuse_activation()
+
         # Final cleanup
         self.cleanup_dead_nodes()
 
