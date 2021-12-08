@@ -345,6 +345,8 @@ class QATQuantizer(object):
             torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
             for n in graph.forward_nodes:
                 if not n.quantized:
+                    if hasattr(n.module, "qconfig"):
+                        delattr(n.module, "qconfig")
                     if hasattr(n.module, "_forward_hooks"):
                         if len(n.module._forward_hooks) > 0:
                             n.module._forward_hooks.popitem()
