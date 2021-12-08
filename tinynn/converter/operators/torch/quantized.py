@@ -272,3 +272,14 @@ class QuantizedHardswishOperator(QuantizedHardswishSchema):
 
         self.run(node)
         self.elementwise_unary(tfl.HardSwishOperator, graph_converter)
+
+
+class QuantizedLeakyReluOperator(QuantizedLeakyReluSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        alpha = self.input_tensors[1]
+        assert isinstance(alpha, float)
+
+        self.run(node)
+        self.elementwise_unary(tfl.LeakyReluOperator, graph_converter, alpha)

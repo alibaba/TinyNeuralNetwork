@@ -139,6 +139,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "quantized::conv_transpose1d": QuantizedConvTranspose1dOperator,
                                                                 "quantized::conv_transpose2d": QuantizedConvTranspose2dOperator,
                                                                 "quantized::hardswish": QuantizedHardswishOperator,
+                                                                "quantized::leaky_relu": QuantizedLeakyReluOperator,
 
                                                                 # non tracking
                                                                 "aten::Int": NoTrackOperator,
