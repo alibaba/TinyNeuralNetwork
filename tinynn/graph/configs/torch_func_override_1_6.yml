@@ -1062,3 +1062,12 @@ torch.nn.functional:
 - triplet_margin_loss
 - triplet_margin_with_distance_loss
 - unfold
+torchvision.ops:
+- _new_empty_tensor
+- box_iou
+- deform_conv2d
+- nms
+- ps_roi_align
+- ps_roi_pool
+- roi_align
+- roi_pool

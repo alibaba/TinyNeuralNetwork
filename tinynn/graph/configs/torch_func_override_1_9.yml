@@ -1274,3 +1274,18 @@ torch.special:
 - special_logit
 - special_xlog1py
 - xlog1py
+torchvision.ops:
+- batched_nms
+- box_area
+- box_convert
+- box_iou
+- clip_boxes_to_image
+- deform_conv2d
+- generalized_box_iou
+- nms
+- ps_roi_align
+- ps_roi_pool
+- remove_small_boxes
+- roi_align
+- roi_pool
+- sigmoid_focal_loss

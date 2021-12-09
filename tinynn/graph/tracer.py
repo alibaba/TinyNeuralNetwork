@@ -808,7 +808,10 @@ def fetch_funcs(config: typing.Optional[str] = None):
         new_dict = {}
         for ns, module_names in module_dict.items():
             log.debug(f'Attempting to load {ns}')
-            spec = importlib.util.find_spec(ns)
+            try:
+                spec = importlib.util.find_spec(ns)
+            except ImportError:
+                continue
             if spec is None:
                 modules = ns.split('.')
                 ns = '.'.join(modules[:-1])
@@ -1476,6 +1479,10 @@ class TraceGraph(object):
 
             if type(node.module) == TraceFunction:
                 node_type = node.type()
+                full_name = node.full_name()
+                if not full_name.startswith('torch.'):
+                    ns = '.'.join(full_name.split('.')[:-1])
+                    self.used_namespaces.add(ns)
                 if node.is_class():
                     if node.module.is_property:
                         line = f"        {output} = {node.prev_node_unique_name(0)}.{node_type}"

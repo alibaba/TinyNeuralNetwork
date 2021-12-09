@@ -1,9 +1,12 @@
-import inspect
-import torch
-import yaml
-import operator
 import importlib
-from torch.overrides import get_testing_overrides, get_overridable_functions, get_ignored_functions
+import inspect
+import operator
+
+import torch
+import torchvision.ops
+import yaml
+from torch.overrides import (get_ignored_functions, get_overridable_functions,
+                             get_testing_overrides)
 
 # TODO: Better detection
 
@@ -127,6 +130,11 @@ if 'torch.tensor' in final_dict:
     v = final_dict.pop('torch.tensor')
     final_dict['torch.Tensor'].extend(v)
 
+# Stage 6: torchvision ops
+final_dict.setdefault('torchvision.ops', [])
+for k, v in torchvision.ops.__dict__.items():
+    if inspect.isroutine(v) and v.__doc__ is not None:
+        final_dict['torchvision.ops'].append(k)
 
 def get_scope(ns):
     spec = importlib.util.find_spec(ns)
@@ -151,7 +159,7 @@ def get_scope(ns):
 ver = torch.__version__
 ver = '_'.join(ver.split('.')[:2])
 
-# Stage 6: Functions in new versions may exist in current version
+# Stage 7: Functions in new versions may exist in current version
 latest = '1_10'
 if ver != latest:
     with open(f'torch_func_override_{latest}.yml', 'r') as f:
@@ -168,7 +176,7 @@ if ver != latest:
                             final_dict[k].append(i)
                             print(k, i)
 
-# Stage 7: Functions may have different names (e.g. F.pad)
+# Stage 8: Functions may have different names (e.g. F.pad)
 for k in final_dict:
     scope = get_scope(k)
     if scope is not None:
@@ -179,13 +187,13 @@ for k in final_dict:
                     final_dict[k].append(i)
                     print(k, i)
 
-# Stage 8: Make the functions unique and sorted
+# Stage 9: Make the functions unique and sorted
 for k, v in final_dict.items():
     vv = list(set(v))
     vv.sort()
     v.clear()
     v.extend(vv)
 
-# Stage 9: Update config
+# Stage 10: Update config
 with open(f'torch_func_override_{ver}.yml', 'w') as f:
     yaml.dump(final_dict, f)
