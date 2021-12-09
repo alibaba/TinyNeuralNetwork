@@ -75,17 +75,26 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
         output_tensor = outputs[0]
 
-        self.rescale_weight_scale_for_qnnpack(input_tensor, weight_tensor, output_tensor)
+        per_tensor = weight_tensor.quantization.dim is None
+        if per_tensor:
+            self.rescale_weight_scale_for_qnnpack(input_tensor, weight_tensor, output_tensor)
 
         # Bias handling
-        bias_scale = input_tensor.quantization.scale * weight_tensor.quantization.scale
+        if per_tensor:
+            bias_scale = input_tensor.quantization.scale * weight_tensor.quantization.scale
+            bias_zero_point = 0
+        else:
+            bias_scale = [input_tensor.quantization.scale * s for s in weight_tensor.quantization.scale]
+            bias_zero_point = [0] * len(bias_scale)
+            bias_dim = weight_tensor.quantization.dim
+
         if transpose:
             if self.asymmetric:
-                bias = self.quantize(bias, bias_scale, 0, dtype=torch.uint8)
+                bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.uint8)
             else:
-                bias = self.quantize(bias, bias_scale, 0, dtype=torch.int8)
+                bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int8)
         else:
-            bias = self.quantize(bias, bias_scale, 0, dtype=torch.int32)
+            bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int32, dim=bias_dim)
 
         bias_tensor = self.create_attr_tensor(bias)
 

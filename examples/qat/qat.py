@@ -33,8 +33,8 @@ def main_worker(args):
         #   quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'force_overwrite': False, 'is_input_quantized': None})
         # The `is_input_quantized` in the previous line is a flag on the input tensors whether they are quantized or not,
         # which can be None (False for all inputs) or a list of booleans that corresponds to the inputs.
-        # Also, if you need symmetric quantization (int8), you may use the following line.
-        #   quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'asymmetric': False})
+        # Also, if you need symmetric quantization (int8, per-channel/per-tensor), you may use the following line.
+        #   quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'asymmetric': False, 'per_tensor': True})
 
         quantizer = QATQuantizer(model, dummy_input, work_dir='out')
         qat_model = quantizer.quantize()

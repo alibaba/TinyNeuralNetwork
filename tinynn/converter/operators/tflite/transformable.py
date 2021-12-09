@@ -239,15 +239,23 @@ class GenericConvOperator(TransformableOperator):
         if conv_op.op.code == tflite.BuiltinOperator.DEPTHWISE_CONV_2D:
             nchw2chwn_perm = np.array([1, 2, 3, 0], dtype='int32')
             nchw2chwn_perm_tensor = self.create_attr_tensor(nchw2chwn_perm)
+            weight_q = weight.quantization
+            if weight_q is not None and weight_q.dim is not None:
+                new_dim = np.nonzero(nchw2chwn_perm == weight_q.dim)[0][0]
+                weight_q = QuantizationParameters(weight_q.scale, weight_q.zero_point, new_dim)
             reordered_weight = self.create_transform_tensor(np.transpose(
-                weight.tensor, nchw2chwn_perm), quantization=weight.quantization)
+                weight.tensor, nchw2chwn_perm), quantization=weight_q)
             conv_op.inputs[1] = reordered_weight
             reorder_op = tfl_ops.TransposeOperator([weight, nchw2chwn_perm_tensor], [reordered_weight])
         else:
             nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
             nchw2nhwc_perm_tensor = self.create_attr_tensor(nchw2nhwc_perm)
+            weight_q = weight.quantization
+            if weight_q is not None and weight_q.dim is not None:
+                new_dim = np.nonzero(nchw2nhwc_perm == weight_q.dim)[0][0]
+                weight_q = QuantizationParameters(weight_q.scale, weight_q.zero_point, new_dim)
             reordered_weight = self.create_transform_tensor(np.transpose(
-                weight.tensor, nchw2nhwc_perm), quantization=weight.quantization)
+                weight.tensor, nchw2nhwc_perm), quantization=weight_q)
             conv_op.inputs[1] = reordered_weight
             reorder_op = tfl_ops.TransposeOperator([weight, nchw2nhwc_perm_tensor], [reordered_weight])
         ops.insert(1, reorder_op)

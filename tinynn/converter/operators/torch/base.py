@@ -219,7 +219,11 @@ class OperatorConverter(ABC):
             cur_scale = weight_tensor.quantization.scale
             log.info(f'rescale quantized weight of {weight_tensor.name}: {orig_scale:.8f}->{cur_scale:.8f}')
 
-    def quantize(self, tensor, scale, zero_point, dtype=torch.uint8):
+    def quantize(self, tensor, scale, zero_point, dtype=torch.uint8, dim=None):
+        if isinstance(scale, list):
+            scale = torch.tensor(scale)
+        if isinstance(zero_point, list):
+            zero_point = torch.tensor(zero_point)
         q_tensor = torch.round(tensor.detach() / scale + zero_point)
         type_info = torch.iinfo(dtype)
         if (q_tensor > type_info.max).any():
@@ -227,7 +231,11 @@ class OperatorConverter(ABC):
         if (q_tensor < type_info.min).any():
             warnings.warn('Underflow while quantizing the tensor')
         q_tensor = q_tensor.to(dtype=dtype)
-        return tfl.FakeQuantTensor(q_tensor, scale, zero_point)
+        if isinstance(scale, torch.Tensor):
+            scale = scale.tolist()
+        if isinstance(zero_point, torch.Tensor):
+            zero_point = zero_point.tolist()
+        return tfl.FakeQuantTensor(q_tensor, scale, zero_point, dim)
 
     def passthrough(self, graph_converter):
         assert len(self.input_tensors) >= len(self.output_tensors)

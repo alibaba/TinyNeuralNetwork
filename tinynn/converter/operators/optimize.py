@@ -290,7 +290,7 @@ class GraphOptimizer(object):
             constant_tensor = transpose['op'].inputs[0].tensor
             perm_tensor = transpose['op'].inputs[1].tensor
             new_constant = np.transpose(constant_tensor, perm_tensor)
-            new_tensor = self.create_attr_tensor(new_constant, quantization=transpose['op'].inputs[0].quantization)
+            new_tensor = self.create_attr_tensor(new_constant, quantization=transpose['op'].outputs[0].quantization)
             new_node = self.graph.add_nodes([new_tensor])[0]
 
             # For each node that is next of a constant transpose node, we connect it with the new constant node

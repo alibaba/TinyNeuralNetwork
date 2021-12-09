@@ -76,25 +76,38 @@ class BaseOperator(object):
 
 
 class QuantizationParameters:
-    scale: float
-    zero_point: int
+    scale: typing.Union[float, typing.List[float]]
+    zero_point: typing.Union[int, typing.List[int]]
     tfl_quant_args: Offset
 
-    def __init__(self, scale: float, zero_point: int):
+    def __init__(self, scale: typing.Union[float, typing.List[float]], zero_point: int, dim: typing.Optional[int] = None):
         self.scale = scale
         self.zero_point = zero_point
+        self.dim = dim
 
         self.tfl_quant_args = 0
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
-        scale = create_numpy_array(builder, tflite.QuantizationParameters.Scale, [self.scale], 'float32')
-        zero_point = create_numpy_array(builder, tflite.QuantizationParameters.ZeroPoint, [self.zero_point], 'int64')
+        if isinstance(self.scale, float):
+            scale = create_numpy_array(builder, tflite.QuantizationParameters.Scale, [self.scale], 'float32')
+        else:
+            scale = create_numpy_array(builder, tflite.QuantizationParameters.Scale, self.scale, 'float32')
+
+        if isinstance(self.zero_point, int):
+            zero_point = create_numpy_array(builder, tflite.QuantizationParameters.ZeroPoint, [
+                                            self.zero_point], 'int64')
+        else:
+            zero_point = create_numpy_array(builder, tflite.QuantizationParameters.ZeroPoint, self.zero_point, 'int64')
 
         tflite.QuantizationParametersStart(builder)
         tflite.QuantizationParametersAddMin(builder, 0)
         tflite.QuantizationParametersAddMax(builder, 0)
         tflite.QuantizationParametersAddScale(builder, scale)
         tflite.QuantizationParametersAddZeroPoint(builder, zero_point)
+
+        if self.dim is not None:
+            tflite.QuantizationParametersAddQuantizedDimension(builder, self.dim)
+
         self.tfl_quant_args = tflite.QuantizationParametersEnd(builder)
 
         return self.tfl_quant_args
@@ -124,10 +137,11 @@ class Buffer(object):
 
 
 class FakeQuantTensor(object):
-    def __init__(self, tensor, scale, zero_point) -> None:
+    def __init__(self, tensor, scale, zero_point, dim=None) -> None:
         self.tensor = tensor
         self.scale = scale
         self.zero_point = zero_point
+        self.dim = dim
 
 
 class Tensor(object):
@@ -148,7 +162,7 @@ class Tensor(object):
         self.is_variable = is_variable
 
         if type(tensor) == FakeQuantTensor:
-            self.quantization = QuantizationParameters(tensor.scale, tensor.zero_point)
+            self.quantization = QuantizationParameters(tensor.scale, tensor.zero_point, tensor.dim)
             tensor = tensor.tensor
 
         if isinstance(tensor, torch.nn.Parameter):
@@ -163,17 +177,35 @@ class Tensor(object):
                 if asymmetric:
                     self.quantization = QuantizationParameters(tensor.q_scale(), tensor.q_zero_point())
                 else:
-                    assert tensor.q_zero_point() == 128
+                    assert tensor.q_zero_point() == 128, "As for symmetric quantization, " \
+                        "the zero point of the u8 tensors should be 128. " \
+                        "This could happen if you didn't train the model after QAT preparation."
                     self.tensor = (self.tensor.astype(np.int32) - 128).astype(np.int8)
                     self.quantization = QuantizationParameters(tensor.q_scale(), 0)
             elif tensor.dtype == torch.qint8:
                 self.tensor = torch.int_repr(tensor.detach()).numpy()
                 if asymmetric:
-                    assert tensor.q_zero_point() == 0
+                    assert tensor.q_zero_point() == 0, "As for asymmetric quantization, " \
+                        "the zero point of the s8 tensors should be 0. "
                     self.tensor = self.tensor.view(np.uint8) + 128
                     self.quantization = QuantizationParameters(tensor.q_scale(), 128)
                 else:
-                    self.quantization = QuantizationParameters(tensor.q_scale(), tensor.q_zero_point())
+                    if tensor.qscheme() in (torch.per_tensor_symmetric, torch.per_tensor_affine):
+                        self.quantization = QuantizationParameters(tensor.q_scale(), tensor.q_zero_point())
+                    else:
+                        assert tensor.qscheme() in (torch.per_channel_symmetric, torch.per_channel_affine)
+
+                        scales = tensor.q_per_channel_scales().tolist()
+                        zero_points = tensor.q_per_channel_zero_points().tolist()
+                        dim = tensor.q_per_channel_axis()
+
+                        if dim < 0:
+                            dim += tensor.dim()
+
+                        assert all((t == 0 for t in zero_points)), f'As for symmetric quantization, " \
+                            "the zero point of the s8 tensors should be 0, but got ${zero_points}'
+
+                        self.quantization = QuantizationParameters(scales, zero_points, dim)
             else:
                 self.tensor = tensor.detach().numpy()
         elif type(tensor) == torch.Size:
