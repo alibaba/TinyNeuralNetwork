@@ -1480,7 +1480,7 @@ class TraceGraph(object):
             if type(node.module) == TraceFunction:
                 node_type = node.type()
                 full_name = node.full_name()
-                if not full_name.startswith('torch.'):
+                if not full_name.startswith('torch.') and not full_name.startswith('self.'):
                     ns = '.'.join(full_name.split('.')[:-1])
                     self.used_namespaces.add(ns)
                 if node.is_class():
