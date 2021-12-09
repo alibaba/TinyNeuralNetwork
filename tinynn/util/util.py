@@ -223,7 +223,7 @@ def get_logger(name: str, level: typing.Optional[str] = None) -> logging.Logger:
 
     Args:
         name (str): The name of the module
-        level (typing.Optional[str]): The level of the logger. Defaults to None ('WARNING').
+        level (typing.Optional[str]): The level of the logger. Defaults to None ('INFO').
 
     Returns:
         logging.Logger: The logger of the module
