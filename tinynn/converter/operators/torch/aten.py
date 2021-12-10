@@ -1274,6 +1274,83 @@ class ATenLayerNormOperator(ATenLayerNormSchema):
             graph_converter.add_operator(op)
 
 
+class ATenInstanceNormOperator(ATenInstanceNormSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        ops = []
+
+        inp = self.find_or_create_input(0, graph_converter)
+        eps = self.input_tensors[args['eps']]
+
+        weight, bias = self.input_tensors[1:3]
+        affine = False
+        track_running_stats = False
+        if weight is not None and bias is not None:
+            affine = True
+            weight, bias = [self.find_or_create_input(i, graph_converter) for i in range(1, 3)]
+
+        running_mean, running_var = self.input_tensors[3:5]
+        if running_mean is not None and running_var is not None:
+            track_running_stats = True
+            running_mean, running_var = [self.find_or_create_input(i, graph_converter) for i in range(3, 5)]
+
+        if affine and track_running_stats:
+            inputs = [inp, weight, bias, running_mean, running_var]
+            outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+            ops.append(tfl.BatchNormOperator(inputs, outputs, eps))
+        else:
+            assert track_running_stats is False, 'Instance norm with track_running_stats=True and affine=False is not supported'
+            dims = len(inp.shape)
+            axis = tuple(range(2, dims))
+            axis_tensor = self.create_attr_tensor(np.array(axis, dtype='int32'))
+            dim_ones = (1,) * (dims - 2)
+            dims = self.create_attr_tensor(np.array(axis, dtype='int32'))
+            mean = self.create_transform_tensor(np.mean(inp.tensor, axis=axis, keepdims=True))
+            ops.append(tfl.MeanOperator([inp, axis_tensor], [mean], keepDims=True))
+
+            squared_diff = self.create_transform_tensor(np.power(inp.tensor - mean.tensor, 2))
+            ops.append(tfl.SquaredDifferenceOperator([inp, mean], [squared_diff]))
+
+            var = self.create_transform_tensor(np.mean(squared_diff.tensor, axis=axis, keepdims=True))
+            ops.append(tfl.MeanOperator([squared_diff, dims], [var], keepDims=True))
+
+            numerator = self.create_transform_tensor(inp.tensor - mean.tensor)
+            ops.append(tfl.SubOperator([inp, mean], [numerator]))
+
+            eps_tensor = self.create_attr_tensor(np.array([eps], dtype='float32'))
+            with_eps = self.create_transform_tensor(var.tensor + eps_tensor.tensor)
+            ops.append(tfl.AddOperator([var, eps_tensor], [with_eps]))
+
+            denominator = self.create_transform_tensor(np.sqrt(with_eps.tensor))
+            ops.append(tfl.SqrtOperator([with_eps], [denominator]))
+
+            outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+            if affine is False:
+                ops.append(tfl.DivOperator([numerator, denominator], outputs))
+            else:
+                weight.tensor = weight.tensor.reshape(-1, *dim_ones)
+                bias.tensor = bias.tensor.reshape(-1, *dim_ones)
+
+                weight_tensor = self.create_attr_tensor(weight.tensor)
+                bias_tensor = self.create_attr_tensor(bias.tensor)
+
+                norm = self.create_transform_tensor(numerator.tensor / denominator.tensor)
+                ops.append(tfl.DivOperator([numerator, denominator], [norm]))
+
+                mul_out = self.create_transform_tensor(norm.tensor * weight_tensor.tensor)
+                ops.append(tfl.MulOperator([norm, weight_tensor], [mul_out]))
+
+                outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+                ops.append(tfl.AddOperator([mul_out, bias_tensor], outputs))
+
+        for op in ops:
+            print(op)
+            graph_converter.add_operator(op)
+
+
 class ATenIndexOperator(ATenIndexSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)

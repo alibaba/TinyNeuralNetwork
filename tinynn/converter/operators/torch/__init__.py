@@ -94,6 +94,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::ne": ATenNeOperator,
                                                                 "aten::softplus": ATenSoftplusOperator,
                                                                 "aten::layer_norm": ATenLayerNormOperator,
+                                                                "aten::instance_norm": ATenInstanceNormOperator,
                                                                 "aten::index": ATenIndexOperator,
                                                                 "aten::clone": ATenCloneOperator,
                                                                 "aten::repeat": ATenRepeatOperator,
