@@ -1255,7 +1255,7 @@ class ATenLayerNormOperator(ATenLayerNormSchema):
         ops.append(tfl.SubOperator([input_tensor, mean_tensor], [numerator]))
 
         eps_tensor = self.create_attr_tensor(np.array([eps], dtype='float32'))
-        with_eps = self.create_transform_tensor(input_tensor.tensor + eps_tensor.tensor)
+        with_eps = self.create_transform_tensor(var_tensor.tensor + eps_tensor.tensor)
         ops.append(tfl.AddOperator([var_tensor, eps_tensor], [with_eps]))
 
         denominator = self.create_transform_tensor(np.sqrt(with_eps.tensor))
