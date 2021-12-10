@@ -791,7 +791,9 @@ class QATQuantizer(object):
                                            'hardsigmoid',
                                            'silu',
                                            'reciprocal',
-                                           'exp')
+                                           'exp',
+                                           'layer_norm',
+                                           'instance_norm')
             else:
                 if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
                     if cur_class == nn.ConvTranspose2d:
@@ -799,7 +801,12 @@ class QATQuantizer(object):
                 else:
                     if cur_class == nn.SiLU:
                         return True
-                return cur_class in (nn.LSTM, nn.RNN, nn.GRU)
+                return cur_class in (nn.LSTM,
+                                     nn.RNN,
+                                     nn.GRU,
+                                     nn.LayerNorm,
+                                     nn.InstanceNorm1d,
+                                     nn.InstanceNorm2d)
 
         unsupported_nodes = graph.filter_forward_nodes(_is_not_quantizable)
         for idx, node in enumerate(reversed(unsupported_nodes)):
