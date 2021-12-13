@@ -1,6 +1,11 @@
-from flatbuffers import flexbuffers
-
 from .generated_ops import CustomOperator
+
+HAS_FLEXBUFFER = False
+try:
+    from flatbuffers import flexbuffers
+    HAS_FLEXBUFFER = True
+except ImportError:
+    pass
 
 
 class Atan2Operator(CustomOperator):
@@ -15,6 +20,7 @@ class TFLiteDetectionPostprocessOperator(CustomOperator):
                  num_classes: int, y_scale: float, x_scale: float,
                  h_scale: float, w_scale: float) -> None:
         super().__init__(inputs, outputs)
+        assert HAS_FLEXBUFFER, "TFLITE_DETECTION_POSTPROCESS relies on FlexBuffer, which requires flatbuffers>=2"
         self.op.custom_code = "TFLITE_DETECTION_POSTPROCESS"
         self.max_detections = max_detections
         self.max_classes_per_detection = max_classes_per_detection
