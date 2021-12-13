@@ -83,6 +83,7 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
         if per_tensor:
             bias_scale = input_tensor.quantization.scale * weight_tensor.quantization.scale
             bias_zero_point = 0
+            bias_dim = None
         else:
             bias_scale = [input_tensor.quantization.scale * s for s in weight_tensor.quantization.scale]
             bias_zero_point = [0] * len(bias_scale)
