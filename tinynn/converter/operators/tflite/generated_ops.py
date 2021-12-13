@@ -697,6 +697,26 @@ class CallOperator(BaseOperator):
 class CustomOperator(BaseOperator):
     def __init__(self, inputs, outputs) -> None:
         super().__init__(tflite.BuiltinOperator.CUSTOM, inputs, outputs)
+        self.custom_options = None
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.NONE)
+        tflite.OperatorAddBuiltinOptions(builder, 0)
+
+        if self.custom_options is not None:
+            tflite.OperatorAddCustomOptionsFormat(builder, tflite.CustomOptionsFormat.FLEXBUFFERS)
+            tflite.OperatorAddCustomOptions(builder, self.custom_options)
+
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
 
 
 class EmbeddingLookupSparseOperator(BaseOperator):
