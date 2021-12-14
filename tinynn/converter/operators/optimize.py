@@ -1268,10 +1268,11 @@ def fuse_transpose_perms_extended(seq: typing.Iterable[ig.Vertex]):
                 new_shape_padded = list(new_shape) + [None] * (len(old_shape) - len(new_shape))
                 next_perm = []
                 new_idx = 0
-                for old, item in zip(old_shape, cur_perm):
-                    if old == new_shape_padded[new_idx]:
-                        next_perm.append(item)
-                        new_idx += 1
+                while new_idx < len(new_shape):
+                    for old, item in zip(old_shape, cur_perm):
+                        if old == new_shape_padded[new_idx]:
+                            next_perm.append(item)
+                            new_idx += 1
                 cur_perm = np.argsort(next_perm)
 
     return cur_perm
@@ -1348,6 +1349,7 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
     remove_ids = []
     actions = []
     for seq in filtered_pairs:
+        print('-' * 60)
         first_node = seq[0]
         last_node = seq[-1]
 
