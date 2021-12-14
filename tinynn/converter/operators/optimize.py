@@ -1349,7 +1349,6 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
     remove_ids = []
     actions = []
     for seq in filtered_pairs:
-        print('-' * 60)
         first_node = seq[0]
         last_node = seq[-1]
 
