@@ -1270,7 +1270,7 @@ def fuse_transpose_perms_extended(seq: typing.Iterable[ig.Vertex]):
                 new_idx = 0
                 while new_idx < len(new_shape):
                     for old, item in zip(old_shape, cur_perm):
-                        if old == new_shape_padded[new_idx]:
+                        if old == new_shape_padded[new_idx] and item not in next_perm:
                             next_perm.append(item)
                             new_idx += 1
                 cur_perm = np.argsort(next_perm)
