@@ -1345,7 +1345,8 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
                         remove_first_node_action: typing.Optional[typing.Callable] = None,
                         remove_last_pred: typing.Union[bool, typing.Callable] = True,
                         remove_last_node_action: typing.Optional[typing.Callable] = None,
-                        skip_pred: typing.Union[bool, typing.Callable] = False):
+                        skip_pred: typing.Union[bool, typing.Callable] = False,
+                        input_idx: int = 0):
     remove_ids = []
     actions = []
     for seq in filtered_pairs:
@@ -1375,7 +1376,7 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
         # If the first node can also be eliminated, then set the previous node as the first node
         if remove_first:
             first_node = graph_converter.graph.vs.find(
-                name=graph_converter.tensor_node_map[first_node['op'].inputs[0].name])
+                name=graph_converter.tensor_node_map[first_node['op'].inputs[input_idx].name])
 
         if not remove_last:
             last_node = seq[-2]
@@ -1389,7 +1390,15 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
 
         if use_forward_input:
             # Find out the output of the first node in the sequence
-            new_output = first_node['outputs'][0]
+            output_idx = 0
+            if first_node.outdegree() > 0:
+                if first_node == seq[0]:
+                    next_idx = 1
+                else:
+                    next_idx = 0
+                output_name = seq[next_idx]['op'].inputs[input_idx].name
+                output_idx = first_node['outputs'].index(output_name)
+            new_output = first_node['outputs'][output_idx]
             assert new_output in graph_converter.tensor_map
 
             # For each node that is next of the last node, we connect it with the first node
@@ -1413,7 +1422,7 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
         if remove_first and remove_last:
             # When the first node is a constant node, we need to set the buffer back
             if first_node['node_type'] == ExtendedOperator.CONSTANT_NODE and not use_forward_input:
-                old_tensor = seq[0]['op'].inputs[0]
+                old_tensor = seq[0]['op'].inputs[input_idx]
                 new_tensor = seq[-1]['op'].outputs[0]
                 new_tensor.buffer = old_tensor.buffer
 
