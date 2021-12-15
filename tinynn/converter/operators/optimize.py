@@ -1088,6 +1088,9 @@ def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph):
                  target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape) or
              (target_vertex['node_type'] == ExtendedOperator.SLICE and
                  target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape) or
+             (target_vertex['node_type'] == ExtendedOperator.GATHER and
+                 target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape and
+                 (np.diff(target_vertex['op'].inputs[1].tensor) == 1).all()) or
              (target_vertex['node_type'] == ExtendedOperator.CAST and
                  target_vertex['op'].inDataType == target_vertex['op'].outDataType))
 
