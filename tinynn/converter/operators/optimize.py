@@ -1020,7 +1020,10 @@ def is_transpose_elementwise_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
             (target_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
                 (is_elementwise_unary_op(source_vertex['node_type'], source_vertex['op']) or
                  is_elementwise_binary_op(source_vertex['node_type'], source_vertex['op'])))) \
-        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+        and ((target_vertex['node_type'] != ExtendedOperator.SPLIT and
+              target_vertex['op'].inputs[0].name in source_vertex['outputs']) or
+             (target_vertex['node_type'] == ExtendedOperator.SPLIT and
+              target_vertex['op'].inputs[1].name in source_vertex['outputs']))
 
 
 def is_reshape_elementwise_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
