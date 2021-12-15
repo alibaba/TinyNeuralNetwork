@@ -392,7 +392,7 @@ class GraphOptimizer(object):
             new_shape = mid_node['op'].outputs[0].shape
 
             if not is_simple_reshape(orig_shape, new_shape):
-                return False
+                return True
 
             new_perm = fuse_transpose_perms_extended(seq)
             return (new_perm != np.sort(new_perm)).any()
