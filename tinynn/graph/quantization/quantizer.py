@@ -203,12 +203,13 @@ class QATQuantizer(object):
             for n in graph.input_nodes:
                 qat_analysis_queue.put((n, False))
 
+        for n in graph.constant_nodes:
+            print(n.unique_name, n.module.dtype)
+            qat_analysis_queue.put((n, not n.module.dtype == 'torch.float32'))
+
         while not qat_analysis_queue.empty():
             node, quantized = qat_analysis_queue.get()
             _qat_analysis(node, quantized)
-
-        for n in graph.constant_nodes:
-            _qat_analysis(n, not n.module.dtype == 'torch.float32')
 
         log.debug("qat analysis over")
 
