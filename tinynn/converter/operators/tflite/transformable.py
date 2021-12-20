@@ -321,14 +321,16 @@ class GenericTransposeConvOperator(TransformableOperator):
         self.groups = groups
 
     def transform(self, graph_converter, mapping):
+        input_tensor = self.inputs[0]
         weight_tensor = self.inputs[1]
 
+        input_dim = len(input_tensor.shape)
         weight_dim = len(weight_tensor.shape)
 
         prev_ops = []
         next_ops = []
 
-        if weight_dim == 3:
+        if weight_dim == 3 or input_dim == 3:
             self.stride.insert(0, 1)
             self.padding.insert(0, 0)
             self.dilation.insert(0, 1)
@@ -342,7 +344,12 @@ class GenericTransposeConvOperator(TransformableOperator):
             reshape_ops = [tfl_ops.ReshapeOperator([old, attr], [new], attr.tensor)
                            for old, new, attr in zip(self.inputs[:2], reshape_outputs, reshape_attrs)]
 
-            prev_ops.extend(reshape_ops)
+            if weight_dim == 3 and input_dim == 3:
+                prev_ops.extend(reshape_ops)
+            elif weight_dim == 3:
+                prev_ops.append(reshape_ops[1])
+            else:
+                prev_ops.append(reshape_ops[0])
 
             conv_outputs = [self.create_transform_tensor(
                 np.expand_dims(self.outputs[0].tensor, 2),
@@ -354,7 +361,12 @@ class GenericTransposeConvOperator(TransformableOperator):
 
             next_ops.extend(conv_ops)
 
-            self.inputs = reshape_outputs + self.inputs[2:]
+            if weight_dim == 3 and input_dim == 3:
+                self.inputs = reshape_outputs + self.inputs[2:]
+            elif weight_dim == 3:
+                self.inputs = self.inputs[0:1] + reshape_outputs[1:2] + self.inputs[1:]
+            else:
+                self.inputs = reshape_outputs[0:1] + self.inputs[1:]
             self.outputs = conv_outputs + self.outputs[1:]
 
             weight_tensor = self.inputs[1]
