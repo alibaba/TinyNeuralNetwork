@@ -86,9 +86,10 @@ class BatchNormOperator(TransformableOperator):
 
         w, b, mean, var = [self.inputs[i]
                            for i in (self.weight_index, self.bias_index, self.running_mean_index, self.running_variance_index)]
-        eps = np.array(self.eps, dtype='float32')
-        new_w = w.tensor / (np.sqrt(var.tensor + eps, dtype='float32'))
-        new_b = b.tensor - w.tensor * mean.tensor / (np.sqrt(var.tensor + eps, dtype='float32'))
+
+        inv = 1 / np.sqrt(var.tensor + self.eps)
+        new_w = inv * w.tensor
+        new_b = b.tensor - mean.tensor * new_w
 
         inp = self.inputs[0]
 
@@ -106,7 +107,7 @@ class BatchNormOperator(TransformableOperator):
             graph_converter.add_operator(tfl_ops.DequantizeOperator([inp], [new_inp]))
 
         mul_out = self.create_transform_tensor(new_inp.tensor * weight.tensor)
-        graph_converter.add_operator(tfl_ops.MulOperator([inp, weight], [mul_out]))
+        graph_converter.add_operator(tfl_ops.MulOperator([new_inp, weight], [mul_out]))
 
         if inp.quantization is not None:
             add_out = self.create_transform_tensor(mul_out.tensor + bias.tensor)
