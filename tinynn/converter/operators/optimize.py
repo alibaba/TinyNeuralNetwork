@@ -85,7 +85,7 @@ class GraphOptimizer(object):
             eps = bn['op'].eps
 
             # Fuse conv/fc and batch-norm
-            new_weight = fuse_bn_weight(eps, bn_w, bn_var, activ_w)
+            new_weight = fuse_bn_weight(eps, bn_w, bn_var, activ_w, conv['node_type'] == ExtendedOperator.GENERIC_DECONV)
             new_bias = fuse_bn_bias(eps, bn_w, bn_var, bn_mean, bn_b, activ_b)
 
             # New attribute tensors
@@ -1194,31 +1194,25 @@ def is_transpose_same_to_reshape_op(op: tfl.BaseOperator):
         return False
 
 
-def fuse_bn_weight(eps, scale, var, weight):
-    while weight.ndim > scale.ndim:
-        scale = scale[:, None]
-    while weight.ndim > var.ndim:
-        var = var[:, None]
+def fuse_bn_weight(eps, scale, var, weight, transpose):
+    if transpose:
+        shape = [1, -1] + [1] * (len(weight.shape) - 2)
+    else:
+        shape = [-1, 1] + [1] * (len(weight.shape) - 2)
 
-    eps = np.array(eps, dtype='float32')
+    inv = 1 / np.sqrt(var + eps)
 
-    return weight * scale / np.sqrt(var + eps, dtype='float32')
+    return weight * (scale * inv).reshape(shape)
 
 
 def fuse_bn_bias(eps, scale, var, mean, bn_b, activ_b):
-    if scale.ndim > 1:
-        scale = scale.flatten()
-    if var.ndim > 1:
-        var = var.flatten()
-
-    eps = np.array(eps, dtype='float32')
-
+    inv = 1 / np.sqrt(var + eps)
     if activ_b is not None:
         if activ_b.shape != mean.shape and activ_b.ndim == 1 and activ_b.size == 1:
             activ_b = activ_b.repeat(mean.size)
-        return ((activ_b - mean) * scale) / (np.sqrt(var + eps, dtype='float32')) + bn_b
+        return (activ_b - mean) * inv * scale + bn_b
     else:
-        return ((- mean) * scale) / (np.sqrt(var + eps, dtype='float32')) + bn_b
+        return (- mean) * inv * scale + bn_b
 
 
 def fuse_slices(seq: typing.Iterable[ig.Vertex]):
