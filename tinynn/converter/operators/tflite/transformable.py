@@ -419,7 +419,7 @@ class GenericTransposeConvOperator(TransformableOperator):
         if len(self.inputs) > 2 and self.inputs[2] is not None:
             bias_tensor = self.inputs[2]
             add_out = ops[-2].outputs[0]
-            bias_transform = self.create_transform_tensor(add_out.tensor.copy())
+            bias_transform = self.create_transform_tensor(add_out.tensor.copy(), quantization=self.outputs[0].quantization)
             ops[-2].outputs[0] = bias_transform
             ops.insert(len(ops) - 1, tfl_ops.AddOperator([bias_transform, bias_tensor], [add_out]))
 
