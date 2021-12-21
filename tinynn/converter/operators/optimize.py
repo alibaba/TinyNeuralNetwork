@@ -6,7 +6,7 @@ import warnings
 
 import igraph as ig
 import numpy as np
-from tinynn.util.util import get_logger
+from tinynn.util.util import class_conditional, get_logger
 
 from tflite.ActivationFunctionType import ActivationFunctionType
 
@@ -22,10 +22,19 @@ class GraphOptimizer(object):
     fuse_tensor_count: int
     fuse_attr_count: int
 
-    def __init__(self, graph: CommonGraph) -> None:
+    # Optimization levels
+    NO_OPTIMIZE: int = 0
+    FOLD_BUFFER: int = 1
+    FUSE_BN: int = 2
+    COMMON_OPTIMIZE: int = 3
+    BRANCH_OPTIMIZE: int = 4
+    ALL_OPTIMIZE: int = 4
+
+    def __init__(self, graph: CommonGraph, level: int) -> None:
         self.graph = graph
         self.fuse_tensor_count = 0
         self.fuse_attr_count = 0
+        self.level = level
 
     def create_attr_tensor(self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None):
         if name is None:
@@ -45,6 +54,7 @@ class GraphOptimizer(object):
             self.fuse_tensor_count += 1
         return tfl.Tensor(tensor, name, has_buffer=False, quantization=quantization)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.FUSE_BN)
     def fuse_conv_fc_bn(self):
         # Find fusable ops
         edges = self.graph.graph.es.select(functools.partial(is_bn_fusable_edge, graph_converter=self.graph.graph))
@@ -113,6 +123,7 @@ class GraphOptimizer(object):
             assert vertex['node_type'] == ExtendedOperator.BATCH_NORM
         self.graph.graph.delete_vertices(remove_ids)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_activation(self):
         # Find fusable ops
         edges = self.graph.graph.es.select(functools.partial(is_activ_fusable_edge, graph_converter=self.graph.graph))
@@ -182,6 +193,7 @@ class GraphOptimizer(object):
         for op, mapping in zip(sorted_ops, restore_mapping):
             op.transform(self.graph, mapping)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_simple_transpose_pass(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_transpose_fusable_edge, graph_converter=self.graph.graph))
@@ -205,6 +217,7 @@ class GraphOptimizer(object):
 
         elinimate_sequences(self.graph, filtered_pairs, _remove_first_pred, _remove_first_action)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_simple_reshape_pass(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_reshape_fusable_edge, graph_converter=self.graph.graph))
@@ -231,6 +244,7 @@ class GraphOptimizer(object):
 
         elinimate_sequences(self.graph, filtered_pairs, _remove_first_pred, _remove_first_action)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_simple_slice_pass(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_slice_fusable_edge, graph_converter=self.graph.graph))
@@ -279,6 +293,7 @@ class GraphOptimizer(object):
                 self.graph.graph.delete_vertices(cleanup_nodes)
                 cleanup_nodes.clear()
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.FOLD_BUFFER)
     def fold_transpose_buffer(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_constant_transpose_fusable_edge, graph_converter=self.graph.graph))
@@ -308,6 +323,7 @@ class GraphOptimizer(object):
         # Delete constant transpose nodes
         self.graph.graph.delete_vertices(remove_ids)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def transpose_to_reshape_pass(self):
         filtered_nodes = self.graph.graph.vs.select(functools.partial(
             is_transformable_transpose_node, graph_converter=self.graph.graph))
@@ -329,6 +345,7 @@ class GraphOptimizer(object):
             node = args[0]
             func(*args)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.FOLD_BUFFER)
     def fold_reshape_buffer(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_constant_reshape_fusable_edge, graph_converter=self.graph.graph))
@@ -358,7 +375,7 @@ class GraphOptimizer(object):
         # Delete constant transpose nodes
         self.graph.graph.delete_vertices(remove_ids)
 
-    def remove_noop_pass(self):
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
         edges = self.graph.graph.es.select(functools.partial(
             is_ending_with_noop_edge, graph_converter=self.graph.graph))
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
@@ -368,6 +385,7 @@ class GraphOptimizer(object):
 
         elinimate_sequences(self.graph, filtered_pairs)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_wrapped_reshape_within_transpose_pass(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_wrapped_reshape_within_transpose_edge, graph_converter=self.graph.graph))
@@ -419,6 +437,7 @@ class GraphOptimizer(object):
 
         elinimate_sequences(self.graph, filtered_pairs, True, None, _remove_last_pred, _remove_last_action, _skip_pred)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
     def branch_reshape_expand_pass(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_reshape_branch_edge, graph_converter=self.graph.graph))
@@ -452,6 +471,7 @@ class GraphOptimizer(object):
 
         expand_op_outputs_in_branches(branch_transpose_nodes, _new_reshape, self.graph)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
     def branch_transpose_expand_pass(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_transpose_branch_edge, graph_converter=self.graph.graph))
@@ -485,6 +505,7 @@ class GraphOptimizer(object):
 
         expand_op_outputs_in_branches(branch_transpose_nodes, _new_transpose, self.graph)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
     def elementwise_op_transpose_passthrough_pass(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_transpose_elementwise_op_edge, graph_converter=self.graph.graph))
@@ -788,6 +809,7 @@ class GraphOptimizer(object):
             node = args[0]
             func(*args)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_bmm_add_pass(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_bmm_add_edge, graph_converter=self.graph.graph))

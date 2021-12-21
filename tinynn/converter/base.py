@@ -24,7 +24,8 @@ class TFLiteConverter(object):
                  dump_jit_model_path: typing.Optional[str] = None,
                  dump_dummy_input_path: typing.Optional[str] = None,
                  dump_config_path: typing.Optional[str] = None,
-                 asymmetric: bool = True) -> None:
+                 asymmetric: bool = True,
+                 optimize: int = GraphOptimizer.ALL_OPTIMIZE) -> None:
         """ The TFLiteConverter class
 
         Args:
@@ -37,6 +38,7 @@ class TFLiteConverter(object):
             dump_dummy_input_path (typing.Optional[str]): The path for dumping the dummy input. Defaults to None
             dump_config_path (typing.Optional[str]): The path for dumping the json config. Defaults to None
             asymmetric (bool): Asymmetric quantization. Defaults to True
+            optimize (int): The level of graph optimization. Defaults to `GraphOptimizer.ALL_OPTIMIZE`
         """
 
         self.model = model
@@ -57,6 +59,7 @@ class TFLiteConverter(object):
         self.dump_jit_model_path = dump_jit_model_path
         self.dump_dummy_input_path = dump_dummy_input_path
         self.dump_config_path = dump_config_path
+        self.optimize = optimize
 
         if dump_config_path and not dump_jit_model_path:
             raise AssertionError("when dump_config_path is set, dump_jit_model_path is required to be set")
@@ -268,7 +271,7 @@ class TFLiteConverter(object):
             log.error(f'Unsupported ops: {", ".join(unsupported_ops)}')
             raise Exception("Cannot continue due to fatal error")
         else:
-            optimizer = GraphOptimizer(self.common_graph)
+            optimizer = GraphOptimizer(self.common_graph, self.optimize)
             optimizer.optimize()
 
             versioner = OPVersioner(self.common_graph)

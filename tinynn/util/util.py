@@ -158,6 +158,27 @@ def conditional(cond: typing.Callable[[], bool]) -> typing.Callable:
     return conditional_decorator
 
 
+def class_conditional(cond: typing.Callable[[typing.Any], bool]) -> typing.Callable:
+    """ A class function wrapper that only runs the code of the function under given condition
+
+    Args:
+        cond (typing.Callable[[], bool]): The predicate given
+
+    Returns:
+        typing.Callable: A new function that only runs under given condition
+    """
+
+    def conditional_decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwds):
+            if cond(args[0]):
+                f(*args, **kwds)
+
+        return wrapper
+
+    return conditional_decorator
+
+
 def tensors2ndarray(tensors) -> list:
     """ Convert tensors in arbitrary format into list of ndarray
 
