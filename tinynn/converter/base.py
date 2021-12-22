@@ -25,6 +25,7 @@ class TFLiteConverter(object):
                  dump_dummy_input_path: typing.Optional[str] = None,
                  dump_config_path: typing.Optional[str] = None,
                  asymmetric: bool = True,
+                 preserve_tensors: bool = False,
                  optimize: int = GraphOptimizer.ALL_OPTIMIZE) -> None:
         """ The TFLiteConverter class
 
@@ -38,6 +39,7 @@ class TFLiteConverter(object):
             dump_dummy_input_path (typing.Optional[str]): The path for dumping the dummy input. Defaults to None
             dump_config_path (typing.Optional[str]): The path for dumping the json config. Defaults to None
             asymmetric (bool): Asymmetric quantization. Defaults to True
+            preserve_tensors (bool): Preserve the copies of the intermediate tensors. Defaults to False
             optimize (int): The level of graph optimization. Defaults to `GraphOptimizer.ALL_OPTIMIZE`
         """
 
@@ -45,6 +47,7 @@ class TFLiteConverter(object):
         self.lower_model = None
         self.graph = None
         self.tensor_map = {}
+        self.tensor_map_copies = {}
         self.common_graph = CommonGraph()
 
         if type(dummy_input) in (tuple, list):
@@ -59,6 +62,7 @@ class TFLiteConverter(object):
         self.dump_jit_model_path = dump_jit_model_path
         self.dump_dummy_input_path = dump_dummy_input_path
         self.dump_config_path = dump_config_path
+        self.preserve_tensors = preserve_tensors
         self.optimize = optimize
 
         if dump_config_path and not dump_jit_model_path:
@@ -242,6 +246,8 @@ class TFLiteConverter(object):
             assert len(output_tensors) == len(outputs)
             for t, name in zip(output_tensors, outputs):
                 self.tensor_map[name] = t
+                if self.preserve_tensors and isinstance(t, torch.Tensor):
+                    self.tensor_map_copies[name] = t.detach().clone()
 
     def __try_infer_type(self, params):
         inferred = torch._C._jit_try_infer_type(params)
@@ -301,7 +307,10 @@ class TFLiteConverter(object):
     def get_value(self, name, default_val=None):
         """ Returns the output according to the name of the node. If the name doesn't exist, `default_val` is returned """
 
-        val = self.tensor_map.get(name, default_val)
+        if self.preserve_tensors:
+            val = self.tensor_map_copies.get(name, default_val)
+        else:
+            val = self.tensor_map.get(name, default_val)
 
         type_ = self.__try_infer_type(val)
         if type_.endswith('PackedParamsBase'):
@@ -316,4 +325,22 @@ class TFLiteConverter(object):
             typing.List[str]: The names of the intermediate tensors
         """
 
-        return list(self.tensor_map.keys())
+        if self.preserve_tensors:
+            return list(self.tensor_map_copies.keys())
+        else:
+            return list(self.tensor_map.keys())
+
+    def inputs_for_tflite(self) -> typing.List[np.ndarray]:
+        """ Prepare inputs for the TFLite backend
+
+        Returns:
+            typing.List[np.ndarray]: The input tensors
+        """
+
+        arrs = []
+        for t, trans in zip(self.dummy_input, self.input_transpose):
+            arr = t.detach().clone().numpy()
+            if trans:
+                arr = np.transpose(arr, (0, 2, 3, 1))
+            arrs.append(arr)
+        return arrs
