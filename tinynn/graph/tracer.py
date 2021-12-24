@@ -744,6 +744,9 @@ def new_func_gen(orig_func, key: str, is_class: bool):
                     trace_func = TraceFunction(key, is_class).parse_args(*args, **kwargs)
                     trace_node = TraceNode(trace_func)
 
+                    modified_result = noop_handler(trace_node, trace_func.prev_tensors, result)
+                    if modified_result is not None:
+                        result = modified_result
                     add_forward_node(trace_node, trace_func.prev_tensors, result)
             log.debug(f'tracing {key} function wrapper complete')
         return result
@@ -1014,6 +1017,36 @@ def gen_module_constrctor_line(module, mod_cache=None):
     return result, mod_cache
 
 
+def noop_handler(node, inputs, outputs):
+    """ Generate modified outputs if the inputs and the outputs are the same """
+    with no_catch():
+        is_list = False
+        is_tuple = False
+        modified = False
+
+        if isinstance(outputs, list):
+            is_list = True
+        elif isinstance(outputs, tuple):
+            is_tuple = True
+        elif isinstance(outputs, torch.Tensor):
+            if id(outputs) in current_graph().tensor_pre_node_dict:
+                return outputs.view(outputs.shape)
+
+        if is_list or is_tuple:
+            is_tracked = [isinstance(t, torch.Tensor) and
+                          id(t) in current_graph().tensor_pre_node_dict for t in outputs]
+            modified = any(is_tracked)
+
+        if modified:
+            new_outputs = [t.view(t.shape) if d else t for t, d in zip(outputs, is_tracked)]
+            if is_tuple:
+                return tuple(new_outputs)
+            else:
+                return new_outputs
+        else:
+            return None
+
+
 def add_input_node(node: TraceNode, output_tensors):
     """ Adds an input node to the current computation graph """
     assert node is not None
@@ -1147,7 +1180,12 @@ def hook_modules(module):
             log.debug(f'tracer in _submodule_tracer in {type(module).__name__}')
             lock(False)
             node = TraceNode(module)
-            add_forward_node(node, inputs, outputs)
+            modified_outputs = noop_handler(node, inputs, outputs)
+            if modified_outputs is None:
+                add_forward_node(node, inputs, outputs)
+            else:
+                add_forward_node(node, inputs, modified_outputs)
+            return modified_outputs
 
         module_unique_name = current_graph().module_unique_name_dict[id(module)]
         if module_unique_name in current_graph().traced_modules:
