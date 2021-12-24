@@ -376,6 +376,7 @@ class GraphOptimizer(object):
         self.graph.graph.delete_vertices(remove_ids)
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
+    def remove_noop_pass(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_ending_with_noop_edge, graph_converter=self.graph.graph))
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
