@@ -205,7 +205,7 @@ class GraphOptimizer(object):
         def _remove_first_pred(seq):
             new_perm = fuse_transpose_perms(seq)
 
-            remove_first = np.all(new_perm == np.sort(new_perm))
+            remove_first = np.array_equal(new_perm, np.sort(new_perm))
             return remove_first, new_perm
 
         def _remove_first_action(first_node, last_node, custom_data):
@@ -231,7 +231,7 @@ class GraphOptimizer(object):
             new_shape = last_node['op'].inputs[1].tensor
             orig_shape = np.array(first_node['op'].inputs[0].shape, dtype='int32')
 
-            remove_first = np.all(new_shape == orig_shape)
+            remove_first = np.array_equal(new_shape, orig_shape)
             return remove_first, new_shape
 
         def _remove_first_action(first_node, last_node, custom_data):
@@ -1207,12 +1207,12 @@ def is_transpose_same_to_reshape_op(op: tfl.BaseOperator):
     input_shape = np.array(op.inputs[0].shape, dtype='int32')
     output_shape = np.array(op.outputs[0].shape, dtype='int32')
 
-    if np.all(input_shape[input_shape != 1] == output_shape[output_shape != 1]):
+    if np.array_equal(input_shape[input_shape != 1], output_shape[output_shape != 1]):
         input_tensor = np.arange(num_elements).reshape(input_shape)
         perm = op.inputs[1].tensor
         new_tensor = np.transpose(input_tensor, perm)
 
-        return np.all(new_tensor.flatten() == input_tensor.flatten())
+        return np.array_equal(new_tensor.flatten(), input_tensor.flatten())
     else:
         return False
 

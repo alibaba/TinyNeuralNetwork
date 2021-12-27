@@ -1710,7 +1710,7 @@ class ATenPixelShuffleOperator(ATenPixelShuffleSchema):
         c = input_tensor.shape[1]
         bs = upscale_factor
         perm = np.arange(c).reshape(c // (bs ** 2), bs, bs).transpose(1, 2, 0).flatten()
-        if not np.all(np.sort(perm) == perm):
+        if not np.array_equal(np.sort(perm), perm):
             reordered = self.create_transform_tensor(ops[0].outputs[0].tensor[:, :, :, perm])
             indices = self.create_attr_tensor(perm.astype('int32'))
             gather_op = tfl.GatherOperator([ops[0].inputs[0], indices], [reordered], axis=3)
@@ -1744,7 +1744,7 @@ class ATenPixelUnshuffleOperator(ATenPixelUnshuffleSchema):
         c = input_tensor.shape[1]
         bs = downscale_factor
         perm = np.arange(c * (bs ** 2)).reshape(bs, bs, c).transpose(2, 0, 1).flatten()
-        if not np.all(np.sort(perm) == perm):
+        if not np.array_equal(np.sort(perm), perm):
             reordered = self.create_transform_tensor(ops[1].outputs[0].tensor[:, :, :, perm])
             indices = self.create_attr_tensor(perm.astype('int32'))
             gather_op = tfl.GatherOperator([reordered, indices], [ops[2].outputs[0]], axis=3)
