@@ -1922,3 +1922,55 @@ class ATenGeluOperator(ATenGeluSchema):
 
         for op in ops:
             graph_converter.add_operator(op)
+
+
+class ATenCopyOperator(ATenCopySchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        other = self.input_tensors[1]
+        output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
+
+        ops = []
+        if isinstance(other, torch.Tensor):
+            other_tensor = self.find_or_create_input(1, graph_converter)
+
+            if other_tensor.buffer is None:
+                other_shape = other_tensor.shape
+                output_shape = output_tensor.shape
+
+                actual_input = other_tensor
+                if other_tensor.dtype != output_tensor.dtype:
+                    casted = self.create_transform_tensor(other_tensor.tensor.astype(output_tensor.dtype))
+                    actual_input = casted
+                    ops.append(tfl.CastOperator([other_tensor], [casted],
+                                                inDataType=tfl.numpy_tflite_dtype_mappings[str(other_tensor.dtype)],
+                                                outDataType=tfl.numpy_tflite_dtype_mappings[str(output_tensor.dtype)]))
+
+                if other_shape == output_shape:
+                    shape_tensor = self.create_attr_tensor(np.array(other_shape, dtype='int32'))
+                    ops.append(tfl.ReshapeOperator([actual_input, shape_tensor], [output_tensor], shape_tensor.tensor))
+                else:
+                    new_shape = other_shape
+
+                    if len(output_shape) > len(other_shape):
+                        new_shape = [1] * (len(output_shape) - len(other_shape)) + list(other_shape)
+                        new_shape_arr = np.array(new_shape, dtype='int32')
+                        reshaped = self.create_transform_tensor(np.reshape(other_tensor.tensor, new_shape_arr))
+                        ops.append(tfl.ReshapeOperator([actual_input], [reshaped], new_shape_arr))
+                        actual_input = reshaped
+
+                    repeats = []
+                    for x, y in zip(new_shape, output_shape):
+                        if x != y:
+                            repeats.append(y)
+                        else:
+                            repeats.append(1)
+
+                    repeat_tensor = self.create_attr_tensor(np.array(repeats, dtype='int32'))
+                    ops.append(tfl.TileOperator([actual_input, repeat_tensor], [output_tensor]))
+
+        for op in ops:
+            graph_converter.add_operator(op)
