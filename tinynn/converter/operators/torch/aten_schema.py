@@ -2093,6 +2093,15 @@ class ATenDivSchema(OperatorConverter):
         pass
 
 
+class ATenCopySchema(OperatorConverter):
+    def parse(self, node, attrs, args, graph_converter):
+        '''aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> (Tensor(a!))
+           aten::copy_.Tensor(Tensor(a!) self, Tensor other) -> (Tensor(a!))
+           aten::copy_.int(Tensor(a!) self, int other) -> (Tensor(a!))
+           aten::copy_.float(Tensor(a!) self, float other) -> (Tensor(a!))'''
+        pass
+
+
 class ATenHardshrinkSchema(OperatorConverter):
     @abstractmethod
     def parse(self, node, attrs, args, graph_converter):
