@@ -442,7 +442,7 @@ class GraphOptimizer(object):
     def branch_reshape_expand_pass(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_reshape_branch_edge, graph_converter=self.graph.graph))
-        branch_transpose_nodes = list(set(self.graph.graph.vs[edge.source] for edge in edges))
+        branch_reshape_nodes = list(set(self.graph.graph.vs[edge.source] for edge in edges))
 
         def _new_reshape(node: ig.Vertex, prev_node: ig.Vertex, next_node: ig.Vertex):
             actions = []
@@ -470,7 +470,7 @@ class GraphOptimizer(object):
 
             return actions
 
-        expand_op_outputs_in_branches(branch_transpose_nodes, _new_reshape, self.graph)
+        expand_op_outputs_in_branches(branch_reshape_nodes, _new_reshape, self.graph)
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
     def branch_transpose_expand_pass(self):
