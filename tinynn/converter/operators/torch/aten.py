@@ -2045,3 +2045,11 @@ class ATenEqOperator(ATenEqSchema):
         if type(self.input_tensors[1]) != torch.Tensor:
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
         self.elementwise_binary(tfl.EqualOperator, graph_converter)
+
+
+class ATenNegOperator(ATenNegSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.elementwise_unary(tfl.NegOperator, graph_converter)
