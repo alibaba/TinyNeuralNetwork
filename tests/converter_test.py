@@ -53,8 +53,11 @@ def get_tflite_out(model_path, inputs):
 
 # Unsupported models
 # resnext: group convs
+# regnet: group convs
 # yolov4: 5-d slices
-BLACKLIST = ('resnext50_32x4d', 'resnext101_32x8d', 'Build_Model')
+BLACKLIST = ('resnext50_32x4d', 'resnext101_32x8d', 'Build_Model', 'regnet_x_16gf', 'regnet_x_1_6gf', 'regnet_x_32gf',
+             'regnet_x_3_2gf', 'regnet_x_400mf', 'regnet_x_800mf', 'regnet_x_8gf', 'regnet_y_16gf', 'regnet_y_1_6gf',
+             'regnet_y_32gf', 'regnet_y_3_2gf', 'regnet_y_400mf', 'regnet_y_800mf', 'regnet_y_8gf')
 
 
 class TestModelMeta(type):
