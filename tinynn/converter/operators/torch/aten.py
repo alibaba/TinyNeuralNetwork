@@ -2053,3 +2053,44 @@ class ATenNegOperator(ATenNegSchema):
 
         self.run(node)
         self.elementwise_unary(tfl.NegOperator, graph_converter)
+
+
+class ATenBitwiseNotOperator(ATenBitwiseNotSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        assert self.input_tensors[0].dtype == torch.bool, "Only bools are supported in aten::bitwise_not"
+
+        self.elementwise_unary(tfl.LogicalNotOperator, graph_converter)
+
+
+class ATenBitwiseAndOperator(ATenBitwiseAndSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        other = self.input_tensors[1]
+        if not isinstance(other, torch.Tensor):
+            self.input_tensors[1] = torch.tensor([other]).repeat(self.input_tensors[0].shape)
+
+        assert all((t.dtype == torch.bool for t in self.input_tensors)), "Only bools are supported in aten::bitwise_not"
+
+        self.elementwise_unary(tfl.LogicalAndOperator, graph_converter)
+
+
+class ATenBitwiseOrOperator(ATenBitwiseOrSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        other = self.input_tensors[1]
+        if not isinstance(other, torch.Tensor):
+            self.input_tensors[1] = torch.tensor([other]).repeat(self.input_tensors[0].shape)
+
+        assert all((t.dtype == torch.bool for t in self.input_tensors)), "Only bools are supported in aten::bitwise_not"
+
+        self.elementwise_unary(tfl.LogicalOrOperator, graph_converter)
