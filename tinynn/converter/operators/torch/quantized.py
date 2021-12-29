@@ -293,3 +293,38 @@ class QuantizedLeakyReluOperator(QuantizedLeakyReluSchema):
 
         self.run(node)
         self.elementwise_unary(tfl.LeakyReluOperator, graph_converter, alpha)
+
+
+class QuantizedLinearDynamicOperator(QuantizedLinearDynamicSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.parse_common(graph_converter)
+
+    def parse_common(self, graph_converter, fusedActivation=tfl_schema.ActivationFunctionType.NONE):
+        _, state = self.unpack_params(self.input_tensors[1])
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        weight = state[0][0]
+        bias = state[0][1]
+
+        weight_tensor = self.create_attr_tensor(weight)
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        output_tensor = outputs[0]
+
+        # Bias handling
+        bias_tensor = self.create_attr_tensor(bias)
+
+        inputs = [input_tensor, weight_tensor, bias_tensor]
+
+        graph_converter.add_operator(tfl.FullyConnectedOperator(
+            inputs, outputs, fusedActivationFunction=fusedActivation))
+
+
+class QuantizedLinearReluDynamicOperator(QuantizedLinearReluDynamicSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        QuantizedLinearDynamicOperator.parse_common(self, graph_converter,
+                                                    tfl_schema.ActivationFunctionType.RELU)

@@ -58,14 +58,17 @@ class ATenLstmOperator(ATenLstmSchema):
         input_tensors[input_index] = self.create_attr_tensor(hidden_state_tensor[slice_idx])
         input_tensors[input_index].is_variable = True
 
-    def parse(self, node, attrs, args, graph_converter):
-        super().parse(node, attrs, args, graph_converter)
-
-        self.run(node)
-
-        input_tensor, hidden_state_tensors, params_tensors = self.input_tensors[:3]
-        has_biases, num_layers, dropout, is_train, bidirectional, batch_first = self.input_tensors[3:]
-
+    def parse_common(self,
+                     input_tensor,
+                     hidden_state_tensors,
+                     params_tensors,
+                     has_biases,
+                     num_layers,
+                     dropout,
+                     is_train,
+                     bidirectional,
+                     batch_first,
+                     graph_converter):
         assert is_train in (False, 0)
         expected_num_params = 2 * num_layers
         if has_biases:
@@ -142,6 +145,18 @@ class ATenLstmOperator(ATenLstmSchema):
 
         for op in ops:
             graph_converter.add_operator(op)
+
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        input_tensor, hidden_state_tensors, params_tensors = self.input_tensors[:3]
+        has_biases, num_layers, dropout, is_train, bidirectional, batch_first = self.input_tensors[3:]
+
+        self.parse_common(input_tensor, hidden_state_tensors, params_tensors,
+                          has_biases, num_layers, dropout, is_train, bidirectional,
+                          batch_first, graph_converter)
 
 
 class ATenBatchNormOperator(ATenBatchNormSchema):
@@ -1974,3 +1989,32 @@ class ATenCopyOperator(ATenCopySchema):
 
         for op in ops:
             graph_converter.add_operator(op)
+
+
+class ATenQuantizedLstmOperator(ATenQuantizedLstmSchema, ATenLstmOperator):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        input_tensor, hidden_state_tensors, params_tensors = self.input_tensors[:3]
+        has_biases, num_layers, dropout, is_train, bidirectional, batch_first = self.input_tensors[3:9]
+
+        params_l = []
+        for t in params_tensors:
+            weight_l = []
+            bias_l = []
+            params = self.unpack_params(t)[1][0]
+            inner_params = params[-1]
+            for p in inner_params:
+                unpacked = self.unpack_params(p)[0]
+                w = unpacked['unpack']
+                weight_l.append(w[0])
+                if len(w) > 1:
+                    bias_l.append(w[1])
+            params_l.extend(weight_l)
+            params_l.extend(bias_l)
+
+        self.parse_common(input_tensor, hidden_state_tensors, params_l,
+                          has_biases, num_layers, dropout, is_train, bidirectional,
+                          batch_first, graph_converter)

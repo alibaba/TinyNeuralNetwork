@@ -122,6 +122,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,
                                                                 "aten::fake_quantize_per_tensor_affine": ATenFakeQuantizePerTensorAffineOperator,
                                                                 "aten::fake_quantize_per_channel_affine": ATenFakeQuantizePerChannelAffineOperator,
+                                                                "aten::quantized_lstm": ATenQuantizedLstmOperator,
                                                                 "aten::dequantize": ATenDequantizeOperator,
                                                                 "quantized::conv1d": QuantizedConv1dOperator,
                                                                 "quantized::conv1d_relu": QuantizedConv1dReluOperator,
@@ -142,6 +143,8 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "quantized::conv_transpose2d": QuantizedConvTranspose2dOperator,
                                                                 "quantized::hardswish": QuantizedHardswishOperator,
                                                                 "quantized::leaky_relu": QuantizedLeakyReluOperator,
+                                                                "quantized::linear_dynamic": QuantizedLinearDynamicOperator,
+                                                                "quantized::linear_relu_dynamic": QuantizedLinearReluDynamicOperator,
 
                                                                 # non tracking
                                                                 "aten::Int": NoTrackOperator,
