@@ -2029,3 +2029,13 @@ class ATenBmmOperator(ATenBmmSchema):
 
         self.run(node)
         ATenMatmulOperator.parse_common(self, node, attrs, args, graph_converter)
+
+
+class ATenEqOperator(ATenEqSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        if type(self.input_tensors[1]) != torch.Tensor:
+            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+        self.elementwise_binary(tfl.EqualOperator, graph_converter)
