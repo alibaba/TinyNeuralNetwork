@@ -912,7 +912,7 @@ class ATenSliceOperator(ATenSliceSchema):
             start += input_tensor.tensor.shape[dim]
 
         if end < 0:
-            end += input_tensor.tensor.shape[dim] + 1
+            end += input_tensor.tensor.shape[dim]
 
         if dim < 0:
             dim += input_tensor.tensor.ndim
