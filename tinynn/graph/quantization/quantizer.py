@@ -950,3 +950,41 @@ class PostQuantizer(QATQuantizer):
                 if hasattr(n.module, "activation_post_process"):
                     delattr(n.module, "activation_post_process")
         return graph.module
+
+
+class DynamicQuantizer(QATQuantizer):
+    rewrite_graph: bool
+    force_overwrite: bool
+    is_input_quantized: typing.Optional[typing.Tuple[bool]]
+    backend: str
+    remove_weights_after_load: bool
+
+    def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
+        """ Constructs a new DynamicQuantizer object
+
+        Args:
+            model: The model to be quantized
+            dummy_input: A viable input to the model
+            work_dir (typing.Optional[str], optional): The working directory in which the intermediate files will be generated. \
+                Defaults to None, in which case "output" will be used.
+            config (typing.Optional[dict]): Options for the quantizer
+        """
+
+        super().__init__(model, dummy_input, work_dir, config)
+
+    def parse_config(self, config: dict):
+        super().parse_config(config)
+
+        self.rewrite_graph = False
+
+        assert not self.asymmetric, "Asymmetric quantization is not supported for DynamicQuantizer"
+        assert self.per_tensor, "Per-channel quantization is not supported for DynamicQuantizer"
+
+    def quantize(self) -> nn.Module:
+        """ Prepare model for dynamic quantization """
+
+        self.model.eval()
+
+        torch_q.quantize_dynamic(self.model, inplace=True)
+
+        return self.model
