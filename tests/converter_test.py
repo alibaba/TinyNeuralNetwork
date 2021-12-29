@@ -46,6 +46,8 @@ def get_tflite_out(model_path, inputs):
     outputs = []
     for i in range(len(output_details)):
         output_data = interpreter.get_tensor(output_details[i]['index'])
+        if not isinstance(output_data, np.ndarray):
+            output_data = np.asarray(output_data).reshape((1, ))
         outputs.append(output_data)
 
     return outputs
