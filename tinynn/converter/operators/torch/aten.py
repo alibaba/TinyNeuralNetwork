@@ -1272,7 +1272,7 @@ class ATenLayerNormOperator(ATenLayerNormSchema):
         squared_diff = self.create_transform_tensor(np.power(input_tensor.tensor - mean_tensor.tensor, 2))
         ops.append(tfl.SquaredDifferenceOperator([input_tensor, mean_tensor], [squared_diff]))
 
-        var_tensor = self.create_transform_tensor(np.mean(squared_diff.tensor, axis=tuple(axes), keepDims=True))
+        var_tensor = self.create_transform_tensor(np.mean(squared_diff.tensor, axis=tuple(axes), keepdims=True))
         ops.append(tfl.MeanOperator([squared_diff, dims_tensor], [var_tensor], keepDims=True))
 
         numerator = self.create_transform_tensor(input_tensor.tensor - mean_tensor.tensor)
