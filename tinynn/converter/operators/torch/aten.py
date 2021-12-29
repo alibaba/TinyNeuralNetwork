@@ -653,16 +653,19 @@ class ATenMaxPool2dOperator(ATenMaxPool2dSchema):
 
 
 class ATenMatmulOperator(ATenMatmulSchema):
-    def parse(self, node, attrs, args, graph_converter):
-        super().parse(node, attrs, args, graph_converter)
-
-        self.run(node)
+    def parse_common(self, node, attrs, args, graph_converter):
         input_tensor, weight_tensor = [self.find_or_create_input(i, graph_converter) for i in range(2)]
         if input_tensor.tensor.ndim >= 2 and input_tensor.tensor.ndim <= 5 \
                 and weight_tensor.tensor.ndim >= 2 and weight_tensor.tensor.ndim <= 5:
             self.elementwise_binary(tfl.BatchMatmulOperator, graph_converter)
         else:
             self.unimplemented(node, attrs, args)
+
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.parse_common(node, attrs, args, graph_converter)
 
 
 class ATenFlattenOperator(ATenFlattenSchema):
@@ -2018,3 +2021,11 @@ class ATenQuantizedLstmOperator(ATenQuantizedLstmSchema, ATenLstmOperator):
         self.parse_common(input_tensor, hidden_state_tensors, params_l,
                           has_biases, num_layers, dropout, is_train, bidirectional,
                           batch_first, graph_converter)
+
+
+class ATenBmmOperator(ATenBmmSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenMatmulOperator.parse_common(self, node, attrs, args, graph_converter)
