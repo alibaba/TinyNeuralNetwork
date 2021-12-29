@@ -567,9 +567,15 @@ class ATenMeanOperator(ATenMeanSchema):
         self.run(node)
 
         input_tensor = self.find_or_create_input(0, graph_converter)
-        dims, keep_dim = self.input_tensors[1:3]
-        if type(dims) not in (list, tuple):
-            dims = [dims]
+
+        if 'dim' in args and 'keepdim' in args:
+            dims, keep_dim = self.input_tensors[1:3]
+            if type(dims) not in (list, tuple):
+                dims = [dims]
+        else:
+            dims = list(range(input_tensor.tensor.ndim))
+            keep_dim = False
+            self.output_tensors[0] = self.output_tensors[0].view(1)
 
         for idx, dim in enumerate(dims):
             if dim < 0:
