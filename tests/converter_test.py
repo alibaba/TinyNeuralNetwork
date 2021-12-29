@@ -111,7 +111,7 @@ class TestModelMeta(type):
                     for pt, tt in zip(outputs, output_tensors):
                         result = torch.allclose(pt, tt, rtol=1e-2, atol=1e-5)
                         if not result:
-                            print((pt - tt).abs().max(), (pt - tt).abs().min(), (pt - tt).abs().mean())
+                            print('diff max, min, mean: ', (pt - tt).abs().max().item(), (pt - tt).abs().min().item(), (pt - tt).abs().mean().item())
 
                             print(pt[(pt - tt).abs() > 1e-4])
                             print(tt[(pt - tt).abs() > 1e-4])
