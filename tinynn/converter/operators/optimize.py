@@ -1188,17 +1188,19 @@ def is_reshape_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
 def is_constant_transpose_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] == ExtendedOperator.CONSTANT_NODE and source_vertex.outdegree() == 1 \
-        and target_vertex['node_type'] == ExtendedOperator.TRANSPOSE and target_vertex.outdegree() >= 1 \
-        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    return source_vertex['node_type'] == ExtendedOperator.CONSTANT_NODE \
+        and target_vertex['node_type'] == ExtendedOperator.TRANSPOSE \
+        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name \
+        and target_vertex.outdegree() >= 1
 
 
 def is_constant_reshape_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] == ExtendedOperator.CONSTANT_NODE and source_vertex.outdegree() == 1 \
-        and target_vertex['node_type'] == ExtendedOperator.RESHAPE and target_vertex.outdegree() >= 1 \
-        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    return source_vertex['node_type'] == ExtendedOperator.CONSTANT_NODE \
+        and target_vertex['node_type'] == ExtendedOperator.RESHAPE \
+        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name \
+        and target_vertex.outdegree() >= 1
 
 
 def is_transpose_same_to_reshape_op(op: tfl.BaseOperator):
