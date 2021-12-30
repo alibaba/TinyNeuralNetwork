@@ -222,8 +222,10 @@ class QuantizedLinearOperator(QuantizedLinearSchema):
 
         inputs = [input_tensor, weight_tensor, bias_tensor]
 
+        keep_dims = len(output_tensor.shape) > 2
+
         graph_converter.add_operator(tfl.FullyConnectedOperator(
-            inputs, outputs, fusedActivationFunction=fusedActivation))
+            inputs, outputs, fusedActivationFunction=fusedActivation, keepNumDims=keep_dims))
 
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
@@ -317,8 +319,10 @@ class QuantizedLinearDynamicOperator(QuantizedLinearDynamicSchema):
 
         inputs = [input_tensor, weight_tensor, bias_tensor]
 
+        keep_dims = len(output_tensor.shape) > 2
+
         graph_converter.add_operator(tfl.FullyConnectedOperator(
-            inputs, outputs, fusedActivationFunction=fusedActivation))
+            inputs, outputs, fusedActivationFunction=fusedActivation, keepNumDims=keep_dims))
 
 
 class QuantizedLinearReluDynamicOperator(QuantizedLinearReluDynamicSchema):

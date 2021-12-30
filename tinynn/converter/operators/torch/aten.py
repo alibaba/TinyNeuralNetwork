@@ -737,7 +737,8 @@ class ATenAddmmOperator(ATenAddmmSchema):
 
         inputs = [input_tensor, weight_transformed, bias_tensor]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-        graph_converter.add_operator(tfl.FullyConnectedOperator(inputs, outputs))
+        keep_dims = len(outputs[0].shape) > 2
+        graph_converter.add_operator(tfl.FullyConnectedOperator(inputs, outputs, keepNumDims=keep_dims))
 
 
 class ATenStackOperator(ATenStackSchema):
@@ -1148,17 +1149,16 @@ class ATenLinearOperator(ATenLinearSchema):
 
         ops = []
         input_tensor, weight_tensor, bias_tensor = self.input_tensors
-        if input_tensor.dim() == 2 or (input_tensor.dim() == 3 and input_tensor.size(0) == 1) and bias_tensor is not None:
+        if input_tensor.dim() >= 2 and input_tensor.dim() <= 5 and bias_tensor is not None:
             # aten::addmm
             input_tensor, weight_tensor, bias_tensor = [self.find_or_create_input(i, graph_converter) for i in range(3)]
             assert len(weight_tensor.shape) == 2, "Weight of AddMM should be 2D"
 
             inputs = [input_tensor, weight_tensor, bias_tensor]
             outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-            ops.append(tfl.FullyConnectedOperator(inputs, outputs))
 
-            if input_tensor.tensor.ndim == 3:
-                ops = self.wrap_ops_with_2d_3d_reshapes(ops)
+            keep_dims = len(outputs[0].shape) > 2
+            ops.append(tfl.FullyConnectedOperator(inputs, outputs, keepNumDims=keep_dims))
         else:
             # aten::matmul + aten::add
             log.error(f'aten::linear is not supported for input shape {input_tensor.shape}, '
