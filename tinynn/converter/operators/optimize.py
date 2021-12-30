@@ -623,7 +623,7 @@ class GraphOptimizer(object):
                 new_dim = np.where(inv_perm_arr == old_dim)[0][0]
                 new_dim_tensor = self.create_attr_tensor(np.array([new_dim], dtype='int32'))
                 actions.append((self.graph.replace_operator_input, (node, 0, new_dim_tensor, True)))
-            elif node['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2):
+            elif node['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2, ExtendedOperator.MIRROR_PAD):
                 old_pad = op.inputs[1].tensor
                 new_pad = self.create_attr_tensor(old_pad[inv_perm_arr])
                 actions.append((self.graph.replace_operator_input, (node, 1, new_pad, True)))
@@ -1096,7 +1096,8 @@ def is_elementwise_binary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         or (op_code in (ExtendedOperator.SPLIT,
                         ExtendedOperator.SPLIT_V,
                         ExtendedOperator.PAD,
-                        ExtendedOperator.PADV2))
+                        ExtendedOperator.PADV2,
+                        ExtendedOperator.MIRROR_PAD))
 
 
 def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph):
@@ -1108,7 +1109,7 @@ def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph):
               target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape) or
              (target_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
                  (np.diff(target_vertex['op'].inputs[1].tensor) == 1).all()) or
-             (target_vertex['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2) and
+             (target_vertex['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2, ExtendedOperator.MIRROR_PAD) and
                  target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape) or
              (target_vertex['node_type'] == ExtendedOperator.TILE and
                  target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape) or
