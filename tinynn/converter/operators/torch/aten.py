@@ -661,9 +661,21 @@ class ATenMaxPool2dOperator(ATenMaxPool2dSchema):
 class ATenMatmulOperator(ATenMatmulSchema):
     def parse_common(self, node, attrs, args, graph_converter):
         input_tensor, weight_tensor = [self.find_or_create_input(i, graph_converter) for i in range(2)]
-        if input_tensor.tensor.ndim >= 2 and input_tensor.tensor.ndim <= 5 \
-                and weight_tensor.tensor.ndim >= 2 and weight_tensor.tensor.ndim <= 5:
-            self.elementwise_binary(tfl.BatchMatmulOperator, graph_converter)
+        if input_tensor.tensor.ndim >= 2 and input_tensor.tensor.ndim <= 5:
+            if weight_tensor.tensor.ndim == 2:
+                bias_tensor = self.create_attr_tensor(np.zeros(weight_tensor.shape[1], dtype='float32'))
+
+                perm = [1, 0]
+                perm_tensor = self.create_attr_tensor(np.array(perm, dtype='int32'))
+                weight_transformed = self.create_transform_tensor(np.transpose(weight_tensor.tensor, perm))
+                graph_converter.add_operator(tfl.TransposeOperator([weight_tensor, perm_tensor], [weight_transformed]))
+
+                inputs = [input_tensor, weight_transformed, bias_tensor]
+                outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+                keep_dims = len(outputs[0].shape) > 2
+                graph_converter.add_operator(tfl.FullyConnectedOperator(inputs, outputs, keepNumDims=keep_dims))
+            elif weight_tensor.tensor.ndim >= 2 and weight_tensor.tensor.ndim <= 5:
+                self.elementwise_binary(tfl.BatchMatmulOperator, graph_converter)
         else:
             self.unimplemented(node, attrs, args)
 
@@ -731,7 +743,7 @@ class ATenAddmmOperator(ATenAddmmSchema):
         assert len(weight_tensor.shape) == 2, "Weight of AddMM should be 2D"
 
         perm = [1, 0]
-        perm_tensor = self.create_attr_tensor(perm)
+        perm_tensor = self.create_attr_tensor(np.array(perm, dtype='int32'))
         weight_transformed = self.create_transform_tensor(np.transpose(weight_tensor.tensor, perm))
         graph_converter.add_operator(tfl.TransposeOperator([weight_tensor, perm_tensor], [weight_transformed]))
 
