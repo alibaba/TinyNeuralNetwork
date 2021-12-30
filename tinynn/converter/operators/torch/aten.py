@@ -2016,8 +2016,8 @@ class ATenQuantizedLstmOperator(ATenQuantizedLstmSchema, ATenLstmOperator):
             params = self.unpack_params(t)[1][0]
             inner_params = params[-1]
             for p in inner_params:
-                unpacked = self.unpack_params(p)[0]
-                w = unpacked['unpack']
+                unpacked = self.unpack_params(p)[1]
+                w = unpacked[0]
                 weight_l.append(w[0])
                 if len(w) > 1:
                     bias_l.append(w[1])
