@@ -993,7 +993,8 @@ class GraphOptimizer(object):
 
         # Other cleanups
         self.fuse_simple_slice_pass()
-        self.remove_noop_pass()
+        for branch in (False, True):
+            self.remove_noop_pass(branch)
         self.fuse_wrapped_reshape_within_transpose_pass()
 
         # Buffer folding
