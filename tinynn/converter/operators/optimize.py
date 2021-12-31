@@ -973,11 +973,15 @@ class GraphOptimizer(object):
         self.fuse_simple_transpose_pass()
         self.fuse_simple_reshape_pass()
 
-        # Branch transpose cleanup
+        # Branch transpose & reshape cleanup
         for _ in range(3):
             self.elementwise_op_transpose_passthrough_pass()
             self.branch_transpose_expand_pass()
             self.fuse_simple_transpose_pass()
+
+            self.elementwise_op_reshape_passthrough_pass()
+            self.branch_reshape_expand_pass()
+            self.fuse_simple_reshape_pass()
 
         # Other cleanups
         self.fuse_simple_slice_pass()
