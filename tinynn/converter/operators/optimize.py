@@ -520,17 +520,7 @@ class GraphOptimizer(object):
         remove_vertices = []
         for node in unique_nodes:
             op = node['op']
-            if node['node_type'] == ExtendedOperator.CONCATENATION:
-                input_indices = range(len(op.inputs))
-            elif node['node_type'] == ExtendedOperator.SPLIT:
-                input_indices = (1, )
-            elif node['node_type'] in (ExtendedOperator.ADD,
-                                       ExtendedOperator.SUB,
-                                       ExtendedOperator.MUL,
-                                       ExtendedOperator.DIV):
-                input_indices = range(2)
-            else:
-                input_indices = range(1)
+            input_indices = op_input_indices(op)
 
             prev_nodes = []
             cand_perms = dict()
@@ -658,23 +648,8 @@ class GraphOptimizer(object):
         remove_vertices = []
         for node in unique_nodes:
             op = node['op']
-            dim_indice = None
-            if node['node_type'] == ExtendedOperator.CONCATENATION:
-                input_indices = range(len(op.inputs))
-                dim_indice = op.axis
-            elif node['node_type'] == ExtendedOperator.SPLIT:
-                input_indices = (1, )
-                dim_indice = op.inputs[0].tensor[0]
-            elif node['node_type'] == ExtendedOperator.SPLIT_V:
-                input_indices = range(1)
-                dim_indice = op.inputs[2].tensor[0]
-            elif node['node_type'] in (ExtendedOperator.ADD,
-                                       ExtendedOperator.SUB,
-                                       ExtendedOperator.MUL,
-                                       ExtendedOperator.DIV):
-                input_indices = range(2)
-            else:
-                input_indices = range(1)
+            dim_indice = op_input_dims(op)
+            input_indices = op_input_indices(op)
 
             prev_nodes = []
             cand_shapes = dict()
@@ -686,7 +661,7 @@ class GraphOptimizer(object):
 
                 if prev_node['node_type'] == ExtendedOperator.RESHAPE:
                     mapping = dict()
-                    if is_simple_reshape(prev_node['op'].inputs[0].shape, prev_node['op'].outputs[0].shape, mapping):
+                    if not is_simple_reshape(prev_node['op'].inputs[0].shape, prev_node['op'].outputs[0].shape, mapping):
                         continue
 
                     new_dim = None
@@ -722,7 +697,7 @@ class GraphOptimizer(object):
 
                 if next_node['node_type'] == ExtendedOperator.RESHAPE:
                     mapping = dict()
-                    if is_simple_reshape(next_node['op'].inputs[0].shape, next_node['op'].outputs[0].shape, mapping):
+                    if not is_simple_reshape(next_node['op'].inputs[0].shape, next_node['op'].outputs[0].shape, mapping):
                         continue
 
                     new_dim = None
@@ -740,6 +715,9 @@ class GraphOptimizer(object):
                     next_shape = tuple(x if i != dim_indice else -1 for i, x in enumerate(next_shape))
                     cand_next_shapes.setdefault(next_shape, 0)
                     cand_next_shapes[next_shape] += 1
+
+            if len(cand_shapes) == 0:
+                continue
 
             cur_reshape_size = max(cand_shapes.values())
             cur_next_reshape_size = max(cand_next_shapes.values())
@@ -771,8 +749,8 @@ class GraphOptimizer(object):
             tensor_node_dict = {}
             for i, op_out in enumerate(op.outputs):
                 new_out = self.create_transform_tensor(np.reshape(
-                    op_out.tensor, next_shape), quantization=op_out.quantization)
-                shape_tensor = self.create_attr_tensor(np.array(new_out.shape, dtype='int32'))
+                    op_out.tensor, prev_shape), quantization=op_out.quantization)
+                shape_tensor = self.create_attr_tensor(np.array(op_out.shape, dtype='int32'))
 
                 # Update relations
                 if op_out.name in self.graph.tensor_node_map:
@@ -787,17 +765,27 @@ class GraphOptimizer(object):
                 tensor_node_dict[op_out.name] = self.graph.graph.vs.find(name=self.graph.tensor_node_map[op_out.name])
 
             # OP specific dim handling logic
-            if node['node_type'] in ExtendedOperator.CONCATENATION:
+            if node['node_type'] == ExtendedOperator.CONCATENATION:
                 new_axis = prev_shape.index(-1)
                 op.axis = new_axis
-            elif node['node_type'] in ExtendedOperator.SPLIT_V:
+            elif node['node_type'] == ExtendedOperator.SPLIT_V:
                 new_dim = prev_shape.index(-1)
                 new_dim_tensor = self.create_attr_tensor(new_dim)
                 actions.append(self.graph.replace_operator_input, (node, 2, new_dim_tensor))
-            elif node['node_type'] in ExtendedOperator.SPLIT:
+            elif node['node_type'] == ExtendedOperator.SPLIT:
                 new_dim = prev_shape.index(-1)
                 new_dim_tensor = self.create_attr_tensor(new_dim)
                 actions.append(self.graph.replace_operator_input, (node, 0, new_dim_tensor))
+            elif node['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2, ExtendedOperator.MIRROR_PAD):
+                old_pad = op.inputs[1].tensor
+                new_dim = prev_shape.index(-1)
+                old_dim = next_shape.index(-1)
+                new_pad = np.zeros((len(prev_shape), 2), dtype='int32')
+                new_pad[new_dim, :] = old_pad[old_dim, :]
+                new_pad_tensor = self.create_attr_tensor(new_pad)
+                actions.append((self.graph.replace_operator_input, (node, 1, new_pad_tensor, True)))
+            elif dim_indice is not None:
+                raise NotImplementedError(f'{node["node_type"]} has the property `dims` but is not handled')
 
             for edge in next_edges:
                 source = tensor_node_dict[edge['name']]
@@ -1239,6 +1227,38 @@ def is_transpose_same_to_reshape_op(op: tfl.BaseOperator):
         return False
 
 
+def op_input_dims(op: tfl.BaseOperator):
+    dim_indices = None
+
+    if isinstance(op, tfl.ConcatenationOperator):
+        dim_indices = op.axis
+    elif isinstance(op, tfl.SplitOperator):
+        dim_indices = op.inputs[0].tensor[0]
+    elif isinstance(op, tfl.SplitVOperator):
+        dim_indices = op.inputs[2].tensor[0]
+    elif isinstance(op, (tfl.PadOperator, tfl.Padv2Operator, tfl.MirrorPadOperator)):
+        pads = np.sum(op.inputs[1].tensor, axis=-1)
+        nonzero_idx = np.nonzero(pads)[0]
+        # TODO: support multi indices
+        if nonzero_idx.size == 1:
+            dim_indices = nonzero_idx[0]
+
+    return dim_indices
+
+
+def op_input_indices(op: tfl.BaseOperator):
+    if isinstance(op, tfl.ConcatenationOperator):
+        input_indices = range(len(op.inputs))
+    elif isinstance(op, tfl.SplitOperator):
+        input_indices = (1, )
+    elif isinstance(op, (tfl.AddOperator, tfl.SubOperator, tfl.MulOperator, tfl.DivOperator)):
+        input_indices = range(2)
+    else:
+        input_indices = range(1)
+
+    return input_indices
+
+
 def fuse_bn_weight(eps, scale, var, weight, transpose):
     if transpose:
         shape = [1, -1] + [1] * (len(weight.shape) - 2)
@@ -1349,6 +1369,9 @@ def fuse_connected_edges(filtered_pairs: typing.List[typing.Iterable[ig.Vertex]]
 
 def is_simple_reshape(orig_shape, new_shape, mapping: typing.Optional[typing.Dict[int, int]] = None):
     if orig_shape == new_shape:
+        if mapping is not None:
+            for i in range(len(orig_shape)):
+                mapping[i] = i
         return True
 
     i = 0
@@ -1368,7 +1391,7 @@ def is_simple_reshape(orig_shape, new_shape, mapping: typing.Optional[typing.Dic
             else:
                 break
         elif orig_shape[i] == new_shape[j]:
-            if mapping:
+            if mapping is not None:
                 mapping[i] = j
             i += 1
             j += 1
