@@ -815,6 +815,9 @@ class GraphOptimizer(object):
         edges = self.graph.graph.es.select(functools.partial(
             is_bmm_add_edge, graph_converter=self.graph.graph))
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
+        filtered_pairs = [p for p in filtered_pairs if p[0]['node_type'] != ExtendedOperator.FULLY_CONNECTED
+                          or len(p[0]['op'].inputs) == 2
+                          or not np.any(p[0]['op'].inputs[2].tensor)]
 
         remove_ids = []
         ops = []
@@ -858,11 +861,17 @@ class GraphOptimizer(object):
 
             ops = []
 
-            weight_t = self.create_transform_tensor(np.transpose(weight_tensor.tensor))
-            weight_perm = self.create_attr_tensor(np.array([1, 0], dtype='int32'))
-            ops.append(tfl.TransposeOperator([weight_tensor, weight_perm], [weight_t]))
+            if bmm['node_type'] == ExtendedOperator.BATCH_MATMUL:
+                weight_t = self.create_transform_tensor(np.transpose(weight_tensor.tensor))
+                weight_perm = self.create_attr_tensor(np.array([1, 0], dtype='int32'))
+                ops.append(tfl.TransposeOperator([weight_tensor, weight_perm], [weight_t]))
+            else:
+                weight_t = weight_tensor
+
+            keep_dims = output_tensor.tensor.ndim > 2
+
             ops.append(tfl.FullyConnectedOperator([input_tensor, weight_t, bias_tensor], [
-                       output_tensor], fusedActivationFunction=add.fusedActivationFunction, keepNumDims=True))
+                       output_tensor], fusedActivationFunction=add.fusedActivationFunction, keepNumDims=keep_dims))
 
             for op in ops:
                 self.graph.add_operator(op, transform=True)
@@ -1125,9 +1134,10 @@ def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph):
 def is_bmm_add_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] == ExtendedOperator.BATCH_MATMUL \
+    return source_vertex['node_type'] in (ExtendedOperator.BATCH_MATMUL,
+                                          ExtendedOperator.FULLY_CONNECTED) \
         and target_vertex['node_type'] == ExtendedOperator.ADD \
-        and source_vertex['op'].inputs[0].tensor.ndim >= 3 \
+        and source_vertex['op'].inputs[0].tensor.ndim >= 2 \
         and source_vertex['op'].inputs[1].tensor.ndim == 2 \
         and target_vertex['op'].inputs[1].tensor.ndim == 1 \
         and target_vertex['op'].inputs[1].shape[0] == source_vertex['op'].inputs[1].shape[-1] \
