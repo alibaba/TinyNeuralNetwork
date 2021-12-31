@@ -376,13 +376,14 @@ class GraphOptimizer(object):
         self.graph.graph.delete_vertices(remove_ids)
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
-    def remove_noop_pass(self):
+    def remove_noop_pass(self, branch: bool = False):
         edges = self.graph.graph.es.select(functools.partial(
-            is_ending_with_noop_edge, graph_converter=self.graph.graph))
+            is_ending_with_noop_edge, graph_converter=self.graph.graph, branch=branch))
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
 
         # Try to fuse the edges
-        filtered_pairs = fuse_connected_edges(filtered_pairs)
+        if not branch:
+            filtered_pairs = fuse_connected_edges(filtered_pairs)
 
         elinimate_sequences(self.graph, filtered_pairs)
 
@@ -958,7 +959,8 @@ class GraphOptimizer(object):
         self.fuse_simple_reshape_pass()
         self.branch_transpose_expand_pass()
         self.fuse_simple_transpose_pass()
-        self.remove_noop_pass()
+        for branch in (False, True):
+            self.remove_noop_pass(branch)
         self.fuse_wrapped_reshape_within_transpose_pass()
 
         # Buffer folding, which is needed by the fusion passes below
@@ -1109,11 +1111,17 @@ def is_elementwise_binary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
                         ExtendedOperator.MIRROR_PAD))
 
 
-def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph):
+def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph, branch: bool = False):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex.outdegree() == 1 and target_vertex.outdegree() >= 1 \
-        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name \
+
+    if branch:
+        source_cond_var = source_vertex.outdegree() >= 1
+    else:
+        source_cond_var = source_vertex.outdegree() == 1
+
+    return source_cond_var and target_vertex.outdegree() >= 1 \
+        and target_vertex['op'].inputs[0].name in source_vertex['outputs'] \
         and ((target_vertex['node_type'] == ExtendedOperator.RESHAPE and
               target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape) or
              (target_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
