@@ -429,12 +429,14 @@ class CommonGraph(object):
                     buffers.append(tensor.buffer)
 
             if label in self.inputs:
-                item_idx = self.inputs.index(label)
-                input_idx[item_idx] = tensor.index
+                item_indices = [i for i, x in enumerate(self.inputs) if x == label]
+                for item_idx in item_indices:
+                    input_idx[item_idx] = tensor.index
 
             if label in self.outputs:
-                item_idx = self.outputs.index(label)
-                output_idx[item_idx] = tensor.index
+                item_indices = [i for i, x in enumerate(self.outputs) if x == label]
+                for item_idx in item_indices:
+                    output_idx[item_idx] = tensor.index
 
         missing_inputs = [name for name, _ in filter(lambda x: x[1] < 0, zip(self.inputs, input_idx))]
         missing_outputs = [name for name, _ in filter(lambda x: x[1] < 0, zip(self.outputs, output_idx))]
