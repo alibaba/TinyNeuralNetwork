@@ -1477,7 +1477,7 @@ class ATenMmOperator(ATenMmSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.elementwise_binary(tfl.BatchMatmulOperator, graph_converter)
+        ATenMatmulOperator.parse_common(self, node, attrs, args, graph_converter)
 
 
 class ATenHardswishOperator(ATenHardswishSchema):
