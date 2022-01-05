@@ -850,7 +850,7 @@ class GraphOptimizer(object):
 
             ops = []
 
-            if bmm['node_type'] == ExtendedOperator.BATCH_MATMUL:
+            if isinstance(bmm, tfl.BatchMatmulOperator):
                 weight_t = self.create_transform_tensor(np.transpose(weight_tensor.tensor))
                 weight_perm = self.create_attr_tensor(np.array([1, 0], dtype='int32'))
                 ops.append(tfl.TransposeOperator([weight_tensor, weight_perm], [weight_t]))
@@ -1135,13 +1135,19 @@ def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph, branch: b
 def is_bmm_add_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] in (ExtendedOperator.BATCH_MATMUL,
-                                          ExtendedOperator.FULLY_CONNECTED) \
+
+    out_dim_idx = None
+    if source_vertex['node_type'] == ExtendedOperator.BATCH_MATMUL:
+        out_dim_idx = -1
+    elif source_vertex['node_type'] == ExtendedOperator.FULLY_CONNECTED:
+        out_dim_idx = 0
+
+    return out_dim_idx is not None \
         and target_vertex['node_type'] == ExtendedOperator.ADD \
         and source_vertex['op'].inputs[0].tensor.ndim >= 2 \
         and source_vertex['op'].inputs[1].tensor.ndim == 2 \
         and target_vertex['op'].inputs[1].tensor.ndim == 1 \
-        and target_vertex['op'].inputs[1].shape[0] == source_vertex['op'].inputs[1].shape[-1] \
+        and target_vertex['op'].inputs[1].shape[0] == source_vertex['op'].inputs[1].shape[out_dim_idx] \
         and source_vertex.outdegree() == 1 and target_vertex.outdegree() >= 1 \
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
 
