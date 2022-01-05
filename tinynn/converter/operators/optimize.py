@@ -453,8 +453,11 @@ class GraphOptimizer(object):
             op_shape = op.inputs[1]
 
             prev_idx = prev_node['outputs'].index(op.inputs[0].name)
-            prev_op = prev_node['op']
-            prev_out = prev_op.outputs[prev_idx]
+            if prev_node['node_type'] == ExtendedOperator.INPUT_NODE:
+                prev_out = self.graph.tensor_map[op.inputs[0].name]
+            else:
+                prev_op = prev_node['op']
+                prev_out = prev_op.outputs[prev_idx]
 
             new_tensor = self.create_transform_tensor(op_out.tensor.copy(), quantization=op_out.quantization)
             new_shape = self.create_attr_tensor(op_shape.tensor.copy())
@@ -487,8 +490,11 @@ class GraphOptimizer(object):
             op_perm = op.inputs[1]
 
             prev_idx = prev_node['outputs'].index(op.inputs[0].name)
-            prev_op = prev_node['op']
-            prev_out = prev_op.outputs[prev_idx]
+            if prev_node['node_type'] == ExtendedOperator.INPUT_NODE:
+                prev_out = self.graph.tensor_map[op.inputs[0].name]
+            else:
+                prev_op = prev_node['op']
+                prev_out = prev_op.outputs[prev_idx]
 
             new_tensor = self.create_transform_tensor(op_out.tensor.copy(), quantization=op_out.quantization)
             new_perm = self.create_attr_tensor(op_perm.tensor.copy())
