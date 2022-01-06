@@ -1465,23 +1465,59 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
         if not remove_last:
             last_node = seq[-2]
 
+        output_idx = 0
+        if first_node == seq[0]:
+            next_idx = 1
+        else:
+            next_idx = 0
+        output_name = seq[next_idx]['op'].inputs[input_idx].name
+        output_idx = first_node['outputs'].index(output_name)
+
         # We use the forward input tensor under the following circumstances.
         # 1. If the previous node before the sequence is an input node
-        # 2. If the first node has multiple outputs
+        # 2. If the first node has multiple outputs and the last node doesn't connect to output nodes
         use_forward_input = False
-        if first_node['node_type'] == ExtendedOperator.INPUT_NODE or first_node.outdegree() > 1:
+        if first_node['node_type'] == ExtendedOperator.INPUT_NODE:
             use_forward_input = True
+
+        branch = first_node.outdegree() > 1
+
+        has_output_nodes = False
+        for edge in last_node.out_edges():
+            target_vertex = edge.target_vertex
+            if target_vertex['node_type'] == ExtendedOperator.OUTPUT_NODE:
+                if use_forward_input:
+                    # Cannot optimize away ops between i/o nodes
+                    skip = True
+                else:
+                    has_output_nodes = True
+                break
+
+        if branch:
+            output_outdegree = 0
+            for edge in first_node.out_edges():
+                target_vertex = edge.target_vertex
+                if target_vertex == last_node:
+                    continue
+                if target_vertex['node_type'] == ExtendedOperator.OUTPUT_NODE:
+                    if has_output_nodes and edge['label'] == output_name:
+                        output_outdegree += 1
+                    break
+                else:
+                    names = [t.name for t in target_vertex['op'].inputs]
+                    if output_name in names:
+                        output_outdegree += 1
+
+            if not has_output_nodes:
+                use_forward_input = True
+            elif output_outdegree > 0:
+                skip = True
+
+        if skip:
+            continue
 
         if use_forward_input:
             # Find out the output of the first node in the sequence
-            output_idx = 0
-            if first_node.outdegree() > 0:
-                if first_node == seq[0]:
-                    next_idx = 1
-                else:
-                    next_idx = 0
-                output_name = seq[next_idx]['op'].inputs[input_idx].name
-                output_idx = first_node['outputs'].index(output_name)
             new_output = first_node['outputs'][output_idx]
             assert new_output in graph_converter.tensor_map
 
@@ -1498,9 +1534,9 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
             graph_converter.connect_next_tensors(last_node, first_node, new_output)
 
             # Update graph, prepare to drop the output tensor of the intermediate nodes and use the output tensor of the last node instead
-            first_node['outputs'][0] = new_output
+            first_node['outputs'][output_idx] = new_output
             if first_node['op'] is not None:
-                first_node['op'].outputs[0] = graph_converter.tensor_map[new_output]
+                first_node['op'].outputs[output_idx] = graph_converter.tensor_map[new_output]
             graph_converter.tensor_node_map[new_output] = first_node['name']
 
         if remove_first and remove_last:
