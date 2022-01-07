@@ -26,7 +26,8 @@ class TFLiteConverter(object):
                  dump_config_path: typing.Optional[str] = None,
                  asymmetric: bool = True,
                  preserve_tensors: bool = False,
-                 optimize: int = GraphOptimizer.ALL_OPTIMIZE) -> None:
+                 optimize: int = GraphOptimizer.ALL_OPTIMIZE,
+                 quantize_target_type: str = 'uint8') -> None:
         """ The TFLiteConverter class
 
         Args:
@@ -41,6 +42,7 @@ class TFLiteConverter(object):
             asymmetric (bool): Asymmetric quantization. Defaults to True
             preserve_tensors (bool): Preserve the copies of the intermediate tensors. Defaults to False
             optimize (int): The level of graph optimization. Defaults to `GraphOptimizer.ALL_OPTIMIZE`
+            quantize_target_type (str): Target type for quantization. Defaults to 'uint8'
         """
 
         self.model = model
@@ -64,6 +66,15 @@ class TFLiteConverter(object):
         self.dump_config_path = dump_config_path
         self.preserve_tensors = preserve_tensors
         self.optimize = optimize
+
+        if quantize_target_type == 'uint8':
+            self.q_type = np.uint8
+            if not self.asymmetric:
+                log.warning('Symmetric quantized model with uint8 is unsupported in most backends of TFLite')
+        elif quantize_target_type == 'int8':
+            self.q_type = np.int8
+        else:
+            raise AttributeError(f'unknown quantize_target_type: {quantize_target_type}, expected: uint8, int8')
 
         if dump_config_path and not dump_jit_model_path:
             raise AssertionError("when dump_config_path is set, dump_jit_model_path is required to be set")
@@ -166,7 +177,8 @@ class TFLiteConverter(object):
         self.common_graph.input_transpose.extend(self.input_transpose)
         tensors = []
         for i, node in enumerate(graph_inputs):
-            tensors.append(Tensor(self.dummy_input[i], node, has_buffer=False, asymmetric=self.asymmetric))
+            tensors.append(Tensor(self.dummy_input[i], node, has_buffer=False,
+                           asymmetric=self.asymmetric, q_type=self.q_type))
         self.common_graph.add_nodes(tensors, ExtendedOperator.INPUT_NODE)
 
     def init_inputs(self):
@@ -206,7 +218,7 @@ class TFLiteConverter(object):
             output_tensors = []
 
             converter_type = OPERATOR_CONVERTER_DICT.get(k, NoTrackOperator)
-            converter = converter_type(node, self.tensor_map, self.asymmetric)
+            converter = converter_type(node, self.tensor_map, self.asymmetric, self.q_type)
             # Don't track the operator if all the input nodes are not tracked unless it has custom implementation (e.g prim::* ops)
             if converter_type.run == NoTrackOperator.run and converter_type != NoTrackOperator:
                 no_track_flag = True
@@ -222,7 +234,7 @@ class TFLiteConverter(object):
                         break
                 if no_track_flag:
                     converter_type = NoTrackOperator
-                    converter = converter_type(node, self.tensor_map, self.asymmetric)
+                    converter = converter_type(node, self.tensor_map, self.asymmetric, self.q_type)
             if k != 'prim::Constant':
                 log.debug(f'{k} {converter.input_names} -> {converter.output_names} {converter_type.__name__}')
             # Don't fetch attrs and schemas for non-tracking nodes

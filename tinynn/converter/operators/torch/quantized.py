@@ -90,9 +90,9 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
             bias_dim = weight_tensor.quantization.dim
 
         if transpose:
-            if self.asymmetric:
+            if self.q_type == np.uint8:
                 bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.uint8)
-            else:
+            elif self.q_type == np.int8:
                 bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int8)
         else:
             bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int32, dim=bias_dim)

@@ -17,7 +17,7 @@ log = get_logger(__name__, 'INFO')
 
 
 class OperatorConverter(ABC):
-    def __init__(self, node, tensor_map, asymmetric=True) -> None:
+    def __init__(self, node, tensor_map, asymmetric=True, q_type=np.uint8) -> None:
         self.input_names = self.get_input_names(node)
         self.output_names = self.get_output_names(node)
         self.input_tensors = self.get_input_tensors(tensor_map)
@@ -27,6 +27,7 @@ class OperatorConverter(ABC):
         self.attr_count = 0
         self.transform_count = 0
         self.asymmetric = asymmetric
+        self.q_type = q_type
 
     @abstractmethod
     def parse(self, node, attrs, args, graph_converter):
@@ -152,9 +153,9 @@ class OperatorConverter(ABC):
                 if graph_converter is not None and n in graph_converter.tensor_map:
                     t = graph_converter.tensor_map[n]
                 else:
-                    t = tfl.Tensor(t, n, has_buffer=non_existent_as_buffer, asymmetric=self.asymmetric)
+                    t = tfl.Tensor(t, n, has_buffer=non_existent_as_buffer, asymmetric=self.asymmetric, q_type=self.q_type)
             else:
-                t = tfl.Tensor(t, n, has_buffer=b, asymmetric=self.asymmetric)
+                t = tfl.Tensor(t, n, has_buffer=b, asymmetric=self.asymmetric, q_type=self.q_type)
             tfl_tensors.append(t)
         return tfl_tensors
 
@@ -167,7 +168,7 @@ class OperatorConverter(ABC):
         #     ' when you encounter this message, it means some ops in the computation graph is not supported'''
 
         tensor = self.input_tensors[idx]
-        return tfl.Tensor(tensor, name, has_buffer=True, asymmetric=self.asymmetric)
+        return tfl.Tensor(tensor, name, has_buffer=True, asymmetric=self.asymmetric, q_type=self.q_type)
 
     def get_unique_attr_name(self):
         if self.attr_count == 0:
@@ -188,12 +189,13 @@ class OperatorConverter(ABC):
     def create_transform_tensor(self, tensor, name=None, quantization=None):
         if name is None:
             name = self.get_unique_transform_name()
-        return tfl.Tensor(tensor, name, has_buffer=False, quantization=quantization, asymmetric=self.asymmetric)
+        return tfl.Tensor(tensor, name, has_buffer=False, quantization=quantization,
+                          asymmetric=self.asymmetric, q_type=self.q_type)
 
     def create_attr_tensor(self, tensor, name=None):
         if name is None:
             name = self.get_unique_attr_name()
-        return tfl.Tensor(tensor, name, has_buffer=True, asymmetric=self.asymmetric)
+        return tfl.Tensor(tensor, name, has_buffer=True, asymmetric=self.asymmetric, q_type=self.q_type)
 
     def unpack_params(self, params):
         result = {}
@@ -340,7 +342,7 @@ class OperatorConverter(ABC):
             input_size = [input_tensor.shape[2], input_tensor.shape[3]]
 
             if not all((i + 2 * p - k) % s == 0 for i, p, k, s in zip(input_size, padding, kernel_size, stride)):
-                assert type(ops[1]) == tfl.MaxPool2dOperator, 'ceil_mode=False for AvgPool not supported'
+                assert type(ops[1]) == tfl.MaxPool2dOperator, 'ceil_mode=True for AvgPool not supported'
                 fill_nan = True
                 ceil_pad = get_pool_ceil_padding(input_tensor, kernel_size, stride, padding)
                 ceil_pad = list(np.add(ceil_pad, padding))
@@ -364,9 +366,14 @@ class OperatorConverter(ABC):
             pad_tensor = self.create_attr_tensor(np.array(pad, dtype='int32'))
             pad_input = ops[fill_nan_index - 1].outputs[0]
             if pad_input.quantization is not None:
-                constant_arr = tfl.FakeQuantTensor(np.zeros(1, dtype=pad_input.dtype),
-                                                   pad_input.quantization.scale,
-                                                   pad_input.quantization.zero_point)
+                if self.q_type == np.uint8:
+                    constant_arr = tfl.FakeQuantTensor(np.zeros(1, dtype=pad_input.dtype),
+                                                    pad_input.quantization.scale,
+                                                    pad_input.quantization.zero_point)
+                else:
+                    constant_arr = tfl.FakeQuantTensor(np.array([-128], dtype=pad_input.dtype),
+                                                    pad_input.quantization.scale,
+                                                    pad_input.quantization.zero_point)
             else:
                 constant_arr = np.array([nan], dtype='float32')
             constant_tensor = self.create_attr_tensor(constant_arr)
@@ -382,19 +389,19 @@ class OperatorConverter(ABC):
         assert tensor.numel() == 1
         assert torch.dtype == torch.float32
         if not tensor.is_nonzero():
-            if self.asymmetric:
+            if self.q_type == np.uint8:
                 return torch.quantize_per_tensor(tensor, 0.5, 128, torch.quint8)
-            else:
+            elif self.q_type == np.int8:
                 return torch.quantize_per_tensor(tensor, 0.5, 0, torch.qint8)
         elif (torch.sign(tensor) < 0).all():
-            if self.asymmetric:
+            if self.q_type == np.uint8:
                 return torch.quantize_per_tensor(tensor, -tensor[0] / 127, 255, torch.quint8)
-            else:
+            elif self.q_type == np.int8:
                 return torch.quantize_per_tensor(tensor, -tensor[0] / 127, 0, torch.qint8)
         else:
-            if self.asymmetric:
+            if self.q_type == np.uint8:
                 return torch.quantize_per_tensor(tensor, tensor[0] / 127, 0, torch.quint8)
-            else:
+            elif self.q_type == np.int8:
                 return torch.quantize_per_tensor(tensor, tensor[0] / 127, 0, torch.qint8)
 
 

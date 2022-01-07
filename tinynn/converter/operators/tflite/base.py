@@ -155,7 +155,7 @@ class Tensor(object):
 
     def __init__(self, tensor: typing.Iterable, name: str, quantization: QuantizationParameters = None,
                  has_buffer: bool = True, dtype: str = None, is_variable: bool = False,
-                 asymmetric: bool = True):
+                 asymmetric: bool = True, q_type: type = np.uint8):
         self.quantization = None
         self.name = name
         self.index = 0
@@ -174,21 +174,30 @@ class Tensor(object):
             assert tensor.is_contiguous, "Tensor should be contiguous"
             if tensor.dtype == torch.quint8:
                 self.tensor = torch.int_repr(tensor.detach()).numpy()
-                if asymmetric:
+                if q_type == np.uint8:
                     self.quantization = QuantizationParameters(tensor.q_scale(), tensor.q_zero_point())
                 else:
-                    assert tensor.q_zero_point() == 128, "As for symmetric quantization, " \
-                        "the zero point of the u8 tensors should be 128. " \
-                        "This could happen if you didn't train the model after QAT preparation."
+                    if not asymmetric:
+                        sym_u8_offset = 128
+                        assert tensor.q_zero_point() == sym_u8_offset, "As for symmetric quantization, " \
+                            f"the zero point of the u8 tensors should be {sym_u8_offset}, but got {tensor.q_zero_point()}. " \
+                            "This could happen if you didn't train the model after QAT preparation, " \
+                            "or the OP is not supported in symmetric quantization (e.g. sigmoid)"
+                    else:
+                        sym_u8_offset = tensor.q_zero_point()
                     self.tensor = (self.tensor.astype(np.int32) - 128).astype(np.int8)
-                    self.quantization = QuantizationParameters(tensor.q_scale(), 0)
+                    self.quantization = QuantizationParameters(tensor.q_scale(), sym_u8_offset - 128)
             elif tensor.dtype == torch.qint8:
                 self.tensor = torch.int_repr(tensor.detach()).numpy()
-                if asymmetric:
-                    assert tensor.q_zero_point() == 0, "As for asymmetric quantization, " \
-                        "the zero point of the s8 tensors should be 0. "
+                if q_type == np.uint8:
+                    if asymmetric:
+                        asym_s8_offset = 0
+                        assert tensor.q_zero_point() == asym_s8_offset, "As for asymmetric quantization, " \
+                            f"the zero point of the s8 tensors should be {asym_s8_offset}, but got {tensor.q_zero_point()}. "
+                    else:
+                        asym_s8_offset = tensor.q_zero_point()
                     self.tensor = self.tensor.view(np.uint8) + 128
-                    self.quantization = QuantizationParameters(tensor.q_scale(), 128)
+                    self.quantization = QuantizationParameters(tensor.q_scale(), asym_s8_offset + 128)
                 else:
                     if tensor.qscheme() in (torch.per_tensor_symmetric, torch.per_tensor_affine):
                         self.quantization = QuantizationParameters(tensor.q_scale(), tensor.q_zero_point())
@@ -202,7 +211,7 @@ class Tensor(object):
                         if dim < 0:
                             dim += tensor.dim()
 
-                        assert all((t == 0 for t in zero_points)), f'As for symmetric quantization, " \
+                        assert all((t == 0 for t in zero_points)), f'As for per-channel quantization, " \
                             "the zero point of the s8 tensors should be 0, but got ${zero_points}'
 
                         self.quantization = QuantizationParameters(scales, zero_points, dim)

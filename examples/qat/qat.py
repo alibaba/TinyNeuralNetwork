@@ -71,7 +71,9 @@ def main_worker(args):
         torch.backends.quantized.engine = 'qnnpack'
 
         # The code section below is used to convert the model to the TFLite format
-        # If you need a quantized model with symmetric quantization (int8),
+        # If you need a quantized model with a specific data type (e.g. int8)
+        # you may specify `quantize_target_type='int8'` in the following line.
+        # If you need a quantized model with symmetric quantization (with pre-defined zero points),
         # you may specify `asymmetric=False` in the following line.
         converter = TFLiteConverter(qat_model, dummy_input, tflite_path='out/qat_model.tflite')
         converter.convert()
