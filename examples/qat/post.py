@@ -34,6 +34,16 @@ def main_worker(args):
         #   quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'force_overwrite': False, 'is_input_quantized': None})
         # The `is_input_quantized` in the previous line is a flag on the input tensors whether they are quantized or not,
         # which can be None (False for all inputs) or a list of booleans that corresponds to the inputs.
+        # Also, we support multiple qschemes for quantization preparation. There are several common choices.
+        #   a. Asymmetric uint8. (default) config={'asymmetric': True, 'per_tensor': True}
+        #      The is the most common choice and also conforms to the legacy TFLite quantization spec.
+        #   b. Asymmetric int8. config={'asymmetric': True, 'per_tensor': False}
+        #      The conforms to the new TFLite quantization spec. In legacy TF versions, this is usually used in post quantization.
+        #      Compared with (a), it has support for per-channel quantization in supported kernels (e.g Conv), while (a) does not.
+        #   c. Symmetric int8. config={'asymmetric': False, 'per_tensor': False}
+        #      The is same to (b) with no offsets, which may be used on some low-end embedded chips.
+        #   d. Symmetric uint8. config={'asymmetric': False, 'per_tensor': True}
+        #      The is same to (a) with no offsets. But it is rarely used, which just serves as a placeholder here.
 
         quantizer = PostQuantizer(model, dummy_input, work_dir='out')
         qat_model = quantizer.quantize()

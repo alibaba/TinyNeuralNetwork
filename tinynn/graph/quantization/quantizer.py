@@ -82,10 +82,7 @@ class QATQuantizer(object):
 
         self.parse_config(config)
 
-        if self.backend == 'qnnpack':
-            if not self.per_tensor and self.asymmetric:
-                raise AttributeError("Per-channel asymmetric quantization is not supported")
-        else:
+        if self.backend != 'qnnpack':
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
 
     def parse_config(self, config: typing.Optional[dict]):
@@ -301,10 +298,10 @@ class QATQuantizer(object):
                 sym_fq = torch_q.FakeQuantize.with_args(observer=torch_q.MovingAverageMinMaxObserver, quant_min=0, quant_max=255,
                                                         dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
                 qconfig = torch_q.QConfig(sym_fq, qconfig.weight)
-                if not self.per_tensor:
-                    sym_fq = torch_q.FakeQuantize.with_args(observer=torch_q.MovingAveragePerChannelMinMaxObserver, quant_min=-127, quant_max=127,
-                                                            dtype=torch.qint8, qscheme=torch.per_channel_symmetric, reduce_range=False, ch_axis=0)
-                    qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
+            if not self.per_tensor:
+                sym_fq = torch_q.FakeQuantize.with_args(observer=torch_q.MovingAveragePerChannelMinMaxObserver, quant_min=-127, quant_max=127,
+                                                        dtype=torch.qint8, qscheme=torch.per_channel_symmetric, reduce_range=False, ch_axis=0)
+                qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
         else:
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
 
