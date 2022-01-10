@@ -2073,3 +2073,19 @@ class ATenProdOperator(ATenProdSchema):
 
         self.run(node)
         self.handle_reduce(tfl.ReduceProdOperator, graph_converter, False)
+
+
+class ATenMinOperator(ATenMinSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.handle_reduce(tfl.ReduceMinOperator, graph_converter, False)
+
+
+class ATenMaxOperator(ATenMaxSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.handle_reduce(tfl.ReduceMaxOperator, graph_converter, False)
