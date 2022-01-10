@@ -417,8 +417,8 @@ class OperatorConverter(ABC):
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
         if len(outputs) > 1:
-            log.warning('Reduce ops like `torch.min` have multiple outputs. However, only the first'
-                        'output will be preserved in our converter. If you need that tensor, please'
+            log.warning('Reduce ops like `torch.min` have multiple outputs. However, only the first '
+                        'output will be preserved in our converter. If you need that tensor, please '
                         'use the `torch.argmin` instead.')
             outputs = outputs[:1]
 
