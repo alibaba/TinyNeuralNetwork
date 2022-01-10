@@ -565,56 +565,7 @@ class ATenMeanOperator(ATenMeanSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-
-        input_tensor = self.find_or_create_input(0, graph_converter)
-
-        if 'dim' in args and 'keepdim' in args:
-            dims, keep_dim = self.input_tensors[1:3]
-            if type(dims) not in (list, tuple):
-                dims = [dims]
-        else:
-            dims = list(range(input_tensor.tensor.ndim))
-            keep_dim = False
-            self.output_tensors[0] = self.output_tensors[0].view(1)
-
-        for idx, dim in enumerate(dims):
-            if dim < 0:
-                dims[idx] += input_tensor.tensor.ndim
-
-        ops = []
-        transpose = False
-
-        # If it is a pooling 2d op, consider wrapping it with transposes
-        if len(input_tensor.shape) == 4 and dims == [2, 3]:
-            dims = [1, 2]
-            transpose = True
-
-        dim_tensor = self.create_attr_tensor(np.array(dims, dtype='int32'))
-
-        inputs = [input_tensor, dim_tensor]
-        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-
-        ops.append(tfl.MeanOperator(inputs, outputs, keep_dim))
-
-        if transpose:
-            if keep_dim:
-                ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
-            else:
-                orig_input = ops[0].inputs[0]
-
-                nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
-                nchw2nhwc_perm_tensor = self.create_attr_tensor(nchw2nhwc_perm)
-
-                new_input = self.create_transform_tensor(np.transpose(
-                    orig_input.tensor, nchw2nhwc_perm), quantization=orig_input.quantization)
-
-                nchw2nhwc_transpose = tfl.TransposeOperator([orig_input, nchw2nhwc_perm_tensor], [new_input])
-
-                ops[0].inputs[0] = new_input
-                ops.insert(0, nchw2nhwc_transpose)
-
-        for op in ops:
-            graph_converter.add_operator(op)
+        self.handle_reduce(tfl.MeanOperator, graph_converter, True)
 
 
 class ATenPowOperator(ATenPowSchema):
@@ -2113,25 +2064,12 @@ class ATenSumOperator(ATenSumSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+        self.handle_reduce(tfl.SumOperator, graph_converter, False)
 
-        input_tensor = self.find_or_create_input(0, graph_converter)
 
-        if 'dim' in args and 'keepdim' in args:
-            dims, keep_dim = self.input_tensors[1:3]
-            if type(dims) not in (list, tuple):
-                dims = [dims]
-        else:
-            dims = list(range(input_tensor.tensor.ndim))
-            keep_dim = False
-            self.output_tensors[0] = self.output_tensors[0].view(1)
+class ATenProdOperator(ATenProdSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
 
-        for idx, dim in enumerate(dims):
-            if dim < 0:
-                dims[idx] += input_tensor.tensor.ndim
-
-        dim_tensor = self.create_attr_tensor(np.array(dims, dtype='int32'))
-
-        inputs = [input_tensor, dim_tensor]
-        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-
-        graph_converter.add_operator(tfl.SumOperator(inputs, outputs, keep_dim))
+        self.run(node)
+        self.handle_reduce(tfl.ReduceProdOperator, graph_converter, False)

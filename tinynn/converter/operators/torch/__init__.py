@@ -124,6 +124,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::bitwise_and": ATenBitwiseAndOperator,
                                                                 "aten::bitwise_or": ATenBitwiseOrOperator,
                                                                 "aten::sum": ATenSumOperator,
+                                                                "aten::prod": ATenProdOperator,
 
                                                                 # quantized
                                                                 "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,

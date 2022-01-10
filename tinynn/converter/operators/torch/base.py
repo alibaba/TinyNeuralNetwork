@@ -385,6 +385,59 @@ class OperatorConverter(ABC):
             pad_op = tfl.Padv2Operator([pad_input, pad_tensor, constant_tensor], [pad_out])
             ops.insert(fill_nan_index, pad_op)
 
+    def handle_reduce(self, converter_class, graph_converter, transpose_opt, *args, **kwargs):
+        input_tensor = self.find_or_create_input(0, graph_converter)
+
+        if 'dim' in args and 'keepdim' in args:
+            dims, keep_dim = self.input_tensors[1:3]
+            if type(dims) not in (list, tuple):
+                dims = [dims]
+        else:
+            dims = list(range(input_tensor.tensor.ndim))
+            keep_dim = False
+            self.output_tensors[0] = self.output_tensors[0].view(1)
+
+        for idx, dim in enumerate(dims):
+            if dim < 0:
+                dims[idx] += input_tensor.tensor.ndim
+
+        ops = []
+        transpose = False
+
+        if transpose_opt:
+            # For some ops the codepath is optimized for nhwc.
+            # For example, for tfl.Mean, if it is a pooling 2d op, consider wrapping it with transposes
+            if len(input_tensor.shape) == 4 and dims == [2, 3]:
+                dims = [1, 2]
+                transpose = True
+
+        dim_tensor = self.create_attr_tensor(np.array(dims, dtype='int32'))
+
+        inputs = [input_tensor, dim_tensor]
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+
+        ops.append(converter_class(inputs, outputs, keep_dim, *args, **kwargs))
+
+        if transpose:
+            if keep_dim:
+                ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
+            else:
+                orig_input = ops[0].inputs[0]
+
+                nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
+                nchw2nhwc_perm_tensor = self.create_attr_tensor(nchw2nhwc_perm)
+
+                new_input = self.create_transform_tensor(np.transpose(
+                    orig_input.tensor, nchw2nhwc_perm), quantization=orig_input.quantization)
+
+                nchw2nhwc_transpose = tfl.TransposeOperator([orig_input, nchw2nhwc_perm_tensor], [new_input])
+
+                ops[0].inputs[0] = new_input
+                ops.insert(0, nchw2nhwc_transpose)
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
     def quantize_scalar_tensor(self, tensor: torch.Tensor):
         assert tensor.numel() == 1
         assert torch.dtype == torch.float32
