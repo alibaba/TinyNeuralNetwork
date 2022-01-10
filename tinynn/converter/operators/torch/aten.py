@@ -2106,3 +2106,32 @@ class ATenBitwiseOrOperator(ATenBitwiseOrSchema):
         assert all((t.dtype == torch.bool for t in self.input_tensors)), "Only bools are supported in aten::bitwise_not"
 
         self.elementwise_unary(tfl.LogicalOrOperator, graph_converter)
+
+
+class ATenSumOperator(ATenSumSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+
+        if 'dim' in args and 'keepdim' in args:
+            dims, keep_dim = self.input_tensors[1:3]
+            if type(dims) not in (list, tuple):
+                dims = [dims]
+        else:
+            dims = list(range(input_tensor.tensor.ndim))
+            keep_dim = False
+            self.output_tensors[0] = self.output_tensors[0].view(1)
+
+        for idx, dim in enumerate(dims):
+            if dim < 0:
+                dims[idx] += input_tensor.tensor.ndim
+
+        dim_tensor = self.create_attr_tensor(np.array(dims, dtype='int32'))
+
+        inputs = [input_tensor, dim_tensor]
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+
+        graph_converter.add_operator(tfl.SumOperator(inputs, outputs, keep_dim))
