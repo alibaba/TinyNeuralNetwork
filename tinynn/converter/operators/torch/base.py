@@ -385,10 +385,10 @@ class OperatorConverter(ABC):
             pad_op = tfl.Padv2Operator([pad_input, pad_tensor, constant_tensor], [pad_out])
             ops.insert(fill_nan_index, pad_op)
 
-    def handle_reduce(self, converter_class, graph_converter, transpose_opt, *args, **kwargs):
+    def handle_reduce(self, converter_class, input_args, graph_converter, transpose_opt, *args, **kwargs):
         input_tensor = self.find_or_create_input(0, graph_converter)
 
-        if 'dim' in args and 'keepdim' in args:
+        if 'dim' in input_args and 'keepdim' in input_args:
             dims, keep_dim = self.input_tensors[1:3]
             if type(dims) not in (list, tuple):
                 dims = [dims]

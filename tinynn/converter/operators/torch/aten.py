@@ -565,7 +565,7 @@ class ATenMeanOperator(ATenMeanSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.handle_reduce(tfl.MeanOperator, graph_converter, True)
+        self.handle_reduce(tfl.MeanOperator, args, graph_converter, True)
 
 
 class ATenPowOperator(ATenPowSchema):
@@ -2064,7 +2064,7 @@ class ATenSumOperator(ATenSumSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.handle_reduce(tfl.SumOperator, graph_converter, False)
+        self.handle_reduce(tfl.SumOperator, args, graph_converter, False)
 
 
 class ATenProdOperator(ATenProdSchema):
@@ -2072,7 +2072,7 @@ class ATenProdOperator(ATenProdSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.handle_reduce(tfl.ReduceProdOperator, graph_converter, False)
+        self.handle_reduce(tfl.ReduceProdOperator, args, graph_converter, False)
 
 
 class ATenMinOperator(ATenMinSchema):
@@ -2080,7 +2080,7 @@ class ATenMinOperator(ATenMinSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.handle_reduce(tfl.ReduceMinOperator, graph_converter, False)
+        self.handle_reduce(tfl.ReduceMinOperator, args, graph_converter, False)
 
 
 class ATenMaxOperator(ATenMaxSchema):
@@ -2088,4 +2088,4 @@ class ATenMaxOperator(ATenMaxSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.handle_reduce(tfl.ReduceMaxOperator, graph_converter, False)
+        self.handle_reduce(tfl.ReduceMaxOperator, args, graph_converter, False)
