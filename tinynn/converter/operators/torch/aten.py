@@ -2115,3 +2115,104 @@ class ATenGluOperator(ATenGluSchema):
 
         for op in ops:
             graph_converter.add_operator(op)
+
+
+class ATenMaskedFillOperator(ATenMaskedFillSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        input_tensor, mask_tensor = [self.find_or_create_input(i, graph_converter) for i in range(2)]
+        mask = self.input_tensors[1]
+        other = self.input_tensors[2]
+        out = self.output_tensors[0]
+
+        ops = []
+        if type(other) == torch.Tensor:
+            if out.dtype != other.dtype:
+                casted = other.clone().to(dtype=out.dtype)
+                other_t = self.find_or_create_input(2, graph_converter)
+                if other_t.buffer is None:
+                    new_other = self.create_transform_tensor(casted)
+                    ops.append(tfl.CastOperator(
+                        [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+                    other_t = new_other
+                    # TODO: +/- inf check for variable tensors
+                else:
+                    if torch.isinf(casted).any():
+                        log.warning('aten::masked_fill(input, mask, value) where value=[+/-]inf is not supported, '
+                                    'trying to convert it to the nearest value')
+                        type_info = torch.finfo(casted.dtype)
+                        clamped = torch.clamp(casted, type_info.min, type_info.max)
+                        other_t = self.create_transform_tensor(clamped, name=self.input_names[1])
+        elif type(other) in (int, float):
+            other_a = np.array([other], dtype=self.input_tensors[0].detach().numpy().dtype)
+            if np.isinf(other_a).any():
+                log.warning('aten::masked_fill(input, mask, value) where value=[+/-]inf is not supported, '
+                            'trying to convert it to the nearest value')
+                type_info = np.finfo(other_a.dtype)
+                other_a = np.clip(other_a, type_info.min, type_info.max)
+            other_t = self.create_attr_tensor(other_a)
+        else:
+            assert False, "value should have type float, tensor in aten::masked_fill(input, mask, value)"
+
+        input_mask = self.create_transform_tensor(mask_tensor.tensor.astype(input_tensor.dtype))
+        ops.append(tfl.CastOperator([mask_tensor], [input_mask],
+                   tfl.torch_tflite_dtype_mappings[mask.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+
+        masked = self.create_transform_tensor(other_t.tensor * mask_tensor.tensor)
+        ops.append(tfl.MulOperator([other_t, input_mask], [masked]))
+
+        one_tensor = self.create_attr_tensor(np.array([1], dtype=input_tensor.dtype))
+        rev_mask = self.create_transform_tensor(one_tensor.tensor - mask_tensor.tensor)
+        ops.append(tfl.SubOperator([one_tensor, input_mask], [rev_mask]))
+
+        non_masked = self.create_transform_tensor(input_tensor.tensor * rev_mask.tensor)
+        ops.append(tfl.MulOperator([input_tensor, rev_mask], [non_masked]))
+
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        ops.append(tfl.AddOperator([non_masked, masked], outputs))
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
+
+class ATenGtOperator(ATenGtSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        if type(self.input_tensors[1]) != torch.Tensor:
+            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+        self.elementwise_binary(tfl.GreaterOperator, graph_converter)
+
+
+class ATenLtOperator(ATenLtSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        if type(self.input_tensors[1]) != torch.Tensor:
+            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+        self.elementwise_binary(tfl.LessOperator, graph_converter)
+
+
+class ATenGeOperator(ATenGeSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        if type(self.input_tensors[1]) != torch.Tensor:
+            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+        self.elementwise_binary(tfl.GreaterEqualOperator, graph_converter)
+
+
+class ATenLeOperator(ATenLeSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        if type(self.input_tensors[1]) != torch.Tensor:
+            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+        self.elementwise_binary(tfl.LessEqualOperator, graph_converter)

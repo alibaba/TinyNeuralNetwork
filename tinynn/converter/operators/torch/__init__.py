@@ -129,6 +129,12 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::max": ATenMaxOperator,
                                                                 "aten::glu": ATenGluOperator,
                                                                 "aten::glu_": ATenGluOperator,
+                                                                "aten::masked_fill": ATenMaskedFillOperator,
+                                                                "aten::masked_fill_": ATenMaskedFillOperator,
+                                                                "aten::gt": ATenGtOperator,
+                                                                "aten::lt": ATenLtOperator,
+                                                                "aten::ge": ATenGeOperator,
+                                                                "aten::le": ATenLeOperator,
 
                                                                 # quantized
                                                                 "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,
