@@ -2089,3 +2089,29 @@ class ATenMaxOperator(ATenMaxSchema):
 
         self.run(node)
         self.handle_reduce(tfl.ReduceMaxOperator, args, graph_converter, False)
+
+
+class ATenGluOperator(ATenGluSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        dim = self.input_tensors[1]
+
+        if dim < 0:
+            dim += input_tensor.tensor.ndim
+
+        ops = []
+
+        mid_arrs = np.split(input_tensor.tensor, 2, axis=dim)
+        dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
+        mid_tensors = [self.create_transform_tensor(t) for t in mid_arrs]
+        ops.append(tfl.SplitOperator([dim_tensor, input_tensor], mid_tensors, 2))
+
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        ops.append(tfl.MulOperator(mid_tensors, outputs))
+
+        for op in ops:
+            graph_converter.add_operator(op)
