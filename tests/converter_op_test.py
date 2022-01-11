@@ -137,6 +137,80 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
+    def test_binary_elementwise_same_dtype(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+        dummy_input_1 = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater,
+                 torch.less, torch.greater_equal, torch.less_equal, torch.eq, torch.ne]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+            def model(x, y): return func(x, y)
+            model_path = get_model_path()
+            inputs = [dummy_input, dummy_input_1]
+            converter = TFLiteConverter(model, inputs, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(*inputs)
+            tfl_output = tfl_run_model(model_path, inputs, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_binary_elementwise_constant_same_dtype(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+        dummy_input_1 = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater,
+                 torch.less, torch.greater_equal, torch.less_equal, torch.eq, torch.ne]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+            def model(x): return func(x, dummy_input_1)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_binary_elementwise_different_dtype(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+        dummy_input_1 = torch.randint(1, 10, size=dummy_input.shape)
+
+        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater,
+                 torch.less, torch.greater_equal, torch.less_equal, torch.eq, torch.ne]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+            def model(x, y): return func(x, y)
+            model_path = get_model_path()
+            inputs = [dummy_input, dummy_input_1]
+            converter = TFLiteConverter(model, inputs, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(*inputs)
+            tfl_output = tfl_run_model(model_path, inputs, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_binary_elementwise_constant_different_dtype(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+        dummy_input_1 = torch.randint(1, 10, size=dummy_input.shape)
+
+        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater,
+                 torch.less, torch.greater_equal, torch.less_equal, torch.eq, torch.ne]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+            def model(x): return func(x, dummy_input_1)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
 
 if __name__ == '__main__':
     unittest.main()
