@@ -2110,8 +2110,11 @@ class ATenGluOperator(ATenGluSchema):
         mid_tensors = [self.create_transform_tensor(t) for t in mid_arrs]
         ops.append(tfl.SplitOperator([dim_tensor, input_tensor], mid_tensors, 2))
 
+        with_act = self.create_transform_tensor(torch.sigmoid(torch.from_numpy(mid_tensors[1].tensor)))
+        ops.append(tfl.LogisticOperator([mid_tensors[1]], [with_act]))
+
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-        ops.append(tfl.MulOperator(mid_tensors, outputs))
+        ops.append(tfl.MulOperator([mid_tensors[0], with_act], outputs))
 
         for op in ops:
             graph_converter.add_operator(op)
