@@ -2133,9 +2133,9 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
 
         ops = []
         if type(other) == torch.Tensor:
+            other_t = self.find_or_create_input(2, graph_converter)
             if out.dtype != other.dtype:
                 casted = other.clone().to(dtype=out.dtype)
-                other_t = self.find_or_create_input(2, graph_converter)
                 if other_t.buffer is None:
                     new_other = self.create_transform_tensor(casted)
                     ops.append(tfl.CastOperator(
@@ -2143,12 +2143,15 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
                     other_t = new_other
                     # TODO: +/- inf check for variable tensors
                 else:
+                    casted = torch.functional.atleast_1d(casted)
                     if torch.isinf(casted).any():
                         log.warning('aten::masked_fill(input, mask, value) where value=[+/-]inf is not supported, '
                                     'trying to convert it to the nearest value')
                         type_info = torch.finfo(casted.dtype)
                         clamped = torch.clamp(casted, type_info.min, type_info.max)
-                        other_t = self.create_transform_tensor(clamped, name=self.input_names[1])
+                        other_t = self.create_attr_tensor(clamped, name=self.input_names[2])
+                    else:
+                        other_t = self.create_attr_tensor(casted, name=self.input_names[2])
         elif type(other) in (int, float):
             other_a = np.array([other], dtype=self.input_tensors[0].detach().numpy().dtype)
             if np.isinf(other_a).any():

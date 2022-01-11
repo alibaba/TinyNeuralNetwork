@@ -18,7 +18,7 @@ def parse_model(path):
 
 def get_model_path():
     size = getattr(get_model_path, 'size', 0)
-    model_path = f'out/converter_test_{size}.tflite'
+    model_path = f'out/converter_optimizer_{size}.tflite'
     setattr(get_model_path, 'size', size + 1)
     return model_path
 
