@@ -34,7 +34,7 @@ class QuantizedMulOperator(QuantizedMulSchema):
     def parse_common(self, node, attrs, args, graph_converter):
         other = self.input_tensors[1]
         if type(other) not in (int, float):
-            self.elementwise_binary(tfl.MulOperator, graph_converter)
+            self.elementwise_binary(tfl.MulOperator, graph_converter, False)
         elif other in (1.0, 1):
             self.passthrough(graph_converter)
         else:
@@ -42,7 +42,7 @@ class QuantizedMulOperator(QuantizedMulSchema):
             other_tensor = torch.tensor([other], dtype=torch.float)
             self.input_names[1] = self.get_unique_attr_name()
             self.input_tensors[1] = self.quantize_scalar_tensor(other_tensor)
-            self.elementwise_binary(tfl.MulOperator, graph_converter)
+            self.elementwise_binary(tfl.MulOperator, graph_converter, False)
 
 
 class QuantizedConv2dReluOperator(QuantizedConv2dReluSchema):
@@ -238,14 +238,14 @@ class QuantizedAddOperator(QuantizedAddSchema):
     def parse_common(self, node, attrs, args, graph_converter):
         other = self.input_tensors[1]
         if type(other) not in (int, float):
-            self.elementwise_binary(tfl.AddOperator, graph_converter)
+            self.elementwise_binary(tfl.AddOperator, graph_converter, False)
         elif other in (0.0, 0):
             self.passthrough(graph_converter)
         else:
             other_tensor = torch.tensor([other], dtype=torch.float)
             self.input_names[1] = self.get_unique_attr_name()
             self.input_tensors[1] = self.quantize_scalar_tensor(other_tensor)
-            self.elementwise_binary(tfl.AddOperator, graph_converter)
+            self.elementwise_binary(tfl.AddOperator, graph_converter, False)
 
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)

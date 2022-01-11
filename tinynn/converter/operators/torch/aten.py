@@ -346,7 +346,7 @@ class ATenReciprocalOperator(ATenReciprocalSchema):
         self.input_tensors.append(torch.tensor([1], dtype=old_inp.dtype))
         self.input_tensors.append(old_inp)
 
-        self.elementwise_binary(tfl.DivOperator, graph_converter)
+        self.elementwise_binary(tfl.DivOperator, graph_converter, False)
 
 
 class ATenRsqrtOperator(ATenRsqrtSchema):
@@ -388,38 +388,16 @@ class ATenSubOperator(ATenSubSchema):
 
         self.run(node)
 
-        inp = self.input_tensors[0]
         other = self.input_tensors[1]
-        out = self.output_tensors[0]
         alpha = self.input_tensors[-1]
         assert alpha == 1
 
-        if out.dtype != inp.dtype:
-            casted = inp.clone().to(dtype=out.dtype)
-            inp_t = self.find_or_create_input(0, graph_converter)
-            if inp_t.buffer is None:
-                new_inp = self.create_transform_tensor(casted)
-                graph_converter.add_operator(tfl.CastOperator(
-                    [inp_t], [new_inp], tfl.torch_tflite_dtype_mappings[inp.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
-                self.input_names[0] = new_inp.name
-            self.input_tensors[0] = casted
-
-        if type(other) == torch.Tensor:
-            if out.dtype != other.dtype:
-                casted = other.clone().to(dtype=out.dtype)
-                other_t = self.find_or_create_input(1, graph_converter)
-                if other_t.buffer is None:
-                    new_other = self.create_transform_tensor(casted)
-                    graph_converter.add_operator(tfl.CastOperator(
-                        [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
-                    self.input_names[1] = new_other.name
-                self.input_tensors[1] = casted
-            self.elementwise_binary(tfl.SubOperator, graph_converter)
-        elif type(other) in (int, float, bool):
+        if type(other) in (int, float, bool):
             self.input_tensors[1] = np.array([other], dtype=self.input_tensors[0].detach().numpy().dtype)
-            self.elementwise_binary(tfl.SubOperator, graph_converter)
-        else:
+        elif type(other) != torch.Tensor:
             assert False, "other should have type int, float, tensor in aten::sub(input, other)"
+
+        self.elementwise_binary(tfl.SubOperator, graph_converter, True)
 
 
 class ATenTransposeOperator(ATenTransposeSchema):
@@ -446,36 +424,14 @@ class ATenMulOperator(ATenMulSchema):
 
         self.run(node)
 
-        inp = self.input_tensors[0]
         other = self.input_tensors[1]
-        out = self.output_tensors[0]
 
-        if out.dtype != inp.dtype:
-            casted = inp.clone().to(dtype=out.dtype)
-            inp_t = self.find_or_create_input(0, graph_converter)
-            if inp_t.buffer is None:
-                new_inp = self.create_transform_tensor(casted)
-                graph_converter.add_operator(tfl.CastOperator(
-                    [inp_t], [new_inp], tfl.torch_tflite_dtype_mappings[inp.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
-                self.input_names[0] = new_inp.name
-            self.input_tensors[0] = casted
-
-        if type(other) == torch.Tensor:
-            if out.dtype != other.dtype:
-                casted = other.clone().to(dtype=out.dtype)
-                other_t = self.find_or_create_input(1, graph_converter)
-                if other_t.buffer is None:
-                    new_other = self.create_transform_tensor(casted)
-                    graph_converter.add_operator(tfl.CastOperator(
-                        [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
-                    self.input_names[1] = new_other.name
-                self.input_tensors[1] = casted
-            self.elementwise_binary(tfl.MulOperator, graph_converter)
-        elif type(other) in (int, float):
+        if type(other) in (int, float):
             self.input_tensors[1] = np.array([other], dtype=self.input_tensors[0].detach().numpy().dtype)
-            self.elementwise_binary(tfl.MulOperator, graph_converter)
-        else:
+        elif type(other) != torch.Tensor:
             assert False, "other should have type int, float, tensor in aten::mul(input, other)"
+
+        self.elementwise_binary(tfl.MulOperator, graph_converter, True)
 
 
 class ATenDequantizeOperator(ATenDequantizeSchema):
@@ -519,7 +475,7 @@ class ATenFlipOperator(ATenFlipSchema):
         dims = [x + n_dim if x < 0 else x for x in self.input_tensors[1]]
         self.input_tensors[1] = np.array(dims, dtype='int32')
 
-        self.elementwise_binary(tfl.ReverseV2Operator, graph_converter)
+        self.elementwise_binary(tfl.ReverseV2Operator, graph_converter, False)
 
 
 class ATenDivOperator(ATenDivSchema):
@@ -528,36 +484,13 @@ class ATenDivOperator(ATenDivSchema):
 
         self.run(node)
 
-        inp = self.input_tensors[0]
         other = self.input_tensors[1]
-        out = self.output_tensors[0]
-
-        if out.dtype != inp.dtype:
-            casted = inp.clone().to(dtype=out.dtype)
-            inp_t = self.find_or_create_input(0, graph_converter)
-            if inp_t.buffer is None:
-                new_inp = self.create_transform_tensor(casted)
-                graph_converter.add_operator(tfl.CastOperator(
-                    [inp_t], [new_inp], tfl.torch_tflite_dtype_mappings[inp.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
-                self.input_names[0] = new_inp.name
-            self.input_tensors[0] = casted
-
-        if type(other) == torch.Tensor:
-            if out.dtype != other.dtype:
-                casted = other.clone().to(dtype=out.dtype)
-                other_t = self.find_or_create_input(1, graph_converter)
-                if other_t.buffer is None:
-                    new_other = self.create_transform_tensor(casted)
-                    graph_converter.add_operator(tfl.CastOperator(
-                        [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
-                    self.input_names[1] = new_other.name
-                self.input_tensors[1] = casted
-            self.elementwise_binary(tfl.DivOperator, graph_converter)
-        elif type(other) in (int, float):
+        if type(other) in (int, float):
             self.input_tensors[1] = np.array([other], dtype=self.input_tensors[0].detach().numpy().dtype)
-            self.elementwise_binary(tfl.DivOperator, graph_converter)
-        else:
-            assert False, "other should have type int, float, tensor in aten::mul(input, other)"
+        elif type(other) != torch.Tensor:
+            assert False, "other should have type int, float, tensor in aten::div(input, other)"
+
+        self.elementwise_binary(tfl.DivOperator, graph_converter, True)
 
 
 class ATenMeanOperator(ATenMeanSchema):
@@ -574,12 +507,11 @@ class ATenPowOperator(ATenPowSchema):
 
         self.run(node)
         assert self.input_tensors[0].dtype in (torch.float32, torch.int32)
-        if type(self.input_tensors[1]) == torch.tensor:
-            if self.input_tensors[1] != self.input_tensors[0].dtype:
-                self.input_tensors[1] = self.input_tensors[1].to(dtype=self.input_tensors[0].dtype).reshape(1)
-        else:
+
+        if type(self.input_tensors[1]) != torch.tensor:
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
-        self.elementwise_binary(tfl.PowOperator, graph_converter)
+
+        self.elementwise_binary(tfl.PowOperator, graph_converter, True)
 
 
 class ATenMaxPool2dOperator(ATenMaxPool2dSchema):
@@ -626,7 +558,7 @@ class ATenMatmulOperator(ATenMatmulSchema):
                 keep_dims = len(outputs[0].shape) > 2
                 graph_converter.add_operator(tfl.FullyConnectedOperator(inputs, outputs, keepNumDims=keep_dims))
             elif weight_tensor.tensor.ndim >= 2 and weight_tensor.tensor.ndim <= 5:
-                self.elementwise_binary(tfl.BatchMatmulOperator, graph_converter)
+                self.elementwise_binary(tfl.BatchMatmulOperator, graph_converter, False)
         else:
             self.unimplemented(node, attrs, args)
 
@@ -674,7 +606,7 @@ class ATenAtan2Operator(ATenAtan2Schema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.elementwise_binary(tfl.Atan2Operator, graph_converter)
+        self.elementwise_binary(tfl.Atan2Operator, graph_converter, False)
 
 
 class ATenSqrtOperator(ATenSqrtSchema):
@@ -759,7 +691,7 @@ class ATenPreluOperator(ATenPreluSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.elementwise_binary(tfl.PreluOperator, graph_converter)
+        self.elementwise_binary(tfl.PreluOperator, graph_converter, False)
 
 
 class ATenToOperator(ATenToSchema):
@@ -809,7 +741,7 @@ class ATenFloorDivideOperator(ATenFloorDivideSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.elementwise_binary(tfl.FloorDivOperator, graph_converter)
+        self.elementwise_binary(tfl.FloorDivOperator, graph_converter, False)
 
 
 class ATenCosOperator(ATenCosSchema):
@@ -985,38 +917,16 @@ class ATenAddOperator(ATenAddSchema):
 
         self.run(node)
 
-        inp = self.input_tensors[0]
         other = self.input_tensors[1]
         alpha = self.input_tensors[-1]
-        out = self.output_tensors[0]
         assert alpha == 1
 
-        if out.dtype != inp.dtype:
-            casted = inp.clone().to(dtype=out.dtype)
-            inp_t = self.find_or_create_input(0, graph_converter)
-            if inp_t.buffer is None:
-                new_inp = self.create_transform_tensor(casted)
-                graph_converter.add_operator(tfl.CastOperator(
-                    [inp_t], [new_inp], tfl.torch_tflite_dtype_mappings[inp.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
-                self.input_names[0] = new_inp.name
-            self.input_tensors[0] = casted
-
-        if type(other) == torch.Tensor:
-            if out.dtype != other.dtype:
-                casted = other.clone().to(dtype=out.dtype)
-                other_t = self.find_or_create_input(1, graph_converter)
-                if other_t.buffer is None:
-                    new_other = self.create_transform_tensor(casted)
-                    graph_converter.add_operator(tfl.CastOperator(
-                        [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
-                    self.input_names[1] = new_other.name
-                self.input_tensors[1] = casted
-            self.elementwise_binary(tfl.AddOperator, graph_converter)
-        elif type(other) in (int, float, bool):
+        if type(other) in (int, float, bool):
             self.input_tensors[1] = np.array([other], dtype=self.input_tensors[0].detach().numpy().dtype)
-            self.elementwise_binary(tfl.AddOperator, graph_converter)
-        else:
+        elif type(other) != torch.Tensor:
             assert False, "other should have type int, float, tensor in aten::add(input, other)"
+
+        self.elementwise_binary(tfl.AddOperator, graph_converter, True)
 
 
 class ATenReluOperator(ATenReluSchema):
@@ -1183,7 +1093,8 @@ class ATenNeOperator(ATenNeSchema):
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
-        self.elementwise_binary(tfl.NotEqualOperator, graph_converter)
+
+        self.elementwise_binary(tfl.NotEqualOperator, graph_converter, True)
 
 
 class ATenSoftplusOperator(ATenSoftplusSchema):
@@ -2007,7 +1918,8 @@ class ATenEqOperator(ATenEqSchema):
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
-        self.elementwise_binary(tfl.EqualOperator, graph_converter)
+
+        self.elementwise_binary(tfl.EqualOperator, graph_converter, True)
 
 
 class ATenNegOperator(ATenNegSchema):
@@ -2189,9 +2101,8 @@ class ATenGtOperator(ATenGtSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        if type(self.input_tensors[1]) != torch.Tensor:
-            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
-        self.elementwise_binary(tfl.GreaterOperator, graph_converter)
+
+        self.elementwise_binary(tfl.GreaterOperator, graph_converter, True)
 
 
 class ATenLtOperator(ATenLtSchema):
@@ -2201,7 +2112,8 @@ class ATenLtOperator(ATenLtSchema):
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
-        self.elementwise_binary(tfl.LessOperator, graph_converter)
+
+        self.elementwise_binary(tfl.LessOperator, graph_converter, True)
 
 
 class ATenGeOperator(ATenGeSchema):
@@ -2211,7 +2123,8 @@ class ATenGeOperator(ATenGeSchema):
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
-        self.elementwise_binary(tfl.GreaterEqualOperator, graph_converter)
+
+        self.elementwise_binary(tfl.GreaterEqualOperator, graph_converter, np.True_)
 
 
 class ATenLeOperator(ATenLeSchema):
@@ -2221,4 +2134,5 @@ class ATenLeOperator(ATenLeSchema):
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
-        self.elementwise_binary(tfl.LessEqualOperator, graph_converter)
+
+        self.elementwise_binary(tfl.LessEqualOperator, graph_converter, True)

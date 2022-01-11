@@ -256,7 +256,21 @@ class OperatorConverter(ABC):
         if inputs[0].buffer is None:
             graph_converter.add_operator(converter_class(inputs, outputs, *args, **kwargs))
 
-    def elementwise_binary(self, converter_class, graph_converter, *args, **kwargs):
+    def elementwise_binary(self, converter_class, graph_converter, autocast, *args, **kwargs):
+        if autocast:
+            result_dtype = torch.promote_types(self.input_tensors[0].dtype, self.input_tensors[1].dtype)
+            for i in range(2):
+                t = self.input_tensors[i]
+                if result_dtype != t.dtype:
+                    casted = t.clone().to(dtype=result_dtype)
+                    inp_t = self.find_or_create_input(i, graph_converter)
+                    if inp_t.buffer is None:
+                        new_inp = self.create_transform_tensor(casted)
+                        graph_converter.add_operator(tfl.CastOperator(
+                            [inp_t], [new_inp], tfl.torch_tflite_dtype_mappings[t.dtype], tfl.torch_tflite_dtype_mappings[result_dtype]))
+                        self.input_names[i] = new_inp.name
+                    self.input_tensors[i] = casted
+
         inputs = [self.find_or_create_input(i, graph_converter) for i in range(2)]
         if not all((t.buffer is not None for t in inputs)):
             outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
@@ -368,12 +382,12 @@ class OperatorConverter(ABC):
             if pad_input.quantization is not None:
                 if self.q_type == np.uint8:
                     constant_arr = tfl.FakeQuantTensor(np.zeros(1, dtype=pad_input.dtype),
-                                                    pad_input.quantization.scale,
-                                                    pad_input.quantization.zero_point)
+                                                       pad_input.quantization.scale,
+                                                       pad_input.quantization.zero_point)
                 else:
                     constant_arr = tfl.FakeQuantTensor(np.array([-128], dtype=pad_input.dtype),
-                                                    pad_input.quantization.scale,
-                                                    pad_input.quantization.zero_point)
+                                                       pad_input.quantization.scale,
+                                                       pad_input.quantization.zero_point)
             else:
                 constant_arr = np.array([nan], dtype='float32')
             constant_tensor = self.create_attr_tensor(constant_arr)
