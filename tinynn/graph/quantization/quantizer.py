@@ -295,11 +295,11 @@ class QATQuantizer(object):
         qconfig_c = None
         if self.backend == 'qnnpack':
             if not self.asymmetric:
-                sym_fq = torch_q.FakeQuantize.with_args(observer=torch_q.MovingAverageMinMaxObserver, quant_min=0, quant_max=255,
+                sym_fq = qconfig.activation.with_args(observer=torch_q.MovingAverageMinMaxObserver, quant_min=0, quant_max=255,
                                                         dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
                 qconfig = torch_q.QConfig(sym_fq, qconfig.weight)
             if not self.per_tensor:
-                sym_fq = torch_q.FakeQuantize.with_args(observer=torch_q.MovingAveragePerChannelMinMaxObserver, quant_min=-127, quant_max=127,
+                sym_fq = qconfig.weight.with_args(observer=torch_q.MovingAveragePerChannelMinMaxObserver.with_args(quant_min=-127, quant_max=127), quant_min=-127, quant_max=127,
                                                         dtype=torch.qint8, qscheme=torch.per_channel_symmetric, reduce_range=False, ch_axis=0)
                 qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
         else:
@@ -376,6 +376,15 @@ class QATQuantizer(object):
                             n.module._forward_hooks.popitem()
                     if hasattr(n.module, "activation_post_process"):
                         delattr(n.module, "activation_post_process")
+        if not self.per_tensor:
+            for n, m in graph.module.named_modules():
+                if n.endswith('.weight_fake_quant'):
+                    observer = getattr(m, 'activation_post_process', None)
+                    if observer is not None:
+                        m.quant_min = -127
+                        m.quant_max = 127
+                        observer.quant_min = -127
+                        observer.quant_max = 127
         return graph.module
 
     def rewrite_quantize_graph(self, graph: TraceGraph) -> None:
