@@ -40,7 +40,6 @@ class OneShotChannelPruner(BasePruner):
         self.sparsity = {}
         self.parse_config()
         self.exclude_ops = []
-        self.exclude_op_preds = [lambda n: n.type() in (nn.RNN, nn.GRU, nn.LSTM) and len(n.prev_tensors) > 1]
 
         for n in self.graph.forward_nodes:
             # Only prune the specific operators
@@ -69,10 +68,9 @@ class OneShotChannelPruner(BasePruner):
                     exclude = True
                     break
 
-                for pred in self.exclude_op_preds:
-                    if pred(m.node) is True:
-                        exclude = True
-                        break
+                if m.node.type() in (nn.RNN, nn.GRU, nn.LSTM) and len(m.node.prev_tensors) > 1:
+                    exclude = True
+                    break
 
             if exclude:
                 for m in sub_graph:
