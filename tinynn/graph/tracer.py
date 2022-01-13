@@ -120,11 +120,14 @@ log = get_logger(__name__, 'WARNING')
 overridable_funcs = {}
 overridable_modules = []
 overridable_creation_funcs = {}
+torch_overrides_funcs = []
+torch_overrides_wrappers = []
 
 # Load state for the override items
 overridable_funcs_loaded = GlobalData(False)
 overridable_modules_loaded = GlobalData(False)
 overridable_creation_funcs_loaded = GlobalData(False)
+torch_overrides_funcs_loaded = GlobalData(False)
 
 funcs_overrided = GlobalData(False)
 modules_overrided = GlobalData(False)
@@ -754,6 +757,29 @@ def new_func_gen(orig_func, key: str, is_class: bool):
     return new_func
 
 
+def new_has_torch_func_gen(orig_func, key: str, is_class: bool):
+    """ Wrapper function for functions in PyTorch """
+    log.debug(f'registered has torch func wrapper: {key}')
+
+    def new_func(*args, **kwargs):
+        return (not lock()) or orig_func(*args, **kwargs)
+
+    return new_func
+
+
+def new_handle_func_gen(orig_func, key: str, is_class: bool):
+    """ Wrapper function for functions in PyTorch """
+    log.debug(f'registered has torch func wrapper: {key}')
+
+    def new_func(func, tracked_args, *args, **kwargs):
+        if lock():
+            return orig_func(func, tracked_args, *args, **kwargs)
+        else:
+            return func(*args, **kwargs)
+
+    return new_func
+
+
 def new_creation_func_gen(orig_func, key: str, is_class: bool):
     """ Wrapper function for functions in PyTorch """
     log.debug(f'registered creation function wrapper: {key}')
@@ -838,6 +864,55 @@ def fetch_funcs(config: typing.Optional[str] = None):
                     importable_module_names[getattr(scope, module_name)] = f'{ns}.{module_name}'
             new_dict[scope] = modules
     return new_dict
+
+
+def prepare_torch_overrides_funcs(funcs):
+    tracked_funcs = []
+    wrappers = []
+    if hasattr(torch, 'overrides') and inspect.ismodule(torch.overrides):
+        all_has_torch_func_names = ['has_torch_function', 'has_torch_function_unary', 'has_torch_function_variadic']
+        all_handle_func_names = ['handle_torch_function']
+
+        has_torch_func_names = []
+        for n in all_has_torch_func_names:
+            if hasattr(torch.overrides, n):
+                has_torch_func_names.append(n)
+
+        handle_func_names = []
+        for n in all_handle_func_names:
+            if hasattr(torch.overrides, n):
+                handle_func_names.append(n)
+
+        has_torch_funcs = {torch.overrides: has_torch_func_names}
+        handle_funcs = {torch.overrides: handle_func_names}
+
+        for ns in funcs.keys():
+            if ns == torch.Tensor:
+                if hasattr(torch, '_tensor') and inspect.ismodule(torch._tensor):
+                    ns = torch._tensor
+                else:
+                    ns = sys.modules['torch.tensor']
+
+            ns_has_torch_func_names = []
+            for k in has_torch_func_names:
+                if hasattr(ns, k):
+                    ns_has_torch_func_names.append(k)
+
+            ns_handle_func_names = []
+            for k in handle_func_names:
+                if hasattr(ns, k):
+                    ns_handle_func_names.append(k)
+
+            if len(ns_has_torch_func_names) > 0:
+                has_torch_funcs.update({ns: ns_has_torch_func_names})
+
+            if len(ns_handle_func_names) > 0:
+                handle_funcs.update({ns: ns_handle_func_names})
+
+        tracked_funcs.extend((has_torch_funcs, handle_funcs))
+        wrappers.extend((new_has_torch_func_gen, new_handle_func_gen))
+
+    return tracked_funcs, wrappers
 
 
 def qualified_name(module, item: typing.Optional[str] = None, short: bool = False):
@@ -2104,6 +2179,13 @@ def patch_helper(wrap_modules: bool = True, wrap_funcs: bool = True, wrap_creati
                 funcs = fetch_funcs()
                 overridable_funcs.update(funcs)
                 overridable_funcs_loaded(True)
+            if not torch_overrides_funcs_loaded():
+                o_funcs, o_wrappers = prepare_torch_overrides_funcs(funcs)
+                torch_overrides_funcs.extend(o_funcs)
+                torch_overrides_wrappers.extend(o_wrappers)
+                torch_overrides_funcs_loaded(True)
+            else:
+                o_funcs, o_wrappers = torch_overrides_funcs, torch_overrides_wrappers
             funcs_overrided(True)
         else:
             wrap_funcs = False
@@ -2122,7 +2204,11 @@ def patch_helper(wrap_modules: bool = True, wrap_funcs: bool = True, wrap_creati
         module_manager = patch_modules(modules, ('__init__', '__setattr__'), (new_init_gen, new_setattr_gen))
         module_manager.__enter__()
     if wrap_funcs:
-        func_manager = patch_funcs((funcs, {torch.Tensor: ['__getattribute__']}), (new_func_gen, new_getattr_gen))
+        tracked_funcs = [funcs, {torch.Tensor: ['__getattribute__']}]
+        wrappers = [new_func_gen, new_getattr_gen]
+        tracked_funcs.extend(o_funcs)
+        wrappers.extend(o_wrappers)
+        func_manager = patch_funcs(tracked_funcs, wrappers)
         func_manager.__enter__()
     if wrap_creation_funcs:
         creation_func_manager = patch_funcs(creation_funcs, new_creation_func_gen)
