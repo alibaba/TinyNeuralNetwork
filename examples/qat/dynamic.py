@@ -47,7 +47,8 @@ def main_worker(args):
         # The code section below is used to convert the model to the TFLite format
         converter = TFLiteConverter(qat_model, dummy_input,
                                     tflite_path='out/dynamic_quant_model.tflite',
-                                    asymmetric=False)
+                                    asymmetric=False,
+                                    quantize_target_type='int8')
         converter.convert()
 
 
