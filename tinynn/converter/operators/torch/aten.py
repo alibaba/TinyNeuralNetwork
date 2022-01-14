@@ -393,7 +393,7 @@ class ATenSubOperator(ATenSubSchema):
         assert alpha == 1
 
         if type(other) in (int, float, bool):
-            self.input_tensors[1] = np.array([other], dtype=self.input_tensors[0].detach().numpy().dtype)
+            self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
         elif type(other) != torch.Tensor:
             assert False, "other should have type int, float, tensor in aten::sub(input, other)"
 
@@ -427,7 +427,7 @@ class ATenMulOperator(ATenMulSchema):
         other = self.input_tensors[1]
 
         if type(other) in (int, float):
-            self.input_tensors[1] = np.array([other], dtype=self.input_tensors[0].detach().numpy().dtype)
+            self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
         elif type(other) != torch.Tensor:
             assert False, "other should have type int, float, tensor in aten::mul(input, other)"
 
@@ -486,7 +486,7 @@ class ATenDivOperator(ATenDivSchema):
 
         other = self.input_tensors[1]
         if type(other) in (int, float):
-            self.input_tensors[1] = np.array([other], dtype=self.input_tensors[0].detach().numpy().dtype)
+            self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
         elif type(other) != torch.Tensor:
             assert False, "other should have type int, float, tensor in aten::div(input, other)"
 
@@ -922,7 +922,7 @@ class ATenAddOperator(ATenAddSchema):
         assert alpha == 1
 
         if type(other) in (int, float, bool):
-            self.input_tensors[1] = np.array([other], dtype=self.input_tensors[0].detach().numpy().dtype)
+            self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
         elif type(other) != torch.Tensor:
             assert False, "other should have type int, float, tensor in aten::add(input, other)"
 
@@ -2101,6 +2101,8 @@ class ATenGtOperator(ATenGtSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+        if type(self.input_tensors[1]) != torch.Tensor:
+            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
 
         self.elementwise_binary(tfl.GreaterOperator, graph_converter, True)
 
