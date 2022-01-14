@@ -90,8 +90,8 @@ def quantize(name, tensor, dtype, qscheme, axis=None, q_type=np.uint8):
         max_val = torch.amax(tensor, dim)
     else:
         if dim is None:
-            min_val = torch.min(tensor, dim)
-            max_val = torch.max(tensor, dim)
+            min_val = torch.min(tensor)
+            max_val = torch.max(tensor)
         else:
             orig_dim = tensor.size(axis)
             if axis != 0:
