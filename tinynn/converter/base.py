@@ -5,7 +5,7 @@ import torch
 
 import numpy as np
 
-from .operators import CommonGraph, ExtendedOperator, GraphOptimizer
+from .operators import CommonGraph, ExtendedOperator, GraphOptimizer, HybridQuantizer
 from .operators.op_version import OPVersioner
 from .operators.tflite import Tensor
 from .operators.torch import OPERATOR_CONVERTER_DICT
@@ -27,7 +27,8 @@ class TFLiteConverter(object):
                  asymmetric: bool = True,
                  preserve_tensors: bool = False,
                  optimize: int = GraphOptimizer.ALL_OPTIMIZE,
-                 quantize_target_type: str = 'uint8') -> None:
+                 quantize_target_type: str = 'uint8',
+                 hybrid_quantization_from_float: bool = False) -> None:
         """ The TFLiteConverter class
 
         Args:
@@ -43,6 +44,7 @@ class TFLiteConverter(object):
             preserve_tensors (bool): Preserve the copies of the intermediate tensors. Defaults to False
             optimize (int): The level of graph optimization. Defaults to `GraphOptimizer.ALL_OPTIMIZE`
             quantize_target_type (str): Target type for quantization. Defaults to 'uint8'
+            hybrid_quantization_from_float (bool): Direct hybrid quantization from a float model. Defaults to False
         """
 
         self.model = model
@@ -66,6 +68,7 @@ class TFLiteConverter(object):
         self.dump_config_path = dump_config_path
         self.preserve_tensors = preserve_tensors
         self.optimize = optimize
+        self.hybrid = hybrid_quantization_from_float
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -291,6 +294,11 @@ class TFLiteConverter(object):
         else:
             optimizer = GraphOptimizer(self.common_graph, self.optimize)
             optimizer.optimize()
+
+            if self.hybrid:
+                quantizer = HybridQuantizer(self.common_graph, self.q_type)
+                quantizer.quantize()
+                optimizer.cleanup_dead_nodes()
 
             versioner = OPVersioner(self.common_graph)
             versioner.process()

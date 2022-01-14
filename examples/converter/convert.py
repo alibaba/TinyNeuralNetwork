@@ -26,6 +26,9 @@ def main_worker():
     torch.backends.quantized.engine = 'qnnpack'
 
     # The code section below is used to convert the model to the TFLite format
+    # If you want perform dynamic quantization on the float models,
+    # you may pass the following arguments.
+    #   `quantize_target_type='int8', hybrid_quantization_from_float=True`
     converter = TFLiteConverter(model, dummy_input, output_path)
     converter.convert()
 
