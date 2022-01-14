@@ -85,8 +85,23 @@ def quantize(name, tensor, dtype, qscheme, axis=None, q_type=np.uint8):
     else:
         dim = None
 
-    min_val = torch.amin(tensor, dim)
-    max_val = torch.amax(tensor, dim)
+    if hasattr(torch, 'amin') and hasattr(torch, 'amax'):
+        min_val = torch.amin(tensor, dim)
+        max_val = torch.amax(tensor, dim)
+    else:
+        if dim is None:
+            min_val = torch.min(tensor, dim)
+            max_val = torch.max(tensor, dim)
+        else:
+            orig_dim = tensor.size(axis)
+            if axis != 0:
+                perm = [axis] + dim
+                tensor_perm = tensor.permute(perm)
+            else:
+                tensor_perm = tensor
+            tensor_2d = tensor_perm.reshape(orig_dim, -1)
+            min_val, _ = torch.min(tensor_2d, 1)
+            max_val, _ = torch.max(tensor_2d, 1)
 
     min_val_neg = torch.min(min_val, torch.zeros_like(min_val))
     max_val_pos = torch.max(max_val, torch.zeros_like(max_val))
