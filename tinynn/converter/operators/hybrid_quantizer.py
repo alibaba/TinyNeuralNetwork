@@ -16,11 +16,13 @@ log = get_logger(__name__)
 class HybridQuantizer(object):
     graph: CommonGraph
 
-    def __init__(self, graph, q_type) -> None:
+    def __init__(self, graph, asymmetric, q_type, per_channel) -> None:
         super().__init__()
 
         self.graph = graph
+        self.asymmetric = asymmetric
         self.q_type = q_type
+        self.per_channel = per_channel
 
     def quantize(self):
         self.quantize_pass()
@@ -33,28 +35,22 @@ class HybridQuantizer(object):
             weight_idx = 1
             new_weight = None
             weight_t = node['op'].inputs[weight_idx]
+            if weight_t.buffer is None or str(weight_t.dtype) != 'float32':
+                continue
             name = weight_t.name
             weight_a = np.frombuffer(weight_t.buffer.data).view(np.float32).reshape(weight_t.shape)
             weight = torch.from_numpy(weight_a.copy())
-            if weight_t.buffer is None or str(weight_t.dtype) != 'float32':
-                continue
-            if node['node_type'] == ExtendedOperator.CONV_2D:
-                if self.q_type == np.uint8:
-                    new_weight = quantize(name, weight, torch.quint8, torch.per_tensor_symmetric, q_type=self.q_type)
-                else:
-                    new_weight = quantize(name, weight, torch.qint8, torch.per_channel_symmetric, 0, q_type=self.q_type)
-            elif node['node_type'] == ExtendedOperator.DEPTHWISE_CONV_2D:
-                if self.q_type == np.uint8:
-                    log.warning('DEPTHWISE_CONV_2D doesn\'t support u8 hybrid quantization')
+            if node['node_type'] == ExtendedOperator.FULLY_CONNECTED or not self.per_channel:
+                if node['node_type'] == ExtendedOperator.DEPTHWISE_CONV_2D:
+                    log.warning('DEPTHWISE_CONV_2D doesn\'t support hybrid per-tensor quantization')
                     continue
-                else:
-                    new_weight = quantize(name, weight, torch.qint8,
-                                          torch.per_channel_symmetric, -1, q_type=self.q_type)
-            elif node['node_type'] == ExtendedOperator.FULLY_CONNECTED:
-                if self.q_type == np.uint8:
-                    new_weight = quantize(name, weight, torch.quint8, torch.per_tensor_symmetric, q_type=self.q_type)
-                else:
-                    new_weight = quantize(name, weight, torch.qint8, torch.per_tensor_symmetric, q_type=self.q_type)
+                if self.asymmetric and hasattr(node['op'], 'asymmetricQuantizeInputs'):
+                    node['op'].asymmetricQuantizeInputs = True
+                new_weight = quantize(name, weight, torch.qint8, torch.per_tensor_symmetric, q_type=self.q_type)
+            elif node['node_type'] == ExtendedOperator.CONV_2D:
+                new_weight = quantize(name, weight, torch.qint8, torch.per_channel_symmetric, 0, q_type=self.q_type)
+            elif node['node_type'] == ExtendedOperator.DEPTHWISE_CONV_2D:
+                new_weight = quantize(name, weight, torch.qint8, torch.per_channel_symmetric, -1, q_type=self.q_type)
 
             actions.append((self.graph.replace_operator_input, (node, weight_idx, new_weight)))
 

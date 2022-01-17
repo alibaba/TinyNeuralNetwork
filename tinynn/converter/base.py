@@ -28,7 +28,8 @@ class TFLiteConverter(object):
                  preserve_tensors: bool = False,
                  optimize: int = GraphOptimizer.ALL_OPTIMIZE,
                  quantize_target_type: str = 'uint8',
-                 hybrid_quantization_from_float: bool = False) -> None:
+                 hybrid_quantization_from_float: bool = False,
+                 hybrid_per_channel: bool = False) -> None:
         """ The TFLiteConverter class
 
         Args:
@@ -45,6 +46,7 @@ class TFLiteConverter(object):
             optimize (int): The level of graph optimization. Defaults to `GraphOptimizer.ALL_OPTIMIZE`
             quantize_target_type (str): Target type for quantization. Defaults to 'uint8'
             hybrid_quantization_from_float (bool): Direct hybrid quantization from a float model. Defaults to False
+            hybrid_per_channel (bool): Prefer per-channel kernels in hybrid quantization. Defaults to False
         """
 
         self.model = model
@@ -69,11 +71,16 @@ class TFLiteConverter(object):
         self.preserve_tensors = preserve_tensors
         self.optimize = optimize
         self.hybrid = hybrid_quantization_from_float
+        self.hybrid_per_channel = hybrid_per_channel
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
             if not self.asymmetric:
                 log.warning('Symmetric quantized model with uint8 is unsupported in most backends of TFLite')
+            if self.hybrid:
+                if self.hybrid_per_channel:
+                    raise AttributeError('Per-channel kernels supports int8 only')
+                raise AttributeError('Hybrid kernels supports int8 only')
         elif quantize_target_type == 'int8':
             self.q_type = np.int8
         else:
@@ -296,7 +303,7 @@ class TFLiteConverter(object):
             optimizer.optimize()
 
             if self.hybrid:
-                quantizer = HybridQuantizer(self.common_graph, self.q_type)
+                quantizer = HybridQuantizer(self.common_graph, self.asymmetric, self.q_type, self.hybrid_per_channel)
                 quantizer.quantize()
                 optimizer.cleanup_dead_nodes()
 
