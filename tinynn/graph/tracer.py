@@ -2154,7 +2154,7 @@ class TraceGraph(object):
 
         # Remove this node
         self.forward_nodes.remove(node)
-        del self.node_map[node.unique_name]
+        del self.nodes_map[node.unique_name]
 
 
 @contextlib.contextmanager

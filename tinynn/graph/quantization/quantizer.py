@@ -781,6 +781,18 @@ class QATQuantizer(object):
                 next_tensors = [x.contiguous() for x in shared_tensors]
                 graph.insert_between(n, node, trace_func, next_tensors)
 
+        # Remove non-leaf `.data` nodes
+        def _is_non_leaf_data_nodes(node, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if cur_class == TraceFunction:
+                return cur_module.kind == 'data' and cur_module.is_property and len(node.next_nodes) > 0
+            return False
+        
+        non_leaf_data_nodes = graph.filter_forward_nodes(_is_non_leaf_data_nodes)
+        for idx, node in enumerate(non_leaf_data_nodes):
+            graph.remove_node(node)
+
         # Add quant/dequant nodes for non-quantizable OPs
         def _is_not_quantizable(node, custom_data):
             cur_module = node.module
