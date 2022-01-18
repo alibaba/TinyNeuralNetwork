@@ -21,6 +21,7 @@ from torch.nn.parallel.distributed import DistributedDataParallel
 
 from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16
 from tinynn.graph.quantization.modules import QPReLU
+from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver
 from tinynn.graph.tracer import (ConstantNode, TraceFunction, TraceGraph,
                                  TraceNode, module_constructor_lines,
                                  override_current_trace_graph, qualified_name,
@@ -290,17 +291,27 @@ class QATQuantizer(object):
         for quant_nodes in quant_list:
             torch_q.fuse_modules(graph.module, quant_nodes, inplace=True)
 
+        self.prepare_qconfig(graph, backend)
+
+    def prepare_qconfig(self, graph: TraceGraph, backend: str):
+        """ Prepare qconfig for various configurations.
+
+        Args:
+            graph (TraceGraph): The computation graph of the model
+            backend (str, optional): The backend of quantization
+        """
+
         log.info('setting qat backend and call prepare_qat')
         qconfig = torch_q.get_default_qat_qconfig(backend)
         qconfig_c = None
         if self.backend == 'qnnpack':
             if not self.asymmetric:
                 sym_fq = qconfig.activation.with_args(observer=torch_q.MovingAverageMinMaxObserver, quant_min=0, quant_max=255,
-                                                        dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
+                                                      dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
                 qconfig = torch_q.QConfig(sym_fq, qconfig.weight)
             if not self.per_tensor:
                 sym_fq = qconfig.weight.with_args(observer=torch_q.MovingAveragePerChannelMinMaxObserver.with_args(quant_min=-127, quant_max=127), quant_min=-127, quant_max=127,
-                                                        dtype=torch.qint8, qscheme=torch.per_channel_symmetric, reduce_range=False, ch_axis=0)
+                                                  dtype=torch.qint8, qscheme=torch.per_channel_symmetric, reduce_range=False, ch_axis=0)
                 qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
         else:
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
@@ -788,7 +799,7 @@ class QATQuantizer(object):
             if cur_class == TraceFunction:
                 return cur_module.kind == 'data' and cur_module.is_property and len(node.next_nodes) > 0
             return False
-        
+
         non_leaf_data_nodes = graph.filter_forward_nodes(_is_non_leaf_data_nodes)
         for idx, node in enumerate(non_leaf_data_nodes):
             graph.remove_node(node)
@@ -926,6 +937,46 @@ class PostQuantizer(QATQuantizer):
 
         super().__init__(model, dummy_input, work_dir, config)
 
+    def prepare_qconfig(self, graph: TraceGraph, backend: str):
+        """ Prepare qconfig for various configurations.
+
+        Args:
+            graph (TraceGraph): The computation graph of the model
+            backend (str, optional): The backend of quantization
+        """
+
+        log.info('setting qat backend and call prepare_qat')
+        qconfig = torch_q.get_default_qconfig(backend)
+        qconfig_c = None
+        if self.backend == 'qnnpack':
+            if not self.asymmetric:
+                sym_fq = torch_q.HistogramObserver.with_args(
+                    dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
+                qconfig = torch_q.QConfig(sym_fq, qconfig.weight)
+            if not self.per_tensor:
+                sym_fq = MinMaxObserver.with_args(
+                    dtype=torch.qint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
+                qconfig = torch_q.QConfig(qconfig.activation, sym_fq)
+                sym_fq = PerChannelMinMaxObserver.with_args(
+                    dtype=torch.qint8, qscheme=torch.per_channel_symmetric, reduce_range=False, ch_axis=0)
+                qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
+        else:
+            log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
+
+        torch.backends.quantized.engine = backend
+        graph.module.qconfig = qconfig
+        if qconfig_c is not None:
+            q = queue.Queue()
+            q.put(graph.module)
+
+            while not q.empty():
+                m = q.get()
+                if type(m).__name__ in ('Conv2d', 'ConvBnReLU2d', 'ConvBn2d', 'ConvReLU2d'):
+                    m.qconfig = qconfig_c
+                else:
+                    for c in m.children():
+                        q.put(c)
+
     def prepare_qat(self, graph: TraceGraph, is_input_quantized: typing.Optional[typing.Tuple[bool]] = None, backend: str = 'qnnpack') -> torch.nn.Module:
         """ Prepare model for QAT training
 
@@ -947,17 +998,22 @@ class PostQuantizer(QATQuantizer):
         # So we wrote some alternatives for the function.
         #   torch.quantization.prepare(graph.module, inplace=True)
 
-        if hasattr(torch_q, 'get_default_qat_module_mappings'):
-            mapping = torch_q.get_default_qat_module_mappings()
-        elif hasattr(torch_q, 'get_qat_module_mappings'):
-            mapping = torch_q.get_qat_module_mappings()
+        if hasattr(torch_q, 'get_default_qconfig_propagation_list'):
+            whitelist = torch_q.get_default_qconfig_propagation_list()
+        elif hasattr(torch_q, 'get_qconfig_propagation_list'):
+            whitelist = torch_q.get_qconfig_propagation_list()
         else:
-            mapping = torch_q.DEFAULT_QAT_MODULE_MAPPING
+            whitelist = torch_q.DEFAULT_QCONFIG_PROPAGATE_WHITE_LIST
 
         if LooseVersion(torch.__version__) < LooseVersion("1.7.0"):
             torch_q.prepare(graph.module, inplace=True)
         else:
-            torch_q.prepare(graph.module, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
+            torch_q.propagate_qconfig_(graph.module, qconfig_dict=None)
+            for n in graph.forward_nodes:
+                if not n.quantized:
+                    if hasattr(n.module, "qconfig"):
+                        delattr(n.module, "qconfig")
+            torch_q.add_observer_(graph.module, qconfig_propagation_list=whitelist)
         for n in graph.forward_nodes:
             if not n.quantized:
                 if hasattr(n.module, "_forward_hooks"):
