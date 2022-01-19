@@ -699,9 +699,21 @@ class ATenToOperator(ATenToSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+        out_type = self.output_tensors[0].dtype
+
+        patch = False
+        if out_type == torch.float64:
+            patch = True
+            out_type = torch.float32
+            temp_tensor = self.output_tensors[0]
+            self.output_tensors[0] = temp_tensor.detach().clone().to(dtype=torch.float32)
+
         self.elementwise_unary(tfl.CastOperator, graph_converter,
                                tfl.torch_tflite_dtype_mappings[self.input_tensors[0].dtype],
-                               tfl.torch_tflite_dtype_mappings[self.output_tensors[0].dtype])
+                               tfl.torch_tflite_dtype_mappings[out_type])
+
+        if patch:
+            self.output_tensors[0] = temp_tensor
 
 
 class ATenViewOperator(ATenViewSchema):
@@ -2038,14 +2050,29 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
 
         self.run(node)
 
-        input_tensor, mask_tensor = [self.find_or_create_input(i, graph_converter) for i in range(2)]
-        mask = self.input_tensors[1]
-        other = self.input_tensors[2]
-        out = self.output_tensors[0]
+        self.parse_common(graph_converter)
+
+    def parse_common(self, graph_converter, input_idx=0, mask_idx=1, other_idx=2, out_idx=0):
+        for i in (input_idx, other_idx):
+            t = self.input_tensors[i]
+            if type(t) == torch.Tensor:
+                if t.dtype == torch.float64:
+                    self.input_tensors[i] = t.to(dtype=torch.float32)
+
+        if self.output_tensors[out_idx].dtype == torch.float64:
+            self.output_tensors[out_idx] = self.output_tensors[out_idx].to(dtype=torch.float32)
+        elif self.output_tensors[out_idx].dtype == torch.int64:
+            self.output_tensors[out_idx] = self.output_tensors[out_idx].to(dtype=torch.int32)
+
+        mask = self.input_tensors[mask_idx]
+        other = self.input_tensors[other_idx]
+        out = self.output_tensors[out_idx]
+
+        input_tensor, mask_tensor = [self.find_or_create_input(i, graph_converter) for i in (input_idx, mask_idx)]
 
         ops = []
         if type(other) == torch.Tensor:
-            other_t = self.find_or_create_input(2, graph_converter)
+            other_t = self.find_or_create_input(other_idx, graph_converter)
             if out.dtype != other.dtype:
                 casted = other.clone().to(dtype=out.dtype)
                 if other_t.buffer is None:
@@ -2061,11 +2088,11 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
                                     'trying to convert it to the nearest value')
                         type_info = torch.finfo(casted.dtype)
                         clamped = torch.clamp(casted, type_info.min, type_info.max)
-                        other_t = self.create_attr_tensor(clamped, name=self.input_names[2])
+                        other_t = self.create_attr_tensor(clamped, name=self.input_names[other_idx])
                     else:
-                        other_t = self.create_attr_tensor(casted, name=self.input_names[2])
+                        other_t = self.create_attr_tensor(casted, name=self.input_names[other_idx])
         elif type(other) in (int, float):
-            other_a = np.array([other], dtype=self.input_tensors[0].detach().numpy().dtype)
+            other_a = np.array([other], dtype=self.input_tensors[input_idx].detach().numpy().dtype)
             if np.isinf(other_a).any():
                 log.warning('aten::masked_fill(input, mask, value) where value=[+/-]inf is not supported, '
                             'trying to convert it to the nearest value')
@@ -2138,3 +2165,26 @@ class ATenLeOperator(ATenLeSchema):
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
 
         self.elementwise_binary(tfl.LessEqualOperator, graph_converter, True)
+
+class ATenRemainderOperator(ATenRemainderSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        if type(self.input_tensors[1]) != torch.Tensor:
+            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+
+        self.elementwise_binary(tfl.FloorModOperator, graph_converter, True)
+
+
+class ATenWhereOperator(ATenWhereSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        assert 'self' in args and 'other' in args, "aten::where(condition) is not supported"
+        
+        if type(self.input_tensors[2]) != torch.Tensor:
+            self.input_tensors[2] = torch.tensor([self.input_tensors[2]])
+        
+        ATenMaskedFillOperator.parse_common(self, graph_converter, input_idx=2, mask_idx=0, other_idx=1)

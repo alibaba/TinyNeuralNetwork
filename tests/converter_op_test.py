@@ -141,7 +141,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
         dummy_input_1 = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater,
+        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater, torch.remainder,
                  torch.less, torch.greater_equal, torch.less_equal, torch.eq, torch.ne]
 
         for func in funcs:
@@ -160,7 +160,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
         dummy_input_1 = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater,
+        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater, torch.remainder,
                  torch.less, torch.greater_equal, torch.less_equal, torch.eq, torch.ne]
 
         for func in funcs:
@@ -178,7 +178,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
         dummy_input_1 = torch.randint(1, 10, size=dummy_input.shape)
 
-        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater,
+        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater, torch.remainder,
                  torch.less, torch.greater_equal, torch.less_equal, torch.eq, torch.ne]
 
         for func in funcs:
@@ -197,7 +197,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
         dummy_input_1 = torch.randint(1, 10, size=dummy_input.shape)
 
-        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater,
+        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater, torch.remainder,
                  torch.less, torch.greater_equal, torch.less_equal, torch.eq, torch.ne]
 
         for func in funcs:
@@ -214,7 +214,7 @@ class ConverterOPTester(unittest.TestCase):
     def test_binary_elementwise_scalar_int(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater,
+        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater, torch.remainder,
                  torch.less, torch.greater_equal, torch.less_equal, torch.eq, torch.ne]
 
         for func in funcs:
@@ -231,7 +231,7 @@ class ConverterOPTester(unittest.TestCase):
     def test_binary_elementwise_scalar_float(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater,
+        funcs = [torch.add, torch.mul, torch.sub, torch.div, torch.greater, torch.remainder,
                  torch.less, torch.greater_equal, torch.less_equal, torch.eq, torch.ne]
 
         for func in funcs:
@@ -244,6 +244,101 @@ class ConverterOPTester(unittest.TestCase):
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
             torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_where_int_scalars(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                y = torch.where(x > 0.5, 0, 1)
+                return y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, check_dtype=False)
+
+    def test_where_float_scalars(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                y = torch.where(x > 0.5, -1.5, 0.5)
+                return y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, check_dtype=False)
+
+    def test_where_tensor_scalar(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                y = torch.where(x > 0.5, x.double(), 0.5)
+                return y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, check_dtype=False)
+
+    def test_where_scalar_tensor(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                y = torch.where(x > 0.5, 0.5, x.double())
+                return y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, check_dtype=False)
+
+    def test_where_tensors(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                y = torch.where(x > 0.5, -x, x)
+                return y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
 
 
 if __name__ == '__main__':
