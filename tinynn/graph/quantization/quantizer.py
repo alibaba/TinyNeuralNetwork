@@ -202,7 +202,6 @@ class QATQuantizer(object):
                 qat_analysis_queue.put((n, False))
 
         for n in graph.constant_nodes:
-            print(n.unique_name, n.module.dtype)
             qat_analysis_queue.put((n, not n.module.dtype == 'torch.float32'))
 
         while not qat_analysis_queue.empty():
@@ -387,6 +386,7 @@ class QATQuantizer(object):
                             n.module._forward_hooks.popitem()
                     if hasattr(n.module, "activation_post_process"):
                         delattr(n.module, "activation_post_process")
+
         if not self.per_tensor:
             for n, m in graph.module.named_modules():
                 if n.endswith('.weight_fake_quant'):
@@ -396,7 +396,68 @@ class QATQuantizer(object):
                         m.quant_max = 127
                         observer.quant_min = -127
                         observer.quant_max = 127
+
+            self.per_channel_qconfig_post_process(graph)
+
         return graph.module
+
+    def per_channel_qconfig_post_process(self, graph):
+        def _find_quantized_cat_nodes(node: TraceNode, custom_node):
+            # Find quantized cat nodes
+            return node.type() == 'cat' and node.quantized
+
+        # For cat nodes, the `activation_post_process` around it needs to be unified
+        quantized_cat_nodes = graph.filter_forward_nodes(_find_quantized_cat_nodes)
+
+        q = queue.Queue()
+        visited = set()
+        for n in quantized_cat_nodes:
+            q.put((n, 'both', 0))
+            parents = []
+            names = []
+            props = []
+            while not q.empty():
+                n, mode, fq_count = q.get()
+                if n.kind() in ('shape', 'size') or n.unique_name in visited:
+                    continue
+
+                visited.add(n.unique_name)
+
+                if isinstance(n.module, nn.Module):
+                    orig_name = graph.module_original_name_dict.get(id(n.module))
+                    new_mod, parent = graph.get_submodule_with_parent_from_name(orig_name)
+                    prop = orig_name.split('.')[-1]
+                    if isinstance(new_mod, torch_q.FakeQuantize):
+                        if fq_count == 0:
+                            parents.append(parent)
+                            names.append(orig_name)
+                            props.append(prop)
+                        fq_count += 1
+                    elif hasattr(new_mod, 'activation_post_process'):
+                        if fq_count == 0:
+                            parents.append(new_mod)
+                            names.append(f'{orig_name}.activation_post_process')
+                            props.append('activation_post_process')
+                        fq_count += 1
+                    if isinstance(new_mod, (torch_q.DeQuantStub, torch_q.QuantStub)):
+                        fq_count = 2
+                elif n.type() == 'cat':
+                    mode = 'both'
+                    fq_count = 0
+
+                if fq_count < 2:
+                    if mode in ('both', 'up'):
+                        for node in n.prev_nodes:
+                            q.put((node, 'up', fq_count))
+                    if mode in ('both', 'down'):
+                        for node in n.next_nodes:
+                            q.put((node, 'down', fq_count))
+
+            if len(names) > 1:
+                log.debug(f'Unifying the following nodes into one: {", ".join(names)}')
+                unified = getattr(parents[0], props[0])
+                for parent, prop in zip(parents[1:], props[1:]):
+                    setattr(parent, prop, unified)
 
     def rewrite_quantize_graph(self, graph: TraceGraph) -> None:
         """ Rewrites the computation graph for quantization """
@@ -1023,6 +1084,10 @@ class PostQuantizer(QATQuantizer):
                     delattr(n.module, "qconfig")
                 if hasattr(n.module, "activation_post_process"):
                     delattr(n.module, "activation_post_process")
+
+        if not self.per_tensor:
+            self.per_channel_qconfig_post_process(graph)
+
         return graph.module
 
 

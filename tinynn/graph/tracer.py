@@ -1738,6 +1738,23 @@ class TraceGraph(object):
             new_module = module_gen_predicate(module)
             self.update_submodule_in_node(node, new_module)
 
+    def get_submodule_with_parent_from_name(self, module_name: str):
+        """ Gets the submodule with its parent using the name given """
+        module_name_parts = module_name.split('.')
+        cur_obj = self.module
+        last_obj = None
+
+        for ns in module_name_parts:
+            last_obj = cur_obj
+            if type(cur_obj) == nn.ModuleList:
+                cur_obj = cur_obj[int(ns)]
+            elif type(cur_obj) == nn.ModuleDict:
+                cur_obj = cur_obj[ns]
+            else:
+                cur_obj = getattr(cur_obj, ns)
+
+        return cur_obj, last_obj
+
     def update_submodule_in_node(self, node: TraceNode, module: nn.Module):
         """ update a submodule from the nodes using the module given """
         module_name = self.module_original_name_dict[id(node.module)]
