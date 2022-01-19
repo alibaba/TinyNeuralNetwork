@@ -2015,6 +2015,22 @@ class ATenMaxOperator(ATenMaxSchema):
         self.handle_reduce(tfl.ReduceMaxOperator, args, graph_converter, False)
 
 
+class ATenAminOperator(ATenAminSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.handle_reduce(tfl.ReduceMinOperator, args, graph_converter, False)
+
+
+class ATenAmaxOperator(ATenAmaxSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.handle_reduce(tfl.ReduceMaxOperator, args, graph_converter, False)
+
+
 class ATenGluOperator(ATenGluSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
@@ -2166,6 +2182,7 @@ class ATenLeOperator(ATenLeSchema):
 
         self.elementwise_binary(tfl.LessEqualOperator, graph_converter, True)
 
+
 class ATenRemainderOperator(ATenRemainderSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
@@ -2183,8 +2200,8 @@ class ATenWhereOperator(ATenWhereSchema):
 
         self.run(node)
         assert 'self' in args and 'other' in args, "aten::where(condition) is not supported"
-        
+
         if type(self.input_tensors[2]) != torch.Tensor:
             self.input_tensors[2] = torch.tensor([self.input_tensors[2]])
-        
+
         ATenMaskedFillOperator.parse_common(self, graph_converter, input_idx=2, mask_idx=0, other_idx=1)
