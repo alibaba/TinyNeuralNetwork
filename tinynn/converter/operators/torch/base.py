@@ -406,6 +406,9 @@ class OperatorConverter(ABC):
             dims, keep_dim = self.input_tensors[1:3]
             if type(dims) not in (list, tuple):
                 dims = [dims]
+            if len(dims) == 0:
+                dims = list(range(input_tensor.tensor.ndim))
+                self.output_tensors[0] = self.output_tensors[0].view(1)
         else:
             dims = list(range(input_tensor.tensor.ndim))
             keep_dim = False
