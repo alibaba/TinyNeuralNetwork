@@ -1800,7 +1800,8 @@ class ATenGatherOperator(ATenGatherSchema):
             axis = len(index_shape) - 1
             shape_tensor = self.create_attr_tensor(np.array(index_shape, dtype='int32'))
             index_reshaped = self.create_transform_tensor(np.reshape(index_tensor.tensor, index_shape))
-            graph_converter.add_operator(tfl.ReshapeOperator([index_tensor, shape_tensor], [index_reshaped], index_shape))
+            graph_converter.add_operator(tfl.ReshapeOperator(
+                [index_tensor, shape_tensor], [index_reshaped], index_shape))
 
             indices_tensors[dim] = index_reshaped
             indices_tensor = self.create_transform_tensor(np.concatenate([x.tensor for x in indices_tensors], axis=-1))
@@ -1958,14 +1959,16 @@ class ATenBitwiseAndOperator(ATenBitwiseAndSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+        self.parse_common(graph_converter)
 
+    def parse_common(self, graph_converter):
         other = self.input_tensors[1]
         if not isinstance(other, torch.Tensor):
             self.input_tensors[1] = torch.tensor([other]).repeat(self.input_tensors[0].shape)
 
         assert all((t.dtype == torch.bool for t in self.input_tensors)), "Only bools are supported in aten::bitwise_not"
 
-        self.elementwise_unary(tfl.LogicalAndOperator, graph_converter)
+        self.elementwise_binary(tfl.LogicalAndOperator, graph_converter, False)
 
 
 class ATenBitwiseOrOperator(ATenBitwiseOrSchema):
@@ -1973,14 +1976,32 @@ class ATenBitwiseOrOperator(ATenBitwiseOrSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+        self.parse_common(graph_converter)
 
+    def parse_common(self, graph_converter):
         other = self.input_tensors[1]
         if not isinstance(other, torch.Tensor):
             self.input_tensors[1] = torch.tensor([other]).repeat(self.input_tensors[0].shape)
 
         assert all((t.dtype == torch.bool for t in self.input_tensors)), "Only bools are supported in aten::bitwise_not"
 
-        self.elementwise_unary(tfl.LogicalOrOperator, graph_converter)
+        self.elementwise_binary(tfl.LogicalOrOperator, graph_converter, False)
+
+
+class ATenAndOperator(ATenAndSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenBitwiseAndOperator.parse_common(self, graph_converter)
+
+
+class ATenOrOperator(ATenOrSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenBitwiseOrOperator.parse_common(self, graph_converter)
 
 
 class ATenSumOperator(ATenSumSchema):

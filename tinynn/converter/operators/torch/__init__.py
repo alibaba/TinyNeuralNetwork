@@ -123,6 +123,8 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::bitwise_not": ATenBitwiseNotOperator,
                                                                 "aten::bitwise_and": ATenBitwiseAndOperator,
                                                                 "aten::bitwise_or": ATenBitwiseOrOperator,
+                                                                "aten::__and__": ATenAndOperator,
+                                                                "aten::__or__": ATenOrOperator,
                                                                 "aten::sum": ATenSumOperator,
                                                                 "aten::prod": ATenProdOperator,
                                                                 "aten::min": ATenMinOperator,

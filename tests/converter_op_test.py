@@ -45,7 +45,7 @@ def get_model_path():
 
 
 class ConverterOPTester(unittest.TestCase):
-    def test_gelu(self):
+    def test_glu(self):
         class TestModel(nn.Module):
             def forward(self, x):
                 y = torch.nn.functional.glu(x, -1)
@@ -433,6 +433,66 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs): return f'testing {func.__name__} failed: {args}'
             torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-4, rtol=1e-4)
 
+
+    def test_unary_bitwise_ops(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32) > 0
+
+        def _not(x): return ~x
+
+        funcs = [torch.bitwise_not, _not]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+            def model(x): return func(x)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_binary_bitwise_ops_scalar(self):
+        raise unittest.SkipTest('Cannot go through torch.jit.trace')
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32) > 0
+
+        def _and(x, y): return x & y
+        def _or(x, y): return x | y
+
+        funcs = [torch.bitwise_and, torch.bitwise_or, _and, _or]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+            for val in (False, True):
+                def model(x): return func(x, val)
+                model_path = get_model_path()
+                converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+                converter.convert()
+
+                dummy_output = model(dummy_input)
+                tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+                torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_binary_bitwise_ops_tensor(self):
+        dummy_input_1 = torch.randn(1, 3, 224, 224, dtype=torch.float32) > 0
+        dummy_input_2 = torch.randn(1, 3, 224, 224, dtype=torch.float32) > 0
+
+        def _and(x, y): return x & y
+        def _or(x, y): return x | y
+
+        funcs = [torch.bitwise_and, torch.bitwise_or, _and, _or]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+            def model(x, y): return func(x, y)
+            model_path = get_model_path()
+            dummy_input = (dummy_input_1, dummy_input_2)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(*dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
 
 if __name__ == '__main__':
     unittest.main()
