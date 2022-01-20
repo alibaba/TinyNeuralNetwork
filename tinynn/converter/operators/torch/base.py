@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from distutils.version import LooseVersion
 
 import ctypes
+import inspect
 import math
 import warnings
 import torch
@@ -153,7 +154,8 @@ class OperatorConverter(ABC):
                 if graph_converter is not None and n in graph_converter.tensor_map:
                     t = graph_converter.tensor_map[n]
                 else:
-                    t = tfl.Tensor(t, n, has_buffer=non_existent_as_buffer, asymmetric=self.asymmetric, q_type=self.q_type)
+                    t = tfl.Tensor(t, n, has_buffer=non_existent_as_buffer,
+                                   asymmetric=self.asymmetric, q_type=self.q_type)
             else:
                 t = tfl.Tensor(t, n, has_buffer=b, asymmetric=self.asymmetric, q_type=self.q_type)
             tfl_tensors.append(t)
@@ -439,7 +441,18 @@ class OperatorConverter(ABC):
                         'use the `torch.argmin` instead.')
             outputs = outputs[:1]
 
-        ops.append(converter_class(inputs, outputs, keep_dim, *args, **kwargs))
+        if hasattr(converter_class, '__init__') and 'keepDims' in inspect.signature(converter_class.__init__).parameters:
+            ops.append(converter_class(inputs, outputs, keep_dim, *args, **kwargs))
+        else:
+            if keep_dim:
+                output_tensor = outputs[0]
+                transform = self.create_transform_tensor(np.squeeze(output_tensor.tensor, dim))
+                ops.append(converter_class(inputs, [transform], *args, **kwargs))
+
+                shape_tensor = self.create_attr_tensor(np.array(output_tensor.shape, dtype='int32'))
+                ops.append(tfl.ReshapeOperator([transform, shape_tensor], [output_tensor], shape_tensor.tensor))
+            else:
+                ops.append(converter_class(inputs, outputs, *args, **kwargs))
 
         if transpose:
             if keep_dim:

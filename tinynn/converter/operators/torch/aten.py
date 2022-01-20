@@ -343,8 +343,8 @@ class ATenReciprocalOperator(ATenReciprocalSchema):
         old_inp = self.input_tensors[0].to(dtype=torch.float32)
         self.input_tensors.clear()
 
-        self.input_tensors.append(torch.tensor([1], dtype=old_inp.dtype))
-        self.input_tensors.append(old_inp)
+        self.input_tensors.insert(0, torch.tensor([1], dtype=old_inp.dtype))
+        self.input_names.insert(0, self.get_unique_attr_name())
 
         self.elementwise_binary(tfl.DivOperator, graph_converter, False)
 
@@ -1670,31 +1670,13 @@ class ATenArgmaxOperator(ATenArgmaxSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        dim, keep_dim = self.input_tensors[1:3]
+
+        assert 'dim' in args and 'keepdim' in args, "aten::argmax(tensor) is not supported"
 
         # Downcast to int32
         self.output_tensors[0] = self.output_tensors[0].to(dtype=torch.int32)
 
-        input_tensor = self.find_or_create_input(0, graph_converter)
-        output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
-
-        if dim < 0:
-            dim += input_tensor.tensor.ndim
-
-        dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
-
-        ops = []
-        if keep_dim in (False, 0):
-            ops.append(tfl.ArgMaxOperator([input_tensor, dim_tensor], [output_tensor], tfl_schema.TensorType.INT32))
-        else:
-            transform = self.create_transform_tensor(np.squeeze(output_tensor, dim))
-            ops.append(tfl.ArgMaxOperator([input_tensor, dim_tensor], [transform], tfl_schema.TensorType.INT32))
-
-            shape_tensor = self.create_attr_tensor(np.array(output_tensor.shape, dtype='int32'))
-            ops.append(tfl.ReshapeOperator([transform, shape_tensor], [output_tensor], shape_tensor.tensor))
-
-        for op in ops:
-            graph_converter.add_operator(op)
+        self.handle_reduce(tfl.ArgMaxOperator, args, graph_converter, False, tfl_schema.TensorType.INT32)
 
 
 class ATenArgminOperator(ATenArgminSchema):
@@ -1702,31 +1684,13 @@ class ATenArgminOperator(ATenArgminSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        dim, keep_dim = self.input_tensors[1:3]
+
+        assert 'dim' in args and 'keepdim' in args, "aten::argmin(tensor) is not supported"
 
         # Downcast to int32
         self.output_tensors[0] = self.output_tensors[0].to(dtype=torch.int32)
 
-        input_tensor = self.find_or_create_input(0, graph_converter)
-        output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
-
-        if dim < 0:
-            dim += input_tensor.tensor.ndim
-
-        dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
-
-        ops = []
-        if keep_dim in (False, 0):
-            ops.append(tfl.ArgMinOperator([input_tensor, dim_tensor], [output_tensor], tfl_schema.TensorType.INT32))
-        else:
-            transform = self.create_transform_tensor(np.squeeze(output_tensor, dim))
-            ops.append(tfl.ArgMinOperator([input_tensor, dim_tensor], [transform], tfl_schema.TensorType.INT32))
-
-            shape_tensor = self.create_attr_tensor(np.array(output_tensor.shape, dtype='int32'))
-            ops.append(tfl.ReshapeOperator([transform, shape_tensor], [output_tensor], shape_tensor.tensor))
-
-        for op in ops:
-            graph_converter.add_operator(op)
+        self.handle_reduce(tfl.ArgMinOperator, args, graph_converter, False, tfl_schema.TensorType.INT32)
 
 
 class ATenExpandOperator(ATenExpandSchema):
