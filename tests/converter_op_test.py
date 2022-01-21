@@ -598,11 +598,11 @@ class ConverterOPTester(unittest.TestCase):
             torch.testing.assert_close(dummy_output, tfl_output)
 
     def test_float_unary_ops(self):
-        random_val = torch.randn(1, 3, 224, 224, dtype=torch.float32) 
+        random_val = torch.randn(1, 3, 224, 224, dtype=torch.float32)
         min_val = torch.tensor(0.1, dtype=torch.float32)
         dummy_input = torch.maximum(random_val, min_val)
 
-        funcs = [torch.reciprocal, torch.exp, torch.log, torch.sqrt, torch.rsqrt]
+        funcs = [torch.reciprocal, torch.exp, torch.log, torch.sqrt, torch.rsqrt, torch.sin, torch.cos, torch.floor]
 
         for func in funcs:
             func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
@@ -615,6 +615,151 @@ class ConverterOPTester(unittest.TestCase):
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
             torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_pow_scalar(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return torch.pow(x, 2)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_pow_tensor(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+        exponents = [torch.randint(0, 4, dummy_input.shape),
+                     torch.randint(0, 4, (1,))]
+
+        for exponent in exponents:
+            def model(x): return torch.pow(x, exponent)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_reshape_ops_no_args(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.flatten, torch.squeeze]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            def model(x): return func(x)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_flatten_with_args(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return torch.flatten(x, 1)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_reshape_ops_with_shapes(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.reshape, torch.Tensor.view]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            def model(x): return func(x, (1, -1, 1))
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_squeeze_with_args(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return torch.squeeze(x, 0)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_unsqueeze_with_args(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return torch.unsqueeze(x, -1)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_transpose(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return torch.transpose(x, 0, -1)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_permute(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return torch.permute(x, [0, 2, 3, 1])
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_clamp_hardtanh(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.clamp, F.hardtanh]
+        ranges = [(0, 6), (0, 1), (-1.5, 1.5), (0, None), (None, 0), (-1.5, None), (None, 1.5)]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            for min_val, max_val in ranges:
+                if func != torch.clamp and None in (min_val, max_val):
+                    continue
+
+                def model(x): return func(x, min_val, max_val)
+                model_path = get_model_path()
+                converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+                converter.convert()
+
+                dummy_output = model(dummy_input)
+                tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+                torch.testing.assert_close(dummy_output, tfl_output)
+
+    
 
 
 if __name__ == '__main__':

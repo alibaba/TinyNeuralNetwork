@@ -508,7 +508,7 @@ class ATenPowOperator(ATenPowSchema):
         self.run(node)
         assert self.input_tensors[0].dtype in (torch.float32, torch.int32)
 
-        if type(self.input_tensors[1]) != torch.tensor:
+        if type(self.input_tensors[1]) != torch.Tensor:
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
 
         self.elementwise_binary(tfl.PowOperator, graph_converter, True)
@@ -1062,21 +1062,33 @@ class ATenClampOperator(ATenClampSchema):
         self.run(node)
 
         min_value, max_value = self.input_tensors[1:]
-        assert min_value is not None
-        assert max_value is not None
+        has_min = min_value is not None
+        has_max = max_value is not None
+        assert has_min or has_max
         if min_value == 0 and max_value == 6:
             self.elementwise_unary(tfl.Relu6Operator, graph_converter)
+        elif min_value == 0 and not has_max:
+            self.elementwise_unary(tfl.ReluOperator, graph_converter)
         else:
             ops = []
             input_tensor = self.find_or_create_input(0, graph_converter)
-            inter_tensor = self.create_transform_tensor(
-                np.where(input_tensor.tensor > min_value, input_tensor.tensor, min_value))
-            min_value_tensor = self.create_attr_tensor(np.array([min_value], dtype=input_tensor.dtype))
-            ops.append(tfl.MaximumOperator([input_tensor, min_value_tensor], [inter_tensor]))
+            if has_min and has_max:
+                inter_tensor = self.create_transform_tensor(
+                    np.where(input_tensor.tensor > min_value, input_tensor.tensor, min_value))
+                min_value_tensor = self.create_attr_tensor(np.array([min_value], dtype=input_tensor.dtype))
+                ops.append(tfl.MaximumOperator([input_tensor, min_value_tensor], [inter_tensor]))
 
-            outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-            max_value_tensor = self.create_attr_tensor(np.array([max_value], dtype=input_tensor.dtype))
-            ops.append(tfl.MinimumOperator([inter_tensor, max_value_tensor], outputs))
+                outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+                max_value_tensor = self.create_attr_tensor(np.array([max_value], dtype=input_tensor.dtype))
+                ops.append(tfl.MinimumOperator([inter_tensor, max_value_tensor], outputs))
+            elif has_min:
+                outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+                max_value_tensor = self.create_attr_tensor(np.array([min_value], dtype=input_tensor.dtype))
+                ops.append(tfl.MaximumOperator([input_tensor, max_value_tensor], outputs))
+            else:
+                outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+                max_value_tensor = self.create_attr_tensor(np.array([max_value], dtype=input_tensor.dtype))
+                ops.append(tfl.MinimumOperator([input_tensor, max_value_tensor], outputs))
 
             for op in ops:
                 graph_converter.add_operator(op)
