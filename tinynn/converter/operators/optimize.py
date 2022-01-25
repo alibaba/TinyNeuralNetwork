@@ -1,5 +1,6 @@
 import copy
 import functools
+import itertools
 import re
 import typing
 import warnings
@@ -514,6 +515,173 @@ class GraphOptimizer(object):
         expand_op_outputs_in_branches(branch_transpose_nodes, _new_transpose, self.graph)
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
+    def elementwise_reshape_transpose_passthrough_pass(self):
+        edges = self.graph.graph.es.select(functools.partial(
+            is_transpose_reshape_op_edge, graph_converter=self.graph.graph))
+        pairs = ((self.graph.graph.vs[edge.source], self.graph.graph.vs[edge.target]) for edge in edges)
+        filtered_nodes = (k[0] if k[0]['node_type'] != ExtendedOperator.TRANSPOSE else k[1] for k in pairs)
+        unique_nodes = list(set(filtered_nodes))
+
+        actions = []
+        remove_edges = []
+        remove_vertices = []
+        for node in unique_nodes:
+            op = node['op']
+            input_indices = op_input_indices(op)
+            l_shape = op.inputs[0].shape
+            r_shape = op.outputs[0].shape
+            l_map, r_map, _, _ = reshape_mapping(l_shape, r_shape)
+
+            mode = None
+            for l, r in zip(l_map, r_map):
+                if len(l) > 1 and len(r) == 1:
+                    if mode in (None, 'up'):
+                        mode = 'up'
+                    else:
+                        mode = '?'
+                        break
+                elif len(r) > 1 and len(l) == 1:
+                    if mode in (None, 'down'):
+                        mode = 'down'
+                    else:
+                        mode = '?'
+                        break
+                elif len(r) > 1 and len(l) > 1:
+                    mode = '?'
+                    break
+
+            if mode is None:
+                mode = 'down'
+
+            # TODO: Support multi-multi mappings
+            if mode == '?':
+                continue
+
+            prev_nodes = []
+            cand_perms = dict()
+            cand_rev_perms = dict()
+            prev_output_indices = []
+            for i in input_indices:
+                prev_node_name = op.inputs[i].name
+                prev_node = self.graph.graph.vs.find(name=self.graph.tensor_node_map[prev_node_name])
+                prev_nodes.append(prev_node)
+                prev_output_indices.append(prev_node['outputs'].index(prev_node_name))
+
+                if prev_node['node_type'] == ExtendedOperator.TRANSPOSE:
+                    if mode == 'down':
+                        perm = tuple(prev_node['op'].inputs[1].tensor.tolist())
+                        cand_perms.setdefault(perm, 0)
+                        cand_perms[perm] += 1
+                    elif mode == 'up':
+                        perm = tuple(np.argsort(prev_node['op'].inputs[1].tensor).tolist())
+                        cand_rev_perms.setdefault(perm, 0)
+                        cand_rev_perms[perm] += 1
+
+            next_nodes = []
+            next_edges = []
+            out_nodes = []
+            for edge in node.out_edges():
+                if edge.index in remove_edges:
+                    continue
+                next_node = self.graph.graph.vs[edge.target]
+
+                if next_node['node_type'] == ExtendedOperator.OUTPUT_NODE:
+                    out_nodes.append(next_node)
+                else:
+                    next_nodes.append(next_node)
+                    next_edges.append(edge)
+
+                if next_node['node_type'] == ExtendedOperator.TRANSPOSE:
+                    if mode == 'down':
+                        perm = tuple(np.argsort(next_node['op'].inputs[1].tensor).tolist())
+                        cand_rev_perms.setdefault(perm, 0)
+                        cand_rev_perms[perm] += 1
+                    elif mode == 'up':
+                        perm = tuple(next_node['op'].inputs[1].tensor.tolist())
+                        cand_perms.setdefault(perm, 0)
+                        cand_perms[perm] += 1
+
+            cur_transpose_size = sum(cand_perms.values()) + sum(cand_rev_perms.values())
+            new_transpose_size = len(prev_nodes) + len(next_nodes) - sum(cand_perms.values())
+
+            # Skip if the number of transpose nodes is not decreasing
+            if len(next_nodes) == 0 or new_transpose_size >= cur_transpose_size:
+                continue
+
+            remove_edges.extend([x.index for x in next_edges])
+            remove_vertices.extend([x.index for x in out_nodes])
+
+            for node in out_nodes:
+                del self.graph.tensor_map[node['outputs'][0]]
+                del self.graph.tensor_node_map[node['outputs'][0]]
+
+            perm = max(cand_perms.items(), key=lambda x: x[1])[0]
+            perm_arr = np.array(perm, dtype='int32')
+            if mode == 'down':
+                inv_perm_arr = np.argsort(perm_arr).astype('int32')
+                l_dict = dict(zip([x[0] for x in l_map], r_map))
+                indices = map(lambda x: l_dict[x], inv_perm_arr.tolist())
+                inv_post_perm = list(itertools.chain.from_iterable(indices))
+                inv_post_perm_arr = np.array(inv_post_perm, dtype='int32')
+                post_perm_arr = np.argsort(inv_post_perm_arr).astype('int32')
+            elif mode == 'up':
+                r_dict = dict(zip([x[0] for x in r_map], l_map))
+                indices = map(lambda x: r_dict[x], perm)
+                inv_perm = list(itertools.chain.from_iterable(indices))
+                inv_perm_arr = np.array(inv_perm, dtype='int32')
+                post_perm_arr = np.argsort(perm_arr).astype('int32')
+                inv_post_perm_arr = np.argsort(post_perm_arr).astype('int32')
+
+            for prev_node, prev_idx, next_idx in zip(prev_nodes, input_indices, prev_output_indices):
+                prev_out = prev_node['op'].outputs[next_idx]
+                perm_tensor = self.create_attr_tensor(inv_perm_arr)
+                prev_new_out = self.create_transform_tensor(np.transpose(
+                    prev_out.tensor, inv_perm_arr), quantization=prev_out.quantization)
+                self.graph.add_operator(tfl.TransposeOperator([prev_out, perm_tensor], [prev_new_out]))
+                actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
+
+            tensor_node_dict = {}
+            for i, op_out in enumerate(op.outputs):
+                perm_tensor = self.create_attr_tensor(post_perm_arr)
+                new_out = self.create_transform_tensor(np.transpose(
+                    op_out.tensor, inv_post_perm_arr), quantization=op_out.quantization)
+
+                # Update relations
+                if op_out.name in self.graph.tensor_node_map:
+                    del self.graph.tensor_node_map[op_out.name]
+                self.graph.tensor_node_map[new_out.name] = node['name']
+                self.graph.tensor_map[new_out.name] = new_out
+                node['outputs'][i] = new_out.name
+                op.outputs[i] = new_out
+
+                self.graph.add_operator(tfl.TransposeOperator([new_out, perm_tensor], [op_out]))
+
+                tensor_node_dict[op_out.name] = self.graph.graph.vs.find(name=self.graph.tensor_node_map[op_out.name])
+
+            # OP specific dim handling logic
+            old_shape = op.inputs[1].tensor
+            new_shape = self.create_attr_tensor(old_shape[inv_post_perm_arr])
+            actions.append((self.graph.replace_operator_input, (node, 1, new_shape, True)))
+            op.newShape = new_shape.tensor
+
+            for edge in next_edges:
+                source = tensor_node_dict[edge['name']]
+                self.graph.graph.add_edge(source, edge.target_vertex, name=edge['name'], label=edge['name'])
+
+        # Process actions
+        ids = []
+        for func, args in actions:
+            node = args[0]
+            res = func(*args)
+            if res is not None:
+                ids.extend(res)
+
+        remove_edges = list(set(remove_edges + ids))
+
+        self.graph.graph.delete_edges(remove_edges)
+        self.graph.graph.delete_vertices(remove_vertices)
+
+    @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
     def elementwise_op_transpose_passthrough_pass(self):
         edges = self.graph.graph.es.select(functools.partial(
             is_transpose_elementwise_op_edge, graph_converter=self.graph.graph))
@@ -989,6 +1157,10 @@ class GraphOptimizer(object):
             self.branch_reshape_expand_pass()
             self.fuse_simple_reshape_pass()
 
+            self.elementwise_reshape_transpose_passthrough_pass()
+            self.branch_transpose_expand_pass()
+            self.fuse_simple_transpose_pass()
+
         # Other cleanups
         self.fuse_simple_slice_pass()
         for branch in (False, True):
@@ -1042,6 +1214,16 @@ def is_transformable_node(vertex: ig.Vertex, graph_converter: ig.Graph):
 def is_transformable_transpose_node(vertex: ig.Vertex, graph_converter: ig.Graph):
     return vertex['node_type'] == ExtendedOperator.TRANSPOSE and vertex.outdegree() >= 1 \
         and is_transpose_same_to_reshape_op(vertex['op'])
+
+
+def is_transpose_reshape_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+    return ((source_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
+             target_vertex['node_type'] == ExtendedOperator.RESHAPE) or
+            (target_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
+             source_vertex['node_type'] == ExtendedOperator.RESHAPE)) \
+        and target_vertex['op'].inputs[0].name in source_vertex['outputs']
 
 
 def is_transpose_elementwise_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
@@ -1422,6 +1604,68 @@ def is_simple_reshape(orig_shape, new_shape, mapping: typing.Optional[typing.Dic
         return False
     else:
         return True
+
+
+def reshape_mapping(shape_1, shape_2):
+    i = 0
+    j = 0
+    acc_l = 1
+    start_l = 0
+    acc_r = 1
+    start_r = 0
+    mapping_l = []
+    mapping_r = []
+    sign = None
+    while i < len(shape_1) or j < len(shape_2):
+        if i < len(shape_1) and j < len(shape_2):
+            if start_l == i and start_r == j and shape_1[i] == shape_2[j]:
+                mapping_l.append([i])
+                mapping_r.append([j])
+                acc_l = 1
+                acc_r = 1
+                i += 1
+                j += 1
+                start_l = i
+                start_r = j
+                sign = None
+            else:
+                if sign in ('l', None):
+                    acc_l = shape_1[i] * acc_l
+                if sign in ('r', None):
+                    acc_r = shape_2[j] * acc_r
+                if acc_l == acc_r:
+                    mapping_l.append(list(range(start_l, i + 1)))
+                    mapping_r.append(list(range(start_r, j + 1)))
+                    acc_l = 1
+                    acc_r = 1
+                    i += 1
+                    j += 1
+                    start_l = i
+                    start_r = j
+                    sign = None
+                elif acc_l < acc_r:
+                    sign = 'l'
+                    i += 1
+                else:
+                    sign = 'r'
+                    j += 1
+        elif i < len(shape_1):
+            assert shape_1[i] == 1
+            mapping_l[-1].append(i)
+            i += 1
+        else:
+            assert shape_2[j] == 1
+            mapping_r[-1].append(j)
+            j += 1
+    non_one_mapping_l = []
+    non_one_mapping_r = []
+    for ml, mr in zip(mapping_l, mapping_r):
+        new_ml = [i for i in ml if shape_1[i] != 1]
+        new_mr = [j for j in mr if shape_2[j] != 1]
+        if len(new_ml) > 0 and len(new_mr) > 0:
+            non_one_mapping_l.append(new_ml)
+            non_one_mapping_r.append(new_mr)
+    return mapping_l, mapping_r, non_one_mapping_l, non_one_mapping_r
 
 
 def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.List[typing.Iterable[ig.Vertex]],
