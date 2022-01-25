@@ -759,8 +759,29 @@ class ConverterOPTester(unittest.TestCase):
                 tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
                 torch.testing.assert_close(dummy_output, tfl_output)
 
-    
+    def test_flip_single_dim(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
+        def model(x): return torch.flip(x, [1])
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_flip_multi_dim(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return torch.flip(x, [1, 2])
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
 
 if __name__ == '__main__':
     unittest.main()

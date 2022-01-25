@@ -475,7 +475,18 @@ class ATenFlipOperator(ATenFlipSchema):
         dims = [x + n_dim if x < 0 else x for x in self.input_tensors[1]]
         self.input_tensors[1] = np.array(dims, dtype='int32')
 
-        self.elementwise_binary(tfl.ReverseV2Operator, graph_converter, False)
+        if len(dims) == 1:
+            self.elementwise_binary(tfl.ReverseV2Operator, graph_converter, False)
+        else:
+            actual_input = self.find_or_create_input(0, graph_converter)
+            for dim in dims[:-1]:
+                transform = self.create_transform_tensor(np.flip(actual_input.tensor, dim))
+                dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
+                graph_converter.add_operator(tfl.ReverseV2Operator([actual_input, dim_tensor], [transform]))
+                actual_input = transform
+            outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+            dim_tensor = self.create_attr_tensor(np.array(dims[-1:], dtype='int32'))
+            graph_converter.add_operator(tfl.ReverseV2Operator([actual_input, dim_tensor], outputs))
 
 
 class ATenDivOperator(ATenDivSchema):
