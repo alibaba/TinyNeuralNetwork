@@ -72,6 +72,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::slice": ATenSliceOperator,
                                                                 "aten::stack": ATenStackOperator,
                                                                 "aten::cat": ATenCatOperator,
+                                                                "aten::chunk": ATenChunkOperator,
                                                                 "aten::embedding": ATenEmbeddingOperator,
                                                                 "aten::linear": ATenLinearOperator,
                                                                 "aten::lstm": ATenLstmOperator,

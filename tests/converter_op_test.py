@@ -27,11 +27,12 @@ def tfl_run_model(path, inputs, outputs):
     interpreter.invoke()
 
     if isinstance(outputs, (list, tuple)):
-        outputs = []
+        tfl_outputs = []
         for i in range(len(outputs)):
             arr = np.asarray(interpreter.get_tensor(output_details[i]['index']))
             o = torch.from_numpy(arr)
-            outputs.append(o)
+            tfl_outputs.append(o)
+        return tfl_outputs
     else:
         arr = np.asarray(interpreter.get_tensor(output_details[0]['index']))
         return torch.from_numpy(arr)
@@ -967,7 +968,6 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
-
     def test_pixel_shuffle_with_reorder(self):
         dummy_input = torch.randn(1, 36, 7, 7, dtype=torch.float32)
 
@@ -984,6 +984,190 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 12, 21, 21, dtype=torch.float32)
 
         def model(x): return torch.pixel_unshuffle(x, 3)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_embedding_1d(self):
+        dummy_input = torch.randint(0, 100, size=(100,))
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.emb = nn.Embedding(100, 24)
+
+            def forward(self, x):
+                return self.emb(x)
+
+        model = Model()
+        model.eval()
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_embedding_2d(self):
+        dummy_input = torch.randint(0, 100, size=(10, 10))
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.emb = nn.Embedding(100, 24)
+
+            def forward(self, x):
+                return self.emb(x)
+
+        model = Model()
+        model.eval()
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_embedding_3d(self):
+        dummy_input = torch.randint(0, 1000, size=(10, 10, 10))
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.emb = nn.Embedding(1000, 24)
+
+            def forward(self, x):
+                return self.emb(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_embedding_3d_with_padding_idx(self):
+        dummy_input = torch.randint(0, 1000, size=(10, 10, 10))
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.emb = nn.Embedding(1000, 24, padding_idx=0)
+
+            def forward(self, x):
+                return self.emb(x)
+
+        model = Model()
+        model.eval()
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_split_chunk_divisible(self):
+        dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.split, torch.Tensor.chunk, torch.chunk]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            def model(x): return func(x, 3, dim=1)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_split_chunk_non_divisible(self):
+        dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.split, torch.Tensor.chunk, torch.chunk]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            def model(x): return func(x, 5, dim=1)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_split_chunk_negative_dim(self):
+        dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.split, torch.Tensor.chunk, torch.chunk]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            def model(x): return func(x, 5, dim=-1)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_split_with_sizes(self):
+        dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
+
+        def model(x): return torch.split(x, [200, 24], dim=-1)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_chunk_divisible(self):
+        dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
+
+        def model(x): return list(torch.chunk(x, 3))
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_chunk_indivisible(self):
+        dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
+
+        def model(x): return list(torch.chunk(x, 7))
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_chunk_indivisible_negative_dim(self):
+        dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
+
+        def model(x): return list(torch.chunk(x, 11, -1))
         model_path = get_model_path()
         converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
