@@ -943,5 +943,55 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
+    def test_pixel_shuffle_no_reorder(self):
+        dummy_input = torch.randn(1, 9, 1, 1, dtype=torch.float32)
+
+        def model(x): return torch.pixel_shuffle(x, 3)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_pixel_unshuffle_no_reorder(self):
+        dummy_input = torch.randn(1, 1, 3, 3, dtype=torch.float32)
+
+        def model(x): return torch.pixel_unshuffle(x, 3)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+
+    def test_pixel_shuffle_with_reorder(self):
+        dummy_input = torch.randn(1, 36, 7, 7, dtype=torch.float32)
+
+        def model(x): return torch.pixel_shuffle(x, 3)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_pixel_unshuffle_with_reorder(self):
+        dummy_input = torch.randn(1, 12, 21, 21, dtype=torch.float32)
+
+        def model(x): return torch.pixel_unshuffle(x, 3)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+
 if __name__ == '__main__':
     unittest.main()

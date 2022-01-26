@@ -1655,9 +1655,9 @@ class ATenPixelShuffleOperator(ATenPixelShuffleSchema):
         if not np.array_equal(np.sort(perm), perm):
             reordered = self.create_transform_tensor(ops[0].outputs[0].tensor[:, :, :, perm])
             indices = self.create_attr_tensor(perm.astype('int32'))
-            gather_op = tfl.GatherOperator([ops[0].inputs[0], indices], [reordered], axis=3)
-            ops[0].inputs[0] = reordered
-            ops.insert(0, gather_op)
+            gather_op = tfl.GatherOperator([ops[0].outputs[0], indices], [reordered], axis=3)
+            ops[1].inputs[0] = reordered
+            ops.insert(1, gather_op)
         for op in ops:
             graph_converter.add_operator(op)
 
@@ -1689,9 +1689,9 @@ class ATenPixelUnshuffleOperator(ATenPixelUnshuffleSchema):
         if not np.array_equal(np.sort(perm), perm):
             reordered = self.create_transform_tensor(ops[1].outputs[0].tensor[:, :, :, perm])
             indices = self.create_attr_tensor(perm.astype('int32'))
-            gather_op = tfl.GatherOperator([reordered, indices], [ops[2].outputs[0]], axis=3)
-            ops.append(gather_op)
-            ops[2].outputs[0] = reordered
+            gather_op = tfl.GatherOperator([reordered, indices], [ops[1].outputs[0]], axis=3)
+            ops.insert(2, gather_op)
+            ops[1].outputs[0] = reordered
 
         for op in ops:
             graph_converter.add_operator(op)
