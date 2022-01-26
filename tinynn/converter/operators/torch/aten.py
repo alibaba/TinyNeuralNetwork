@@ -1754,6 +1754,7 @@ class ATenExpandOperator(ATenExpandSchema):
 
             # No-OP if input tensor is already of desired sizes
             if output_shape == input_shape:
+                self.passthrough(graph_converter)
                 return
 
             ops = []
