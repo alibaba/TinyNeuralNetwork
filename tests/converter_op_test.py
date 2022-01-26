@@ -1119,7 +1119,7 @@ class ConverterOPTester(unittest.TestCase):
         for func in funcs:
             func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
             print(f'testing {func_name}')
-            def model(x): return func(x, 5, dim=-1)
+            def model(x): return func(x, 7, dim=-1)
             model_path = get_model_path()
             converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
@@ -1143,7 +1143,7 @@ class ConverterOPTester(unittest.TestCase):
     def test_chunk_divisible(self):
         dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
 
-        def model(x): return list(torch.chunk(x, 3))
+        def model(x): return list(torch.chunk(x, 3, 1))
         model_path = get_model_path()
         converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
@@ -1155,7 +1155,7 @@ class ConverterOPTester(unittest.TestCase):
     def test_chunk_indivisible(self):
         dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
 
-        def model(x): return list(torch.chunk(x, 7))
+        def model(x): return list(torch.chunk(x, 7, 1))
         model_path = get_model_path()
         converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()

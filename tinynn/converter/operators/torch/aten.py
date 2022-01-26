@@ -1621,6 +1621,7 @@ class ATenChunkOperator(ATenChunkSchema):
 
         if dim_size % chunks != 0:
             size_splits = np.array([t.size(dim) for t in self.output_tensors[0]], dtype='int32')
+            chunks = len(size_splits)
             split_tensor = self.create_attr_tensor(size_splits)
             graph_converter.add_operator(tfl.SplitVOperator([input_tensor, split_tensor, dim_tensor], outputs, chunks))
         else:
