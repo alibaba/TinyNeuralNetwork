@@ -148,15 +148,14 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 9)
         self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 10)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 3)
-        
+
         split_output_indices = tfl_model.Subgraphs(0).Operators(0).OutputsAsNumpy().tolist()
         split_output_names = [tfl_model.Subgraphs(0).Tensors(i).Name() for i in split_output_indices]
-        
+
         for i in range(1, 10):
             input_idx = tfl_model.Subgraphs(0).Operators(i).Inputs(0)
             input_name = tfl_model.Subgraphs(0).Tensors(input_idx).Name()
             self.assertIn(input_name, split_output_names)
-
 
     def test_simple_transpose(self):
         class TestModel(nn.Module):
@@ -501,6 +500,98 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 3)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_transpose_across_channel_shuffle(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.permute(x, [0, 2, 3, 1])
+                x = torch.reshape(x, [1, 2, 112, 224, 3])
+                x = torch.transpose(x, 1, 2)
+                x = torch.reshape(x, [1, 224, 224, 3])
+                x = torch.permute(x, [0, 3, 1, 2])
+                return x
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 3)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 3)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(
+            0).OpcodeIndex()).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(1).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(1).OutputsLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(
+            1).OpcodeIndex()).BuiltinCode(), tflite.BuiltinOperator.TRANSPOSE)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(2).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(2).OutputsLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(
+            2).OpcodeIndex()).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
+
+    def test_transpose_across_squeeze(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.permute(x, [0, 2, 3, 1])
+                x = torch.reshape(x, [224, 224, 3])
+                x = torch.permute(x, [2, 0, 1])
+                return x
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_transpose_across_unsqueeze(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.permute(x, [1, 2, 0])
+                x = torch.reshape(x, [1, 224, 224, 3])
+                x = torch.permute(x, [0, 3, 1, 2])
+                return x
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 2)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
 
