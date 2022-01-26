@@ -766,6 +766,19 @@ class ATenFloorDivideOperator(ATenFloorDivideSchema):
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+        elif self.input_tensors[1].dtype != self.input_tensors[0].dtype:
+            other = self.find_or_create_input(1, graph_converter)
+            if other.buffer is None:
+                inp = self.find_or_create_input(0, graph_converter)
+                new_other = self.input_tensors[1].detach().clone().to(dtype=self.input_tensors[0].dtype)
+                new_other_t = self.create_transform_tensor(new_other)
+                graph_converter.add_operator(tfl.CastOperator([other], [new_other_t],
+                    tfl.torch_tflite_dtype_mappings[self.input_tensors[1].dtype],
+                    tfl.torch_tflite_dtype_mappings[self.input_tensors[0].dtype]))
+                self.input_tensors[1] = new_other
+                self.input_names[1] = new_other_t.name
+            else:
+                self.input_tensors[1] = self.input_tensors[1].to(dtype=self.input_tensors[0].dtype)
 
         assert all((not t.is_floating_point() for t in self.input_tensors[:2])), \
             "floor_divide for floats is not supported"
