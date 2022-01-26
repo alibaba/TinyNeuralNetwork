@@ -783,5 +783,42 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
+    def test_floor_div_scalar(self):
+        dummy_input = torch.randint(-100, 100, size=(1, 3, 224, 224))
+
+        def model(x): return torch.floor_divide(x, 2)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_floor_div_scalar(self):
+        dummy_input = torch.randint(0, 100, size=(1, 3, 224, 224)).int()
+
+        def model(x): return torch.floor_divide(x, 2)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_floor_div_scalar(self):
+        dummy_input = torch.randint(0, 100, size=(1, 3, 224, 224)).int()
+        dummy_input_1 = torch.tensor(2).int()
+
+        def model(x): return torch.floor_divide(x, dummy_input_1)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
 if __name__ == '__main__':
     unittest.main()
