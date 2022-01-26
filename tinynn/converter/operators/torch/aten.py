@@ -1880,7 +1880,7 @@ class ATenCopyOperator(ATenCopySchema):
                     if len(output_shape) > len(other_shape):
                         new_shape = [1] * (len(output_shape) - len(other_shape)) + list(other_shape)
                         new_shape_arr = np.array(new_shape, dtype='int32')
-                        reshaped = self.create_transform_tensor(np.reshape(other_tensor.tensor, new_shape_arr))
+                        reshaped = self.create_transform_tensor(np.reshape(actual_input.tensor, new_shape_arr))
                         ops.append(tfl.ReshapeOperator([actual_input], [reshaped], new_shape_arr))
                         actual_input = reshaped
 

@@ -1250,6 +1250,45 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
+    def test_copy_constant(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+        buffer = torch.empty(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return buffer.copy_(x)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_copy_constant_broadcast(self):
+        dummy_input = torch.randn(224, dtype=torch.float32)
+        buffer = torch.empty(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return buffer.copy_(x)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_copy_constant_broadcast_with_cast(self):
+        dummy_input = torch.randint(0, 100, size=(224,), dtype=torch.int32)
+        buffer = torch.empty(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return buffer.copy_(x)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
 
 if __name__ == '__main__':
     unittest.main()
