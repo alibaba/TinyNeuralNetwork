@@ -1289,6 +1289,195 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
+    def test_2d_matmuls_constant(self):
+        dummy_input = torch.randn(9, 17, dtype=torch.float32)
+        mat = torch.randn(17, 22, dtype=torch.float32)
+
+        funcs = [torch.mm, torch.matmul]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            def model(x): return func(x, mat)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_2d_matmuls_tensor(self):
+        mat1 = torch.randn(9, 17, dtype=torch.float32)
+        mat2 = torch.randn(17, 22, dtype=torch.float32)
+
+        funcs = [torch.mm, torch.matmul]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            def model(x, y): return func(x, y)
+            dummy_input = (mat1, mat2)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(*dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_3d_matmuls_constant(self):
+        dummy_input = torch.randn(1, 9, 17, dtype=torch.float32)
+        mat = torch.randn(1, 17, 22, dtype=torch.float32)
+
+        funcs = [torch.bmm, torch.matmul]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            def model(x): return func(x, mat)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_3d_matmuls_tensor(self):
+        mat1 = torch.randn(1, 9, 17, dtype=torch.float32)
+        mat2 = torch.randn(1, 17, 22, dtype=torch.float32)
+
+        funcs = [torch.bmm, torch.matmul]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            def model(x, y): return func(x, y)
+            dummy_input = (mat1, mat2)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(*dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_3d_2d_matmul_constant(self):
+        dummy_input = torch.randn(1, 9, 17, dtype=torch.float32)
+        mat = torch.randn(17, 22, dtype=torch.float32)
+
+        def model(x): return torch.matmul(x, mat)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_3d_2d_matmul_tensor(self):
+        mat1 = torch.randn(1, 9, 17, dtype=torch.float32)
+        mat2 = torch.randn(17, 22, dtype=torch.float32)
+
+        def model(x, y): return torch.matmul(x, y)
+        dummy_input = (mat1, mat2)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_2d_linear(self):
+        dummy_input = torch.randn(9, 17, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.fc = nn.Linear(17, 22)
+
+            def forward(self, x):
+                return self.fc(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_3d_linear(self):
+        dummy_input = torch.randn(1, 9, 17, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.fc = nn.Linear(17, 22)
+
+            def forward(self, x):
+                return self.fc(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_2d_linear_no_bias(self):
+        dummy_input = torch.randn(9, 17, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.fc = nn.Linear(17, 22, bias=False)
+
+            def forward(self, x):
+                return self.fc(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_3d_linear_no_bias(self):
+        dummy_input = torch.randn(1, 9, 17, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.fc = nn.Linear(17, 22, bias=False)
+
+            def forward(self, x):
+                return self.fc(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
 
 if __name__ == '__main__':
     unittest.main()

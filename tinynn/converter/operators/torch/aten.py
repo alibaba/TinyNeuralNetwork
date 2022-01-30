@@ -1067,10 +1067,13 @@ class ATenLinearOperator(ATenLinearSchema):
 
         ops = []
         input_tensor, weight_tensor, bias_tensor = self.input_tensors
-        if input_tensor.dim() >= 2 and input_tensor.dim() <= 5 and bias_tensor is not None:
-            # aten::addmm
-            input_tensor, weight_tensor, bias_tensor = [self.find_or_create_input(i, graph_converter) for i in range(3)]
+        if input_tensor.dim() >= 2 and input_tensor.dim() <= 5:
             assert len(weight_tensor.shape) == 2, "Weight of AddMM should be 2D"
+            if bias_tensor is not None:
+                input_tensor, weight_tensor, bias_tensor = [self.find_or_create_input(i, graph_converter) for i in range(3)]
+            else:
+                input_tensor, weight_tensor = [self.find_or_create_input(i, graph_converter) for i in range(2)]
+                bias_tensor = self.create_attr_tensor(np.zeros(weight_tensor.shape[0], dtype='float32'))
 
             inputs = [input_tensor, weight_tensor, bias_tensor]
             outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
@@ -1078,7 +1081,6 @@ class ATenLinearOperator(ATenLinearSchema):
             keep_dims = len(outputs[0].shape) > 2
             ops.append(tfl.FullyConnectedOperator(inputs, outputs, keepNumDims=keep_dims))
         else:
-            # aten::matmul + aten::add
             log.error(f'aten::linear is not supported for input shape {input_tensor.shape}, '
                       f'weight shape {weight_tensor.shape}, '
                       f'bias type {type(bias_tensor).__name__}')
