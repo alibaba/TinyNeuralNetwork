@@ -1478,6 +1478,20 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
+    def test_addmm(self):
+        dummy_input = torch.randn(9, 17, dtype=torch.float32)
+        mat = torch.randn(17, 22, dtype=torch.float32)
+        bias = torch.randn(22, dtype=torch.float32)
+
+        def model(x): return torch.addmm(bias, x, mat)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
 
 if __name__ == '__main__':
     unittest.main()
