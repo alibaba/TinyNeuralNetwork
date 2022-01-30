@@ -262,7 +262,7 @@ class ATenAvgPool2dOperator(ATenAvgPool2dSchema):
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
         kernel_h, kernel_w = self.input_tensors[1]
-        stride_h, stride_w = self.input_tensors[2] or self.input_tensors[1]
+        stride_h, stride_w = self.input_tensors[2] or (kernel_h, kernel_w)
         padding_h, padding_w = self.input_tensors[3]
         ceil_mode = self.input_tensors[4]
         count_include_pad = self.input_tensors[5]
@@ -535,7 +535,7 @@ class ATenMaxPool2dOperator(ATenMaxPool2dSchema):
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
         kernel_h, kernel_w = self.input_tensors[1]
-        stride_h, stride_w = self.input_tensors[2]
+        stride_h, stride_w = self.input_tensors[2] or (kernel_h, kernel_w)
         pad_h, pad_w = self.input_tensors[3]
         dilation_h, dilation_w = self.input_tensors[4]
         ceil_mode = self.input_tensors[5]
@@ -773,8 +773,8 @@ class ATenFloorDivideOperator(ATenFloorDivideSchema):
                 new_other = self.input_tensors[1].detach().clone().to(dtype=self.input_tensors[0].dtype)
                 new_other_t = self.create_transform_tensor(new_other)
                 graph_converter.add_operator(tfl.CastOperator([other], [new_other_t],
-                    tfl.torch_tflite_dtype_mappings[self.input_tensors[1].dtype],
-                    tfl.torch_tflite_dtype_mappings[self.input_tensors[0].dtype]))
+                                                              tfl.torch_tflite_dtype_mappings[self.input_tensors[1].dtype],
+                                                              tfl.torch_tflite_dtype_mappings[self.input_tensors[0].dtype]))
                 self.input_tensors[1] = new_other
                 self.input_names[1] = new_other_t.name
             else:
