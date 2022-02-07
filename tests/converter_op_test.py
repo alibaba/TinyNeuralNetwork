@@ -1603,6 +1603,126 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
+    def test_constant_pad_1d(self):
+        dummy_input = torch.randn(1, 3, 224, dtype=torch.float32)
+
+        def model(x): return F.pad(x, (1, 1))
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_constant_pad_2d(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return F.pad(x, (1, 1, 2, 2))
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_constant_pad_2d_with_fill_value(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return F.pad(x, (1, 1, 2, 2), 'constant', 0.5)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_reflection_pad_1d(self):
+        dummy_input = torch.randn(1, 3, 224, dtype=torch.float32)
+
+        def model(x): return F.pad(x, (2, 2), 'reflect')
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_reflection_pad_2d(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return F.pad(x, (1, 1, 2, 0), 'reflect')
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_upsample_bilinear(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return F.interpolate(x, scale_factor=2.0, mode='bilinear')
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_upsample_bilinear_align_corners(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return F.interpolate(x, scale_factor=2.0, mode='bilinear', align_corners=True)
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_upsample_nearest(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return F.interpolate(x, scale_factor=2.0, mode='nearest')
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_upsample_bilinear_output_size(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return F.interpolate(x, size=(448, 448), mode='bilinear')
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_upsample_nearest_output_size(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x): return F.interpolate(x, size=(448, 448), mode='nearest')
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
 
 if __name__ == '__main__':
     unittest.main()
