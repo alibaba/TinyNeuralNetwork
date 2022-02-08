@@ -31,11 +31,12 @@ class GraphOptimizer(object):
     BRANCH_OPTIMIZE: int = 4
     ALL_OPTIMIZE: int = 4
 
-    def __init__(self, graph: CommonGraph, level: int) -> None:
+    def __init__(self, graph: CommonGraph, level: int, fuse_quant: bool) -> None:
         self.graph = graph
         self.fuse_tensor_count = 0
         self.fuse_attr_count = 0
         self.level = level
+        self.fuse_quant = fuse_quant
 
     def create_attr_tensor(self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None):
         if name is None:
@@ -1111,6 +1112,57 @@ class GraphOptimizer(object):
         self.graph.outputs.extend(unpacked_outputs)
         self.graph.add_outputs(output_names)
 
+    @class_conditional(lambda self: self.fuse_quant)
+    def fuse_quant_dequant_nodes(self):
+        edges = self.graph.graph.es.select(functools.partial(
+            is_quant_dequant_edge, graph_converter=self.graph.graph))
+        filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
+
+        remove_vertices = []
+        input_mapping = {}
+        output_mapping = {}
+        for prev, next in filtered_pairs:
+            if prev['node_type'] == ExtendedOperator.INPUT_NODE:
+                remove_vertices.append(prev)
+                next['node_type'] = prev['node_type']
+                next['op'] = None
+                input_name = prev['outputs'][0]
+                input_mapping.setdefault(input_name, [])
+                input_mapping[input_name].extend(next['outputs'])
+            else:
+                remove_vertices.append(next)
+                if prev['op'] is not None:
+                    prev['node_type'] = next['node_type']
+                    prev_name = prev['op'].outputs[0].name
+                    new_name = prev['op'].inputs[0].name
+                    prev['op'] = None
+                    output_mapping.setdefault(prev_name, [])
+                    output_mapping[prev_name].append(new_name)
+
+        self.graph.graph.delete_vertices(remove_vertices)
+
+        if len(input_mapping) > 0:
+            new_inputs = []
+            for name in self.graph.inputs:
+                if name in input_mapping:
+                    new_inputs.extend(input_mapping[name])
+                else:
+                    new_inputs.append(name)
+            
+            self.graph.inputs.clear()
+            self.graph.inputs.extend(new_inputs)
+
+        if len(output_mapping) > 0:
+            new_outputs = []
+            for name in self.graph.outputs:
+                if name in output_mapping:
+                    new_outputs.extend(output_mapping[name])
+                else:
+                    new_outputs.append(name)
+
+            self.graph.outputs.clear()
+            self.graph.outputs.extend(new_outputs)
+
     def optimize(self):
         # Input/output passes
         self.output_list_unpack_pass()
@@ -1180,6 +1232,9 @@ class GraphOptimizer(object):
 
         # Fuse activation
         self.fuse_activation()
+
+        # Fuse quant/dequant nodes
+        self.fuse_quant_dequant_nodes()
 
         # Final cleanup
         self.cleanup_dead_nodes()
@@ -1407,6 +1462,16 @@ def is_constant_reshape_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
         and target_vertex['node_type'] == ExtendedOperator.RESHAPE \
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name \
         and target_vertex.outdegree() >= 1
+
+
+def is_quant_dequant_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+    return (source_vertex['node_type'] == ExtendedOperator.INPUT_NODE
+            and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
+            and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name) or \
+           (source_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
+            and target_vertex['node_type'] == ExtendedOperator.OUTPUT_NODE)
 
 
 def is_transpose_same_to_reshape_op(op: tfl.BaseOperator):

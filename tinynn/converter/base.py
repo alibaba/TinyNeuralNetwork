@@ -29,7 +29,8 @@ class TFLiteConverter(object):
                  optimize: int = GraphOptimizer.ALL_OPTIMIZE,
                  quantize_target_type: str = 'uint8',
                  hybrid_quantization_from_float: bool = False,
-                 hybrid_per_channel: bool = False) -> None:
+                 hybrid_per_channel: bool = False,
+                 fuse_quant_dequant: bool = False) -> None:
         """ The TFLiteConverter class
 
         Args:
@@ -47,6 +48,7 @@ class TFLiteConverter(object):
             quantize_target_type (str): Target type for quantization. Defaults to 'uint8'
             hybrid_quantization_from_float (bool): Direct hybrid quantization from a float model. Defaults to False
             hybrid_per_channel (bool): Prefer per-channel kernels in hybrid quantization. Defaults to False
+            fuse_quant_dequant (bool): Remove quant and dequant nodes directly connected to i/o nodes. Defaults to False
         """
 
         self.model = model
@@ -72,6 +74,7 @@ class TFLiteConverter(object):
         self.optimize = optimize
         self.hybrid = hybrid_quantization_from_float
         self.hybrid_per_channel = hybrid_per_channel
+        self.fuse_quant_dequant = fuse_quant_dequant
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -299,7 +302,7 @@ class TFLiteConverter(object):
             log.error(f'Unsupported ops: {", ".join(unsupported_ops)}')
             raise Exception("Cannot continue due to fatal error")
         else:
-            optimizer = GraphOptimizer(self.common_graph, self.optimize)
+            optimizer = GraphOptimizer(self.common_graph, self.optimize, self.fuse_quant_dequant)
             optimizer.optimize()
 
             if self.hybrid:

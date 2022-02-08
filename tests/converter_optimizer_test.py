@@ -594,6 +594,32 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 2)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
+    def test_fuse_quant_dequant(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.quantize_per_tensor(x, 0.05, 128, torch.quint8)
+                x = F.relu(x)
+                x = torch.dequantize(x)
+                return x
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, fuse_quant_dequant=True)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
 if __name__ == '__main__':
     unittest.main()
