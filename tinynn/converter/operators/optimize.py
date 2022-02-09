@@ -492,7 +492,8 @@ class GraphOptimizer(object):
             op_perm = op.inputs[1]
 
             prev_idx = prev_node['outputs'].index(op.inputs[0].name)
-            if prev_node['node_type'] == ExtendedOperator.INPUT_NODE:
+            if prev_node['node_type'] in (ExtendedOperator.INPUT_NODE,
+                                          ExtendedOperator.CONSTANT_NODE):
                 prev_out = self.graph.tensor_map[op.inputs[0].name]
             else:
                 prev_op = prev_node['op']

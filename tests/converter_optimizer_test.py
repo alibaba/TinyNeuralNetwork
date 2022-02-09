@@ -621,5 +621,46 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
+    def test_branch_expand_transpose(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                y = torch.permute(x, [0, 2, 3, 1])
+                y1 = torch.permute(y, [0, 3, 1, 2])
+                y2 = torch.permute(y, [0, 3, 1, 2])
+                y = y1 + y2
+                return y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+    def test_branch_expand_transpose_buffer(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer('buf1', nn.Parameter(torch.randn(1, 3, 224, 224)))
+
+            def forward(self, x):
+                y = torch.permute(self.buf1, [0, 2, 3, 1])
+                y1 = torch.permute(y, [0, 3, 1, 2])
+                y2 = torch.permute(y, [0, 3, 1, 2])
+                y = x + y1 + y2
+                return y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+
 if __name__ == '__main__':
     unittest.main()
