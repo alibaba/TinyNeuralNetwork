@@ -533,6 +533,28 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
+    def test_prelu_multi_channel(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.prelu = nn.PReLU(3)
+
+            def forward(self, x):
+                return self.prelu(x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
     def test_softmax_like_funcs(self):
         dummy_input = torch.randn(1, 1000, dtype=torch.float32)
 
