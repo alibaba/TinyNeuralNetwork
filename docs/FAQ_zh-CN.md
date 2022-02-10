@@ -104,9 +104,9 @@ A：一般有两种解法
         - Quantized schema [quantized_schema.py](../tinynn/converter/operators/torch/quantized_schema.py)
     - 两者的对应翻译代码
         - ATen OPs [aten.py](../tinynn/converter/operators/torch/aten.py)
-        - Quantized OPs [aten.py](../tinynn/converter/operators/torch/quantized.py)
+        - Quantized OPs [quantized.py](../tinynn/converter/operators/torch/quantized.py)
     - OP翻译逻辑的注册
-        - Registration [__init__.py](https://github.com/alibaba/TinyNeuralNetwork/blob/main/tinynn/converter/operators/torch/__init__.py)
+        - Registration [\_\_init\_\_.py](https://github.com/alibaba/TinyNeuralNetwork/blob/main/tinynn/converter/operators/torch/__init__.py)
 
     实现步骤：
     1. 查阅TorchScript和TFLite的Schema，选取两边对应的OP

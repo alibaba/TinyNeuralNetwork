@@ -102,9 +102,9 @@ There are a large number of operators in PyTorch. We cannot cover all operators,
         - Quantized schema [quantized_schema.py](../tinynn/converter/operators/torch/quantized_schema.py)
     - Translation logic
         - ATen OPs [aten.py](../tinynn/converter/operators/torch/aten.py)
-        - Quantized OPs [aten.py](../tinynn/converter/operators/torch/quantized.py)
+        - Quantized OPs [quantized.py](../tinynn/converter/operators/torch/quantized.py)
     - Registration of OP translation logic
-        - Registration table [__init__.py](https://github.com/alibaba/TinyNeuralNetwork/blob/main/tinynn/converter/operators/torch/__init__.py)
+        - Registration table [\_\_init\_\_.py](https://github.com/alibaba/TinyNeuralNetwork/blob/main/tinynn/converter/operators/torch/__init__.py)
 
     Implementation steps:
     1. Read through the schema of both TorchScript and TFLite, and select the appropriate OP(s) on both sides
