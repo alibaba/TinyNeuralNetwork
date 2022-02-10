@@ -39,6 +39,11 @@ class ATenLstmOperator(ATenLstmSchema):
             fused_bias_slices = torch.chunk(fused_bias, 4, 0)
             for idx, (bias, gate) in enumerate(zip(fused_bias_slices, gates)):
                 input_tensors[input_start_index + 11 + idx] = self.create_attr_tensor(bias)
+        else:
+            bias_shape = input_tensors[input_start_index + 3].shape[:1]
+            for idx, gate in enumerate(gates):
+                bias = torch.zeros(bias_shape, dtype=torch.float32)
+                input_tensors[input_start_index + 11 + idx] = self.create_attr_tensor(bias)
 
     def lstm_hidden_state_helper(self,
                                  input_tensors,
@@ -71,8 +76,10 @@ class ATenLstmOperator(ATenLstmSchema):
                      graph_converter):
         assert is_train in (False, 0)
         expected_num_params = 2 * num_layers
+        params_step = 2
         if has_biases:
             expected_num_params *= 2
+            params_step *= 2
         if bidirectional:
             expected_num_params *= 2
 
@@ -90,7 +97,7 @@ class ATenLstmOperator(ATenLstmSchema):
 
         suffixes = ["_fw", "_bw"]
         state_kinds = ["act", "cell"]
-        param_start_indices = [0, 4]
+        param_start_indices = [0, params_step]
         input_start_indices = [1, 18]
 
         ops = []
@@ -141,7 +148,7 @@ class ATenLstmOperator(ATenLstmSchema):
                                                                   timeMajor=not batch_first))
 
             current_input = outputs[0]
-            params_offset += 4 * num_directions
+            params_offset += params_step * num_directions
 
         for op in ops:
             graph_converter.add_operator(op)
