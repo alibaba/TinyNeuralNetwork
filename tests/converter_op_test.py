@@ -555,6 +555,81 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
+    def test_prelu_multi_channel_with_transposes(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.prelu = nn.PReLU(16)
+
+            def forward(self, x):
+                x = F.interpolate(x, scale_factor=2)
+                x = self.prelu(x)
+                x = x.permute([0, 2, 3, 1])
+                return x
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.randn(1, 16, 128, 1)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_prelu_with_reshapes(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.prelu = nn.PReLU()
+
+            def forward(self, x):
+                x = x.reshape(1, 16, 128)
+                x = self.prelu(x)
+                x = x.reshape([1, 16, 128, 1])
+                return x
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.randn(1, 16, 128, 1)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_prelu_multi_channel_with_reshapes(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.prelu = nn.PReLU(16)
+
+            def forward(self, x):
+                x = x.reshape(1, 16, 128)
+                x = self.prelu(x)
+                x = x.reshape([1, 16, 128, 1])
+                return x
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.randn(1, 16, 128, 1)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
     def test_softmax_like_funcs(self):
         dummy_input = torch.randn(1, 1000, dtype=torch.float32)
 

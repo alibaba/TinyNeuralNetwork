@@ -794,6 +794,15 @@ class GraphOptimizer(object):
                 old_pad = op.inputs[1].tensor
                 new_pad = self.create_attr_tensor(old_pad[inv_perm_arr])
                 actions.append((self.graph.replace_operator_input, (node, 1, new_pad, True)))
+            elif node['node_type'] == ExtendedOperator.PRELU:
+                old_weight = op.inputs[1].tensor
+                if old_weight.ndim != 1:
+                    assert old_weight.ndim + 1 == len(inv_perm_arr)
+                    new_perm = np.argsort(np.argsort(inv_perm_arr[1:]))
+                    new_perm_t = self.create_attr_tensor(np.array(new_perm, dtype='int32'))
+                    new_weight = self.create_transform_tensor(np.transpose(old_weight, new_perm))
+                    self.graph.add_operator(tfl.TransposeOperator([op.inputs[1], new_perm_t], [new_weight]))
+                    actions.append((self.graph.replace_operator_input, (node, 1, new_weight, True)))
 
             for edge in next_edges:
                 source = tensor_node_dict[edge['name']]
@@ -960,6 +969,17 @@ class GraphOptimizer(object):
                 new_pad[new_dim, :] = old_pad[old_dim, :]
                 new_pad_tensor = self.create_attr_tensor(new_pad)
                 actions.append((self.graph.replace_operator_input, (node, 1, new_pad_tensor, True)))
+            elif node['node_type'] == ExtendedOperator.PRELU:
+                old_weight = op.inputs[1].tensor
+                if old_weight.ndim != 1:
+                    new_dim = prev_shape.index(-1)
+                    old_dim = next_shape.index(-1)
+                    new_shape = np.ones(len(prev_shape) - 1, dtype='int32')
+                    new_shape[new_dim - 1] = old_weight.shape[old_dim - 1]
+                    new_shape_t = self.create_attr_tensor(new_shape)
+                    new_weight = self.create_transform_tensor(np.reshape(old_weight, new_shape))
+                    self.graph.add_operator(tfl.ReshapeOperator([op.inputs[1], new_shape_t], [new_weight], new_shape))
+                    actions.append((self.graph.replace_operator_input, (node, 1, new_weight, True)))
             elif dim_indice is not None:
                 raise NotImplementedError(f'{node["node_type"]} has the property `dims` but is not handled')
 
@@ -1506,7 +1526,11 @@ def op_input_dims(op: tfl.BaseOperator):
         # TODO: support multi indices
         if nonzero_idx.size == 1:
             dim_indices = nonzero_idx[0]
-
+    elif isinstance(op, tfl.PreluOperator):
+        w_shape = np.array(op.inputs[1].shape, dtype='int32')
+        nonzero_idx = np.nonzero(w_shape != 1)[0]
+        if nonzero_idx.size == 1:
+            dim_indices = nonzero_idx[0] + 1
     return dim_indices
 
 
