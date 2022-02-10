@@ -87,3 +87,75 @@ A: There are generally two ways to tackle this problem.
   Use `qat_train_model.py` for training, and then use `qat_eval_model.py` to load the weights trained by the former when inference is needed
   (Since there is no `self.conv1` in `qat_eval_model.py`, you need to set `strict=False` when calling `load_state_dict`)
 + Like the former one, generate two different copies of the model in training mode and evaluation mode respectively. And then, make a copy of `qat_train_model.py` and replace the forward function with that in `qat_eval_model.py` manually. Finally, use the modified script as the one for the evaluation mode.
+
+#### What should I do if the operator is not supported?
+There are a large number of operators in PyTorch. We cannot cover all operators, but only most of the commonly used ones. Therefore, if you have unsupported operators in your model, you have the following options:
+1. [Submit](https://github.com/alibaba/TinyNeuralNetwork/issues/new/choose) a new issue
+2. You can also try to implement it yourself. The process of operator translation in model conversion is actually the process of mapping between corresponding TorchScript OP and TFLite OP.
+    
+    The locations of the relevant code
+    - TFLite
+        - OP schema (without I/O tensors): [generated_ops.py](../tinynn/converter/operators/tflite/generated_ops.py)
+        - Full schema: https://www.tensorflow.org/mlir/tfl_ops
+    - TorchScript
+        - ATen schema [aten_schema.py](../tinynn/converter/operators/torch/aten_schema.py)
+        - Quantized schema [quantized_schema.py](../tinynn/converter/operators/torch/quantized_schema.py)
+    - Translation logic
+        - ATen OPs [aten.py](../tinynn/converter/operators/torch/aten.py)
+        - Quantized OPs [aten.py](../tinynn/converter/operators/torch/quantized.py)
+    - Registration of OP translation logic
+        - Registration table [__init__.py](https://github.com/alibaba/TinyNeuralNetwork/blob/main/tinynn/converter/operators/torch/__init__.py)
+
+    Implementation steps:
+    1. Read through the schema of both TorchScript and TFLite, and select the appropriate OP(s) on both sides
+    2. Add an entry in the OP translation registration table
+    3. Add a new parser class to the translation logic. This class needs to inherit the corresponding TorchScript schema class.
+    4. Implement the function `parse` of the aforementioned class
+
+    For details, please refer to the implementation of SiLU: https://github.com/alibaba/TinyNeuralNetwork/commit/ebd30325761a103c5469cf6dd4be730d93725356
+
+#### Model conversion fails for unknown reasons. How to provide the model to the developers for debugging purposes?
+You can use `export_converter_files` to export your models with some related configuration files. For details, see the code below
+````py
+from tinynn.util.converter_util import export_converter_files
+
+model = Model()
+model.cpu()
+model.eval()
+
+dummy_input = torch.randn(1, 3, 224, 224)
+export_dir = 'out'
+export_name = 'test_model'
+
+export_converter_files(model, dummy_input, export_dir, export_name)
+````
+Executing this code, you'll get two files in the specified directory, including the TorchScript model (.pt) and the input and output description files (.json). These two files can be shared with developers for debugging.
+
+#### Why is the input shape different from the original?
+Generally, for a vision model, the memory layout of the input data used by PyTorch is NCHW, and on the embedded device side, the layout of the supported image data is usually NHWC. Therefore, the 4-dimensional input is transformed by default. If you do not need this behaviour, you can add the parameter `input_transpose=False` when defining TFLiteConverter.
+
+#### How to convert a model with LSTM?
+Since the target format of our conversion is TFLite, we need to understand how LSTM works in PyTorch and Tensorflow respectively.
+
+When using TF2.X to export the LSTM model to Tensorflow Lite, it will be translated into the `UnidirectionalLSTM` operator, and the state tensors in it will be saved as a `Variable` (a.k.a persistent memory). The state of each mini-batch will be automatically be accumulated. These state tensors are not included in the input and output of the model.
+
+In PyTorch, LSTM contains an optional state input and state output. When the state is not passed in, the initial hidden layer state always remains all 0 for each mini-batch inference, which is different from Tensorflow.
+
+Therefore, in order to simulate the behavior on the Tensorflow side, when exporting the LSTM model on the PyTorch side, be sure to delete the LSTM state inputs and outputs from the model inputs and outputs.
+
+Next, for streaming and non-streaming scenarios, how should we use the exported LSTM model?
+
+##### Non-streaming scenarios
+In this case, we just need to set the state inputs to 0. Fortunately, Tensorflow Lite's Interpreter provides a convenient interface [reset_all_variables](https://www.tensorflow.org/api_docs/python/tf/lite/Interpreter#reset_all_variables).
+So, we only need to call `reset_all_variables` before each call to `invoke`.
+
+##### Streaming scenarios
+In this case, it's somehow more complicated because we need to read and write state variables. We can use Netron to open the generated model, locate all LSTM nodes, and view the input whose name contains state. For example, for the states in a unidirectional LSTM node, the attributes are named `output_state_in` and `cell_state_in`, you can expand and see that their kind is `Variable`. Record their locations (i.e. the `location` property).
+
+![image](https://user-images.githubusercontent.com/9998726/150492819-5f7d4f43-347e-4c1f-a700-72e77d95e9e9.png)
+
+When using Tensorflow Lite's Interpreter, you only need to read or write these state variables according to these `location`s, combined with methods like `get_tensor` and `set_tensor`. For details, see [here](https://github.com/alibaba/TinyNeuralNetwork/issues/29#issuecomment-1018292677).
+
+Note: These state variables are all two-dimensional with the shape of `[batch_size, hidden_size or input_size]`. So in the streaming scenario, you only need to split these variables according to the first dimension.
+
+Usually, when the number of hidden layers is large enough (128+), the LSTM OP will be time-consuming in the TFLite backend. In this case, consider using dynamic range quantization to optimize its performance, see [dynamic.py](../examples/qat/dynamic.py).

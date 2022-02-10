@@ -87,3 +87,77 @@ A：一般有两种解法
   用前者进行训练，然后在需要推理的时候用qat_eval_model.py去load前者训练出来的权重
   （由于qat_eval_model.py中并没self.conv1，因此load_state_dict的时候需要设置strict=False)
 + 仍然生成两份代码，然后复制一份qat_train_model.py并把forward函数手动替换为qat_eval_model.py中的forward函数即可
+
+## 模型转换
+
+#### 算子不支持如何处理？
+由于PyTorch的算子数量相当多，我们无法覆盖所有的算子，只能覆盖大部分常用的算子。因此，如果遇到不支持的算子，你可以有以下选择：
+1. [提交](https://github.com/alibaba/TinyNeuralNetwork/issues/new/choose)一个新issue
+2. 你也可以选择自己实现，模型转换中算子翻译的过程其实就是将TorchScript OP与TFLite OP对应的过程
+    
+    相关代码的位置
+    - TFLite 
+        - OP schema (without I/O tensors): [generated_ops.py](../tinynn/converter/operators/tflite/generated_ops.py)
+        - Full schema: https://www.tensorflow.org/mlir/tfl_ops
+    - TorchScript
+        - ATen schema [aten_schema.py](../tinynn/converter/operators/torch/aten_schema.py)
+        - Quantized schema [quantized_schema.py](../tinynn/converter/operators/torch/quantized_schema.py)
+    - 两者的对应翻译代码
+        - ATen OPs [aten.py](../tinynn/converter/operators/torch/aten.py)
+        - Quantized OPs [aten.py](../tinynn/converter/operators/torch/quantized.py)
+    - OP翻译逻辑的注册
+        - Registration [__init__.py](https://github.com/alibaba/TinyNeuralNetwork/blob/main/tinynn/converter/operators/torch/__init__.py)
+
+    实现步骤：
+    1. 查阅TorchScript和TFLite的Schema，选取两边对应的OP
+    2. 在OP翻译注册逻辑中添加一个条目
+    3. 在翻译对应代码处添加对应的类，该类需继承相应的TorchScript schema类。
+    4. 在上述类中添加对应逻辑
+
+    具体可以参见SiLU的实现： https://github.com/alibaba/TinyNeuralNetwork/commit/ebd30325761a103c5469cf6dd4be730d93725356
+
+#### 模型转换因为未知原因失败了，如何提供相应的数据方便开发者调试？
+我们提供了一个函数，方便进行模型和相关配置的导出，具体可见下方代码
+```py
+from tinynn.util.converter_util import export_converter_files
+
+model = Model()
+model.cpu()
+model.eval()
+
+dummy_input = torch.randn(1, 3, 224, 224)
+export_dir = 'out'
+export_name = 'test_model'
+
+export_converter_files(model, dummy_input, export_dir, export_name)
+```
+执行这段代码会在指定的目录下生成两个文件，包含TorchScript模型(.pt)和输入输出的描述文件(.json)，可以将这两个文件分享给开发者来做调试。
+
+#### 为什么输入的shape和原始的不一样？
+一般在视觉模型中，PyTorch这边采用的输入数据的内存排布为NCHW，而在嵌入式设备侧，一般支持的图片数据的排布为NHWC。因此，默认对4维的输入都做了内存排布的转换，如果你不需要这种转换，可以在定义TFLiteConverter时加上`input_transpose=False`这个参数。
+
+#### 如何转换带LSTM的模型？
+由于我们转换的目标为TFLite，因此需要先了解一下在PyTorch和Tensorflow中LSTM分别是如何运行的。
+
+使用TF2.X导出LSTM模型至Tensorflow Lite时，会将其翻译成`UnidirectionalLSTM`这个算子，其中的状态数据保存为一个`Variable`，即一个持久化的数据空间当中，每组mini-batch的状态会自动的做累积。这些状态量是不包含在模型的输入和输出之中的。
+
+而在PyTorch中，LSTM含有一个可选的状态输入和状态输出，当不传入状态时，每次mini-batch的推理，初始隐层状态总是保持全0，这点与Tensorflow不同。
+
+因此，为了能模拟Tensorflow这边的行为，在PyTorch侧导出LSTM模型时，请务必将LSTM的状态输入以及输出从模型输入、输出中删除。
+
+那么，对于流式以及非流式的场景下，我们应该分别怎么去使用导出后的LSTM模型呢？
+
+##### 非流式场景下
+这种情况下，我们只需要将状态输入设置为0。所幸，Tensorflow Lite的Interpreter提供了一个方便的接口 [reset_all_variables](https://www.tensorflow.org/api_docs/python/tf/lite/Interpreter#reset_all_variables)。
+所以，我们只需要在每次调用`invoke`之前，调用一次`reset_all_variables`即可。
+
+##### 流式场景下
+这种情况下，会稍许复杂一些，因为我们需要读写状态变量。我们可以使用Netron来打开生成的模型，定位到所有LSTM节点中，查看其中名称包含state的输入，例如对于单向LSTM状态量的属性名为`output_state_in`和`cell_state_in`，你可以展开后看到他们的kind为`Variable`。记住他们的位置（即`location`属性）。
+
+![image](https://user-images.githubusercontent.com/9998726/150492819-5f7d4f43-347e-4c1f-a700-72e77d95e9e9.png)
+
+在使用Tensorflow Lite的Interpreter时，你只需要根据这些`location`，结合`get_tensor`和`set_tensor`方法就可以读或者写这些状态变量了。具体可参见[此处](https://github.com/alibaba/TinyNeuralNetwork/issues/29#issuecomment-1018292677)。
+
+Note: 这些状态变量都是二维的，维度为`[batch_size, hidden_size或者input_size]`。所以在流式场景下，你只需要根据第一个维度对这些变量做拆分就可以了。
+
+通常情况下，当隐层数量较大时（如128及以上）LSTM的模型在TFLite中会比较耗时。这种情况下，可以考虑使用动态范围量化来优化其性能，参见[dynamic.py](../examples/qat/dynamic.py)。
