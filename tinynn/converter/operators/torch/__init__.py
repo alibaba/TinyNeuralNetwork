@@ -163,6 +163,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "quantized::batch_norm2d": QuantizedBatchNorm2dOperator,
                                                                 "quantized::batch_norm2d_relu": QuantizedBatchNorm2dReluOperator,
                                                                 "quantized::add": QuantizedAddOperator,
+                                                                "quantized::add_relu": QuantizedAddReluOperator,
                                                                 "quantized::add_scalar": QuantizedAddScalarOperator,
                                                                 "quantized::conv_transpose1d": QuantizedConvTranspose1dOperator,
                                                                 "quantized::conv_transpose2d": QuantizedConvTranspose2dOperator,

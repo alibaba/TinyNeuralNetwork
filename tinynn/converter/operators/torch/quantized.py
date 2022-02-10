@@ -235,23 +235,38 @@ class QuantizedLinearOperator(QuantizedLinearSchema):
 
 
 class QuantizedAddOperator(QuantizedAddSchema):
-    def parse_common(self, node, attrs, args, graph_converter):
+    def parse_common(self, node, attrs, args, graph_converter,
+                     fusedActivation=tfl_schema.ActivationFunctionType.NONE):
         other = self.input_tensors[1]
         if type(other) not in (int, float):
-            self.elementwise_binary(tfl.AddOperator, graph_converter, False)
+            self.elementwise_binary(tfl.AddOperator, graph_converter, False, fusedActivation)
         elif other in (0.0, 0):
-            self.passthrough(graph_converter)
+            if fusedActivation == tfl_schema.ActivationFunctionType.NONE:
+                self.passthrough(graph_converter)
+            elif fusedActivation == tfl_schema.ActivationFunctionType.RELU:
+                self.elementwise_unary(tfl.ReluOperator, graph_converter)
+            elif fusedActivation == tfl_schema.ActivationFunctionType.RELU6:
+                self.elementwise_unary(tfl.Relu6Operator, graph_converter)
         else:
             other_tensor = torch.tensor([other], dtype=torch.float)
             self.input_names[1] = self.get_unique_attr_name()
             self.input_tensors[1] = self.quantize_scalar_tensor(other_tensor)
-            self.elementwise_binary(tfl.AddOperator, graph_converter, False)
+            self.elementwise_binary(tfl.AddOperator, graph_converter, False, fusedActivation)
 
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
         self.parse_common(node, attrs, args, graph_converter)
+
+
+class QuantizedAddReluOperator(QuantizedAddReluSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        QuantizedAddOperator.parse_common(self, node, attrs, args, graph_converter,
+                                          tfl_schema.ActivationFunctionType.RELU)
 
 
 class QuantizedLinearReluOperator(QuantizedLinearReluSchema):
