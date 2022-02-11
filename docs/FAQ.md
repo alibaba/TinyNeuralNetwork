@@ -88,6 +88,8 @@ A: There are generally two ways to tackle this problem.
   (Since there is no `self.conv1` in `qat_eval_model.py`, you need to set `strict=False` when calling `load_state_dict`)
 + Like the former one, generate two different copies of the model in training mode and evaluation mode respectively. And then, make a copy of `qat_train_model.py` and replace the forward function with that in `qat_eval_model.py` manually. Finally, use the modified script as the one for the evaluation mode.
 
+## Model conversion
+
 #### What should I do if the operator is not supported?
 There are a large number of operators in PyTorch. We cannot cover all operators, but only most of the commonly used ones. Therefore, if you have unsupported operators in your model, you have the following options:
 1. [Submit](https://github.com/alibaba/TinyNeuralNetwork/issues/new/choose) a new issue
