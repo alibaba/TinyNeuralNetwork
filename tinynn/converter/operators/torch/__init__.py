@@ -50,6 +50,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::pow": ATenPowOperator,
                                                                 "aten::sqrt": ATenSqrtOperator,
                                                                 "aten::sigmoid": ATenSigmoidOperator,
+                                                                "aten::sigmoid_": ATenSigmoidOperator,
                                                                 "aten::add": ATenAddOperator,
                                                                 "aten::add_": ATenAddOperator,
                                                                 "aten::sub": ATenSubOperator,
@@ -142,6 +143,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "aten::le": ATenLeOperator,
                                                                 "aten::remainder": ATenRemainderOperator,
                                                                 "aten::where": ATenWhereOperator,
+                                                                "aten::type_as": ATenTypeAsOperator,
 
                                                                 # quantized
                                                                 "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,

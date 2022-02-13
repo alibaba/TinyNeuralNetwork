@@ -2257,3 +2257,25 @@ class ATenWhereOperator(ATenWhereSchema):
             self.input_tensors[2] = torch.tensor([self.input_tensors[2]])
 
         ATenMaskedFillOperator.parse_common(self, graph_converter, input_idx=2, mask_idx=0, other_idx=1)
+
+
+class ATenTypeAsOperator(ATenTypeAsSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        out_type = self.input_tensors[1].dtype
+
+        patch = False
+        if out_type == torch.float64:
+            patch = True
+            out_type = torch.float32
+            temp_tensor = self.output_tensors[0]
+            self.output_tensors[0] = temp_tensor.detach().clone().to(dtype=torch.float32)
+
+        self.elementwise_unary(tfl.CastOperator, graph_converter,
+                               tfl.torch_tflite_dtype_mappings[self.input_tensors[0].dtype],
+                               tfl.torch_tflite_dtype_mappings[out_type])
+
+        if patch:
+            self.output_tensors[0] = temp_tensor
