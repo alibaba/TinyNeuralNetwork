@@ -1500,11 +1500,12 @@ class ATenVarOperator(ATenVarSchema):
         samples = np.prod(sample_dims, dtype='float32')
         if unbiased and correction != 0:
             samples -= correction
+        samples = samples.astype('float32')
         samples_tensor = self.create_attr_tensor(samples)
 
         dims_tensor = self.create_attr_tensor(np.array(dims, dtype='int32'))
-        mean_tensor = self.create_transform_tensor(np.mean(input_tensor.tensor, axis=tuple(dims), keepdims=keep_dims))
-        ops.append(tfl.MeanOperator([input_tensor, dims_tensor], [mean_tensor], keepDims=keep_dims))
+        mean_tensor = self.create_transform_tensor(np.mean(input_tensor.tensor, axis=tuple(dims), keepdims=True))
+        ops.append(tfl.MeanOperator([input_tensor, dims_tensor], [mean_tensor], keepDims=True))
 
         squared_diff = self.create_transform_tensor(np.power(input_tensor.tensor - mean_tensor.tensor, 2))
         ops.append(tfl.SquaredDifferenceOperator([input_tensor, mean_tensor], [squared_diff]))
@@ -1546,11 +1547,12 @@ class ATenStdOperator(ATenStdSchema):
         samples = np.prod(sample_dims, dtype='float32')
         if unbiased and correction != 0:
             samples -= correction
+        samples = samples.astype('float32')
         samples_tensor = self.create_attr_tensor(samples)
 
         dims_tensor = self.create_attr_tensor(np.array(dims, dtype='int32'))
-        mean_tensor = self.create_transform_tensor(np.mean(input_tensor.tensor, axis=tuple(dims), keepdims=keep_dims))
-        ops.append(tfl.MeanOperator([input_tensor, dims_tensor], [mean_tensor], keepDims=keep_dims))
+        mean_tensor = self.create_transform_tensor(np.mean(input_tensor.tensor, axis=tuple(dims), keepdims=True))
+        ops.append(tfl.MeanOperator([input_tensor, dims_tensor], [mean_tensor], keepDims=True))
 
         squared_diff = self.create_transform_tensor(np.power(input_tensor.tensor - mean_tensor.tensor, 2))
         ops.append(tfl.SquaredDifferenceOperator([input_tensor, mean_tensor], [squared_diff]))

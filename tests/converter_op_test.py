@@ -371,7 +371,7 @@ class ConverterOPTester(unittest.TestCase):
             print(f'testing {func.__name__}')
 
             def model(x):
-                res = func(x, dim=1)
+                res = func(x, dim=1, keepdim=True)
                 return res if type(res) == torch.Tensor else res[0]
             model_path = get_model_path()
             converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
@@ -2281,6 +2281,113 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(*dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_var_std_no_dim(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.std, torch.var]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            def model(x): return func(x)
+            model_path = get_model_path()
+
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            def msg(*args, **kwargs): return f'testing {func.__name__} failed: {args}'
+            torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+
+    def test_var_std_ops_single_dim(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.std, torch.var]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+
+            def model(x): return func(x, dim=1)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            def msg(*args, **kwargs): return f'testing {func.__name__} failed: {args}'
+            torch.testing.assert_close(dummy_output, tfl_output, msg=msg)
+
+    def test_var_std_ops_single_dim_unbiased(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.std, torch.var]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+
+            def model(x): return func(x, dim=-3, unbiased=False)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            def msg(*args, **kwargs): return f'testing {func.__name__} failed: {args}'
+            torch.testing.assert_close(dummy_output, tfl_output, msg=msg)
+
+    def test_var_std_single_dim_keepdim(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.std, torch.var]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+
+            def model(x): return func(x, dim=1, keepdim=True)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            def msg(*args, **kwargs): return f'testing {func.__name__} failed: {args}'
+            torch.testing.assert_close(dummy_output, tfl_output, msg=msg)
+
+    def test_var_std_multi_dim(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.std, torch.var]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+            def model(x): return func(x, dim=[1, 2])
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            def msg(*args, **kwargs): return f'testing {func.__name__} failed: {args}'
+            torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+
+    def test_var_std_multi_dim_keepdim(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [torch.std, torch.var]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+            def model(x): return func(x, dim=[1, 2], keepdim=True)
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            def msg(*args, **kwargs): return f'testing {func.__name__} failed: {args}'
+            torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
 
 if __name__ == '__main__':
