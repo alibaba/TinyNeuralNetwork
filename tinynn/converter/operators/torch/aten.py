@@ -724,10 +724,7 @@ class ATenPreluOperator(ATenPreluSchema):
 
 
 class ATenToOperator(ATenToSchema):
-    def parse(self, node, attrs, args, graph_converter):
-        super().parse(node, attrs, args, graph_converter)
-
-        self.run(node)
+    def parse_common(self, node, attrs, args, graph_converter):
         out_type = self.output_tensors[0].dtype
 
         patch = False
@@ -743,6 +740,12 @@ class ATenToOperator(ATenToSchema):
 
         if patch:
             self.output_tensors[0] = temp_tensor
+
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.parse_common(node, attrs, args, graph_converter)
 
 
 class ATenViewOperator(ATenViewSchema):
@@ -2257,3 +2260,11 @@ class ATenWhereOperator(ATenWhereSchema):
             self.input_tensors[2] = torch.tensor([self.input_tensors[2]])
 
         ATenMaskedFillOperator.parse_common(self, graph_converter, input_idx=2, mask_idx=0, other_idx=1)
+
+
+class ATenTypeAsOperator(ATenTypeAsSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenToOperator.parse_common(self, node, attrs, args, graph_converter)
