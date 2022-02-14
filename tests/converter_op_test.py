@@ -2161,6 +2161,86 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
+    def test_select(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x): return x[0]
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_select_negative_index(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x): return x[-1]
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_index(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x): return x[[2, 3]]
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_index_negative_index(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x): return x[[-1, -2]]
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_index_tensor_index(self):
+        dummy_input_1 = torch.randn(10, 10, dtype=torch.float32)
+        dummy_input_2 = torch.randint(0, 10, size=(10, ))
+
+        def model(x, y): return x[y]
+        model_path = get_model_path()
+
+        dummy_input = (dummy_input_1, dummy_input_2)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_index_multi_dim(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x): return x[..., [2, 3]]
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1341,7 +1341,7 @@ class ATenIndexOperator(ATenIndexSchema):
         assert len(filtered_dims) == 1, "Multiple indices for aten::index is not supported"
 
         try:
-            names = [graph_converter.get_list_expanded_names(self.input_names[1])]
+            names = graph_converter.get_list_expanded_names(self.input_names[1])
         except KeyError:
             names = [self.get_unique_attr_name() for _ in indices]
 
@@ -1349,6 +1349,9 @@ class ATenIndexOperator(ATenIndexSchema):
         filtered_tensors = [indices[i].to(dtype=torch.int32) for i in filtered_dims]
 
         input_tensor = self.find_or_create_input(0, graph_converter)
+        # TODO: support negative tensor indices
+        filtered_tensors = [t + (t < 0).int() * input_tensor.shape[i] if n not in graph_converter.tensor_map else t for i,
+                            n, t in zip(filtered_dims, filtered_names, filtered_tensors)]
         indice_tensors = self.to_tfl_tensors(filtered_names, filtered_tensors,
                                              graph_converter=graph_converter,
                                              non_existent_as_buffer=True)
