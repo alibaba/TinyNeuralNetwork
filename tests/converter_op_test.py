@@ -2040,6 +2040,46 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
+    def test_sigmoid_(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        def model(x):
+            x.sigmoid_()
+            return x
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input.clone())
+        tfl_output = tfl_run_model(model_path, dummy_input.clone(), dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_type_as(self):
+        dummy_input_1 = torch.randint(1, 100, (1, 3, 224, 224), dtype=torch.int32)
+        dummy_input_2 = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+        def model(x, y): return x.type_as(y)
+        model_path = get_model_path()
+        dummy_input = (dummy_input_1, dummy_input_2)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_to(self):
+        dummy_input_1 = torch.randn(1, 3, 224, 224, dtype=torch.float64)
+        dummy_input_2 = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+        def model(x, y): return x.to(y.dtype)
+        model_path = get_model_path()
+        dummy_input = (dummy_input_1, dummy_input_2)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
 
 if __name__ == '__main__':
     unittest.main()

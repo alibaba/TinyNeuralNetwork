@@ -724,10 +724,7 @@ class ATenPreluOperator(ATenPreluSchema):
 
 
 class ATenToOperator(ATenToSchema):
-    def parse(self, node, attrs, args, graph_converter):
-        super().parse(node, attrs, args, graph_converter)
-
-        self.run(node)
+    def parse_common(self, node, attrs, args, graph_converter):
         out_type = self.output_tensors[0].dtype
 
         patch = False
@@ -743,6 +740,12 @@ class ATenToOperator(ATenToSchema):
 
         if patch:
             self.output_tensors[0] = temp_tensor
+
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.parse_common(node, attrs, args, graph_converter)
 
 
 class ATenViewOperator(ATenViewSchema):
@@ -2264,18 +2267,4 @@ class ATenTypeAsOperator(ATenTypeAsSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        out_type = self.input_tensors[1].dtype
-
-        patch = False
-        if out_type == torch.float64:
-            patch = True
-            out_type = torch.float32
-            temp_tensor = self.output_tensors[0]
-            self.output_tensors[0] = temp_tensor.detach().clone().to(dtype=torch.float32)
-
-        self.elementwise_unary(tfl.CastOperator, graph_converter,
-                               tfl.torch_tflite_dtype_mappings[self.input_tensors[0].dtype],
-                               tfl.torch_tflite_dtype_mappings[out_type])
-
-        if patch:
-            self.output_tensors[0] = temp_tensor
+        ATenToOperator.parse_common(self, node, attrs, args, graph_converter)
