@@ -2213,7 +2213,7 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 
-    def test_index_tensor_index(self):
+    def test_index_tensor_indices(self):
         dummy_input_1 = torch.randn(10, 10, dtype=torch.float32)
         dummy_input_2 = torch.randint(0, 10, size=(10, ))
 
@@ -2238,6 +2238,47 @@ class ConverterOPTester(unittest.TestCase):
         converter.convert()
 
         dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_gather(self):
+        dummy_input = torch.randn(10, dtype=torch.float32)
+
+        def model(x): return torch.gather(x, 0, torch.tensor([1, 2, 3]))
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_gather_negative_dim(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x): return torch.gather(x, -1, torch.tensor([[1, 2, 3]]))
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output)
+
+    def test_gather_tensor_indices(self):
+        dummy_input_1 = torch.randn(10, 10, dtype=torch.float32)
+        dummy_input_2 = torch.randint(0, 10, size=(10, 2))
+
+        def model(x, y): return torch.gather(x, 0, y)
+        model_path = get_model_path()
+
+        dummy_input = (dummy_input_1, dummy_input_2)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output)
 

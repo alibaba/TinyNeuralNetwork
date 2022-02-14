@@ -1840,6 +1840,15 @@ class ATenGatherOperator(ATenGatherSchema):
             graph_converter.add_operator(tfl.ReshapeOperator(
                 [index_tensor, shape_tensor], [index_reshaped], index_shape))
 
+            if str(index_reshaped.dtype) != 'int32':
+                index_casted = self.create_transform_tensor(index_reshaped.tensor.astype('int32'))
+                graph_converter.add_operator(tfl.CastOperator(
+                    [index_reshaped], [index_casted],
+                    tfl.numpy_tflite_dtype_mappings[str(index_reshaped.dtype)],
+                    tfl.numpy_tflite_dtype_mappings[str(index_casted.dtype)]
+                ))
+                index_reshaped = index_casted
+
             indices_tensors[dim] = index_reshaped
             indices_tensor = self.create_transform_tensor(np.concatenate([x.tensor for x in indices_tensors], axis=-1))
             graph_converter.add_operator(tfl.ConcatenationOperator(indices_tensors, [indices_tensor], axis=axis))
