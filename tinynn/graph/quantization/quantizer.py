@@ -402,6 +402,8 @@ class QATQuantizer(object):
         return graph.module
 
     def per_channel_qconfig_post_process(self, graph):
+        connected_types = ['cat', 'chunk', 'split']
+
         def _find_quantized_cat_nodes(node: TraceNode, custom_node):
             # Find quantized cat nodes
             return node.type() == 'cat' and node.quantized
@@ -410,18 +412,22 @@ class QATQuantizer(object):
         quantized_cat_nodes = graph.filter_forward_nodes(_find_quantized_cat_nodes)
 
         q = queue.Queue()
-        visited = set()
+        visited_center = set()
         for n in quantized_cat_nodes:
             q.put((n, 'both', 0))
             parents = []
             names = []
             props = []
+            visited_other = set()
             while not q.empty():
                 n, mode, fq_count = q.get()
-                if n.kind() in ('shape', 'size') or n.unique_name in visited:
+                if n.kind() in ('shape', 'size') or n.unique_name in visited_center or n.unique_name in visited_other:
                     continue
-
-                visited.add(n.unique_name)
+                
+                if n.type() in connected_types:
+                    visited_center.add(n.unique_name)
+                else:
+                    visited_other.add(n.unique_name)
 
                 if isinstance(n.module, nn.Module):
                     orig_name = graph.module_original_name_dict.get(id(n.module))
@@ -441,7 +447,7 @@ class QATQuantizer(object):
                         fq_count += 1
                     if isinstance(new_mod, (torch_q.DeQuantStub, torch_q.QuantStub)):
                         fq_count = 2
-                elif n.type() == 'cat':
+                elif n.type() in connected_types:
                     mode = 'both'
                     fq_count = 0
 
@@ -758,7 +764,7 @@ class QATQuantizer(object):
                 if next_class == TraceFunction:
                     return next_module.kind == 'relu'
                 else:
-                    return cur_class.__name__ == 'ReLU'
+                    return next_class.__name__ == 'ReLU'
 
         add_relu_fusable_nodes = graph.filter_forward_nodes(_is_add_relu_fusable_node)
         for node in add_relu_fusable_nodes:
