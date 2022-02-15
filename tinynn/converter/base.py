@@ -24,12 +24,13 @@ class TFLiteConverter(object):
                  dump_jit_model_path: typing.Optional[str] = None,
                  dump_dummy_input_path: typing.Optional[str] = None,
                  dump_config_path: typing.Optional[str] = None,
-                 asymmetric: bool = True,
+                 strict_symmetric_check: bool = False,
                  preserve_tensors: bool = False,
                  optimize: int = GraphOptimizer.ALL_OPTIMIZE,
                  quantize_target_type: str = 'uint8',
                  hybrid_quantization_from_float: bool = False,
                  hybrid_per_channel: bool = False,
+                 hybrid_asymmetric_inputs: bool = True,
                  fuse_quant_dequant: bool = False) -> None:
         """ The TFLiteConverter class
 
@@ -42,12 +43,13 @@ class TFLiteConverter(object):
             dump_jit_model_path (typing.Optional[str]): The path for dumping the jit model. Defaults to None
             dump_dummy_input_path (typing.Optional[str]): The path for dumping the dummy input. Defaults to None
             dump_config_path (typing.Optional[str]): The path for dumping the json config. Defaults to None
-            asymmetric (bool): Asymmetric quantization. Defaults to True
+            strict_symmetric_check (bool): Strict symmetric quantization checks. Defaults to False
             preserve_tensors (bool): Preserve the copies of the intermediate tensors. Defaults to False
             optimize (int): The level of graph optimization. Defaults to `GraphOptimizer.ALL_OPTIMIZE`
             quantize_target_type (str): Target type for quantization. Defaults to 'uint8'
             hybrid_quantization_from_float (bool): Direct hybrid quantization from a float model. Defaults to False
             hybrid_per_channel (bool): Prefer per-channel kernels in hybrid quantization. Defaults to False
+            hybrid_asymmetric_inputs (bool): Prefer asymmetric inputs while performing hybrid quantization
             fuse_quant_dequant (bool): Remove quant and dequant nodes directly connected to i/o nodes. Defaults to False
         """
 
@@ -65,7 +67,7 @@ class TFLiteConverter(object):
 
         self.tflite_path = tflite_path
         self.input_transpose = input_transpose
-        self.asymmetric = asymmetric
+        self.strict_symmetric_check = strict_symmetric_check
 
         self.dump_jit_model_path = dump_jit_model_path
         self.dump_dummy_input_path = dump_dummy_input_path
@@ -74,11 +76,12 @@ class TFLiteConverter(object):
         self.optimize = optimize
         self.hybrid = hybrid_quantization_from_float
         self.hybrid_per_channel = hybrid_per_channel
+        self.hybrid_asymmetric_inputs = hybrid_asymmetric_inputs
         self.fuse_quant_dequant = fuse_quant_dequant
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
-            if not self.asymmetric:
+            if self.strict_symmetric_check:
                 log.warning('Symmetric quantized model with uint8 is unsupported in most backends of TFLite')
             if self.hybrid:
                 if self.hybrid_per_channel:
@@ -191,7 +194,7 @@ class TFLiteConverter(object):
         tensors = []
         for i, node in enumerate(graph_inputs):
             tensors.append(Tensor(self.dummy_input[i], node, has_buffer=False,
-                           asymmetric=self.asymmetric, q_type=self.q_type))
+                           asymmetric=not self.strict_symmetric_check, q_type=self.q_type))
         self.common_graph.add_nodes(tensors, ExtendedOperator.INPUT_NODE)
 
     def init_inputs(self):
@@ -231,7 +234,7 @@ class TFLiteConverter(object):
             output_tensors = []
 
             converter_type = OPERATOR_CONVERTER_DICT.get(k, NoTrackOperator)
-            converter = converter_type(node, self.tensor_map, self.asymmetric, self.q_type)
+            converter = converter_type(node, self.tensor_map, not self.strict_symmetric_check, self.q_type)
             # Don't track the operator if all the input nodes are not tracked unless it has custom implementation (e.g prim::* ops)
             if converter_type.run == NoTrackOperator.run and converter_type != NoTrackOperator:
                 no_track_flag = True
@@ -247,7 +250,7 @@ class TFLiteConverter(object):
                         break
                 if no_track_flag:
                     converter_type = NoTrackOperator
-                    converter = converter_type(node, self.tensor_map, self.asymmetric, self.q_type)
+                    converter = converter_type(node, self.tensor_map, not self.strict_symmetric_check, self.q_type)
             if k != 'prim::Constant':
                 log.debug(f'{k} {converter.input_names} -> {converter.output_names} {converter_type.__name__}')
             # Don't fetch attrs and schemas for non-tracking nodes
@@ -306,7 +309,8 @@ class TFLiteConverter(object):
             optimizer.optimize()
 
             if self.hybrid:
-                quantizer = HybridQuantizer(self.common_graph, self.asymmetric, self.q_type, self.hybrid_per_channel)
+                quantizer = HybridQuantizer(self.common_graph, self.hybrid_asymmetric_inputs,
+                                            self.q_type, self.hybrid_per_channel)
                 quantizer.quantize()
                 optimizer.cleanup_dead_nodes()
 
