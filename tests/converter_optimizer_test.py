@@ -682,6 +682,53 @@ class ConverterOptimizerTester(unittest.TestCase):
             self.assertEqual(tfl_model.Subgraphs(0).Operators(i).InputsLength(), 2)
             self.assertEqual(tfl_model.Subgraphs(0).Operators(i).OutputsLength(), 1)
 
+    def test_unused_tensors(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.split(x, 1, 1)
+                return x[1:]
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+    def test_unused_tensors_branch_transpose(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.permute(x, [0, 2, 3, 1])
+                x = torch.split(x, 1, -1)
+                return [t.permute([0, 3, 1, 2]) for t in x[1:]]
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+    def test_unused_tensors_branch_reshape(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.reshape(x, [6, 224, 224])
+                x = torch.split(x, 2, 0)
+                return [t.reshape([1, 2, 224, 224]) for t in x[1:]]
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 6, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
 
 if __name__ == '__main__':
     unittest.main()

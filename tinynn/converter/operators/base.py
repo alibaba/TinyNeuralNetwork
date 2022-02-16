@@ -17,6 +17,7 @@ class _ExtendedOperatorBase(BuiltinOperator, *bases):
     INPUT_NODE = -1
     OUTPUT_NODE = -2
     CONSTANT_NODE = -3
+    UNUSED_NODE = -4
 
     BATCH_NORM = -10
     GENERIC_CONV = -11

@@ -276,7 +276,9 @@ class GraphOptimizer(object):
         if not self.graph.graph.is_connected('weak'):
             while True:
                 for vertex in self.graph.graph.vs:
-                    if vertex['node_type'] != ExtendedOperator.OUTPUT_NODE and vertex.outdegree() == 0:
+                    if vertex['node_type'] not in (ExtendedOperator.OUTPUT_NODE,
+                                                   ExtendedOperator.UNUSED_NODE) \
+                            and vertex.outdegree() == 0:
                         if vertex['node_type'] == ExtendedOperator.INPUT_NODE:
                             continue
                         if vertex['node_type'] != ExtendedOperator.CONSTANT_NODE:
@@ -715,6 +717,7 @@ class GraphOptimizer(object):
             next_nodes = []
             next_edges = []
             out_nodes = []
+            skip_names = []
             for edge in node.out_edges():
                 if edge.index in remove_edges:
                     continue
@@ -722,6 +725,8 @@ class GraphOptimizer(object):
 
                 if next_node['node_type'] == ExtendedOperator.OUTPUT_NODE:
                     out_nodes.append(next_node)
+                elif next_node['node_type'] == ExtendedOperator.UNUSED_NODE:
+                    skip_names.append(edge['label'])
                 else:
                     next_nodes.append(next_node)
                     next_edges.append(edge)
@@ -759,6 +764,13 @@ class GraphOptimizer(object):
 
             tensor_node_dict = {}
             for i, op_out in enumerate(op.outputs):
+                # For unused tensors, we perform inplace shape updates
+                if op_out.name in skip_names:
+                    orig_shape = np.array(op_out.shape, dtype='int32')
+                    new_shape = orig_shape[inv_perm_arr]
+                    op_out.shape = tuple(new_shape.tolist())
+                    continue
+
                 perm_tensor = self.create_attr_tensor(perm_arr)
                 new_out = self.create_transform_tensor(np.transpose(
                     op_out.tensor, inv_perm_arr), quantization=op_out.quantization)
@@ -869,6 +881,7 @@ class GraphOptimizer(object):
             next_nodes = []
             next_edges = []
             out_nodes = []
+            skip_names = []
             for edge in node.out_edges():
                 if edge.index in remove_edges:
                     continue
@@ -876,6 +889,8 @@ class GraphOptimizer(object):
 
                 if next_node['node_type'] == ExtendedOperator.OUTPUT_NODE:
                     out_nodes.append(next_node)
+                elif next_node['node_type'] == ExtendedOperator.UNUSED_NODE:
+                    skip_names.append(edge['label'])
                 else:
                     next_nodes.append(next_node)
                     next_edges.append(edge)
@@ -933,6 +948,12 @@ class GraphOptimizer(object):
 
             tensor_node_dict = {}
             for i, op_out in enumerate(op.outputs):
+                # For unused tensors, we perform inplace shape updates
+                if op_out.name in skip_names:
+                    new_shape = np.reshape(op_out.tensor, prev_shape).shape
+                    op_out.shape = tuple(new_shape)
+                    continue
+
                 new_out = self.create_transform_tensor(np.reshape(
                     op_out.tensor, prev_shape), quantization=op_out.quantization)
                 shape_tensor = self.create_attr_tensor(np.array(op_out.shape, dtype='int32'))
@@ -955,12 +976,12 @@ class GraphOptimizer(object):
                 op.axis = new_axis
             elif node['node_type'] == ExtendedOperator.SPLIT_V:
                 new_dim = prev_shape.index(-1)
-                new_dim_tensor = self.create_attr_tensor(new_dim)
-                actions.append(self.graph.replace_operator_input, (node, 2, new_dim_tensor))
+                new_dim_tensor = self.create_attr_tensor(np.array([new_dim], dtype='int32'))
+                actions.append((self.graph.replace_operator_input, (node, 2, new_dim_tensor)))
             elif node['node_type'] == ExtendedOperator.SPLIT:
                 new_dim = prev_shape.index(-1)
-                new_dim_tensor = self.create_attr_tensor(new_dim)
-                actions.append(self.graph.replace_operator_input, (node, 0, new_dim_tensor))
+                new_dim_tensor = self.create_attr_tensor(np.array([new_dim], dtype='int32'))
+                actions.append((self.graph.replace_operator_input, (node, 0, new_dim_tensor)))
             elif node['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2, ExtendedOperator.MIRROR_PAD):
                 old_pad = op.inputs[1].tensor
                 new_dim = prev_shape.index(-1)
@@ -1118,6 +1139,36 @@ class GraphOptimizer(object):
         # Remove the collected edges
         self.graph.graph.delete_edges(remove_edges)
 
+    def connect_unused_tensors_pass(self):
+        filtered_nodes = self.graph.graph.vs.select(functools.partial(
+            is_multi_output_op_node, graph_converter=self.graph.graph))
+
+        list_unpack_names = set([i for s in self.graph.iterable_map.values() for i in s])
+        all_tensors = set(self.graph.graph.es['label'])
+        names = []
+        for node in filtered_nodes:
+            output_names = node['outputs']
+
+            # Recognizes the pattern SPLIT -> (RESHAPE, ..., RESHAPE)
+            if not list_unpack_names.isdisjoint(set(output_names)):
+                output_names = []
+                outdegree = 0
+                for edge in node.out_edges():
+                    target_vertex = edge.target_vertex
+                    if target_vertex['node_type'] == ExtendedOperator.RESHAPE:
+                        outdegree += target_vertex.outdegree()
+                        output_names.append(target_vertex['outputs'][0])
+
+                    # Only nodes with partially unused tensors are supported
+                    if outdegree == 0:
+                        continue
+
+            for out in output_names:
+                if out not in all_tensors:
+                    names.append(out)
+
+        self.graph.add_outputs(names, ExtendedOperator.UNUSED_NODE)
+
     def output_list_unpack_pass(self):
         output_names = []
         unpacked_outputs = []
@@ -1169,7 +1220,7 @@ class GraphOptimizer(object):
                     new_inputs.extend(input_mapping[name])
                 else:
                     new_inputs.append(name)
-            
+
             self.graph.inputs.clear()
             self.graph.inputs.extend(new_inputs)
 
@@ -1188,6 +1239,9 @@ class GraphOptimizer(object):
         # Input/output passes
         self.output_list_unpack_pass()
         self.input_transpose_pass()
+
+        # Connect unused tensors with special nodes
+        self.connect_unused_tensors_pass()
 
         # Transpose, Reshape and NO-OP cleanup
         self.branch_reshape_expand_pass()
@@ -1290,6 +1344,11 @@ def is_transformable_node(vertex: ig.Vertex, graph_converter: ig.Graph):
 def is_transformable_transpose_node(vertex: ig.Vertex, graph_converter: ig.Graph):
     return vertex['node_type'] == ExtendedOperator.TRANSPOSE and vertex.outdegree() >= 1 \
         and is_transpose_same_to_reshape_op(vertex['op'])
+
+
+def is_multi_output_op_node(vertex: ig.Vertex, graph_converter: ig.Graph):
+    return vertex['node_type'] >= 0 and len(vertex['outputs']) > 1 \
+        and vertex.outdegree() > 0
 
 
 def is_transpose_reshape_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
@@ -1819,7 +1878,8 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
         has_output_nodes = False
         for edge in last_node.out_edges():
             target_vertex = edge.target_vertex
-            if target_vertex['node_type'] == ExtendedOperator.OUTPUT_NODE:
+            if target_vertex['node_type'] in (ExtendedOperator.OUTPUT_NODE,
+                                              ExtendedOperator.UNUSED_NODE):
                 if use_forward_input:
                     # Cannot optimize away ops between i/o nodes
                     skip = True
@@ -1833,7 +1893,8 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
                 target_vertex = edge.target_vertex
                 if target_vertex == last_node:
                     continue
-                if target_vertex['node_type'] == ExtendedOperator.OUTPUT_NODE:
+                if target_vertex['node_type'] in (ExtendedOperator.OUTPUT_NODE,
+                                                  ExtendedOperator.UNUSED_NODE):
                     if has_output_nodes and edge['label'] == output_name:
                         output_outdegree += 1
                     break

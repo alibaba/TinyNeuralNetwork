@@ -108,7 +108,8 @@ class CommonGraph(object):
 
         nodes = []
         for t in tensors:
-            if node_type == ExtendedOperator.OUTPUT_NODE:
+            if node_type in (ExtendedOperator.OUTPUT_NODE,
+                             ExtendedOperator.UNUSED_NODE):
                 tensor_name = t.name + '_output'
                 if tensor_name in self.tensor_map:
                     i = 1
@@ -172,7 +173,7 @@ class CommonGraph(object):
             self.tensor_node_map[t.name] = node['name']
         return node
 
-    def add_outputs(self, names: typing.List[str]):
+    def add_outputs(self, names: typing.List[str], node_type=ExtendedOperator.OUTPUT_NODE):
         """ Add the output nodes with the names given
 
         Args:
@@ -181,7 +182,7 @@ class CommonGraph(object):
 
         if len(names) > 0:
             output_tensors = list(map(lambda x: self.tensor_map[x], names))
-            output_nodes = self.add_nodes(output_tensors, ExtendedOperator.OUTPUT_NODE)
+            output_nodes = self.add_nodes(output_tensors, node_type)
             for idx, (name, output_node) in enumerate(zip(names, output_nodes)):
                 current_node = self.graph.vs.find(name=self.tensor_node_map[name])
                 edge = self.graph.add_edge(current_node, output_node, name=output_node["outputs"][0], label=name)
@@ -294,7 +295,8 @@ class CommonGraph(object):
             next_op = self.graph.vs[next_tensor.target]
             if skips_nodes is not None and next_op['name'] in skips_nodes:
                 continue
-            if next_op['node_type'] != ExtendedOperator.OUTPUT_NODE:
+            if next_op['node_type'] not in (ExtendedOperator.OUTPUT_NODE,
+                                            ExtendedOperator.UNUSED_NODE):
                 assert tensor_name == next_tensor['name'], f'next tensor name mismatches: {tensor_name} vs {next_tensor["name"]}'
                 self.graph.add_edge(connect_node, next_op, name=tensor_name, label=tensor_name)
             else:
