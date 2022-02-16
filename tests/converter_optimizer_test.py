@@ -639,6 +639,16 @@ class ConverterOptimizerTester(unittest.TestCase):
         converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.ADD)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
     def test_branch_expand_transpose_buffer(self):
         class TestModel(nn.Module):
             def __init__(self):
@@ -660,6 +670,17 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 2)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 2)
+        for i in range(2):
+            self.assertEqual(tfl_model.OperatorCodes(i).BuiltinCode(), tflite.BuiltinOperator.ADD)
+            self.assertEqual(tfl_model.Subgraphs(0).Operators(i).InputsLength(), 2)
+            self.assertEqual(tfl_model.Subgraphs(0).Operators(i).OutputsLength(), 1)
 
 
 if __name__ == '__main__':
