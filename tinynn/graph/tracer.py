@@ -379,6 +379,81 @@ class TraceFunction(object):
         self.kargs = None
         self.args_string = None
         self.args_parsed = None
+        self.tensor_names = None
+        self.args_template = None
+        self.args_template_no_self = None
+
+    def __repr__(self) -> str:
+        """ Returns the string representation of the object """
+
+        arg_len = len(self.tensor_names)
+
+        if arg_len > 0:
+            prefix = 'lambda args: '
+        else:
+            prefix = 'lambda: '
+
+        extra_expr = self.extra_expr('args')
+        expr = f'{prefix}{extra_expr}'
+        return expr
+
+    def extra_expr(self, prefix=None, first=None):
+        """ Returns the extra string representation of the object """
+        arg_len = len(self.tensor_names)
+
+        if arg_len == 0:
+            expr = f'{self.full_name}({self.args_template})'
+        else:
+            if prefix is None:
+                tensor_names = self.tensor_names
+            else:
+                tensor_names = [f'{prefix}[{i}]' for i in range(arg_len)]
+            
+            if first is not None:
+                tensor_names = [first] + tensor_names[1:]
+
+            if self.is_class:
+                if self.is_property:
+                    expr = f'{tensor_names[0]}.{self.func_type}'
+                elif self.func_type == '__getitem__':
+                    args = self.args_string_no_self
+                    if not args.startswith('[') and not args.endswith(']'):
+                        args = f'[{args}]'
+                    expr = f'{tensor_names[0]}{args}'
+                else:
+                    full_template = f'{{}}.{self.func_type}({self.args_template_no_self})'
+                    expr = full_template.format(*tensor_names)
+            else:
+                full_template = f'{self.full_name}({self.args_template})'
+                expr = full_template.format(*tensor_names)
+        
+        return expr
+
+    def __call__(self, *args, **kwargs):
+        """ Calls the function with a list of tensor inputs """
+
+        if len(kwargs) > 0:
+            log.warning('Keyword arguments are ignored when calling TraceFunction')
+
+        if len(args) == 0:
+            arg_len = 0
+        else:
+            if len(args) > 1:
+                log.warning('Multiple arguments are passed in, but all but the first one will be ignored')
+
+            if not isinstance(args[0], (tuple, list)):
+                log.error('Only tuple or list is accepted here')
+                assert False
+
+            arg_len = len(args[0])
+        
+        expected_len = len(self.tensor_names)
+        if arg_len != expected_len:
+            log.error(f'Wrong number of input tensors, expected: {expected_len}, but got {arg_len}')
+            assert False
+
+        expr = self.extra_expr('args[0]')
+        return eval(expr)
 
     def parse_args(self, *args, **kwargs):
         """ Sets the string representation of the arguments """
@@ -411,9 +486,20 @@ class TraceFunction(object):
             if id(a) in current_graph().tensor_pre_index_dict:
                 pre_node_index = current_graph().tensor_pre_index_dict[id(a)]
                 log.debug(f'pre_index gen func {self.kind}: {pre_node_index}')
-                return f"{ns}{pre_node_name}[{pre_node_index}]"
+                if type(pre_node_index) in (list, tuple):
+                    indices_str = ''.join([f'[{i}]' for i in pre_node_index])
+                    return f"{ns}{pre_node_name}{indices_str}"
+                else:
+                    return f"{ns}{pre_node_name}[{pre_node_index}]"
             else:
                 return f"{ns}{pre_node_name}"
+
+        def _escape_arg(arg: str):
+            """ Escapes the special characters in the argument string """
+            for c in ('{', '}'):
+                if c in arg:
+                    arg = arg.replace(c, f'{c}{c}')
+            return arg
 
         def _parse_args(arg):
             """ Converts the argument to a list of strings """
@@ -426,9 +512,10 @@ class TraceFunction(object):
                         (type(a) in (torch.dtype, torch.device, torch.Size) and
                          id(a) in current_graph().tensor_pre_node_dict):
                     self.prev_tensors.append(a)
-                    new_arg.append(_tensor_name(a))
+                    self.tensor_names.append(_tensor_name(a))
+                    new_arg.append('{}')
                 elif type(a) in (str, torch.device):
-                    new_arg.append(f"\'{a}\'")
+                    new_arg.append(_escape_arg(f"\'{a}\'"))
                 elif type(a) in (int, float, bool, torch.dtype):
                     new_arg.append(str(a))
                 elif a is None:
@@ -464,6 +551,7 @@ class TraceFunction(object):
             else:
                 return content
 
+        self.tensor_names = []
         self.prev_tensors.clear()
         arg_str = _parse_args(args)
 
@@ -486,8 +574,11 @@ class TraceFunction(object):
                 arg_str[i] = _flatten_list(arg_str[i])
 
         try:
-            self.args_string = ", ".join(arg_str)
-            self.args_string_no_self = ", ".join(arg_str[1:])
+            self.args_template = ", ".join(arg_str)
+            self.args_string = self.args_template.format(*self.tensor_names)
+            self.args_template_no_self = ", ".join(arg_str[1:])
+            offset = 1 if arg_str[0] == '{}' else 0
+            self.args_string_no_self = self.args_template_no_self.format(*self.tensor_names[offset:])
         except Exception:
             log.error(f"Error generating argument string for function {self.full_name}")
             assert False
@@ -1591,26 +1682,14 @@ class TraceGraph(object):
                                for i in range(len(node.prev_nodes))])
 
             if type(node.module) == TraceFunction:
-                node_type = node.type()
                 full_name = node.full_name()
                 if not full_name.startswith('torch.') and not full_name.startswith('self.'):
                     ns = '.'.join(full_name.split('.')[:-1])
                     self.used_namespaces.add(ns)
+                first_arg = None
                 if node.is_class():
-                    if node.module.is_property:
-                        line = f"        {output} = {node.prev_node_unique_name(0)}.{node_type}"
-                    elif node_type == '__getitem__':
-                        args = node.module.args_string_no_self
-                        if not args.startswith('[') and not args.endswith(']'):
-                            args = f'[{args}]'
-                        line = f"        {output} = {node.prev_node_unique_name(0)}{args}"
-                    else:
-                        # Since the node is a class and the member function is called, the first argument should be removed.
-                        args = node.module.args_string_no_self
-                        line = f"        {output} = {node.prev_node_unique_name(0)}.{node_type}({args})"
-                else:
-                    args = node.module.args_string
-                    line = f"        {output} = {node.full_name()}({args})"
+                    first_arg = node.prev_node_unique_name(0)
+                line = f"        {output} = {node.module.extra_expr(first=first_arg)}"
             else:
                 line = f"        {output} = self.{node.unique_name}({param})"
             lines.append(line)
