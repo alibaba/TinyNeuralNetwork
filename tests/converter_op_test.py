@@ -2389,6 +2389,32 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs): return f'testing {func.__name__} failed: {args}'
             torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
+    def test_norms(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [nn.BatchNorm2d(3), nn.InstanceNorm2d(3), nn.LayerNorm([3, 224, 224])]
+
+        for func in funcs:
+            class Model(nn.Module):
+                def __init__(self) -> None:
+                    super().__init__()
+                    self.norm = func
+
+                def forward(self, x):
+                    return self.norm(x)
+
+            model = Model()
+            model.eval()
+
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            def msg(*args, **kwargs): return f'testing {func.__name__} failed: {args}'
+            torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+
 
 if __name__ == '__main__':
     unittest.main()
