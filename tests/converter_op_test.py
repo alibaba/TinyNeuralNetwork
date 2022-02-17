@@ -2415,6 +2415,98 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs): return f'testing {func.__name__} failed: {args}'
             torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
+    def test_conv(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.Conv2d(3, 8, 3)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        def msg(*args, **kwargs): return f'testing failed: {args}'
+        torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+
+    def test_conv_no_bias(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.Conv2d(3, 8, 3, bias=False)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        def msg(*args, **kwargs): return f'testing failed: {args}'
+        torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+
+    def test_conv_transpose(self):
+        dummy_input = torch.randn(1, 16, 50, 100, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2))
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        def msg(*args, **kwargs): return f'testing failed: {args}'
+        torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+
+    def test_conv_transpose_no_bias(self):
+        dummy_input = torch.randn(1, 16, 50, 100, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2), bias=False)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        def msg(*args, **kwargs): return f'testing failed: {args}'
+        torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+
 
 if __name__ == '__main__':
     unittest.main()
