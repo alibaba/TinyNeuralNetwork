@@ -8,6 +8,7 @@ per-file-ignores =
         tinynn/converter/operators/torch/aten_schema.py: E501
         tinynn/converter/operators/torch/quantized_schema.py: E501
         tinynn/converter/operators/torch/torchvision_schema.py: E501
+        tests/converter_op_test.py: E704
         examples/*: E402
 exclude =
         ./.git
@@ -18,3 +19,6 @@ exclude =
         ./myenv
         ./tests/models/
         ./tests/out/
+        ./build/
+        ./debugging/
+        ./examples/mixed_qat/mobilenet_mixed_qat.py

@@ -24,7 +24,7 @@ def collect_testcases():
     for usage in usages:
         try:
             m = eval(usage)
-        except:
+        except Exception:
             continue
 
         results.append((usage, m))
@@ -52,8 +52,8 @@ class TestModelMeta(type):
         def f(self):
             line, _ = gen_module_constrctor_line(test_mod)
             try:
-                m = eval(line)
-            except:
+                eval(line)
+            except Exception:
                 self.fail(f'Cannot restore from {usage}, got {line}')
         return f
 

@@ -537,20 +537,20 @@ class GraphOptimizer(object):
             l_map, r_map, _, _ = reshape_mapping(l_shape, r_shape)
 
             mode = None
-            for l, r in zip(l_map, r_map):
-                if len(l) > 1 and len(r) == 1:
+            for l_val, r_val in zip(l_map, r_map):
+                if len(l_val) > 1 and len(r_val) == 1:
                     if mode in (None, 'up'):
                         mode = 'up'
                     else:
                         mode = '?'
                         break
-                elif len(r) > 1 and len(l) == 1:
+                elif len(r_val) > 1 and len(l_val) == 1:
                     if mode in (None, 'down'):
                         mode = 'down'
                     else:
                         mode = '?'
                         break
-                elif len(r) > 1 and len(l) > 1:
+                elif len(r_val) > 1 and len(l_val) > 1:
                     mode = '?'
                     break
 

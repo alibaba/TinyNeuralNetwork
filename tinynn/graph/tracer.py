@@ -408,7 +408,7 @@ class TraceFunction(object):
                 tensor_names = self.tensor_names
             else:
                 tensor_names = [f'{prefix}[{i}]' for i in range(arg_len)]
-            
+
             if first is not None:
                 tensor_names = [first] + tensor_names[1:]
 
@@ -426,7 +426,7 @@ class TraceFunction(object):
             else:
                 full_template = f'{self.full_name}({self.args_template})'
                 expr = full_template.format(*tensor_names)
-        
+
         return expr
 
     def __call__(self, *args, **kwargs):
@@ -446,7 +446,7 @@ class TraceFunction(object):
                 assert False
 
             arg_len = len(args[0])
-        
+
         expected_len = len(self.tensor_names)
         if arg_len != expected_len:
             log.error(f'Wrong number of input tensors, expected: {expected_len}, but got {arg_len}')
@@ -1577,7 +1577,7 @@ class TraceGraph(object):
         if self.inited:
             return
 
-        with no_catch() as res:
+        with no_catch():
             device = get_module_device(self.module)
 
         with self.__numbering_context():

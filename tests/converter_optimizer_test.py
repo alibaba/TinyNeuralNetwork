@@ -261,7 +261,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
-    def test_unary_elementwise_transpose(self):
+    def test_unary_elementwise_reshape(self):
         class TestModel(nn.Module):
             def forward(self, x):
                 y = torch.reshape(x, (3, 224, 224))

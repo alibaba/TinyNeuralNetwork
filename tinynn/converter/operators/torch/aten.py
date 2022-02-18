@@ -790,7 +790,6 @@ class ATenFloorDivideOperator(ATenFloorDivideSchema):
         elif self.input_tensors[1].dtype != self.input_tensors[0].dtype:
             other = self.find_or_create_input(1, graph_converter)
             if other.buffer is None:
-                inp = self.find_or_create_input(0, graph_converter)
                 new_other = self.input_tensors[1].detach().clone().to(dtype=self.input_tensors[0].dtype)
                 new_other_t = self.create_transform_tensor(new_other)
                 graph_converter.add_operator(tfl.CastOperator([other], [new_other_t],
@@ -1325,7 +1324,6 @@ class ATenInstanceNormOperator(ATenInstanceNormSchema):
                 ops.append(tfl.AddOperator([mul_out, bias_tensor], outputs))
 
         for op in ops:
-            print(op)
             graph_converter.add_operator(op)
 
 

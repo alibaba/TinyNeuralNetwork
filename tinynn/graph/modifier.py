@@ -790,7 +790,7 @@ class RNNChannelModifier(ChannelModifier):
     def ot_channel(self, has_proj=None):
         if has_proj is None:
             has_proj = hasattr(self.node.module, 'proj_size') and self.node.module.proj_size > 0
-        
+
         if has_proj:
             out_size = self.node.module.proj_size
         else:

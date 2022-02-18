@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   unit-test:
-    name: Unit tests for (${{ matrix.python-version }}, ${{ matrix.os }})
+    name: Unit tests for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
