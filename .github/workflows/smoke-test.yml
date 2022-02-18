@@ -1,0 +1,24 @@
+name: Python Package using Conda
+
+on: [push]
+
+jobs:
+  smoke-test:
+    name: Basic test for (${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        python-version: ["3.6", "3.7", "3.8", "3.9"]
+    steps:
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: ${{ matrix.python-version }}
+      - name: Install PyTorch
+        shell: bash
+        run: conda install pytorch torchvision -c pytorch
+      - name: Install TinyNeuralNetwork
+        shell: bash
+        run: python setup.py install
