@@ -1,6 +1,8 @@
-name: Python Package using Conda
+name: Installation test
 
-on: [push]
+on:
+  schedule:
+    - cron:  '00 18 * * *'
 
 jobs:
   smoke-test:
