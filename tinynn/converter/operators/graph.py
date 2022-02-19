@@ -221,7 +221,8 @@ class CommonGraph(object):
                 edge = self.graph.add_edge(prev_node, next_node, name=edge_name, label=edge_name)
                 log.debug(f'NEW EDGE: {prev_node["label"]} -> {next_node["label"]} {self.tensor_map[edge["name"]]}')
 
-    def replace_operator_input(self, node: ig.Vertex, input_idx: int, new_tensor: tfl.Tensor, return_ids: bool = False, skip: int = 0) -> typing.Optional[typing.List[int]]:
+    def replace_operator_input(self, node: ig.Vertex, input_idx: int, new_tensor: tfl.Tensor,
+                               return_ids: bool = False, skip: int = 0) -> typing.Optional[typing.List[int]]:
         """ Use a new input tensor in a op node
 
         Args:
