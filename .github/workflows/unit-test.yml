@@ -44,6 +44,4 @@ jobs:
           rm -rf out || true
           python converter_test.py -v -k mobilenet
           rm -rf out || true
-          python converter_qat_test.py -v -k mobilenet
-          rm -rf out || true
           python tracer_test.py -v -k mobilenet
