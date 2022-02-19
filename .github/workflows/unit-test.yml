@@ -20,7 +20,12 @@ jobs:
           auto-update-conda: true
           python-version: 3.8
       - name: Install PyTorch
-        run: conda install pytorch torchvision -c pytorch
+        run: |
+         if [ "$RUNNER_OS" == "macOS" ]; then
+              conda install pytorch torchvision -c pytorch
+         else
+              conda install pytorch torchvision cpuonly -c pytorch
+         fi
       - name: Install TinyNeuralNetwork
         run: python setup.py install
       - name: Install test dependencies
