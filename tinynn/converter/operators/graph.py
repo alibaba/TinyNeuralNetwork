@@ -221,7 +221,7 @@ class CommonGraph(object):
                 edge = self.graph.add_edge(prev_node, next_node, name=edge_name, label=edge_name)
                 log.debug(f'NEW EDGE: {prev_node["label"]} -> {next_node["label"]} {self.tensor_map[edge["name"]]}')
 
-    def replace_operator_input(self, node: ig.Vertex, input_idx: int, new_tensor: tfl.Tensor, return_ids: bool = False) -> typing.Optional[typing.List[int]]:
+    def replace_operator_input(self, node: ig.Vertex, input_idx: int, new_tensor: tfl.Tensor, return_ids: bool = False, skip: int = 0) -> typing.Optional[typing.List[int]]:
         """ Use a new input tensor in a op node
 
         Args:
@@ -229,6 +229,7 @@ class CommonGraph(object):
             input_idx (int): the index of the input tensor
             new_tensor (tfl.Tensor): The tensor to be be used
             return_ids (bool): Return the ids instead of removing the edges. Defaults to False.
+            skip (int): Number of items to skip
 
         Returns:
             typing.Optional[typing.List[int]]: The edges to be removed if return_ids is True, otherwise None
@@ -242,6 +243,9 @@ class CommonGraph(object):
             start = self.graph.vs[edge.source]
             for i in range(len(start['outputs'])):
                 if start['outputs'][i] == old_tensor.name and edge['name'] == old_tensor.name:
+                    if skip > 0:
+                        skip -= 1
+                        continue
                     remove_edges.append(edge.index)
                     break
             if len(remove_edges) > 0:
