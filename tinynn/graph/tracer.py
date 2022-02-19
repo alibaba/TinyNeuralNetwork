@@ -1757,6 +1757,7 @@ class TraceGraph(object):
 
         if output_weight_path:
             torch.save(dummy_model.state_dict(), output_weight_path)
+            output_weight_path_str = output_weight_path.replace('\\', '\\\\')
 
         init_block = self.__gen_init_code()
         forward_block = self.__gen_forward_code()
@@ -1768,7 +1769,7 @@ class TraceGraph(object):
             "init_block": init_block,
             "forward_block": forward_block,
             "name_block": model_name,
-            "load_weight_block": "" if output_weight_path is None else f"    model.load_state_dict(torch.load('{output_weight_path}'))",
+            "load_weight_block": "" if output_weight_path is None else f"    model.load_state_dict(torch.load('{output_weight_path_str}'))",
             "input_block": input_block,
             "input_names": ", ".join([f"dummy_input_{i}" for i in range(len(self.input_nodes))])
         }
