@@ -511,7 +511,6 @@ class ConverterOPTester(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, r'Tensor-likes are not close!.*'):
                 torch.testing.assert_close(dummy_output, tfl_output)
 
-    @unittest.skip("Needs investigation")
     def test_prelu(self):
         class Model(nn.Module):
             def __init__(self) -> None:

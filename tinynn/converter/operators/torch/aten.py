@@ -711,14 +711,29 @@ class ATenPreluOperator(ATenPreluSchema):
         self.run(node)
 
         alpha = self.input_tensors[1]
-        if alpha.numel() != 1:
-            alpha_tensor = self.find_or_create_input(1, graph_converter)
-            new_shape = list(alpha_tensor.shape) + [1] * (self.input_tensors[0].ndim - 2)
-            shape_tensor = self.create_attr_tensor(np.array(new_shape, dtype='int32'))
+
+        weight_c = alpha.numel()
+        input_c = self.input_tensors[0].shape[1]
+        new_shape = [input_c] + [1] * (self.input_tensors[0].ndim - 2)
+
+        alpha_tensor = self.find_or_create_input(1, graph_converter)
+        shape_tensor = self.create_attr_tensor(np.array(new_shape, dtype='int32'))
+
+        update_name = True
+        if weight_c == input_c:
             new_alpha = self.create_transform_tensor(np.reshape(alpha_tensor.tensor, new_shape))
             graph_converter.add_operator(tfl.ReshapeOperator([alpha_tensor, shape_tensor], [new_alpha], new_shape))
+        elif input_c != weight_c:
+            new_alpha = self.create_transform_tensor(np.tile(alpha_tensor.tensor, new_shape))
+            if alpha_tensor.buffer is None:
+                graph_converter.add_operator(tfl.TileOperator([alpha_tensor, shape_tensor], [new_alpha]))
+            else:
+                update_name = False
+                new_alpha = new_alpha.tensor
+
+        self.input_tensors[1] = new_alpha
+        if update_name:
             self.input_names[1] = new_alpha.name
-            self.input_tensors[1] = new_alpha
 
         self.elementwise_binary(tfl.PreluOperator, graph_converter, False)
 
