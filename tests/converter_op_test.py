@@ -579,7 +579,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_prelu_with_reshapes(self):
         class Model(nn.Module):
