@@ -41,6 +41,9 @@ jobs:
         run: |
           source activate.sh
           cd tests
+          rm -rf out || true
           python converter_test.py -v -k mobilenet
+          rm -rf out || true
           python converter_qat_test.py -v -k mobilenet
-          python tracer.py -v -k mobilenet
+          rm -rf out || true
+          python tracer_test.py -v -k mobilenet
