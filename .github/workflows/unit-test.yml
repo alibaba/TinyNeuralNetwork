@@ -37,5 +37,10 @@ jobs:
           cd tests
           python converter_op_test.py -v
           python converter_optimizer_test.py -v
+      - name: Run integration tests
+        run: |
+          source activate.sh
+          cd tests
           python converter_test.py -v -k mobilenet
+          python converter_qat_test.py -v -k mobilenet
           python tracer.py -v -k mobilenet
