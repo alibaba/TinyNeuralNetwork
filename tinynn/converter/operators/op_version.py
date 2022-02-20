@@ -6,10 +6,10 @@ import tflite as tfl_schema
 
 
 class OPVersioner(object):
-    """ Sets the version of the OPs in the computation graph """
+    """Sets the version of the OPs in the computation graph"""
 
     def __init__(self, graph: CommonGraph) -> None:
-        """ Constructs an OPVersioner object
+        """Constructs an OPVersioner object
 
         Args:
             graph (CommonGraph): The computation graph
@@ -18,30 +18,47 @@ class OPVersioner(object):
         self.graph = graph
 
     def process(self):
-        """ The main process function for the whole graph """
+        """The main process function for the whole graph"""
         for node in self.graph.graph.vs:
             if node['node_type'] >= 0:
                 self.process_op(node['op'])
 
     def process_op(self, op: tfl.BaseOperator):
-        """ Sets the version of the OP
+        """Sets the version of the OP
 
         Args:
             op (tfl.BaseOperator): The operator to be processed
         """
 
-        # Translated from `GetBuiltinOperatorVersion` in https://github.com/tensorflow/tensorflow/blob/master/tensorflow/lite/tools/versioning/op_version.cc
+        # Translated from `GetBuiltinOperatorVersion` in
+        # https://github.com/tensorflow/tensorflow/blob/master/tensorflow/lite/tools/versioning/op_version.cc
         if op.op.code == ExtendedOperator.CONV_2D:
-            if str(op.inputs[0].dtype) == 'int8' and str(op.inputs[1].dtype) == 'int8' and str(op.outputs[0].dtype) == 'int8':
+            if (
+                str(op.inputs[0].dtype) == 'int8'
+                and str(op.inputs[1].dtype) == 'int8'
+                and str(op.outputs[0].dtype) == 'int8'
+            ):
                 op.op.version = 3
-            elif str(op.inputs[0].dtype) == 'float32' and str(op.inputs[1].dtype) == 'int8' and str(op.outputs[0].dtype) == 'float32':
+            elif (
+                str(op.inputs[0].dtype) == 'float32'
+                and str(op.inputs[1].dtype) == 'int8'
+                and str(op.outputs[0].dtype) == 'float32'
+            ):
                 op.op.version = 2
             else:
                 op.op.version = 1
         elif op.op.code == ExtendedOperator.DEPTHWISE_CONV_2D:
-            if str(op.inputs[0].dtype) == 'float32' and str(op.inputs[1].dtype) == 'int8' and str(op.outputs[0].dtype) == 'float32':
+            if (
+                str(op.inputs[0].dtype) == 'float32'
+                and str(op.inputs[1].dtype) == 'int8'
+                and str(op.outputs[0].dtype) == 'float32'
+            ):
                 op.op.version = 4
-            elif str(op.inputs[0].dtype) == 'int8' and str(op.inputs[1].dtype) == 'int8' and str(op.outputs[0].dtype) == 'int8':
+            elif (
+                str(op.inputs[0].dtype) == 'int8'
+                and str(op.inputs[1].dtype) == 'int8'
+                and str(op.outputs[0].dtype) == 'int8'
+            ):
                 op.op.version = 3
             elif op.dilationHFactor != 1 or op.dilationWFactor != 1:
                 op.op.version = 2
@@ -57,9 +74,17 @@ class OPVersioner(object):
                 op.op.version = 6
             elif op.keepNumDims:
                 op.op.version = 5
-            elif str(op.inputs[0].dtype) == 'int8' and str(op.inputs[1].dtype) == 'int8' and str(op.outputs[0].dtype) == 'int8':
+            elif (
+                str(op.inputs[0].dtype) == 'int8'
+                and str(op.inputs[1].dtype) == 'int8'
+                and str(op.outputs[0].dtype) == 'int8'
+            ):
                 op.op.version = 4
-            elif str(op.inputs[0].dtype) == 'float32' and str(op.inputs[1].dtype) == 'int8' and str(op.outputs[0].dtype) == 'float32':
+            elif (
+                str(op.inputs[0].dtype) == 'float32'
+                and str(op.inputs[1].dtype) == 'int8'
+                and str(op.outputs[0].dtype) == 'float32'
+            ):
                 op.op.version = 3
             elif op.weightsFormat == tfl_schema.FullyConnectedOptionsWeightsFormat.SHUFFLED4x16INT8:
                 op.op.version = 2
@@ -75,14 +100,25 @@ class OPVersioner(object):
         elif op.op.code == ExtendedOperator.SVDF:
             if str(op.inputs[0].dtype) == 'int8':
                 op.op.version = 3
-            elif str(op.inputs[0].dtype) == 'float32' and str(op.inputs[1].dtype) == 'int8' and str(op.outputs[0].dtype) == 'float32':
+            elif (
+                str(op.inputs[0].dtype) == 'float32'
+                and str(op.inputs[1].dtype) == 'int8'
+                and str(op.outputs[0].dtype) == 'float32'
+            ):
                 op.op.version = 2
             else:
                 op.op.version = 1
         elif op.op.code == ExtendedOperator.MUL:
-            if op.inputs[0].quantization is not None and op.inputs[1].quantization is not None and op.outputs[0].quantization is not None \
-                    and op.inputs[0].quantization.scale != 0.0 and op.inputs[1].quantization.scale != 0.0 and op.outputs[0].quantization.scale != 0.0 \
-                    and op.inputs[0].quantization.scale * op.inputs[1].quantization.scale / op.outputs[0].quantization.scale >= 1.0:
+            if (
+                op.inputs[0].quantization is not None
+                and op.inputs[1].quantization is not None
+                and op.outputs[0].quantization is not None
+                and op.inputs[0].quantization.scale != 0.0
+                and op.inputs[1].quantization.scale != 0.0
+                and op.outputs[0].quantization.scale != 0.0
+                and op.inputs[0].quantization.scale * op.inputs[1].quantization.scale / op.outputs[0].quantization.scale
+                >= 1.0
+            ):
                 op.op.version = 3
             elif str(op.inputs[0].dtype) == 'int8':
                 op.op.version = 2
@@ -103,15 +139,23 @@ class OPVersioner(object):
             else:
                 op.op.version = 1
         elif op.op.code == ExtendedOperator.LSTM:
-            if op.kernelType == tfl_schema.LSTMKernelType.FULL and str(op.inputs[0].dtype) == 'float32' \
-                    and str(op.inputs[2].dtype) == 'int8' and str(op.outputs[0].dtype) == 'float32':
+            if (
+                op.kernelType == tfl_schema.LSTMKernelType.FULL
+                and str(op.inputs[0].dtype) == 'float32'
+                and str(op.inputs[2].dtype) == 'int8'
+                and str(op.outputs[0].dtype) == 'float32'
+            ):
                 op.op.version = 3
             elif op.kernelType == tfl_schema.LSTMKernelType.BASIC:
                 op.op.version = 2
             else:
                 op.op.version = 1
         elif op.op.code == ExtendedOperator.UNIDIRECTIONAL_SEQUENCE_LSTM:
-            if str(op.inputs[0].dtype) == 'float32' and str(op.inputs[2].dtype) == 'int8' and str(op.outputs[0].dtype) == 'float32':
+            if (
+                str(op.inputs[0].dtype) == 'float32'
+                and str(op.inputs[2].dtype) == 'int8'
+                and str(op.outputs[0].dtype) == 'float32'
+            ):
                 op.op.version = 2
             else:
                 op.op.version = 1
@@ -191,7 +235,10 @@ class OPVersioner(object):
         elif op.op.code in (ExtendedOperator.MINIMUM, ExtendedOperator.MAXIMUM):
             if str(op.inputs[0].dtype) == 'int16' and str(op.outputs[0].dtype) == 'int16':
                 op.op.version = 4
-            elif len(op.inputs[0].shape) != len(op.inputs[1].shape) and max(len(op.inputs[0].shape), len(op.inputs[1].shape)) > 4:
+            elif (
+                len(op.inputs[0].shape) != len(op.inputs[1].shape)
+                and max(len(op.inputs[0].shape), len(op.inputs[1].shape)) > 4
+            ):
                 op.op.version = 3
             elif str(op.inputs[0].dtype) == 'int8':
                 op.op.version = 2
@@ -217,40 +264,45 @@ class OPVersioner(object):
             else:
                 op.op.version = 1
         elif op.op.version == ExtendedOperator.SUB:
-            if len(op.inputs[0].shape) != len(op.inputs[1].shape) and max(len(op.inputs[0].shape), len(op.inputs[1].shape)) > 4:
+            if (
+                len(op.inputs[0].shape) != len(op.inputs[1].shape)
+                and max(len(op.inputs[0].shape), len(op.inputs[1].shape)) > 4
+            ):
                 op.op.version = 3
             elif str(op.inputs[0].dtype) == 'int8':
                 op.op.version = 2
             else:
                 op.op.version = 1
-        elif op.op.code in (ExtendedOperator.AVERAGE_POOL_2D,
-                            ExtendedOperator.ADD,
-                            ExtendedOperator.CONCATENATION,
-                            ExtendedOperator.MAX_POOL_2D,
-                            ExtendedOperator.PAD,
-                            ExtendedOperator.PADV2,
-                            ExtendedOperator.SOFTMAX,
-                            ExtendedOperator.SPACE_TO_DEPTH,
-                            ExtendedOperator.SPLIT_V,
-                            ExtendedOperator.MEAN,
-                            ExtendedOperator.SUM,
-                            ExtendedOperator.REDUCE_MAX,
-                            ExtendedOperator.REDUCE_MIN,
-                            ExtendedOperator.RELU6,
-                            ExtendedOperator.RESIZE_NEAREST_NEIGHBOR,
-                            ExtendedOperator.TANH,
-                            ExtendedOperator.LOGISTIC,
-                            ExtendedOperator.LOG_SOFTMAX,
-                            ExtendedOperator.TOPK_V2,
-                            ExtendedOperator.ARG_MAX,
-                            ExtendedOperator.ARG_MIN,
-                            ExtendedOperator.EQUAL,
-                            ExtendedOperator.NOT_EQUAL,
-                            ExtendedOperator.GREATER,
-                            ExtendedOperator.GREATER_EQUAL,
-                            ExtendedOperator.LESS,
-                            ExtendedOperator.LESS_EQUAL,
-                            ExtendedOperator.SELECT):
+        elif op.op.code in (
+            ExtendedOperator.AVERAGE_POOL_2D,
+            ExtendedOperator.ADD,
+            ExtendedOperator.CONCATENATION,
+            ExtendedOperator.MAX_POOL_2D,
+            ExtendedOperator.PAD,
+            ExtendedOperator.PADV2,
+            ExtendedOperator.SOFTMAX,
+            ExtendedOperator.SPACE_TO_DEPTH,
+            ExtendedOperator.SPLIT_V,
+            ExtendedOperator.MEAN,
+            ExtendedOperator.SUM,
+            ExtendedOperator.REDUCE_MAX,
+            ExtendedOperator.REDUCE_MIN,
+            ExtendedOperator.RELU6,
+            ExtendedOperator.RESIZE_NEAREST_NEIGHBOR,
+            ExtendedOperator.TANH,
+            ExtendedOperator.LOGISTIC,
+            ExtendedOperator.LOG_SOFTMAX,
+            ExtendedOperator.TOPK_V2,
+            ExtendedOperator.ARG_MAX,
+            ExtendedOperator.ARG_MIN,
+            ExtendedOperator.EQUAL,
+            ExtendedOperator.NOT_EQUAL,
+            ExtendedOperator.GREATER,
+            ExtendedOperator.GREATER_EQUAL,
+            ExtendedOperator.LESS,
+            ExtendedOperator.LESS_EQUAL,
+            ExtendedOperator.SELECT,
+        ):
             if str(op.inputs[0].dtype) == 'int8':
                 op.op.version = 2
             else:

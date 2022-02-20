@@ -27,18 +27,28 @@ def device_init(device_ids):
 
 
 class NetAdaptPruner(OneShotChannelPruner):
-    required_params = ('budget_type', 'metrics', 'netadapt_max_iter',
-                       'budget_reduce_rate_init', 'budget_reduce_rate_decay', 'netadapt_lr')
+    required_params = (
+        'budget_type',
+        'metrics',
+        'netadapt_max_iter',
+        'budget_reduce_rate_init',
+        'budget_reduce_rate_decay',
+        'netadapt_lr',
+    )
     required_context_params = ('val_loader', 'train_loader', 'train_func', 'validate_func', 'optimizer', 'criterion')
     default_values = {'netadapt_dir': 'netadapt_train/', 'netadapt_max_rounds': -1, 'netadapt_min_feature_size': 8}
-    context_from_params_dict = {'optimizer': ['netadapt_optimizer',
-                                              'optimizer'], 'criterion': ['netadapt_criterion', 'criterion']}
-    condition_dict = {'netadapt_max_iter': lambda x: 0 < x,
-                      'budget_reduce_rate_init': lambda x: 0 <= x <= 1,
-                      'budget_reduce_rate_decay': lambda x: 0 <= x <= 1,
-                      'netadapt_lr': lambda x: 0 < x < 1,
-                      'netadapt_max_rounds': lambda x: x >= -1,
-                      'budget_type': lambda x: x in ('flops', 'weights', 'latency')}
+    context_from_params_dict = {
+        'optimizer': ['netadapt_optimizer', 'optimizer'],
+        'criterion': ['netadapt_criterion', 'criterion'],
+    }
+    condition_dict = {
+        'netadapt_max_iter': lambda x: 0 < x,
+        'budget_reduce_rate_init': lambda x: 0 <= x <= 1,
+        'budget_reduce_rate_decay': lambda x: 0 <= x <= 1,
+        'netadapt_lr': lambda x: 0 < x < 1,
+        'netadapt_max_rounds': lambda x: x >= -1,
+        'budget_type': lambda x: x in ('flops', 'weights', 'latency'),
+    }
 
     budget: int
     budget_ratio: float
@@ -64,7 +74,7 @@ class NetAdaptPruner(OneShotChannelPruner):
             self.original_channels[node.unique_name] = node.module.weight.shape[0]
 
     def parse_config(self):
-        """ Parses the context and copy the needed items to the pruner """
+        """Parses the context and copy the needed items to the pruner"""
 
         super(OneShotChannelPruner, self).parse_config()
 
@@ -115,24 +125,25 @@ class NetAdaptPruner(OneShotChannelPruner):
             raise Exception('You should define either `budget` or `budget_ratio` for NetAdaptPruner, not both of them')
 
     def generate_config(self, path: str) -> None:
-        """ Generates a new copy the updated configuration with the given path """
+        """Generates a new copy the updated configuration with the given path"""
 
         super(OneShotChannelPruner, self).generate_config(path)
 
     def get_sparsity_state(self) -> typing.Dict[str, float]:
-        """ Calculate the sparsity of the subgraphs in the original model """
+        """Calculate the sparsity of the subgraphs in the original model"""
 
         sparsity = {}
         for node in self.center_nodes:
-            sparsity[node.unique_name] = (self.original_channels[node.unique_name] -
-                                          node.module.weight.shape[0]) / self.original_channels[node.unique_name]
+            sparsity[node.unique_name] = (
+                self.original_channels[node.unique_name] - node.module.weight.shape[0]
+            ) / self.original_channels[node.unique_name]
         return sparsity
 
-    def get_pruned_subgraph_info(self, iteration: int, subgraph_id: int, current_flops: float, target_flops: float) -> \
-            typing.Tuple[
-                float, typing.Dict[str, float], int]:
-        """ Prunes the given subgraph so that the flops of the model <
-        target flops and finetunes model with the pruned subgraph """
+    def get_pruned_subgraph_info(
+        self, iteration: int, subgraph_id: int, current_flops: float, target_flops: float
+    ) -> typing.Tuple[float, typing.Dict[str, float], int]:
+        """Prunes the given subgraph so that the flops of the model <
+        target flops and finetunes model with the pruned subgraph"""
 
         if torch.cuda.is_available():
             self.context.device = torch.device("cuda", torch.cuda.current_device())
@@ -143,8 +154,7 @@ class NetAdaptPruner(OneShotChannelPruner):
         self.model = copy.deepcopy(self.model)
         self.model.eval()
         self.reset()
-        log.info(
-            f'Processing subgraph index {subgraph_id} at iteration: {iteration}, device: {self.context.device}')
+        log.info(f'Processing subgraph index {subgraph_id} at iteration: {iteration}, device: {self.context.device}')
         sparsity, new_flops = self.find_prune_plan(subgraph_id, current_flops, target_flops)
         if len(sparsity) == 0:
             # Cannot find a plan, early stop
@@ -156,7 +166,8 @@ class NetAdaptPruner(OneShotChannelPruner):
 
         # Regenerate the optimizer, since the model has changed
         self.context.optimizer = type(self.context.optimizer)(
-            self.model.parameters(), **self.context.optimizer.defaults)
+            self.model.parameters(), **self.context.optimizer.defaults
+        )
 
         # Use fork to speed up data loading in child processes
         mp_context = mp.get_context('fork')
@@ -191,8 +202,10 @@ class NetAdaptPruner(OneShotChannelPruner):
 
         return acc, sparsity, new_flops
 
-    def find_prune_plan(self, subgraph_id: int, pre_flops: float, target_flops: float) -> typing.Tuple[typing.Dict[str, float], int]:
-        """ Figures out the best plan to prune the given subgraph so that the flops of the model < target flops """
+    def find_prune_plan(
+        self, subgraph_id: int, pre_flops: float, target_flops: float
+    ) -> typing.Tuple[typing.Dict[str, float], int]:
+        """Figures out the best plan to prune the given subgraph so that the flops of the model < target flops"""
 
         nodes = []
 
@@ -203,12 +216,20 @@ class NetAdaptPruner(OneShotChannelPruner):
         num_out_channels = nodes[0].next_tensors[0].shape[1]
 
         # All possible number of channels according to `netadapt_min_feature_size`
-        candidate_channels = list(range(num_out_channels // self.netadapt_min_feature_size *
-                                        self.netadapt_min_feature_size, self.netadapt_min_feature_size - 1,
-                                        -self.netadapt_min_feature_size))
+        candidate_channels = list(
+            range(
+                num_out_channels // self.netadapt_min_feature_size * self.netadapt_min_feature_size,
+                self.netadapt_min_feature_size - 1,
+                -self.netadapt_min_feature_size,
+            )
+        )
         # Possible sparsity for pruning the model
-        sparsity_per_step = list(map(lambda x: (num_out_channels - x[0]) / num_out_channels,
-                                     zip(candidate_channels[1:], candidate_channels[:-1])))
+        sparsity_per_step = list(
+            map(
+                lambda x: (num_out_channels - x[0]) / num_out_channels,
+                zip(candidate_channels[1:], candidate_channels[:-1]),
+            )
+        )
         # Init sparsity dictionary
         self.sparsity = self.sparsity.fromkeys(self.sparsity, 0.0)
 
@@ -244,9 +265,11 @@ class NetAdaptPruner(OneShotChannelPruner):
                     # Skip further calculations if FLOPs varies proportional to output channel size
                     num_cur_flops = post_flops
                     num_next_flops = next_flops
-                    if num_cur_flops % candidate_channels[idx] == 0 and \
-                            num_next_flops % candidate_channels[idx + 1] == 0 and \
-                            num_cur_flops // candidate_channels[idx] == num_next_flops // candidate_channels[idx + 1]:
+                    if (
+                        num_cur_flops % candidate_channels[idx] == 0
+                        and num_next_flops % candidate_channels[idx + 1] == 0
+                        and num_cur_flops // candidate_channels[idx] == num_next_flops // candidate_channels[idx + 1]
+                    ):
                         diff_flops = num_cur_flops - num_next_flops
                     else:
                         possible_diff_flops = num_cur_flops - num_next_flops
@@ -257,9 +280,11 @@ class NetAdaptPruner(OneShotChannelPruner):
                         possible_diff_flops = None
                 post_flops = next_flops
 
-            log.info(f'Subgraph: {subgraph_id}, '
-                     f'Channels: {candidate_channels[idx + 1]}/{num_out_channels}, '
-                     f'FLOPS(pre/post/target): {pre_flops}/{post_flops}/{target_flops:.2f}')
+            log.info(
+                f'Subgraph: {subgraph_id}, '
+                f'Channels: {candidate_channels[idx + 1]}/{num_out_channels}, '
+                f'FLOPS(pre/post/target): {pre_flops}/{post_flops}/{target_flops:.2f}'
+            )
 
             # Early stop if we get the desired sparsity
             if post_flops < target_flops:
@@ -269,14 +294,14 @@ class NetAdaptPruner(OneShotChannelPruner):
         return {}, -1
 
     def prune_subgraph(self, sparsity: typing.Dict[str, float]) -> None:
-        """ Prunes the model with the sparsity dictionary given """
+        """Prunes the model with the sparsity dictionary given"""
 
         self.sparsity = copy.deepcopy(sparsity)
 
         super().prune()
 
     def prune(self):
-        """ The main function for pruning """
+        """The main function for pruning"""
 
         # PyTorch forbids initialization CUDA in the default fork settings
         # So `spawn` is used here instead
@@ -291,18 +316,22 @@ class NetAdaptPruner(OneShotChannelPruner):
         for i in range(max_workers):
             available_cores.put(i)
 
-        with ProcessPoolExecutor(max_workers=max_workers, mp_context=mp_context, initializer=device_init,
-                                 initargs=(available_cores,)) as pool:
+        with ProcessPoolExecutor(
+            max_workers=max_workers, mp_context=mp_context, initializer=device_init, initargs=(available_cores,)
+        ) as pool:
 
             cur_flops = self.calc_flops()
 
-            while (self.netadapt_max_rounds == -1 or self.iteration <= self.netadapt_max_rounds) \
-                    and cur_flops > self.budget:
+            while (
+                self.netadapt_max_rounds == -1 or self.iteration <= self.netadapt_max_rounds
+            ) and cur_flops > self.budget:
 
                 log.info(f"Start iteration {self.iteration}")
 
                 # Acquire target FLOPs for the current ratio
-                target_flops = cur_flops - self.budget_reduce_rate_init * cur_flops * (self.budget_reduce_rate_decay ** (self.iteration - 1))
+                target_flops = cur_flops - self.budget_reduce_rate_init * cur_flops * (
+                    self.budget_reduce_rate_decay ** (self.iteration - 1)
+                )
 
                 # Regenerate modifier, graph and center nodes before sending to child processes
                 if self.iteration != 1:
@@ -310,9 +339,13 @@ class NetAdaptPruner(OneShotChannelPruner):
 
                 # Prepare jobs for child processes
                 num_subgraphs = len(self.graph_modifier.sub_graphs)
-                results = pool.map(self.get_pruned_subgraph_info, [self.iteration] * num_subgraphs,
-                                   range(num_subgraphs), [cur_flops] * num_subgraphs,
-                                   [target_flops] * num_subgraphs)
+                results = pool.map(
+                    self.get_pruned_subgraph_info,
+                    [self.iteration] * num_subgraphs,
+                    range(num_subgraphs),
+                    [cur_flops] * num_subgraphs,
+                    [target_flops] * num_subgraphs,
+                )
 
                 # Get the step we should take by comparing the best accuracy among all sub jobs
                 max_idx, (best_acc, best_sparsity, best_flops) = max(enumerate(results), key=lambda x: x[1][0])
@@ -343,7 +376,7 @@ class NetAdaptPruner(OneShotChannelPruner):
                 self.iteration += 1
 
     def restore(self, iteration: int) -> torch.nn.Module:
-        """ Restores a model at specific iteration """
+        """Restores a model at specific iteration"""
 
         sparsity_path = os.path.join(self.netadapt_dir, f'iter_{iteration}_sparsity.yml')
         weights_path = os.path.join(self.netadapt_dir, f'iter_{iteration}.pth')

@@ -14,14 +14,9 @@ log = get_logger(__name__, 'INFO')
 
 
 class ATenLstmOperator(ATenLstmSchema):
-    def lstm_input_helper(self,
-                          input_tensors,
-                          params_tensors,
-                          has_biases,
-                          param_start_index,
-                          input_start_index,
-                          layer_idx,
-                          suffix):
+    def lstm_input_helper(
+        self, input_tensors, params_tensors, has_biases, param_start_index, input_start_index, layer_idx, suffix
+    ):
         weight_ih_slices = torch.chunk(params_tensors[param_start_index], 4, 0)
         gates = ["input", "forget", "cell", "output"]
         for idx, (weight_ih, gate) in enumerate(zip(weight_ih_slices, gates)):
@@ -45,17 +40,19 @@ class ATenLstmOperator(ATenLstmSchema):
                 bias = torch.zeros(bias_shape, dtype=torch.float32)
                 input_tensors[input_start_index + 11 + idx] = self.create_attr_tensor(bias)
 
-    def lstm_hidden_state_helper(self,
-                                 input_tensors,
-                                 hidden_state_tensors,
-                                 hidden_state_index,
-                                 input_index,
-                                 num_directions,
-                                 direction_idx,
-                                 num_layers,
-                                 layer_idx,
-                                 suffix,
-                                 state_type):
+    def lstm_hidden_state_helper(
+        self,
+        input_tensors,
+        hidden_state_tensors,
+        hidden_state_index,
+        input_index,
+        num_directions,
+        direction_idx,
+        num_layers,
+        layer_idx,
+        suffix,
+        state_type,
+    ):
 
         hidden_state_tensor = hidden_state_tensors[hidden_state_index]
         assert hidden_state_tensor.dim() == 3
@@ -63,17 +60,19 @@ class ATenLstmOperator(ATenLstmSchema):
         input_tensors[input_index] = self.create_attr_tensor(hidden_state_tensor[slice_idx])
         input_tensors[input_index].is_variable = True
 
-    def parse_common(self,
-                     input_tensor,
-                     hidden_state_tensors,
-                     params_tensors,
-                     has_biases,
-                     num_layers,
-                     dropout,
-                     is_train,
-                     bidirectional,
-                     batch_first,
-                     graph_converter):
+    def parse_common(
+        self,
+        input_tensor,
+        hidden_state_tensors,
+        params_tensors,
+        has_biases,
+        num_layers,
+        dropout,
+        is_train,
+        bidirectional,
+        batch_first,
+        graph_converter,
+    ):
         assert is_train in (False, 0)
         expected_num_params = 2 * num_layers
         params_step = 2
@@ -83,8 +82,9 @@ class ATenLstmOperator(ATenLstmSchema):
         if bidirectional:
             expected_num_params *= 2
 
-        assert len(
-            params_tensors) == expected_num_params, f'num of params in LSTM is wrong. got: {len(params_tensors)}, expected: {expected_num_params}'
+        assert (
+            len(params_tensors) == expected_num_params
+        ), f'num of params in LSTM is wrong. got: {len(params_tensors)}, expected: {expected_num_params}'
 
         num_input_tensors = 24
         num_directions = 1
@@ -108,26 +108,30 @@ class ATenLstmOperator(ATenLstmSchema):
             inputs = [current_input] + [tfl.OptionalTensorInstance] * (num_input_tensors - 1)
 
             for direction_idx in range(num_directions):
-                self.lstm_input_helper(inputs,
-                                       params_tensors,
-                                       has_biases,
-                                       params_offset + param_start_indices[direction_idx],
-                                       input_start_indices[direction_idx],
-                                       layer_idx,
-                                       suffixes[direction_idx])
+                self.lstm_input_helper(
+                    inputs,
+                    params_tensors,
+                    has_biases,
+                    params_offset + param_start_indices[direction_idx],
+                    input_start_indices[direction_idx],
+                    layer_idx,
+                    suffixes[direction_idx],
+                )
 
             for direction_idx in range(num_directions):
                 for state_kind_idx in range(len(state_kinds)):
-                    self.lstm_hidden_state_helper(inputs,
-                                                  hidden_state_tensors,
-                                                  state_kind_idx,
-                                                  state_start_index + direction_idx * num_directions + state_kind_idx,
-                                                  num_directions,
-                                                  direction_idx,
-                                                  num_layers,
-                                                  layer_idx,
-                                                  suffixes[direction_idx],
-                                                  state_kinds[state_kind_idx])
+                    self.lstm_hidden_state_helper(
+                        inputs,
+                        hidden_state_tensors,
+                        state_kind_idx,
+                        state_start_index + direction_idx * num_directions + state_kind_idx,
+                        num_directions,
+                        direction_idx,
+                        num_layers,
+                        layer_idx,
+                        suffixes[direction_idx],
+                        state_kinds[state_kind_idx],
+                    )
 
             if layer_idx == num_layers - 1:
                 layer_output = lstm_output
@@ -138,14 +142,24 @@ class ATenLstmOperator(ATenLstmSchema):
             outputs = [layer_output]
 
             if bidirectional:
-                ops.append(tfl.BidirectionalSequenceLstmOperator(inputs, outputs,
-                                                                 fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
-                                                                 timeMajor=not batch_first,
-                                                                 mergeOutputs=True))
+                ops.append(
+                    tfl.BidirectionalSequenceLstmOperator(
+                        inputs,
+                        outputs,
+                        fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
+                        timeMajor=not batch_first,
+                        mergeOutputs=True,
+                    )
+                )
             else:
-                ops.append(tfl.UnidirectionalSequenceLstmOperator(inputs, outputs,
-                                                                  fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
-                                                                  timeMajor=not batch_first))
+                ops.append(
+                    tfl.UnidirectionalSequenceLstmOperator(
+                        inputs,
+                        outputs,
+                        fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
+                        timeMajor=not batch_first,
+                    )
+                )
 
             current_input = outputs[0]
             params_offset += params_step * num_directions
@@ -161,9 +175,18 @@ class ATenLstmOperator(ATenLstmSchema):
         input_tensor, hidden_state_tensors, params_tensors = self.input_tensors[:3]
         has_biases, num_layers, dropout, is_train, bidirectional, batch_first = self.input_tensors[3:]
 
-        self.parse_common(input_tensor, hidden_state_tensors, params_tensors,
-                          has_biases, num_layers, dropout, is_train, bidirectional,
-                          batch_first, graph_converter)
+        self.parse_common(
+            input_tensor,
+            hidden_state_tensors,
+            params_tensors,
+            has_biases,
+            num_layers,
+            dropout,
+            is_train,
+            bidirectional,
+            batch_first,
+            graph_converter,
+        )
 
 
 class ATenBatchNormOperator(ATenBatchNormSchema):
@@ -199,10 +222,9 @@ class ATenConstantPadNdOperator(ATenConstantPadNdSchema):
                 constant_arr = np.array([constant_value], dtype='float32')
             else:
                 float_arr = torch.tensor([constant_value], dtype=torch.float32)
-                constant_arr = torch.quantize_per_tensor(float_arr,
-                                                         output.quantization.scale,
-                                                         output.quantization.zero_point,
-                                                         torch.quint8)
+                constant_arr = torch.quantize_per_tensor(
+                    float_arr, output.quantization.scale, output.quantization.zero_point, torch.quint8
+                )
 
             inputs.append(self.create_attr_tensor(constant_arr))
 
@@ -297,7 +319,9 @@ class ATenAdaptiveAvgPool2dOperator(ATenAdaptiveAvgPool2dSchema):
         output_h, output_w = self.input_tensors[1]
 
         dim_h, dim_w = input_tensor.shape[2:]
-        assert dim_h % output_h == 0 and dim_w % output_w == 0, f'not supported: input dim: [{dim_h}, {dim_w}], output size: [{output_h}, {output_w}]'
+        assert (
+            dim_h % output_h == 0 and dim_w % output_w == 0
+        ), f'not supported: input dim: [{dim_h}, {dim_w}], output size: [{output_h}, {output_w}]'
         assert input_tensor.tensor.ndim == 4, 'Only 4D input is supported'
 
         ops = []
@@ -377,7 +401,8 @@ class ATenHardtanhOperator(ATenHardtanhSchema):
             ops = []
             input_tensor = self.find_or_create_input(0, graph_converter)
             inter_tensor = self.create_transform_tensor(
-                np.where(input_tensor.tensor > min_value, input_tensor.tensor, min_value))
+                np.where(input_tensor.tensor > min_value, input_tensor.tensor, min_value)
+            )
             min_value_tensor = self.create_attr_tensor(np.array([min_value], dtype=input_tensor.dtype))
             ops.append(tfl.MaximumOperator([input_tensor, min_value_tensor], [inter_tensor]))
 
@@ -667,16 +692,19 @@ class ATenStackOperator(ATenStackSchema):
             dim += self.input_tensors[0][0].ndim + 1
 
         names = graph_converter.get_list_expanded_names(self.input_names[0])
-        orig_inputs = self.to_tfl_tensors(names, self.input_tensors[0],
-                                          graph_converter=graph_converter,
-                                          non_existent_as_buffer=True)
-        inputs = [self.create_transform_tensor(np.expand_dims(orig_inputs[i].tensor, dim))
-                  for i in range(len(orig_inputs))]
+        orig_inputs = self.to_tfl_tensors(
+            names, self.input_tensors[0], graph_converter=graph_converter, non_existent_as_buffer=True
+        )
+        inputs = [
+            self.create_transform_tensor(np.expand_dims(orig_inputs[i].tensor, dim)) for i in range(len(orig_inputs))
+        ]
         attrs = [self.create_attr_tensor(np.array(t.shape, dtype='int32')) for t in inputs]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
-        ops = [tfl.ReshapeOperator([orig, attr], [new], new.tensor.shape)
-               for orig, new, attr in zip(orig_inputs, inputs, attrs)]
+        ops = [
+            tfl.ReshapeOperator([orig, attr], [new], new.tensor.shape)
+            for orig, new, attr in zip(orig_inputs, inputs, attrs)
+        ]
         ops.append(tfl.ConcatenationOperator(inputs, outputs, dim))
 
         for op in ops:
@@ -696,9 +724,9 @@ class ATenCatOperator(ATenCatSchema):
             dim += self.input_tensors[0][0].ndim
 
         names = graph_converter.get_list_expanded_names(self.input_names[0])
-        inputs = self.to_tfl_tensors(names, self.input_tensors[0],
-                                     graph_converter=graph_converter,
-                                     non_existent_as_buffer=True)
+        inputs = self.to_tfl_tensors(
+            names, self.input_tensors[0], graph_converter=graph_converter, non_existent_as_buffer=True
+        )
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
         graph_converter.add_operator(tfl.ConcatenationOperator(inputs, outputs, dim))
@@ -749,9 +777,12 @@ class ATenToOperator(ATenToSchema):
             temp_tensor = self.output_tensors[0]
             self.output_tensors[0] = temp_tensor.detach().clone().to(dtype=torch.float32)
 
-        self.elementwise_unary(tfl.CastOperator, graph_converter,
-                               tfl.torch_tflite_dtype_mappings[self.input_tensors[0].dtype],
-                               tfl.torch_tflite_dtype_mappings[out_type])
+        self.elementwise_unary(
+            tfl.CastOperator,
+            graph_converter,
+            tfl.torch_tflite_dtype_mappings[self.input_tensors[0].dtype],
+            tfl.torch_tflite_dtype_mappings[out_type],
+        )
 
         if patch:
             self.output_tensors[0] = temp_tensor
@@ -807,19 +838,26 @@ class ATenFloorDivideOperator(ATenFloorDivideSchema):
             if other.buffer is None:
                 new_other = self.input_tensors[1].detach().clone().to(dtype=self.input_tensors[0].dtype)
                 new_other_t = self.create_transform_tensor(new_other)
-                graph_converter.add_operator(tfl.CastOperator([other], [new_other_t],
-                                                              tfl.torch_tflite_dtype_mappings[self.input_tensors[1].dtype],
-                                                              tfl.torch_tflite_dtype_mappings[self.input_tensors[0].dtype]))
+                graph_converter.add_operator(
+                    tfl.CastOperator(
+                        [other],
+                        [new_other_t],
+                        tfl.torch_tflite_dtype_mappings[self.input_tensors[1].dtype],
+                        tfl.torch_tflite_dtype_mappings[self.input_tensors[0].dtype],
+                    )
+                )
                 self.input_tensors[1] = new_other
                 self.input_names[1] = new_other_t.name
             else:
                 self.input_tensors[1] = self.input_tensors[1].to(dtype=self.input_tensors[0].dtype)
 
-        assert all((not t.is_floating_point() for t in self.input_tensors[:2])), \
-            "floor_divide for floats is not supported"
+        assert all(
+            (not t.is_floating_point() for t in self.input_tensors[:2])
+        ), "floor_divide for floats is not supported"
 
-        assert all(((t >= 0).all() for t in self.input_tensors[:2])), \
-            "floor_divide for negative numbers is not supported"
+        assert all(
+            ((t >= 0).all() for t in self.input_tensors[:2])
+        ), "floor_divide for negative numbers is not supported"
 
         self.elementwise_binary(tfl.FloorDivOperator, graph_converter, False)
 
@@ -849,8 +887,9 @@ class ATenConv2dOperator(ATenConv2dSchema):
         inputs = [self.find_or_create_input(i, graph_converter) for i in range(end_index)]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
-        graph_converter.add_operator(tfl.GenericConvOperator(
-            inputs, outputs, stride, padding, dilation, output_padding, groups))
+        graph_converter.add_operator(
+            tfl.GenericConvOperator(inputs, outputs, stride, padding, dilation, output_padding, groups)
+        )
 
 
 class ATenConvolutionOperator(ATenConvolutionSchema):
@@ -869,11 +908,13 @@ class ATenConvolutionOperator(ATenConvolutionSchema):
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
         if transpose == 0:
-            graph_converter.add_operator(tfl.GenericConvOperator(
-                inputs, outputs, stride, padding, dilation, output_padding, groups))
+            graph_converter.add_operator(
+                tfl.GenericConvOperator(inputs, outputs, stride, padding, dilation, output_padding, groups)
+            )
         else:
-            graph_converter.add_operator(tfl.GenericTransposeConvOperator(
-                inputs, outputs, stride, padding, dilation, output_padding, groups))
+            graph_converter.add_operator(
+                tfl.GenericTransposeConvOperator(inputs, outputs, stride, padding, dilation, output_padding, groups)
+            )
 
 
 class ATenSliceOperator(ATenSliceSchema):
@@ -1052,8 +1093,9 @@ class ATenSelectOperator(ATenSelectSchema):
 
         index_tensor = self.create_attr_tensor(np.array([index], dtype='int32'))
         all_out = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
-        gather_out = self.create_transform_tensor(np.expand_dims(
-            all_out.tensor, dim), quantization=all_out.quantization)
+        gather_out = self.create_transform_tensor(
+            np.expand_dims(all_out.tensor, dim), quantization=all_out.quantization
+        )
         reshape_attr = self.create_attr_tensor(self.output_tensors[0].shape)
 
         ops = []
@@ -1105,7 +1147,9 @@ class ATenLinearOperator(ATenLinearSchema):
         if input_tensor.dim() >= 2 and input_tensor.dim() <= 5:
             assert len(weight_tensor.shape) == 2, "Weight of AddMM should be 2D"
             if bias_tensor is not None:
-                input_tensor, weight_tensor, bias_tensor = [self.find_or_create_input(i, graph_converter) for i in range(3)]
+                input_tensor, weight_tensor, bias_tensor = [
+                    self.find_or_create_input(i, graph_converter) for i in range(3)
+                ]
             else:
                 input_tensor, weight_tensor = [self.find_or_create_input(i, graph_converter) for i in range(2)]
                 bias_tensor = self.create_attr_tensor(np.zeros(weight_tensor.shape[0], dtype='float32'))
@@ -1116,9 +1160,11 @@ class ATenLinearOperator(ATenLinearSchema):
             keep_dims = len(outputs[0].shape) > 2
             ops.append(tfl.FullyConnectedOperator(inputs, outputs, keepNumDims=keep_dims))
         else:
-            log.error(f'aten::linear is not supported for input shape {input_tensor.shape}, '
-                      f'weight shape {weight_tensor.shape}, '
-                      f'bias type {type(bias_tensor).__name__}')
+            log.error(
+                f'aten::linear is not supported for input shape {input_tensor.shape}, '
+                f'weight shape {weight_tensor.shape}, '
+                f'bias type {type(bias_tensor).__name__}'
+            )
             self.unimplemented(node, attrs, args)
 
         for op in ops:
@@ -1144,7 +1190,8 @@ class ATenClampOperator(ATenClampSchema):
             input_tensor = self.find_or_create_input(0, graph_converter)
             if has_min and has_max:
                 inter_tensor = self.create_transform_tensor(
-                    np.where(input_tensor.tensor > min_value, input_tensor.tensor, min_value))
+                    np.where(input_tensor.tensor > min_value, input_tensor.tensor, min_value)
+                )
                 min_value_tensor = self.create_attr_tensor(np.array([min_value], dtype=input_tensor.dtype))
                 ops.append(tfl.MaximumOperator([input_tensor, min_value_tensor], [inter_tensor]))
 
@@ -1294,7 +1341,9 @@ class ATenInstanceNormOperator(ATenInstanceNormSchema):
             outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
             ops.append(tfl.BatchNormOperator(inputs, outputs, eps))
         else:
-            assert track_running_stats is False, 'Instance norm with track_running_stats=True and affine=False is not supported'
+            assert (
+                track_running_stats is False
+            ), 'Instance norm with track_running_stats=True and affine=False is not supported'
             dims = len(inp.shape)
             axis = tuple(range(2, dims))
             axis_tensor = self.create_attr_tensor(np.array(axis, dtype='int32'))
@@ -1363,11 +1412,13 @@ class ATenIndexOperator(ATenIndexSchema):
 
         input_tensor = self.find_or_create_input(0, graph_converter)
         # TODO: support negative tensor indices
-        filtered_tensors = [t + (t < 0).int() * input_tensor.shape[i] if n not in graph_converter.tensor_map else t for i,
-                            n, t in zip(filtered_dims, filtered_names, filtered_tensors)]
-        indice_tensors = self.to_tfl_tensors(filtered_names, filtered_tensors,
-                                             graph_converter=graph_converter,
-                                             non_existent_as_buffer=True)
+        filtered_tensors = [
+            t + (t < 0).int() * input_tensor.shape[i] if n not in graph_converter.tensor_map else t
+            for i, n, t in zip(filtered_dims, filtered_names, filtered_tensors)
+        ]
+        indice_tensors = self.to_tfl_tensors(
+            filtered_names, filtered_tensors, graph_converter=graph_converter, non_existent_as_buffer=True
+        )
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
         actual_input = input_tensor
@@ -1525,7 +1576,8 @@ class ATenVarOperator(ATenVarSchema):
 
         if unbiased and correction != 0:
             squared_diff_sum = self.create_transform_tensor(
-                np.sum(squared_diff.tensor, axis=tuple(dims), keepdims=keep_dims))
+                np.sum(squared_diff.tensor, axis=tuple(dims), keepdims=keep_dims)
+            )
             ops.append(tfl.SumOperator([squared_diff, dims_tensor], [squared_diff_sum], keepDims=keep_dims))
             ops.append(tfl.DivOperator([squared_diff_sum, samples_tensor], [output_tensor]))
         else:
@@ -1572,14 +1624,16 @@ class ATenStdOperator(ATenStdSchema):
 
         if unbiased and correction != 0:
             squared_diff_sum = self.create_transform_tensor(
-                np.sum(squared_diff.tensor, axis=tuple(dims), keepdims=keep_dims))
+                np.sum(squared_diff.tensor, axis=tuple(dims), keepdims=keep_dims)
+            )
             ops.append(tfl.SumOperator([squared_diff, dims_tensor], [squared_diff_sum], keepDims=keep_dims))
 
             var_tensor = self.create_transform_tensor(squared_diff_sum.tensor / samples_tensor.tensor)
             ops.append(tfl.DivOperator([squared_diff_sum, samples_tensor], [var_tensor]))
         else:
             var_tensor = self.create_transform_tensor(
-                np.mean(squared_diff.tensor, axis=tuple(dims), keepdims=keep_dims))
+                np.mean(squared_diff.tensor, axis=tuple(dims), keepdims=keep_dims)
+            )
             ops.append(tfl.MeanOperator([squared_diff, dims_tensor], [var_tensor], keepDims=keep_dims))
 
         ops.append(tfl.SqrtOperator([var_tensor], [output_tensor]))
@@ -1599,8 +1653,9 @@ class ATenReflectionPad2dOperator(ATenReflectionPad2dSchema):
         pad_tensor = self.create_attr_tensor(tfl_pads)
 
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-        graph_converter.add_operator(tfl.MirrorPadOperator(
-            [input_tensor, pad_tensor], outputs, tfl_schema.MirrorPadMode.REFLECT))
+        graph_converter.add_operator(
+            tfl.MirrorPadOperator([input_tensor, pad_tensor], outputs, tfl_schema.MirrorPadMode.REFLECT)
+        )
 
 
 class ATenReflectionPad1dOperator(ATenReflectionPad1dSchema):
@@ -1614,8 +1669,9 @@ class ATenReflectionPad1dOperator(ATenReflectionPad1dSchema):
         pad_tensor = self.create_attr_tensor(tfl_pads)
 
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-        graph_converter.add_operator(tfl.MirrorPadOperator(
-            [input_tensor, pad_tensor], outputs, tfl_schema.MirrorPadMode.REFLECT))
+        graph_converter.add_operator(
+            tfl.MirrorPadOperator([input_tensor, pad_tensor], outputs, tfl_schema.MirrorPadMode.REFLECT)
+        )
 
 
 class ATenSplitOperator(ATenSplitSchema):
@@ -1706,7 +1762,7 @@ class ATenPixelShuffleOperator(ATenPixelShuffleSchema):
 
         c = input_tensor.shape[1]
         bs = upscale_factor
-        perm = np.arange(c).reshape(c // (bs ** 2), bs, bs).transpose(1, 2, 0).flatten()
+        perm = np.arange(c).reshape(c // (bs**2), bs, bs).transpose(1, 2, 0).flatten()
         if not np.array_equal(np.sort(perm), perm):
             reordered = self.create_transform_tensor(ops[0].outputs[0].tensor[:, :, :, perm])
             indices = self.create_attr_tensor(perm.astype('int32'))
@@ -1740,7 +1796,7 @@ class ATenPixelUnshuffleOperator(ATenPixelUnshuffleSchema):
 
         c = input_tensor.shape[1]
         bs = downscale_factor
-        perm = np.arange(c * (bs ** 2)).reshape(bs, bs, c).transpose(2, 0, 1).flatten()
+        perm = np.arange(c * (bs**2)).reshape(bs, bs, c).transpose(2, 0, 1).flatten()
         if not np.array_equal(np.sort(perm), perm):
             reordered = self.create_transform_tensor(ops[1].outputs[0].tensor[:, :, :, perm])
             indices = self.create_attr_tensor(perm.astype('int32'))
@@ -1852,16 +1908,20 @@ class ATenGatherOperator(ATenGatherSchema):
             axis = len(index_shape) - 1
             shape_tensor = self.create_attr_tensor(np.array(index_shape, dtype='int32'))
             index_reshaped = self.create_transform_tensor(np.reshape(index_tensor.tensor, index_shape))
-            graph_converter.add_operator(tfl.ReshapeOperator(
-                [index_tensor, shape_tensor], [index_reshaped], index_shape))
+            graph_converter.add_operator(
+                tfl.ReshapeOperator([index_tensor, shape_tensor], [index_reshaped], index_shape)
+            )
 
             if str(index_reshaped.dtype) != 'int32':
                 index_casted = self.create_transform_tensor(index_reshaped.tensor.astype('int32'))
-                graph_converter.add_operator(tfl.CastOperator(
-                    [index_reshaped], [index_casted],
-                    tfl.numpy_tflite_dtype_mappings[str(index_reshaped.dtype)],
-                    tfl.numpy_tflite_dtype_mappings[str(index_casted.dtype)]
-                ))
+                graph_converter.add_operator(
+                    tfl.CastOperator(
+                        [index_reshaped],
+                        [index_casted],
+                        tfl.numpy_tflite_dtype_mappings[str(index_reshaped.dtype)],
+                        tfl.numpy_tflite_dtype_mappings[str(index_casted.dtype)],
+                    )
+                )
                 index_reshaped = index_casted
 
             indices_tensors[dim] = index_reshaped
@@ -1917,9 +1977,14 @@ class ATenCopyOperator(ATenCopySchema):
                 if other_tensor.dtype != output_tensor.dtype:
                     casted = self.create_transform_tensor(other_tensor.tensor.astype(output_tensor.dtype))
                     actual_input = casted
-                    ops.append(tfl.CastOperator([other_tensor], [casted],
-                                                inDataType=tfl.numpy_tflite_dtype_mappings[str(other_tensor.dtype)],
-                                                outDataType=tfl.numpy_tflite_dtype_mappings[str(output_tensor.dtype)]))
+                    ops.append(
+                        tfl.CastOperator(
+                            [other_tensor],
+                            [casted],
+                            inDataType=tfl.numpy_tflite_dtype_mappings[str(other_tensor.dtype)],
+                            outDataType=tfl.numpy_tflite_dtype_mappings[str(output_tensor.dtype)],
+                        )
+                    )
 
                 if other_shape == output_shape:
                     shape_tensor = self.create_attr_tensor(np.array(other_shape, dtype='int32'))
@@ -1972,9 +2037,18 @@ class ATenQuantizedLstmOperator(ATenQuantizedLstmSchema, ATenLstmOperator):
             params_l.extend(weight_l)
             params_l.extend(bias_l)
 
-        self.parse_common(input_tensor, hidden_state_tensors, params_l,
-                          has_biases, num_layers, dropout, is_train, bidirectional,
-                          batch_first, graph_converter)
+        self.parse_common(
+            input_tensor,
+            hidden_state_tensors,
+            params_l,
+            has_biases,
+            num_layers,
+            dropout,
+            is_train,
+            bidirectional,
+            batch_first,
+            graph_converter,
+        )
 
 
 class ATenBmmOperator(ATenBmmSchema):
@@ -2175,15 +2249,23 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
                 casted = other.clone().to(dtype=out.dtype)
                 if other_t.buffer is None:
                     new_other = self.create_transform_tensor(casted)
-                    ops.append(tfl.CastOperator(
-                        [other_t], [new_other], tfl.torch_tflite_dtype_mappings[other.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+                    ops.append(
+                        tfl.CastOperator(
+                            [other_t],
+                            [new_other],
+                            tfl.torch_tflite_dtype_mappings[other.dtype],
+                            tfl.torch_tflite_dtype_mappings[out.dtype],
+                        )
+                    )
                     other_t = new_other
                     # TODO: +/- inf check for variable tensors
                 else:
                     casted = torch.functional.atleast_1d(casted)
                     if torch.isinf(casted).any():
-                        log.warning('aten::masked_fill(input, mask, value) where value=[+/-]inf is not supported, '
-                                    'trying to convert it to the nearest value')
+                        log.warning(
+                            'aten::masked_fill(input, mask, value) where value=[+/-]inf is not supported, '
+                            'trying to convert it to the nearest value'
+                        )
                         type_info = torch.finfo(casted.dtype)
                         clamped = torch.clamp(casted, type_info.min, type_info.max)
                         other_t = self.create_attr_tensor(clamped, name=self.input_names[other_idx])
@@ -2192,8 +2274,10 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
         elif type(other) in (int, float):
             other_a = np.array([other], dtype=self.input_tensors[input_idx].detach().numpy().dtype)
             if np.isinf(other_a).any():
-                log.warning('aten::masked_fill(input, mask, value) where value=[+/-]inf is not supported, '
-                            'trying to convert it to the nearest value')
+                log.warning(
+                    'aten::masked_fill(input, mask, value) where value=[+/-]inf is not supported, '
+                    'trying to convert it to the nearest value'
+                )
                 type_info = np.finfo(other_a.dtype)
                 other_a = np.clip(other_a, type_info.min, type_info.max)
             other_t = self.create_attr_tensor(other_a)
@@ -2201,8 +2285,14 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
             assert False, "value should have type float, tensor in aten::masked_fill(input, mask, value)"
 
         input_mask = self.create_transform_tensor(mask_tensor.tensor.astype(input_tensor.dtype))
-        ops.append(tfl.CastOperator([mask_tensor], [input_mask],
-                   tfl.torch_tflite_dtype_mappings[mask.dtype], tfl.torch_tflite_dtype_mappings[out.dtype]))
+        ops.append(
+            tfl.CastOperator(
+                [mask_tensor],
+                [input_mask],
+                tfl.torch_tflite_dtype_mappings[mask.dtype],
+                tfl.torch_tflite_dtype_mappings[out.dtype],
+            )
+        )
 
         masked = self.create_transform_tensor(other_t.tensor * mask_tensor.tensor)
         ops.append(tfl.MulOperator([other_t, input_mask], [masked]))

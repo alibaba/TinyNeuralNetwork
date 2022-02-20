@@ -34,8 +34,8 @@ class PrimListConstructConverter(PrimOperatorConverter):
 
 class PrimListUnpackConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
-        assert(type(self.input_tensors[0]) in (list, tuple))
-        assert(len(self.input_tensors[0]) == len(self.output_names))
+        assert type(self.input_tensors[0]) in (list, tuple)
+        assert len(self.input_tensors[0]) == len(self.output_names)
         self.output_tensors.extend(self.input_tensors[0])
 
         try:
@@ -67,16 +67,19 @@ class PrimGetAttrConverter(PrimOperatorConverter):
 
 class PrimNumToTensorConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
-        assert(type(self.input_tensors[0]) in (int, float))
-        assert(len(self.input_tensors) == len(self.output_names))
+        assert type(self.input_tensors[0]) in (int, float)
+        assert len(self.input_tensors) == len(self.output_names)
         t = torch.tensor(self.input_tensors[0])
         if t.dtype == torch.int64:
             log.warning(
-                f'{self.output_names[0]} is of type int64, which is unsupported in TFLite, trying to downcast to int32')
+                f'{self.output_names[0]} is of type int64, which is unsupported in TFLite, trying to downcast to int32'
+            )
             t = t.to(dtype=torch.int32)
         if t.dtype == torch.float64:
             log.warning(
-                f'{self.output_names[0]} is of type float64, which is unsupported in TFLite, trying to downcast to float32')
+                f'{self.output_names[0]} is of type float64, which is unsupported in TFLite, trying to downcast to'
+                ' float32'
+            )
             t = t.to(dtype=torch.float32)
         self.output_tensors.append(t)
 
@@ -139,7 +142,8 @@ class PrimConstantChunkConverter(PrimOperatorConverter):
                 size_splits = np.array([t.size(dim) for t in self.output_tensors], dtype='int32')
                 chunks = len(size_splits)
                 split_tensor = self.create_attr_tensor(size_splits)
-                graph_converter.add_operator(tfl.SplitVOperator(
-                    [input_tensor, split_tensor, dim_tensor], outputs, chunks))
+                graph_converter.add_operator(
+                    tfl.SplitVOperator([input_tensor, split_tensor, dim_tensor], outputs, chunks)
+                )
             else:
                 graph_converter.add_operator(tfl.SplitOperator([dim_tensor, input_tensor], outputs, chunks))

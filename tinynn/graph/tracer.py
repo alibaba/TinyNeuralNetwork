@@ -25,44 +25,45 @@ from ._utils import patch_getitem, revert_getitem
 
 
 class GlobalData(object):
-    """ The data structure to store data that can be used in this script,
-        which is a wrapper of a object of a built-in type. """
+    """The data structure to store data that can be used in this script,
+    which is a wrapper of a object of a built-in type."""
 
     def __init__(self, value):
         super().__init__()
         self.value = value
 
     def get_value(self):
-        """ Returns the inner value of the wrapper """
+        """Returns the inner value of the wrapper"""
         return self.value
 
     def set_value(self, value):
-        """ Sets the inner value of the wrapper """
+        """Sets the inner value of the wrapper"""
         self.value = value
 
     def __str__(self):
-        """ Returns the string representation of the inner object """
+        """Returns the string representation of the inner object"""
         return self.value.__str__()
 
     def __repr__(self):
-        """ Returns the string representation of the inner object """
+        """Returns the string representation of the inner object"""
         return self.value.__repr__()
 
     def __call__(self, *args):
-        """ Simplifies the usage of the wrapper
-            e.g. a = GlobalData(3)
-                 a()  -> a.get_value()
-                 a(1) -> a.set_value(1) """
+        """Simplifies the usage of the wrapper
+        e.g. a = GlobalData(3)
+             a()  -> a.get_value()
+             a(1) -> a.set_value(1)"""
         if len(args) == 0:
             return self.get_value()
         elif len(args) == 1:
             return self.set_value(*args)
         else:
-            raise ValueError(f'length of input data must in [0,1],\
-                but got length: {len(args)} --> args: {args}')
+            raise ValueError(
+                f'length of input data must in [0,1],                but got length: {len(args)} --> args: {args}'
+            )
 
     def __bool__(self):
-        """ Returns the actual boolean value of the inner object """
+        """Returns the actual boolean value of the inner object"""
         return self.value.__bool__()
 
 
@@ -98,17 +99,7 @@ if __name__ == "__main__":
 """
 
 # Special math operators
-SPECIAL_OPERATORS = ['add',
-                     'and',
-                     'div',
-                     'floordiv',
-                     'lshift',
-                     'mul',
-                     'or',
-                     'pow',
-                     'rshift',
-                     'sub',
-                     'xor']
+SPECIAL_OPERATORS = ['add', 'and', 'div', 'floordiv', 'lshift', 'mul', 'or', 'pow', 'rshift', 'sub', 'xor']
 
 
 # Global objects
@@ -159,7 +150,8 @@ importable_module_names = {}
 
 
 class TraceNode(object):
-    """ A basic data structure to represent a node in the computation graph """
+    """A basic data structure to represent a node in the computation graph"""
+
     module: typing.Union[torch.nn.Module, 'TraceFunction', 'ConstantNode']
     prev_nodes: typing.List['TraceNode']
     next_nodes: typing.List['TraceNode']
@@ -170,7 +162,11 @@ class TraceNode(object):
     unique_name: str
     active: bool
 
-    def __init__(self, module: typing.Union[torch.nn.Module, 'ConstantNode', 'TraceFunction'], cur_graph: typing.Optional['TraceGraph'] = None):
+    def __init__(
+        self,
+        module: typing.Union[torch.nn.Module, 'ConstantNode', 'TraceFunction'],
+        cur_graph: typing.Optional['TraceGraph'] = None,
+    ):
         # Inner module, could either be a `nn.Module`, `ConstantNode` or `TraceFunction`
         self.module = module
 
@@ -222,39 +218,39 @@ class TraceNode(object):
             cur_graph.global_nodes[self.unique_name] = 0
 
     def type(self):
-        """ Returns the original name of the function or the type of the module """
+        """Returns the original name of the function or the type of the module"""
         if type(self.module) == TraceFunction:
             return self.module.func_type
 
         return type(self.module)
 
     def kind(self):
-        """ Returns the kind of the function or the type of the module """
+        """Returns the kind of the function or the type of the module"""
         if type(self.module) == TraceFunction:
             return self.module.kind
 
         return type(self.module)
 
     def is_class(self) -> bool:
-        """ Judges whether it is a class function or not """
+        """Judges whether it is a class function or not"""
         if type(self.module) == TraceFunction:
             return self.module.is_class
         else:
             return False
 
     def full_name(self) -> str:
-        """ Returns the original full name of the function (including namespace) """
+        """Returns the original full name of the function (including namespace)"""
         if type(self.module) in (TraceFunction, ConstantNode):
             return self.module.full_name
         else:
             return f'{type(self.module).__module__}.{type(self.module).__name__}'
 
     def __hash__(self) -> str:
-        """ Uses the unique name as the hash for the node """
+        """Uses the unique name as the hash for the node"""
         return self.unique_name
 
     def prev_node_unique_name(self, idx) -> str:
-        """ A utility function to generate the name of the previous node with index """
+        """A utility function to generate the name of the previous node with index"""
         if idx < len(self.prev_nodes) and idx < len(self.prev_indices):
             node_name = self.prev_nodes[idx].unique_name
             node_idx = self.prev_indices[idx]
@@ -274,7 +270,7 @@ class TraceNode(object):
 
 
 class ConstantNode(object):
-    """ A data structure for runtime-defined constants """
+    """A data structure for runtime-defined constants"""
 
     def __init__(self, data: typing.List, dtype: torch.dtype, shape: torch.Size):
         # Raw data (list)
@@ -302,7 +298,7 @@ class ConstantNode(object):
 
     def parse(self, convert_to_parameter: bool = False):
         def _stringify_list(content) -> str:
-            """ Convert a list of objects to a string """
+            """Convert a list of objects to a string"""
             if isinstance(content, (list, tuple)):
                 sub_contents = []
                 for item in content:
@@ -323,9 +319,11 @@ class ConstantNode(object):
 
 
 class TraceFunction(object):
-    """ A data structure for traced functions """
+    """A data structure for traced functions"""
 
-    def __init__(self, full_name: str, is_class: bool = False, is_property: bool = False, prefix: typing.Optional[str] = None):
+    def __init__(
+        self, full_name: str, is_class: bool = False, is_property: bool = False, prefix: typing.Optional[str] = None
+    ):
         super().__init__()
 
         # The base name of the function
@@ -385,7 +383,7 @@ class TraceFunction(object):
         self.args_offset = None
 
     def __repr__(self) -> str:
-        """ Returns the string representation of the object """
+        """Returns the string representation of the object"""
 
         arg_len = len(self.tensor_names)
 
@@ -399,7 +397,7 @@ class TraceFunction(object):
         return expr
 
     def extra_expr(self, prefix=None, first=None):
-        """ Returns the extra string representation of the object """
+        """Returns the extra string representation of the object"""
         arg_len = len(self.tensor_names)
 
         if arg_len == 0:
@@ -431,7 +429,7 @@ class TraceFunction(object):
         return expr
 
     def __call__(self, *args, **kwargs):
-        """ Calls the function with a list of tensor inputs """
+        """Calls the function with a list of tensor inputs"""
 
         if len(kwargs) > 0:
             log.warning('Keyword arguments are ignored when calling TraceFunction')
@@ -457,15 +455,16 @@ class TraceFunction(object):
         return eval(expr)
 
     def parse_args(self, *args, **kwargs):
-        """ Sets the string representation of the arguments """
+        """Sets the string representation of the arguments"""
 
         def _tensor_name(a, convert_to_parameter=False):
-            """ Get the tensor name from the computation graph """
+            """Get the tensor name from the computation graph"""
             ns = ''
             if id(a) not in current_graph().tensor_pre_node_dict:
                 if not a.is_leaf:
                     log.error(
-                        f'Connection is lost when generating code for {self.unique_name} of type {self.full_name}')
+                        f'Connection is lost when generating code for {self.unique_name} of type {self.full_name}'
+                    )
                 else:
                     # Constant generation
                     log.warning('Constant generation is experimental and may yield error')
@@ -496,22 +495,22 @@ class TraceFunction(object):
                 return f"{ns}{pre_node_name}"
 
         def _escape_arg(arg: str):
-            """ Escapes the special characters in the argument string """
+            """Escapes the special characters in the argument string"""
             for c in ('{', '}'):
                 if c in arg:
                     arg = arg.replace(c, f'{c}{c}')
             return arg
 
         def _parse_args(arg):
-            """ Converts the argument to a list of strings """
+            """Converts the argument to a list of strings"""
             new_arg = []
 
             for a in arg:
                 if isinstance(a, (list, tuple, torch.Size)):
                     new_arg.append(_parse_args(a))
-                elif type(a) in (torch.Tensor, torch.nn.Parameter) or \
-                        (type(a) in (torch.dtype, torch.device, torch.Size) and
-                         id(a) in current_graph().tensor_pre_node_dict):
+                elif type(a) in (torch.Tensor, torch.nn.Parameter) or (
+                    type(a) in (torch.dtype, torch.device, torch.Size) and id(a) in current_graph().tensor_pre_node_dict
+                ):
                     self.prev_tensors.append(a)
                     self.tensor_names.append(_tensor_name(a))
                     new_arg.append('{}')
@@ -542,7 +541,7 @@ class TraceFunction(object):
             return new_arg
 
         def _flatten_list(content):
-            """ Flatten a list of nested list or string into a string """
+            """Flatten a list of nested list or string into a string"""
             if isinstance(content, list):
                 sub_contents = []
                 for item in content:
@@ -586,30 +585,30 @@ class TraceFunction(object):
         return self
 
     def update_tensor_name(self, index, new_name):
-        """ Updates the tensor name at the given index """
+        """Updates the tensor name at the given index"""
         self.tensor_names[index] = new_name
 
     def replace_tensor_name(self, old_name, new_name):
-        """ Replaces the specific tensor name with the given one """
+        """Replaces the specific tensor name with the given one"""
         for i, name in enumerate(self.tensor_names):
             if name == old_name:
                 self.tensor_names[i] = new_name
 
     def update_args_string(self):
-        """ Updates the string representation according to the templates and the tensor names """
+        """Updates the string representation according to the templates and the tensor names"""
         if self.args_template:
             self.args_string = self.args_template.format(*self.tensor_names)
         if self.args_template_no_self:
-            self.args_string_no_self = self.args_template_no_self.format(*self.tensor_names[self.args_offset:])
+            self.args_string_no_self = self.args_template_no_self.format(*self.tensor_names[self.args_offset :])
 
     def get_tensor_name(self, index):
-        """ Retrieves the tensor name at the given index """
+        """Retrieves the tensor name at the given index"""
         return self.tensor_names[index]
 
 
 @contextlib.contextmanager
 def no_catch():
-    """ Context manager for tracing nodes. Use it to avoid tracing the nodes recursively. """
+    """Context manager for tracing nodes. Use it to avoid tracing the nodes recursively."""
     if lock():
         yield False
     else:
@@ -619,18 +618,17 @@ def no_catch():
 
 
 def args_as_string(args, kwargs):
-    """ String representation of the args and the keyword args """
+    """String representation of the args and the keyword args"""
     cleaned_args = [f'"{arg}"' if type(arg) == str else str(arg) for arg in args]
     args_content = ', '.join(cleaned_args)
-    kwargs_content = ', '.join((f'{k}="{v}"' if type(
-        v) is str else f'{k}={v}' for k, v in kwargs.items()))
+    kwargs_content = ', '.join((f'{k}="{v}"' if type(v) is str else f'{k}={v}' for k, v in kwargs.items()))
     args_connector = '' if args_content == '' or kwargs_content == '' else ', '
     full_args_content = f'{args_content}{args_connector}{kwargs_content}'
     return full_args_content
 
 
 def new_setattr_gen(orig_setattr, key: str):
-    """ Wrapper function for the __setattr__ functions of the modules in PyTorch """
+    """Wrapper function for the __setattr__ functions of the modules in PyTorch"""
     log.debug(f'registered module setattr wrapper: {key}')
 
     def new_setattr(obj, name, value):
@@ -649,7 +647,9 @@ def new_setattr_gen(orig_setattr, key: str):
                 if related:
                     class_name = '.'.join(key.split('.')[:-1])
                     log.warning(
-                        f'The constant property `{name}` of {class_name} is changed. We need to drop the original constructor line.')
+                        f'The constant property `{name}` of {class_name} is changed. We need to drop the original'
+                        ' constructor line.'
+                    )
                     module_constructor_traced.remove(id(obj))
                     del module_constructor_lines[id(obj)]
             return orig_setattr(obj, name, value)
@@ -709,7 +709,7 @@ def new_module_getattr_gen(orig_getattr, key: str, res: typing.Dict[str, bool]):
 
 
 def new_getattr_gen(orig_getattr, key: str, is_class: bool):
-    """ Wrapper function for the __getattribute__ functions of the modules in PyTorch """
+    """Wrapper function for the __getattribute__ functions of the modules in PyTorch"""
     log.debug(f'registered module getattr wrapper: {key}')
 
     def new_getattr(obj, name):
@@ -726,9 +726,11 @@ def new_getattr_gen(orig_getattr, key: str, is_class: bool):
                 if related:
                     # Also the property should be constant if the result object is unchanged.
                     # Only create a new node when there isn't one.
-                    if id(result) in current_graph().tensor_pre_node_dict and \
-                            id(result) in original_values_for_tracked_objects and \
-                            original_values_for_tracked_objects[id(result)] == result:
+                    if (
+                        id(result) in current_graph().tensor_pre_node_dict
+                        and id(result) in original_values_for_tracked_objects
+                        and original_values_for_tracked_objects[id(result)] == result
+                    ):
                         node_name = current_graph().tensor_pre_node_dict[id(result)]
                         trace_node = current_graph().nodes_map[node_name]
                         if trace_node.module.is_property and trace_node.module.func_type == 'shape':
@@ -753,8 +755,9 @@ def new_getattr_gen(orig_getattr, key: str, is_class: bool):
                             new_result = []
                             for elem in result:
                                 new_result.append(torch.tensor(elem))
-                                current_graph().tensor_pre_node_dict[id(new_result[-1])
-                                                                     ] = current_graph().tensor_pre_node_dict[id(obj)]
+                                current_graph().tensor_pre_node_dict[
+                                    id(new_result[-1])
+                                ] = current_graph().tensor_pre_node_dict[id(obj)]
                             old_result = result
                             result = tuple(new_result)
 
@@ -775,7 +778,7 @@ def new_getattr_gen(orig_getattr, key: str, is_class: bool):
 
 
 def new_init_gen(orig_init, key: str):
-    """ Wrapper function for the init functions of the modules in PyTorch """
+    """Wrapper function for the init functions of the modules in PyTorch"""
     log.debug(f'registered module init wrapper: {key}')
 
     def new_init(obj, *args, **kwargs):
@@ -788,7 +791,8 @@ def new_init_gen(orig_init, key: str):
             if id(obj) not in module_constructor_lines:
                 if not res:
                     log.warning(
-                        f'Failed to acquire the tracing lock while tracing {init_fullname}, which is unexpected.')
+                        f'Failed to acquire the tracing lock while tracing {init_fullname}, which is unexpected.'
+                    )
                 log.debug(f'{key} in with block, lock: {lock}')
 
                 rckwa = check_types(kwargs.values())
@@ -796,7 +800,8 @@ def new_init_gen(orig_init, key: str):
                 err_type = rca or rckwa
                 if err_type:
                     log.warning(
-                        f'Constructor of {class_fullname} has arguments of type {err_type} which is unsupported')
+                        f'Constructor of {class_fullname} has arguments of type {err_type} which is unsupported'
+                    )
                     log.warning(f'  Args: {args}')
                     log.warning(f'  Keyword args: {kwargs}')
                 else:
@@ -811,7 +816,7 @@ def new_init_gen(orig_init, key: str):
 
 
 def new_func_gen(orig_func, key: str, is_class: bool):
-    """ Wrapper function for functions in PyTorch """
+    """Wrapper function for functions in PyTorch"""
     log.debug(f'registered function wrapper: {key}')
 
     def new_func(*args, **kwargs):
@@ -843,8 +848,9 @@ def new_func_gen(orig_func, key: str, is_class: bool):
                         new_result = []
                         for elem in result:
                             new_result.append(torch.tensor(elem))
-                            current_graph().tensor_pre_node_dict[id(new_result[-1])
-                                                                 ] = current_graph().tensor_pre_node_dict[id(args[0])]
+                            current_graph().tensor_pre_node_dict[
+                                id(new_result[-1])
+                            ] = current_graph().tensor_pre_node_dict[id(args[0])]
                         result = tuple(new_result)
                         related = True
                 elif type(result) in (torch.dtype, torch.device):
@@ -870,7 +876,7 @@ def new_func_gen(orig_func, key: str, is_class: bool):
 
 
 def new_has_torch_func_gen(orig_func, key: str, is_class: bool):
-    """ Wrapper function for functions in PyTorch """
+    """Wrapper function for functions in PyTorch"""
     log.debug(f'registered has torch func wrapper: {key}')
 
     def new_func(*args, **kwargs):
@@ -880,7 +886,7 @@ def new_has_torch_func_gen(orig_func, key: str, is_class: bool):
 
 
 def new_handle_func_gen(orig_func, key: str, is_class: bool):
-    """ Wrapper function for functions in PyTorch """
+    """Wrapper function for functions in PyTorch"""
     log.debug(f'registered has torch func wrapper: {key}')
 
     def new_func(func, tracked_args, *args, **kwargs):
@@ -893,7 +899,7 @@ def new_handle_func_gen(orig_func, key: str, is_class: bool):
 
 
 def new_creation_func_gen(orig_func, key: str, is_class: bool):
-    """ Wrapper function for functions in PyTorch """
+    """Wrapper function for functions in PyTorch"""
     log.debug(f'registered creation function wrapper: {key}')
 
     def new_func(*args, **kwargs):
@@ -913,7 +919,7 @@ def new_creation_func_gen(orig_func, key: str, is_class: bool):
 
 
 def fetch_modules(config: typing.Optional[str] = None):
-    """ Fetches the functions from the config. """
+    """Fetches the functions from the config."""
     if config is None:
         config = os.path.join(current_dir, 'configs/torch_module_override.yml')
     modules = []
@@ -936,7 +942,7 @@ def fetch_modules(config: typing.Optional[str] = None):
 
 
 def fetch_funcs(config: typing.Optional[str] = None):
-    """ Fetches the functions from the config. """
+    """Fetches the functions from the config."""
     if config is None:
         version_parts = torch.__version__.split('.')
         if int(version_parts[1]) < 6:
@@ -1055,7 +1061,7 @@ def qualified_name(module, item: typing.Optional[str] = None, short: bool = Fals
 
 @contextlib.contextmanager
 def patch(object, name, gen, *args, **kwargs):
-    """ Temporarily monkeypatches an object. """
+    """Temporarily monkeypatches an object."""
 
     pre_patched_value = getattr(object, name)
     setattr(object, name, gen(pre_patched_value, *args, **kwargs))
@@ -1065,7 +1071,7 @@ def patch(object, name, gen, *args, **kwargs):
 
 @contextlib.contextmanager
 def patch_modules(objects, names, gens):
-    """ Temporarily monkeypatches the modules in PyTorch. """
+    """Temporarily monkeypatches the modules in PyTorch."""
     if not isinstance(names, (tuple, list)) and not isinstance(gens, (tuple, list)):
         names = (names,)
         gens = (gens,)
@@ -1085,7 +1091,7 @@ def patch_modules(objects, names, gens):
 
 @contextlib.contextmanager
 def patch_funcs(object_dicts, gens):
-    """ Temporarily monkeypatches the functions in PyTorch. """
+    """Temporarily monkeypatches the functions in PyTorch."""
     if not isinstance(object_dicts, (tuple, list)) and not isinstance(gens, (tuple, list)):
         object_dicts = (object_dicts,)
         gens = (gens,)
@@ -1122,7 +1128,7 @@ def patch_funcs(object_dicts, gens):
 
 
 def get_constructor_args(actual_class_type):
-    """ Gets the args of the original constructor for a known module class """
+    """Gets the args of the original constructor for a known module class"""
     if actual_class_type in module_constructor_signatures:
         return module_constructor_signatures[actual_class_type]
     else:
@@ -1130,14 +1136,18 @@ def get_constructor_args(actual_class_type):
 
 
 def gen_module_constrctor_line(module, mod_cache=None):
-    """ Generates the constructor line for a loaded module """
-    ignored_args = {'torch.nn.ZeroPad2d': ['value'],
-                    'torch.nn.UpsamplingNearest2d': ['mode'],
-                    'torch.nn.UpsamplingBilinear2d': ['mode']}
-    legacy_modules = {'torch.nn.FractionalMaxPool2d',
-                      'torch.nn.FractionalMaxPool3d',
-                      'torch.nn.TransformerEncoderLayer',
-                      'torch.nn.TransformerDecoderLayer'}
+    """Generates the constructor line for a loaded module"""
+    ignored_args = {
+        'torch.nn.ZeroPad2d': ['value'],
+        'torch.nn.UpsamplingNearest2d': ['mode'],
+        'torch.nn.UpsamplingBilinear2d': ['mode'],
+    }
+    legacy_modules = {
+        'torch.nn.FractionalMaxPool2d',
+        'torch.nn.FractionalMaxPool3d',
+        'torch.nn.TransformerEncoderLayer',
+        'torch.nn.TransformerDecoderLayer',
+    }
 
     def _skip_ignored_args(name, *args, **kwargs):
         iargs = ignored_args[name]
@@ -1167,9 +1177,12 @@ def gen_module_constrctor_line(module, mod_cache=None):
                 if prop_name == 'self':
                     continue
                 if prop_name not in known_constants:
-                    if not hasattr(module_cls, prop_name) or not isinstance(getattr(module_cls, prop_name), (type(None), str, int, float, bool)):
+                    if not hasattr(module_cls, prop_name) or not isinstance(
+                        getattr(module_cls, prop_name), (type(None), str, int, float, bool)
+                    ):
                         log.warning(
-                            f'Argument "{prop_name}" of the constructor of {name} is not a known constant, skipping')
+                            f'Argument "{prop_name}" of the constructor of {name} is not a known constant, skipping'
+                        )
                         continue
                 prop_value = getattr(module, prop_name)
                 if p.default is p.empty:
@@ -1198,16 +1211,16 @@ def gen_module_constrctor_line(module, mod_cache=None):
         if name in ignored_args:
             start_pos = result.find('(')
             end_pos = result.rfind(')')
-            head = result[:start_pos + 1]
+            head = result[: start_pos + 1]
             tail = result[end_pos:]
-            mid = result[start_pos + 1:end_pos]
+            mid = result[start_pos + 1 : end_pos]
             result = head + eval(f'_skip_ignored_args("{name}", {mid})') + tail
 
     return result, mod_cache
 
 
 def noop_handler(node, inputs, outputs):
-    """ Generate modified outputs if the inputs and the outputs are the same """
+    """Generate modified outputs if the inputs and the outputs are the same"""
     with no_catch():
         is_list = False
         is_tuple = False
@@ -1222,8 +1235,9 @@ def noop_handler(node, inputs, outputs):
                 return outputs.view(outputs.shape)
 
         if is_list or is_tuple:
-            is_tracked = [isinstance(t, torch.Tensor) and
-                          id(t) in current_graph().tensor_pre_node_dict for t in outputs]
+            is_tracked = [
+                isinstance(t, torch.Tensor) and id(t) in current_graph().tensor_pre_node_dict for t in outputs
+            ]
             modified = any(is_tracked)
 
         if modified:
@@ -1237,7 +1251,7 @@ def noop_handler(node, inputs, outputs):
 
 
 def add_input_node(node: TraceNode, output_tensors):
-    """ Adds an input node to the current computation graph """
+    """Adds an input node to the current computation graph"""
     assert node is not None
     if not isinstance(output_tensors, (list, tuple)):
         output_tensors = [output_tensors]
@@ -1252,7 +1266,7 @@ def add_input_node(node: TraceNode, output_tensors):
 
 
 def add_constant_node(node: TraceNode, output_tensor):
-    """ Adds a constant node to the current computation graph """
+    """Adds a constant node to the current computation graph"""
     assert node is not None
     actual_tensor = output_tensor
     if isinstance(output_tensor, torch.nn.Parameter):
@@ -1267,7 +1281,7 @@ def add_constant_node(node: TraceNode, output_tensor):
 
 
 def add_output_node(node: TraceNode, input_tensors):
-    """ Adds an output node to the current computation graph """
+    """Adds an output node to the current computation graph"""
     assert node is not None
     need_idx = True
     if not isinstance(input_tensors, (list, tuple)):
@@ -1289,7 +1303,7 @@ def add_output_node(node: TraceNode, input_tensors):
 
 
 def add_forward_node(node: TraceNode, input_tensors, output_tensors):
-    """ Adds a forward node to the current computation graph """
+    """Adds a forward node to the current computation graph"""
     assert node is not None
     if not isinstance(input_tensors, (list, tuple)):
         input_tensors = [input_tensors]
@@ -1303,9 +1317,10 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
     node.next_tensors.extend(output_tensors)
 
     for i, t in enumerate(input_tensors):
-        assert type(t) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), \
-            f'Input #{i} of {node.unique_name}({node.type()}) should be one of the following type \
-            [torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter], but got {type(t)}'
+        assert type(t) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), (
+            f'Input #{i} of {node.unique_name}({node.type()}) should be one of the following type            '
+            f' [torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter], but got {type(t)}'
+        )
         if id(t) not in current_graph().tensor_pre_node_dict:
             if not t.is_leaf:
                 log.error(f'Connection is lost when generating code for {node.unique_name} of type {node.full_name()}')
@@ -1335,17 +1350,19 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
     for i, t in enumerate(output_tensors):
         if isinstance(t, (list, tuple)):
             for j, rt in enumerate(t):
-                assert type(rt) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), \
-                    f'Output [{i}][{j}] of {node.unique_name}({node.type()}) should be one of the following type \
-                    [torch.dtype, torch.device, torch.Size, torch.Tensor], but got {type(rt)}'
+                assert type(rt) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), (
+                    f'Output [{i}][{j}] of {node.unique_name}({node.type()}) should be one of the following type       '
+                    f'              [torch.dtype, torch.device, torch.Size, torch.Tensor], but got {type(rt)}'
+                )
                 current_graph().tensor_pre_node_dict[id(rt)] = node.unique_name
                 if need_idx:
                     log.debug(f'set pre_index tensor {i}, {j}')
                     current_graph().tensor_pre_index_dict[id(rt)] = [i, j]
         else:
-            assert type(t) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), \
-                f'Output #{i} of {node.unique_name}({node.type()}) should be one of the following type \
-                [torch.dtype, torch.device, torch.Size, torch.Tensor], but got {type(t)}'
+            assert type(t) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), (
+                f'Output #{i} of {node.unique_name}({node.type()}) should be one of the following type                '
+                f' [torch.dtype, torch.device, torch.Size, torch.Tensor], but got {type(t)}'
+            )
             current_graph().tensor_pre_node_dict[id(t)] = node.unique_name
             if need_idx:
                 log.debug(f'set pre_index tensor {i}')
@@ -1357,7 +1374,7 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
 
 @contextlib.contextmanager
 def hook_modules(module):
-    """ Temporarily adds the hooks to a `nn.Module` for tracing """
+    """Temporarily adds the hooks to a `nn.Module` for tracing"""
     hooks = []
 
     def register_submodule_tracer(module):
@@ -1414,20 +1431,28 @@ def hook_modules(module):
             add_output_node(node, outputs)
         elif isinstance(outputs, (list, tuple)):
             for i in outputs:
-                if type(i) == torch.Tensor or (isinstance(i, (list, tuple)) and all((type(x) == torch.Tensor for x in i))):
+                if type(i) == torch.Tensor or (
+                    isinstance(i, (list, tuple)) and all((type(x) == torch.Tensor for x in i))
+                ):
                     node = TraceNode(TraceFunction("output"))
                     add_output_node(node, i)
                 else:
                     log.warning(
-                        "Only tensors or list, tuple of tensors are supported when nested in a class, dict, list or tuple")
+                        "Only tensors or list, tuple of tensors are supported when nested in a class, dict, list or"
+                        " tuple"
+                    )
         elif isinstance(outputs, dict):
             for k, v in outputs.items():
-                if type(v) == torch.Tensor or (isinstance(v, (list, tuple)) and all((type(x) == torch.Tensor for x in v))):
+                if type(v) == torch.Tensor or (
+                    isinstance(v, (list, tuple)) and all((type(x) == torch.Tensor for x in v))
+                ):
                     node = TraceNode(TraceFunction("output"))
                     add_output_node(node, v)
                 else:
                     log.warning(
-                        "Only tensors or list, tuple of tensors are supported when nested in a class, dict, list or tuple")
+                        "Only tensors or list, tuple of tensors are supported when nested in a class, dict, list or"
+                        " tuple"
+                    )
         else:
             log.warning(f'Output type is not supported: {type(outputs).__name__}, try to extract tensors from it')
             for k in outputs.__dir__():
@@ -1451,7 +1476,7 @@ def hook_modules(module):
 
 @contextlib.contextmanager
 def tracer_context():
-    """ Basic context manager for tracing """
+    """Basic context manager for tracing"""
     yield True
     lock(False)
     module_constructor_traced.clear()
@@ -1461,14 +1486,14 @@ def tracer_context():
 
 @contextlib.contextmanager
 def model_constructor_tracer():
-    """ Basic context manager for capturing constructors for `nn.Module` """
+    """Basic context manager for capturing constructors for `nn.Module`"""
     with patch_helper(wrap_funcs=False, wrap_creation_funcs=False):
         yield True
 
 
 @contextlib.contextmanager
 def model_tracer():
-    """ Simple context manager for tracing. Also captures module constructors """
+    """Simple context manager for tracing. Also captures module constructors"""
     with tracer_context():
         with model_constructor_tracer():
             yield True
@@ -1476,7 +1501,7 @@ def model_tracer():
 
 @contextlib.contextmanager
 def construct_trace_graph(module, dummy_input: torch.Tensor, eliminate_dead_graph: bool) -> 'TraceGraph':
-    """ Simple context manager for creating a new TraceGraph """
+    """Simple context manager for creating a new TraceGraph"""
     current_graph(TraceGraph(module, dummy_input, eliminate_dead_graph))
     yield current_graph.get_value()
     current_graph(None)
@@ -1484,7 +1509,7 @@ def construct_trace_graph(module, dummy_input: torch.Tensor, eliminate_dead_grap
 
 @contextlib.contextmanager
 def override_current_trace_graph(new_graph: 'TraceGraph') -> 'TraceGraph':
-    """ Simple context manager for creating a new TraceGraph """
+    """Simple context manager for creating a new TraceGraph"""
     old_graph = current_graph.get_value()
     current_graph(new_graph)
     yield current_graph.get_value()
@@ -1492,7 +1517,8 @@ def override_current_trace_graph(new_graph: 'TraceGraph') -> 'TraceGraph':
 
 
 class TraceGraph(object):
-    """ A data structure for storing a computation graph """
+    """A data structure for storing a computation graph"""
+
     global_functions: typing.Dict[str, int]
     global_nodes: typing.Dict[str, int]
     module_unique_name_dict: typing.Dict[int, torch.nn.Module]
@@ -1544,7 +1570,8 @@ class TraceGraph(object):
         # Input module
         if isinstance(module, DataParallel) or isinstance(module, DistributedDataParallel):
             log.error(
-                'You are tracing a parallel module, which is unsupported. Please pass in a raw model using `.module`.')
+                'You are tracing a parallel module, which is unsupported. Please pass in a raw model using `.module`.'
+            )
             assert False
         else:
             self.module = module
@@ -1571,11 +1598,11 @@ class TraceGraph(object):
         self.used_namespaces = set()
 
     def all_nodes(self) -> typing.List[TraceNode]:
-        """ Returns all the nodes in a computation graph during forward process """
+        """Returns all the nodes in a computation graph during forward process"""
         return self.input_nodes + self.forward_nodes + self.output_nodes + self.constant_nodes
 
     def __tag_nodes(self) -> None:
-        """ Gives the modules and the submodules a unique name """
+        """Gives the modules and the submodules a unique name"""
         # Tag submodules
         for n, m in self.module.named_modules():
             self.module_original_name_dict[id(m)] = n
@@ -1587,14 +1614,14 @@ class TraceGraph(object):
         self.module_unique_name_dict[id(self.module)] = type(self.module).__name__
 
     def __active_detection(self, node: TraceNode):
-        """ Detects whether the node is active or not """
+        """Detects whether the node is active or not"""
         if not node.active:
             node.active = True
             for i in node.prev_nodes:
                 self.__active_detection(i)
 
     def init(self) -> None:
-        """ Builds a computation graph """
+        """Builds a computation graph"""
         if self.inited:
             return
 
@@ -1652,14 +1679,14 @@ class TraceGraph(object):
 
     @contextlib.contextmanager
     def __numbering_context(self):
-        """ A simple context manager for numbering nodes """
+        """A simple context manager for numbering nodes"""
         yield True
 
         self.global_functions.clear()
         self.global_nodes.clear()
 
     def __gen_init_code(self) -> str:
-        """ Generates the code for the init function for a `nn.Module` """
+        """Generates the code for the init function for a `nn.Module`"""
         generated_node = []
         lines = []
         mod_cache_dict = dict()
@@ -1678,12 +1705,17 @@ class TraceGraph(object):
             elif type(node.module) == ConstantNode:
                 # Parameter generation
                 self.used_namespaces.add('torch')
-                line = f'        self.register_parameter("{node.unique_name}", torch.nn.Parameter(torch.empty({node.module.shape}, dtype={node.module.dtype})))'
+                line = (
+                    f'        self.register_parameter("{node.unique_name}",'
+                    f' torch.nn.Parameter(torch.empty({node.module.shape}, dtype={node.module.dtype})))'
+                )
                 lines.append(line)
             elif type(node.module) != TraceFunction:
                 # Generate the module even if the constructor is not caught
                 log.info(
-                    f'the constructor of the module {node.unique_name} of type {type(node.module).__name__} is not traced, trying the experimental way')
+                    f'the constructor of the module {node.unique_name} of type {type(node.module).__name__} is not'
+                    ' traced, trying the experimental way'
+                )
                 root_ns = qualified_name(node.type()).split('.')[0]
                 self.used_namespaces.add(root_ns)
                 orig_constructor_line, mod_cache = gen_module_constrctor_line(node.module, mod_cache_dict)
@@ -1695,14 +1727,12 @@ class TraceGraph(object):
         return block
 
     def __gen_forward_code(self) -> str:
-        """ Generates the code for the forward function for a `nn.Module` """
-        lines = [
-            f"    def forward(self, {','.join([i.unique_name for i in self.input_nodes])}):"]
+        """Generates the code for the forward function for a `nn.Module`"""
+        lines = [f"    def forward(self, {','.join([i.unique_name for i in self.input_nodes])}):"]
 
         for node in self.forward_nodes:
             output = ", ".join([node.unique_name])
-            param = ", ".join([node.prev_node_unique_name(i)
-                               for i in range(len(node.prev_nodes))])
+            param = ", ".join([node.prev_node_unique_name(i) for i in range(len(node.prev_nodes))])
 
             if type(node.module) == TraceFunction:
                 full_name = node.full_name()
@@ -1730,7 +1760,7 @@ class TraceGraph(object):
         return block
 
     def __gen_import_code(self) -> str:
-        """ Generates the code for the import section for a `nn.Module` """
+        """Generates the code for the import section for a `nn.Module`"""
         # TODO: Selective module importing
         import_block = """import torch\nimport torch.nn\nimport torch.functional\nimport torch.nn.functional"""
         if self.quantized is True:
@@ -1740,7 +1770,7 @@ class TraceGraph(object):
         return import_block
 
     def __gen_input_code(self) -> str:
-        """ Generates the code for the input section for the code to invoke `nn.Module` """
+        """Generates the code for the input section for the code to invoke `nn.Module`"""
         input_block = ""
         for i, node in enumerate(self.input_nodes):
             shape = ", ".join((str(i) for i in node.next_tensors[0].shape))
@@ -1753,9 +1783,14 @@ class TraceGraph(object):
 
         return input_block
 
-    def generate_code(self, output_script_path: typing.Optional[str], output_weight_path: typing.Optional[str],
-                      model_name: str = 'DefaultModel', check: bool = False) -> bool:
-        """ The main function for code generation """
+    def generate_code(
+        self,
+        output_script_path: typing.Optional[str],
+        output_weight_path: typing.Optional[str],
+        model_name: str = 'DefaultModel',
+        check: bool = False,
+    ) -> bool:
+        """The main function for code generation"""
 
         output_paths = (output_script_path, output_weight_path)
         for output_path in output_paths:
@@ -1790,9 +1825,11 @@ class TraceGraph(object):
             "init_block": init_block,
             "forward_block": forward_block,
             "name_block": model_name,
-            "load_weight_block": "" if output_weight_path is None else f"    model.load_state_dict(torch.load('{output_weight_path_str}'))",
+            "load_weight_block": ""
+            if output_weight_path is None
+            else f"    model.load_state_dict(torch.load('{output_weight_path_str}'))",
             "input_block": input_block,
-            "input_names": ", ".join([f"dummy_input_{i}" for i in range(len(self.input_nodes))])
+            "input_names": ", ".join([f"dummy_input_{i}" for i in range(len(self.input_nodes))]),
         }
 
         code = MODULE_TEMPLATE % context
@@ -1833,16 +1870,17 @@ class TraceGraph(object):
         else:
             return True
 
-    def update_submodule_in_nodes_from_predicate(self, nodes: typing.List[TraceNode],
-                                                 module_gen_predicate: typing.Callable[[nn.Module], nn.Module]):
-        """ update a submodule from the nodes using the predicate given """
+    def update_submodule_in_nodes_from_predicate(
+        self, nodes: typing.List[TraceNode], module_gen_predicate: typing.Callable[[nn.Module], nn.Module]
+    ):
+        """update a submodule from the nodes using the predicate given"""
         for node in nodes:
             module = node.module
             new_module = module_gen_predicate(module)
             self.update_submodule_in_node(node, new_module)
 
     def get_submodule_with_parent_from_name(self, module_name: str):
-        """ Gets the submodule with its parent using the name given """
+        """Gets the submodule with its parent using the name given"""
         module_name_parts = module_name.split('.')
         cur_obj = self.module
         last_obj = None
@@ -1859,7 +1897,7 @@ class TraceGraph(object):
         return cur_obj, last_obj
 
     def update_submodule_in_node(self, node: TraceNode, module: nn.Module):
-        """ update a submodule from the nodes using the module given """
+        """update a submodule from the nodes using the module given"""
         module_name = self.module_original_name_dict[id(node.module)]
         module_name_parts = module_name.split('.')
         cur_obj = self.module
@@ -1882,7 +1920,7 @@ class TraceGraph(object):
             setattr(cur_obj, ns, new_obj)
 
     def filter_forward_nodes(self, predicate, custom_data=None, reverse=False) -> typing.List[TraceNode]:
-        """ A utility function for filtering forward nodes """
+        """A utility function for filtering forward nodes"""
         nodes = []
         iter_nodes = self.forward_nodes
         if reverse:
@@ -1893,7 +1931,7 @@ class TraceGraph(object):
         return nodes
 
     def insert_after(self, node: TraceNode, module, next_tensors: typing.Optional[typing.List[torch.Tensor]] = None):
-        """ Insert a module or an existing node after a node in the computation graph """
+        """Insert a module or an existing node after a node in the computation graph"""
         # Create a new node and connects it to the next node/tensors
         if type(module) != TraceNode:
             new_node = TraceNode(module, cur_graph=self)
@@ -1952,9 +1990,15 @@ class TraceGraph(object):
                     next_node.module.replace_tensor_name(node_unique_name, new_node.unique_name)
                     next_node.module.update_args_string()
 
-    def insert_between(self, prev_node: TraceNode, next_node: TraceNode, module,
-                       next_tensors: typing.Optional[typing.List[torch.Tensor]] = None, move_idx: bool = False):
-        """ Insert a module or an existing node between two nodes in the computation graph """
+    def insert_between(
+        self,
+        prev_node: TraceNode,
+        next_node: TraceNode,
+        module,
+        next_tensors: typing.Optional[typing.List[torch.Tensor]] = None,
+        move_idx: bool = False,
+    ):
+        """Insert a module or an existing node between two nodes in the computation graph"""
         # Create a new node and connects it to the previous node/tensors
         old_unique_name = prev_node.unique_name
         is_constant_node = type(prev_node.module) == ConstantNode
@@ -2031,7 +2075,7 @@ class TraceGraph(object):
             n.module.update_args_string()
 
     def insert_before(self, node: TraceNode, module, next_tensors: typing.Optional[typing.List[torch.Tensor]] = None):
-        """ Insert a module or an existing node before a node in the computation graph """
+        """Insert a module or an existing node before a node in the computation graph"""
         # Create a new node and connects it to the previous node/tensors
         if type(module) != TraceNode:
             if not isinstance(module, (tuple, list)):
@@ -2122,7 +2166,7 @@ class TraceGraph(object):
             n.module.update_args_string()
 
     def replace_node_module(self, node: TraceNode, module: torch.nn.Module) -> None:
-        """ Replaces a module in a node with another """
+        """Replaces a module in a node with another"""
         # Update unique name for node
         old_unique_name = node.unique_name
         is_constant_node = type(node.module) == ConstantNode
@@ -2150,9 +2194,10 @@ class TraceGraph(object):
                 n.module.replace_tensor_name(prev_unique_name, node.unique_name)
                 n.module.update_args_string()
 
-    def fuse_nodes_to_func(self, nodes: typing.List[TraceNode], full_name: str, kind: str, func_type: str,
-                           is_class: bool) -> None:
-        """ Fuses several nodes into one function """
+    def fuse_nodes_to_func(
+        self, nodes: typing.List[TraceNode], full_name: str, kind: str, func_type: str, is_class: bool
+    ) -> None:
+        """Fuses several nodes into one function"""
         if len(nodes) > 1:
             # Set the full name if the first node is already a TraceFunction
             # Otherwise, we need to construct one.
@@ -2185,8 +2230,9 @@ class TraceGraph(object):
 
                 # Update next tensors
                 for t in node.next_tensors:
-                    self.tensor_pre_node_dict[id(t)] = self.tensor_pre_node_dict[id(
-                        t)].replace(last_node_unique_name, first_node_unique_name)
+                    self.tensor_pre_node_dict[id(t)] = self.tensor_pre_node_dict[id(t)].replace(
+                        last_node_unique_name, first_node_unique_name
+                    )
 
                 for n in node.next_nodes:
                     # Update next nodes
@@ -2206,7 +2252,7 @@ class TraceGraph(object):
             log.warning('Calling fuse with less than 2 nodes is no-op.')
 
     def remove_node(self, node: TraceNode) -> None:
-        """ Remove a node from the computation graph """
+        """Remove a node from the computation graph"""
         if node not in self.forward_nodes:
             log.error('Only forward nodes can be removed')
             assert False
@@ -2308,7 +2354,7 @@ def load_creation_funcs():
 
 @contextlib.contextmanager
 def patch_helper(wrap_modules: bool = True, wrap_funcs: bool = True, wrap_creation_funcs: bool = True):
-    """ Temporarily monkeypatches the functions and the modules in PyTorch. """
+    """Temporarily monkeypatches the functions and the modules in PyTorch."""
     if wrap_modules:
         if not modules_overrided():
             modules = load_overridable_modules()
@@ -2354,7 +2400,7 @@ def patch_helper(wrap_modules: bool = True, wrap_funcs: bool = True, wrap_creati
 
 
 def check_types(values: typing.Iterable) -> bool:
-    """ Checks whether unsupported types are in the args. """
+    """Checks whether unsupported types are in the args."""
     for value in values:
         if isinstance(value, (tuple, list)):
             res = check_types(value)
@@ -2366,7 +2412,7 @@ def check_types(values: typing.Iterable) -> bool:
 
 
 def check_tensor_type(value) -> bool:
-    """ Check whether types are related to torch.Tensor. """
+    """Check whether types are related to torch.Tensor."""
     if isinstance(value, (tuple, list)):
         for item in value:
             res = check_tensor_type(item)
@@ -2378,7 +2424,7 @@ def check_tensor_type(value) -> bool:
 
 
 def check_creation_args(args: typing.Iterable) -> typing.Tuple:
-    """ Cast arguments of type of Tensor to normal values """
+    """Cast arguments of type of Tensor to normal values"""
     new_args = []
     for arg in args:
         if isinstance(arg, (tuple, list)):
@@ -2394,7 +2440,7 @@ def check_creation_args(args: typing.Iterable) -> typing.Tuple:
 
 
 def trace(module: torch.nn.Module, dummy_input: torch.Tensor, eliminate_dead_graph: bool = False) -> TraceGraph:
-    """ main function for tracing """
+    """main function for tracing"""
     try:
         with construct_trace_graph(module, dummy_input, eliminate_dead_graph) as new_graph:
             new_graph.init()

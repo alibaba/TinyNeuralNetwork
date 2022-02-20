@@ -33,8 +33,10 @@ class CommonGraph(object):
         self.input_transpose = []
         self.node_op_counter = 0
 
-    def add_iterable_pair(self, input_names: typing.List[str], output_names: typing.List[str], key: typing.Optional[str] = None):
-        """ Adds the tensor mapping for a ListConstruct tensor
+    def add_iterable_pair(
+        self, input_names: typing.List[str], output_names: typing.List[str], key: typing.Optional[str] = None
+    ):
+        """Adds the tensor mapping for a ListConstruct tensor
 
         Args:
             input_names (typing.List[str]): The names of the input tensors
@@ -54,7 +56,7 @@ class CommonGraph(object):
             assert False, "You should specify key == 'input' or 'output'"
 
     def has_nested_names(self, key: str) -> bool:
-        """ Whether a tensor has nested tensor (names)
+        """Whether a tensor has nested tensor (names)
 
         Args:
             key (str): The name of the tensor
@@ -66,7 +68,7 @@ class CommonGraph(object):
         return key in self.iterable_map
 
     def get_list_expanded_names(self, key: str) -> typing.List[str]:
-        """ Get the names of the nested tensors of a ListConstruct tensor
+        """Get the names of the nested tensors of a ListConstruct tensor
 
         Args:
             key (str): The name of the ListConstruct tensor
@@ -78,7 +80,7 @@ class CommonGraph(object):
         return self.iterable_map[key]
 
     def check_tensor(self, name: str, node_type: ExtendedOperator, tensor: tfl.Tensor) -> ig.Vertex:
-        """ Checks whether the node with the tensor as the output already exists
+        """Checks whether the node with the tensor as the output already exists
 
         Args:
             name (str): The name of the tensor
@@ -95,8 +97,10 @@ class CommonGraph(object):
         assert id(self.tensor_map[name]) == id(tensor), f"tensor {name} already exists"
         return node
 
-    def add_nodes(self, tensors: typing.List[tfl.Tensor], node_type=ExtendedOperator.CONSTANT_NODE) -> typing.List[ig.Vertex]:
-        """ Add a list of nodes (usually special ones) with the tensors
+    def add_nodes(
+        self, tensors: typing.List[tfl.Tensor], node_type=ExtendedOperator.CONSTANT_NODE
+    ) -> typing.List[ig.Vertex]:
+        """Add a list of nodes (usually special ones) with the tensors
 
         Args:
             tensors (typing.List[tfl.Tensor]): The output tensors of the nodes
@@ -108,8 +112,7 @@ class CommonGraph(object):
 
         nodes = []
         for t in tensors:
-            if node_type in (ExtendedOperator.OUTPUT_NODE,
-                             ExtendedOperator.UNUSED_NODE):
+            if node_type in (ExtendedOperator.OUTPUT_NODE, ExtendedOperator.UNUSED_NODE):
                 tensor_name = t.name + '_output'
                 if tensor_name in self.tensor_map:
                     i = 1
@@ -125,16 +128,19 @@ class CommonGraph(object):
             if tensor_name in self.tensor_node_map:
                 nodes.append(self.check_tensor(tensor_name, node_type, t))
             else:
-                node = self.graph.add_vertex(node_type=node_type, outputs=[
-                    tensor_name], label=ExtendedOperator(node_type).type_name(),
-                    name=tensor_name)
+                node = self.graph.add_vertex(
+                    node_type=node_type,
+                    outputs=[tensor_name],
+                    label=ExtendedOperator(node_type).type_name(),
+                    name=tensor_name,
+                )
                 self.tensor_map[tensor_name] = t
                 self.tensor_node_map[tensor_name] = node['name']
                 nodes.append(node)
         return nodes
 
     def add_node(self, tensors: typing.List[tfl.Tensor], tfl_op: tfl.BaseOperator, output_exists: bool = False):
-        """ Add a node (usually a op node) with the output tensors
+        """Add a node (usually a op node) with the output tensors
 
         Args:
             tensors (typing.List[tfl.Tensor]): The output tensors of the node
@@ -149,23 +155,36 @@ class CommonGraph(object):
         node_unique_name = f'__tinynn_op_{self.node_op_counter}__'
         self.node_op_counter += 1
         if tfl_op.op.custom_code is not None:
-            node = self.graph.add_vertex(node_type=tfl_op.op.code, custom_type=tfl_op.op.custom_code,
-                                         outputs=output_names, op=tfl_op, label=tfl_op.type_name(),
-                                         name=node_unique_name)
+            node = self.graph.add_vertex(
+                node_type=tfl_op.op.code,
+                custom_type=tfl_op.op.custom_code,
+                outputs=output_names,
+                op=tfl_op,
+                label=tfl_op.type_name(),
+                name=node_unique_name,
+            )
         else:
-            node = self.graph.add_vertex(node_type=tfl_op.op.code, outputs=output_names,
-                                         op=tfl_op, label=tfl_op.type_name(),
-                                         name=node_unique_name)
+            node = self.graph.add_vertex(
+                node_type=tfl_op.op.code,
+                outputs=output_names,
+                op=tfl_op,
+                label=tfl_op.type_name(),
+                name=node_unique_name,
+            )
 
         log.debug(f'NEW VERTEX:  {node["op"].type_name()}[{node["name"]}] {node["op"].inputs} -> {node["op"].outputs}')
 
         for t in tensors:
             if not output_exists:
-                assert t.name not in self.tensor_node_map, f"output tensor ({t.name}) should not be in the nodes map at this time"
+                assert (
+                    t.name not in self.tensor_node_map
+                ), f"output tensor ({t.name}) should not be in the nodes map at this time"
                 self.tensor_map[t.name] = t
             else:
                 if t.name in self.tensor_map:
-                    assert self.tensor_map[t.name] == t, f"output tensor ({t.name}) has changed during graph reconstruction"
+                    assert (
+                        self.tensor_map[t.name] == t
+                    ), f"output tensor ({t.name}) has changed during graph reconstruction"
                 else:
                     log.debug(f'tensor node map add {t.name} during transformation')
                     self.tensor_map[t.name] = t
@@ -174,7 +193,7 @@ class CommonGraph(object):
         return node
 
     def add_outputs(self, names: typing.List[str], node_type=ExtendedOperator.OUTPUT_NODE):
-        """ Add the output nodes with the names given
+        """Add the output nodes with the names given
 
         Args:
             names (typing.List[str]): The names of the output nodes to be created
@@ -186,10 +205,12 @@ class CommonGraph(object):
             for idx, (name, output_node) in enumerate(zip(names, output_nodes)):
                 current_node = self.graph.vs.find(name=self.tensor_node_map[name])
                 edge = self.graph.add_edge(current_node, output_node, name=output_node["outputs"][0], label=name)
-                log.debug(f'NEW EDGE: {current_node["label"]} -> {output_node["label"]} {self.tensor_map[edge["name"]]}')
+                log.debug(
+                    f'NEW EDGE: {current_node["label"]} -> {output_node["label"]} {self.tensor_map[edge["name"]]}'
+                )
 
     def add_operator(self, tfl_op: tfl.BaseOperator, transform: bool = False):
-        """ Add a new operator to the graph
+        """Add a new operator to the graph
 
         Args:
             tfl_op (tfl.BaseOperator): The operator be added
@@ -198,15 +219,16 @@ class CommonGraph(object):
         input_nodes = self.add_nodes(tfl_op.inputs)
         current_node = self.add_node(tfl_op.outputs, tfl_op, transform)
         for idx, input_node in enumerate(input_nodes):
-            edge = self.graph.add_edge(input_node, current_node,
-                                       name=tfl_op.inputs[idx].name, label=tfl_op.inputs[idx].name)
+            edge = self.graph.add_edge(
+                input_node, current_node, name=tfl_op.inputs[idx].name, label=tfl_op.inputs[idx].name
+            )
             log.debug(f'NEW EDGE: {input_node["label"]} -> {current_node["label"]} {self.tensor_map[edge["name"]]}')
 
         output_names = set(self.outputs).intersection(set([t.name for t in tfl_op.outputs]))
         self.add_outputs(output_names)
 
     def try_restore_edges(self, mapping: typing.List[typing.Tuple[str, str]]):
-        """ Try to restore the edges between nodes
+        """Try to restore the edges between nodes
 
         Args:
             mapping (typing.List[typing.Tuple[str, str]]): A list of mapping (edge name, target node nam)
@@ -221,9 +243,10 @@ class CommonGraph(object):
                 edge = self.graph.add_edge(prev_node, next_node, name=edge_name, label=edge_name)
                 log.debug(f'NEW EDGE: {prev_node["label"]} -> {next_node["label"]} {self.tensor_map[edge["name"]]}')
 
-    def replace_operator_input(self, node: ig.Vertex, input_idx: int, new_tensor: tfl.Tensor,
-                               return_ids: bool = False, skip: int = 0) -> typing.Optional[typing.List[int]]:
-        """ Use a new input tensor in a op node
+    def replace_operator_input(
+        self, node: ig.Vertex, input_idx: int, new_tensor: tfl.Tensor, return_ids: bool = False, skip: int = 0
+    ) -> typing.Optional[typing.List[int]]:
+        """Use a new input tensor in a op node
 
         Args:
             node (ig.Vertex): An op node
@@ -263,7 +286,7 @@ class CommonGraph(object):
             self.graph.delete_edges(remove_edges)
 
     def append_operator_input(self, node: ig.Vertex, new_tensor: tfl.Tensor):
-        """ Add a new input tensor to a op node
+        """Add a new input tensor to a op node
 
         Args:
             node (ig.Vertex): An op node
@@ -287,8 +310,14 @@ class CommonGraph(object):
             indices.append(op_node.index)
         self.graph.delete_vertices(indices)
 
-    def connect_next_tensors(self, find_node: ig.Vertex, connect_node: ig.Vertex, tensor_name: str, skips_nodes: typing.Optional[typing.List[str]] = None):
-        """ Add edges between `connect_node` and the next nodes of `find_node` with the name `tensor_name`
+    def connect_next_tensors(
+        self,
+        find_node: ig.Vertex,
+        connect_node: ig.Vertex,
+        tensor_name: str,
+        skips_nodes: typing.Optional[typing.List[str]] = None,
+    ):
+        """Add edges between `connect_node` and the next nodes of `find_node` with the name `tensor_name`
 
         Args:
             find_node ([ig.Vertex]): The node to search for next nodes
@@ -300,19 +329,27 @@ class CommonGraph(object):
             next_op = self.graph.vs[next_tensor.target]
             if skips_nodes is not None and next_op['name'] in skips_nodes:
                 continue
-            if next_op['node_type'] not in (ExtendedOperator.OUTPUT_NODE,
-                                            ExtendedOperator.UNUSED_NODE):
-                assert tensor_name == next_tensor['name'], f'next tensor name mismatches: {tensor_name} vs {next_tensor["name"]}'
+            if next_op['node_type'] not in (ExtendedOperator.OUTPUT_NODE, ExtendedOperator.UNUSED_NODE):
+                assert (
+                    tensor_name == next_tensor['name']
+                ), f'next tensor name mismatches: {tensor_name} vs {next_tensor["name"]}'
                 self.graph.add_edge(connect_node, next_op, name=tensor_name, label=tensor_name)
             else:
                 assert next_tensor['name'].startswith(
-                    tensor_name + '_output'), f'output tensor and node name mismatches: {tensor_name} vs {next_tensor["name"]}'
+                    tensor_name + '_output'
+                ), f'output tensor and node name mismatches: {tensor_name} vs {next_tensor["name"]}'
                 self.graph.add_edge(connect_node, next_op, name=next_tensor['name'], label=tensor_name)
 
             log.debug(f'NEW EDGE: {connect_node["label"]} -> {next_op["label"]} {self.tensor_map[next_tensor["name"]]}')
 
-    def replace_next_tensors(self, find_node: ig.Vertex, connect_node: ig.Vertex, tensor_name: str, skips_nodes: typing.Optional[typing.List[str]] = None):
-        """ A variant of connect_next_tensors that also replace the tensors in the next nodes
+    def replace_next_tensors(
+        self,
+        find_node: ig.Vertex,
+        connect_node: ig.Vertex,
+        tensor_name: str,
+        skips_nodes: typing.Optional[typing.List[str]] = None,
+    ):
+        """A variant of connect_next_tensors that also replace the tensors in the next nodes
 
         Args:
             find_node ([ig.Vertex]): The node to search for next nodes
@@ -327,7 +364,9 @@ class CommonGraph(object):
             if skips_nodes is not None and next_op['name'] in skips_nodes:
                 continue
             if next_op['node_type'] != ExtendedOperator.OUTPUT_NODE:
-                assert orig_name == next_tensor['name'], f'next tensor name mismatches: {tensor_name} vs {next_tensor["name"]}'
+                assert (
+                    orig_name == next_tensor['name']
+                ), f'next tensor name mismatches: {tensor_name} vs {next_tensor["name"]}'
                 op = next_op['op']
                 for idx, t in enumerate(op.inputs):
                     if t.name == orig_name:
@@ -340,7 +379,7 @@ class CommonGraph(object):
             log.debug(f'{next_op["label"]} {next_op["op"].inputs} {next_op["op"].outputs}')
 
     def visualize(self, hide_constants=True):
-        """ Plot the TinyNeuralNetwork graph
+        """Plot the TinyNeuralNetwork graph
 
         Args:
             hide_constants (bool, optional): Hide constants in the plot. Defaults to True.
@@ -348,6 +387,7 @@ class CommonGraph(object):
 
         self.check()
         import matplotlib.pyplot as plt
+
         _, axs = plt.subplots()
 
         if hide_constants:
@@ -364,13 +404,11 @@ class CommonGraph(object):
         visual_style["margin"] = 20
         ig.plot(subgraph, target=axs, **visual_style)
         axs.axis("off")
-        plt.subplots_adjust(top=1, bottom=0, right=1, left=0,
-                            hspace=0, wspace=0)
+        plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
         plt.show()
 
     def check(self):
-        """ Checks whether the graph is in a good state
-        """
+        """Checks whether the graph is in a good state"""
 
         assert self.graph.is_dag(), "The graph is not a DAG"
         assert self.graph.is_directed(), "The graph is not directed"
@@ -381,7 +419,7 @@ class CommonGraph(object):
         # assert self.graph.is_connected('weak'), "The graph is not connected"
 
     def collect_operators(self) -> typing.List[tfl.BaseOperator]:
-        """ Collect ops
+        """Collect ops
 
         Returns:
             typing.List[tfl.BaseOperator]: operators with the numbered index
@@ -402,7 +440,9 @@ class CommonGraph(object):
             result.append(op)
         return result
 
-    def collect_tensor_buffers(self) -> typing.Tuple[typing.List[tfl.Tensor], typing.List[tfl.Buffer], typing.List[int], typing.List[int]]:
+    def collect_tensor_buffers(
+        self,
+    ) -> typing.Tuple[typing.List[tfl.Tensor], typing.List[tfl.Buffer], typing.List[int], typing.List[int]]:
         """ Collect tensors, buffers and I/O indices
 
         Returns:
@@ -463,7 +503,7 @@ class CommonGraph(object):
         return tensors, buffers, input_idx, output_idx
 
     def convert(self, tflite_path: str):
-        """ Convert from the TinyNeuralNetwork Graph to the tflite model
+        """Convert from the TinyNeuralNetwork Graph to the tflite model
 
         Args:
             tflite_path ([str]): Path of the generated tflite model

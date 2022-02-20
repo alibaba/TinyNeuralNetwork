@@ -9,10 +9,27 @@ log = get_logger(__name__, 'INFO')
 
 
 class DLContext(object):
-    def __init__(self, train_loader=None, train_sampler=None, val_loader=None, criterion=None, optimizer=None,
-                 scheduler=None, warmup_scheduler=None, epoch=0, max_epoch=None, iteration=0, warmup_iteration=0,
-                 max_iteration=None, gpu=None, device=None, print_freq=50,
-                 train_func=None, validate_fun=None, custom_args: dict = None):
+    def __init__(
+        self,
+        train_loader=None,
+        train_sampler=None,
+        val_loader=None,
+        criterion=None,
+        optimizer=None,
+        scheduler=None,
+        warmup_scheduler=None,
+        epoch=0,
+        max_epoch=None,
+        iteration=0,
+        warmup_iteration=0,
+        max_iteration=None,
+        gpu=None,
+        device=None,
+        print_freq=50,
+        train_func=None,
+        validate_fun=None,
+        custom_args: dict = None,
+    ):
         self.train_loader = train_loader
         self.train_sampler = train_sampler
         self.val_loader = val_loader
@@ -28,7 +45,7 @@ class DLContext(object):
         self.gpu = gpu
         self.device = device
         self.print_freq = print_freq
-        self.best_acc = 0.
+        self.best_acc = 0.0
         self.best_epoch = -1
         self.train_func = train_func
         self.validate_func = validate_fun
@@ -60,17 +77,24 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def train(model, context: DLContext, train_func: typing.Callable[[torch.nn.Module, DLContext], None],
-          validate_func: typing.Callable[[torch.nn.Module, DLContext], float],
-          distributed: bool = False, main_process: bool = True,
-          qat: bool = False, work_dir: str = None):
-    """ The main function for the whole train process
+def train(
+    model,
+    context: DLContext,
+    train_func: typing.Callable[[torch.nn.Module, DLContext], None],
+    validate_func: typing.Callable[[torch.nn.Module, DLContext], float],
+    distributed: bool = False,
+    main_process: bool = True,
+    qat: bool = False,
+    work_dir: str = None,
+):
+    """The main function for the whole train process
 
     Args:
         model: The model to be trained
         context (DLContext): the DLContext object
         train_func (typing.Callable[[torch.nn.Module, DLContext], None]): The function to train the model by one step
-        validate_func (typing.Callable[[torch.nn.Module, DLContext], float]): The function to get the accuracy of the model
+        validate_func (typing.Callable[[torch.nn.Module, DLContext], float]): The function to get the accuracy of the \
+            model
         distributed (bool, optional): Whether DDP training is used. Defaults to False.
         main_process (bool, optional): Whether the code runs in the main process. Defaults to True.
         qat (bool, optional): Whether to perform quantization-aware training. Defaults to False.
@@ -131,7 +155,7 @@ def train(model, context: DLContext, train_func: typing.Callable[[torch.nn.Modul
 
 
 def get_device() -> torch.device:
-    """ Gets the default device
+    """Gets the default device
 
     Returns:
         [torch.device]: The default device
@@ -144,7 +168,7 @@ def get_device() -> torch.device:
 
 
 def get_module_device(module: torch.nn.Module) -> typing.Optional[torch.device]:
-    """ Gets the device of the module
+    """Gets the device of the module
 
     Args:
         module (torch.nn.Module): The given module

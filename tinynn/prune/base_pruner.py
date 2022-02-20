@@ -45,21 +45,21 @@ class BasePruner(ABC):
 
     @abstractmethod
     def prune(self):
-        """ The main function for pruning """
+        """The main function for pruning"""
         pass
 
     @abstractmethod
     def register_mask(self):
-        """ Computes the mask for the parameters in the model and register them through the maskers """
+        """Computes the mask for the parameters in the model and register them through the maskers"""
         pass
 
     @abstractmethod
     def apply_mask(self):
-        """ Applies the masks for the parameters and updates the shape and properties of the tensors and modules """
+        """Applies the masks for the parameters and updates the shape and properties of the tensors and modules"""
         pass
 
     def parse_config(self):
-        """ Parses the config and init the parameters of the pruner """
+        """Parses the config and init the parameters of the pruner"""
 
         if isinstance(self.config, str):
             self.config = self.load_config(self.config)
@@ -100,7 +100,7 @@ class BasePruner(ABC):
                 raise Exception(f'The value of `{param_key}` doesn\'t meet the requirement: {getsource(predicate)}')
 
     def parse_context(self, context: DLContext):
-        """ Parses the context and copy the needed items to the pruner """
+        """Parses the context and copy the needed items to the pruner"""
 
         for context_key, param_keys in self.context_from_params_dict.items():
             for param_key in param_keys:
@@ -117,7 +117,7 @@ class BasePruner(ABC):
         self.context = context
 
     def summary(self):
-        """ Dumps the parameters and possibly the related context items of the pruner """
+        """Dumps the parameters and possibly the related context items of the pruner"""
 
         if len(self.required_params) > 0:
             log.info('-' * 80)
@@ -133,7 +133,7 @@ class BasePruner(ABC):
 
     @classmethod
     def load_config(cls, path: str) -> dict:
-        """ Loads the configuration file and returns it as a dictionary """
+        """Loads the configuration file and returns it as a dictionary"""
 
         with open(path, 'r') as f:
             config = yaml.load(f, Loader=yaml.RoundTripLoader)
@@ -141,7 +141,7 @@ class BasePruner(ABC):
 
     @conditional(lambda: not dist.is_initialized() or dist.get_rank() == 0)
     def generate_config(self, path: str, config: dict = None) -> None:
-        """ Generates a new copy the updated configuration with the given path """
+        """Generates a new copy the updated configuration with the given path"""
 
         if config is None:
             config = self.config
@@ -168,12 +168,12 @@ class BasePruner(ABC):
                 return graph
 
     def reset(self):
-        """ Regenerate the TraceGraph when it is invalidated """
+        """Regenerate the TraceGraph when it is invalidated"""
 
         self.graph = self.trace()
 
     def calc_flops(self) -> int:
-        """ Calculate the flops of the given model """
+        """Calculate the flops of the given model"""
 
         # If graph is invalidated, then we need to regenerate the graph
         if not self.graph.inited:
@@ -206,7 +206,7 @@ class BasePruner(ABC):
                 else:
                     groups = m.groups
                 total_ops += out_elements * (in_channels // groups * kernel_ops + bias_ops)
-            elif type(m) in (nn.BatchNorm2d, ):
+            elif type(m) in (nn.BatchNorm2d,):
                 channels = m.num_features - remove_in_channel_count
                 nelements = node.prev_tensors[0].numel() // m.num_features * channels
 
@@ -218,14 +218,14 @@ class BasePruner(ABC):
                 num_elements = node.prev_tensors[0].numel() // node.prev_tensors[0].size(1) * channels
 
                 total_ops += kernel_ops * num_elements
-            elif type(m) in (nn.ReLU, ):
+            elif type(m) in (nn.ReLU,):
                 channels = node.prev_tensors[0].size(1) - remove_in_channel_count
 
                 kernel_ops = 1
                 num_elements = node.prev_tensors[0].numel() // node.prev_tensors[0].size(1) * channels
 
                 total_ops += kernel_ops * num_elements
-            elif type(m) in (nn.Linear, ):
+            elif type(m) in (nn.Linear,):
                 in_channels = m.in_features - remove_in_channel_count
                 out_channels = m.out_features - remove_out_channel_count
 

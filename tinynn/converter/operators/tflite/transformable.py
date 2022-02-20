@@ -41,8 +41,9 @@ class TransformableOperator(BaseOperator):
             self.transform_count += 1
         return Tensor(tensor, name, has_buffer=False, quantization=quantization)
 
-    def wrap_ops_with_nhwc_nchw_transposes(self, ops: typing.List[tfl_ops.BaseOperator], input_idx: int = 0,
-                                           output_idx: int = 0) -> typing.List[tfl_ops.BaseOperator]:
+    def wrap_ops_with_nhwc_nchw_transposes(
+        self, ops: typing.List[tfl_ops.BaseOperator], input_idx: int = 0, output_idx: int = 0
+    ) -> typing.List[tfl_ops.BaseOperator]:
         orig_input = ops[0].inputs[input_idx]
         orig_output = ops[-1].outputs[output_idx]
 
@@ -52,10 +53,12 @@ class TransformableOperator(BaseOperator):
         nhwc2nchw_perm_tensor = self.create_attr_tensor(nhwc2nchw_perm)
         nchw2nhwc_perm_tensor = self.create_attr_tensor(nchw2nhwc_perm)
 
-        new_input = self.create_transform_tensor(np.transpose(
-            orig_input.tensor, nchw2nhwc_perm), quantization=orig_input.quantization)
-        new_output = self.create_transform_tensor(np.transpose(
-            orig_output.tensor, nchw2nhwc_perm), quantization=orig_output.quantization)
+        new_input = self.create_transform_tensor(
+            np.transpose(orig_input.tensor, nchw2nhwc_perm), quantization=orig_input.quantization
+        )
+        new_output = self.create_transform_tensor(
+            np.transpose(orig_output.tensor, nchw2nhwc_perm), quantization=orig_output.quantization
+        )
 
         nchw2nhwc_transpose = tfl_ops.TransposeOperator([orig_input, nchw2nhwc_perm_tensor], [new_input])
         nhwc2nchw_transpose = tfl_ops.TransposeOperator([new_output, nhwc2nchw_perm_tensor], [orig_output])
@@ -75,8 +78,14 @@ class BatchNormOperator(TransformableOperator):
 
     output_index = 0
 
-    def __init__(self, inputs: typing.List['Tensor'], outputs: typing.List['Tensor'], eps: float, quantization: typing.Optional[QuantizationParameters] = None,
-                 fusedActivationFunction=tflite.ActivationFunctionType.NONE):
+    def __init__(
+        self,
+        inputs: typing.List['Tensor'],
+        outputs: typing.List['Tensor'],
+        eps: float,
+        quantization: typing.Optional[QuantizationParameters] = None,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+    ):
         super().__init__(ExtendedOperator.BATCH_NORM, inputs, outputs, 1)
         self.eps = eps
         self.fusedActivationFunction = fusedActivationFunction
@@ -84,8 +93,10 @@ class BatchNormOperator(TransformableOperator):
     def transform(self, graph_converter, mapping):
         assert all((x.buffer is not None for x in self.inputs[1:]))
 
-        w, b, mean, var = [self.inputs[i]
-                           for i in (self.weight_index, self.bias_index, self.running_mean_index, self.running_variance_index)]
+        w, b, mean, var = [
+            self.inputs[i]
+            for i in (self.weight_index, self.bias_index, self.running_mean_index, self.running_variance_index)
+        ]
 
         inv = 1 / np.sqrt(var.tensor + self.eps)
         new_w = inv * w.tensor
@@ -114,9 +125,10 @@ class BatchNormOperator(TransformableOperator):
         else:
             add_out = self.outputs[self.output_index]
 
-        graph_converter.add_operator(tfl_ops.AddOperator([mul_out, bias], [add_out],
-                                                         fusedActivationFunction=self.fusedActivationFunction),
-                                     transform=True)
+        graph_converter.add_operator(
+            tfl_ops.AddOperator([mul_out, bias], [add_out], fusedActivationFunction=self.fusedActivationFunction),
+            transform=True,
+        )
 
         if inp.quantization is not None:
             quant_out = self.outputs[self.output_index]
@@ -141,8 +153,17 @@ class GenericConvOperator(TransformableOperator):
 
     fusedActivationFunction: tflite.ActivationFunctionType
 
-    def __init__(self, inputs: typing.List['Tensor'], outputs: typing.List['Tensor'], stride: typing.List[int], padding: typing.List[int],
-                 dialation: typing.List[int], output_padding: typing.List[int], groups: int, fusedActivationFunction=tflite.ActivationFunctionType.NONE):
+    def __init__(
+        self,
+        inputs: typing.List['Tensor'],
+        outputs: typing.List['Tensor'],
+        stride: typing.List[int],
+        padding: typing.List[int],
+        dialation: typing.List[int],
+        output_padding: typing.List[int],
+        groups: int,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+    ):
         super().__init__(ExtendedOperator.GENERIC_CONV, inputs, outputs, 1)
         self.stride = stride
         self.padding = padding
@@ -173,23 +194,36 @@ class GenericConvOperator(TransformableOperator):
                 reshape_input_size = 2
 
             reshape_outputs = [
-                self.create_transform_tensor(np.expand_dims(t.tensor, 2),
-                                             name=f'{self.outputs[0].name}_{t.name}_4d_input',
-                                             quantization=t.quantization) for t in self.inputs[:reshape_input_size]]
+                self.create_transform_tensor(
+                    np.expand_dims(t.tensor, 2),
+                    name=f'{self.outputs[0].name}_{t.name}_4d_input',
+                    quantization=t.quantization,
+                )
+                for t in self.inputs[:reshape_input_size]
+            ]
             reshape_attrs = [self.create_attr_tensor(np.array(t.shape, dtype='int32')) for t in reshape_outputs]
-            reshape_ops = [tfl_ops.ReshapeOperator([old, attr], [new], attr.tensor)
-                           for old, new, attr in zip(self.inputs[:reshape_input_size], reshape_outputs, reshape_attrs)]
+            reshape_ops = [
+                tfl_ops.ReshapeOperator([old, attr], [new], attr.tensor)
+                for old, new, attr in zip(self.inputs[:reshape_input_size], reshape_outputs, reshape_attrs)
+            ]
 
             prev_ops.extend(reshape_ops)
 
-            conv_outputs = [self.create_transform_tensor(
-                np.expand_dims(self.outputs[i].tensor, 2),
-                name=f'{self.outputs[i].name}_4d_output',
-                quantization=self.outputs[i].quantization) for i in range(reshape_output_size)]
-            conv_attrs = [self.create_attr_tensor(np.array(t.shape, dtype='int32'))
-                          for t in self.outputs[:reshape_output_size]]
-            conv_ops = [tfl_ops.ReshapeOperator([old, attr], [new], attr.tensor)
-                        for old, new, attr in zip(conv_outputs, self.outputs[:reshape_output_size], conv_attrs)]
+            conv_outputs = [
+                self.create_transform_tensor(
+                    np.expand_dims(self.outputs[i].tensor, 2),
+                    name=f'{self.outputs[i].name}_4d_output',
+                    quantization=self.outputs[i].quantization,
+                )
+                for i in range(reshape_output_size)
+            ]
+            conv_attrs = [
+                self.create_attr_tensor(np.array(t.shape, dtype='int32')) for t in self.outputs[:reshape_output_size]
+            ]
+            conv_ops = [
+                tfl_ops.ReshapeOperator([old, attr], [new], attr.tensor)
+                for old, new, attr in zip(conv_outputs, self.outputs[:reshape_output_size], conv_attrs)
+            ]
 
             next_ops.extend(conv_ops)
 
@@ -202,19 +236,29 @@ class GenericConvOperator(TransformableOperator):
 
         if weight_tensor.shape[1] == 1 and weight_tensor.shape[0] == self.groups:
             conv_op = tfl_ops.DepthwiseConv2dOperator(
-                self.inputs, self.outputs,
-                strideH=self.stride[0], strideW=self.stride[1],
+                self.inputs,
+                self.outputs,
+                strideH=self.stride[0],
+                strideW=self.stride[1],
                 depthMultiplier=1,
-                dilationHFactor=self.dilation[0], dilationWFactor=self.dilation[1],
-                fusedActivationFunction=self.fusedActivationFunction, padding=tflite.Padding.VALID)
+                dilationHFactor=self.dilation[0],
+                dilationWFactor=self.dilation[1],
+                fusedActivationFunction=self.fusedActivationFunction,
+                padding=tflite.Padding.VALID,
+            )
         else:
             if input_tensor.shape[1] != weight_tensor.shape[1]:
                 warnings.warn('Group conv is not supported if official tflite interpreter is used')
             conv_op = tfl_ops.Conv2dOperator(
-                self.inputs, self.outputs,
-                strideH=self.stride[0], strideW=self.stride[1],
-                dilationHFactor=self.dilation[0], dilationWFactor=self.dilation[1],
-                fusedActivationFunction=self.fusedActivationFunction, padding=tflite.Padding.VALID)
+                self.inputs,
+                self.outputs,
+                strideH=self.stride[0],
+                strideW=self.stride[1],
+                dilationHFactor=self.dilation[0],
+                dilationWFactor=self.dilation[1],
+                fusedActivationFunction=self.fusedActivationFunction,
+                padding=tflite.Padding.VALID,
+            )
 
         ops = self.wrap_ops_with_nhwc_nchw_transposes([conv_op])
         conv_op = ops[1]
@@ -244,8 +288,9 @@ class GenericConvOperator(TransformableOperator):
             if weight_q is not None and weight_q.dim is not None:
                 new_dim = np.nonzero(nchw2chwn_perm == weight_q.dim)[0][0]
                 weight_q = QuantizationParameters(weight_q.scale, weight_q.zero_point, new_dim)
-            reordered_weight = self.create_transform_tensor(np.transpose(
-                weight.tensor, nchw2chwn_perm), quantization=weight_q)
+            reordered_weight = self.create_transform_tensor(
+                np.transpose(weight.tensor, nchw2chwn_perm), quantization=weight_q
+            )
             conv_op.inputs[1] = reordered_weight
             reorder_op = tfl_ops.TransposeOperator([weight, nchw2chwn_perm_tensor], [reordered_weight])
         else:
@@ -255,8 +300,9 @@ class GenericConvOperator(TransformableOperator):
             if weight_q is not None and weight_q.dim is not None:
                 new_dim = np.nonzero(nchw2nhwc_perm == weight_q.dim)[0][0]
                 weight_q = QuantizationParameters(weight_q.scale, weight_q.zero_point, new_dim)
-            reordered_weight = self.create_transform_tensor(np.transpose(
-                weight.tensor, nchw2nhwc_perm), quantization=weight_q)
+            reordered_weight = self.create_transform_tensor(
+                np.transpose(weight.tensor, nchw2nhwc_perm), quantization=weight_q
+            )
             conv_op.inputs[1] = reordered_weight
             reorder_op = tfl_ops.TransposeOperator([weight, nchw2nhwc_perm_tensor], [reordered_weight])
         ops.insert(1, reorder_op)
@@ -268,9 +314,9 @@ class GenericConvOperator(TransformableOperator):
 
         if len(conv_op.inputs) == 2 or conv_op.inputs[2] is None:
             if conv_op.inputs[0].dtype == np.float32:
-                bias = np.zeros((kernel_num, ), dtype='float32')
+                bias = np.zeros((kernel_num,), dtype='float32')
             else:
-                bias = np.zeros((kernel_num, ), dtype='int32')
+                bias = np.zeros((kernel_num,), dtype='int32')
 
             conv_op.inputs.append(self.create_attr_tensor(bias))
         elif conv_op.inputs[2].shape[0] != kernel_num and conv_op.inputs[2].shape[0] == 1:
@@ -292,10 +338,12 @@ class GenericConvOperator(TransformableOperator):
             output_name = op.outputs[0].name
             node_name = graph_converter.tensor_node_map[output_name]
             node = graph_converter.graph.vs.find(name=node_name)
-            assert node.outdegree() > 0, f'The following node should be a part of the transformable node, \
-                but the outdegree of it is zero. {node}'
+            assert node.outdegree() > 0, (
+                'The following node should be a part of the transformable node,                 but the outdegree of'
+                f' it is zero. {node}'
+            )
             next_node = graph_converter.graph.vs[node.out_edges()[0].target]
-            assert(next_node['node_type'] != ExtendedOperator.CONSTANT_NODE)
+            assert next_node['node_type'] != ExtendedOperator.CONSTANT_NODE
 
 
 class GenericTransposeConvOperator(TransformableOperator):
@@ -312,8 +360,16 @@ class GenericTransposeConvOperator(TransformableOperator):
     output_padding: typing.List[int]
     groups: int
 
-    def __init__(self, inputs: typing.List['Tensor'], outputs: typing.List['Tensor'], stride: typing.List[int], padding: typing.List[int],
-                 dilation: typing.List[int], output_padding: typing.List[int], groups: int):
+    def __init__(
+        self,
+        inputs: typing.List['Tensor'],
+        outputs: typing.List['Tensor'],
+        stride: typing.List[int],
+        padding: typing.List[int],
+        dilation: typing.List[int],
+        output_padding: typing.List[int],
+        groups: int,
+    ):
         super().__init__(ExtendedOperator.GENERIC_DECONV, inputs, outputs, 1)
         self.stride = stride
         self.padding = padding
@@ -337,13 +393,19 @@ class GenericTransposeConvOperator(TransformableOperator):
             self.dilation.insert(0, 1)
             self.output_padding.insert(0, 0)
 
-            reshape_outputs = [self.create_transform_tensor(
-                np.expand_dims(t.tensor, 2),
-                name=f'{self.outputs[0].name}_{t.name}_4d_input',
-                quantization=t.quantization) for t in self.inputs[:2]]
+            reshape_outputs = [
+                self.create_transform_tensor(
+                    np.expand_dims(t.tensor, 2),
+                    name=f'{self.outputs[0].name}_{t.name}_4d_input',
+                    quantization=t.quantization,
+                )
+                for t in self.inputs[:2]
+            ]
             reshape_attrs = [self.create_attr_tensor(np.array(t.shape, dtype='int32')) for t in reshape_outputs]
-            reshape_ops = [tfl_ops.ReshapeOperator([old, attr], [new], attr.tensor)
-                           for old, new, attr in zip(self.inputs[:2], reshape_outputs, reshape_attrs)]
+            reshape_ops = [
+                tfl_ops.ReshapeOperator([old, attr], [new], attr.tensor)
+                for old, new, attr in zip(self.inputs[:2], reshape_outputs, reshape_attrs)
+            ]
 
             if weight_dim == 3 and input_dim == 3:
                 prev_ops.extend(reshape_ops)
@@ -352,13 +414,18 @@ class GenericTransposeConvOperator(TransformableOperator):
             else:
                 prev_ops.append(reshape_ops[0])
 
-            conv_outputs = [self.create_transform_tensor(
-                np.expand_dims(self.outputs[0].tensor, 2),
-                name=f'{self.outputs[0].name}_4d_output',
-                quantization=self.outputs[0].quantization)]
+            conv_outputs = [
+                self.create_transform_tensor(
+                    np.expand_dims(self.outputs[0].tensor, 2),
+                    name=f'{self.outputs[0].name}_4d_output',
+                    quantization=self.outputs[0].quantization,
+                )
+            ]
             conv_attrs = [self.create_attr_tensor(np.array(t.shape, dtype='int32')) for t in self.outputs[:1]]
-            conv_ops = [tfl_ops.ReshapeOperator([old, attr], [new], attr.tensor)
-                        for old, new, attr in zip(conv_outputs, self.outputs[:1], conv_attrs)]
+            conv_ops = [
+                tfl_ops.ReshapeOperator([old, attr], [new], attr.tensor)
+                for old, new, attr in zip(conv_outputs, self.outputs[:1], conv_attrs)
+            ]
 
             next_ops.extend(conv_ops)
 
@@ -375,7 +442,12 @@ class GenericTransposeConvOperator(TransformableOperator):
             assert False, "Only Conv[Transpose]1d/2d is supported"
 
         conv_op = tfl_ops.TransposeConvOperator(
-            self.inputs[:2][::-1], self.outputs, strideH=self.stride[0], strideW=self.stride[1], padding=tflite.Padding.VALID)
+            self.inputs[:2][::-1],
+            self.outputs,
+            strideH=self.stride[0],
+            strideW=self.stride[1],
+            padding=tflite.Padding.VALID,
+        )
 
         ops = self.wrap_ops_with_nhwc_nchw_transposes([conv_op], input_idx=1)
 
@@ -409,8 +481,9 @@ class GenericTransposeConvOperator(TransformableOperator):
         weight = conv_op.inputs[1]
         nchw2chwn_perm = np.array([1, 2, 3, 0], dtype='int32')
         nchw2chwn_perm_tensor = self.create_attr_tensor(nchw2chwn_perm)
-        reordered_weight = self.create_transform_tensor(np.transpose(
-            weight.tensor, nchw2chwn_perm), quantization=weight.quantization)
+        reordered_weight = self.create_transform_tensor(
+            np.transpose(weight.tensor, nchw2chwn_perm), quantization=weight.quantization
+        )
         conv_op.inputs[1] = reordered_weight
         reorder_op = tfl_ops.TransposeOperator([weight, nchw2chwn_perm_tensor], [reordered_weight])
         ops.insert(1, reorder_op)
@@ -419,7 +492,9 @@ class GenericTransposeConvOperator(TransformableOperator):
         if len(self.inputs) > 2 and self.inputs[2] is not None:
             bias_tensor = self.inputs[2]
             add_out = ops[-2].outputs[0]
-            bias_transform = self.create_transform_tensor(add_out.tensor.copy(), quantization=self.outputs[0].quantization)
+            bias_transform = self.create_transform_tensor(
+                add_out.tensor.copy(), quantization=self.outputs[0].quantization
+            )
             ops[-2].outputs[0] = bias_transform
             ops.insert(len(ops) - 1, tfl_ops.AddOperator([bias_transform, bias_tensor], [add_out]))
 

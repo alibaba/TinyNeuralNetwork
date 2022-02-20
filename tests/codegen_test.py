@@ -32,7 +32,6 @@ def collect_testcases():
 
 
 class TestModelMeta(type):
-
     @classmethod
     def __prepare__(mcls, name, bases):
         d = dict()
@@ -55,6 +54,7 @@ class TestModelMeta(type):
                 eval(line)
             except Exception:
                 self.fail(f'Cannot restore from {usage}, got {line}')
+
         return f
 
 

@@ -9,10 +9,15 @@ import torchvision.transforms as transforms
 from tinynn.util.train_util import AverageMeter, DLContext
 
 
-def get_dataloader(data_path: str, img_size: int = 224, batch_size: int = 128, worker: int = 4,
-                   distributed: bool = False,
-                   download: bool = False) -> typing.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
-    """ Constructs the dataloaders for training and validating
+def get_dataloader(
+    data_path: str,
+    img_size: int = 224,
+    batch_size: int = 128,
+    worker: int = 4,
+    distributed: bool = False,
+    download: bool = False,
+) -> typing.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+    """Constructs the dataloaders for training and validating
 
     Args:
         data_path (str): The path of the dataset
@@ -23,40 +28,54 @@ def get_dataloader(data_path: str, img_size: int = 224, batch_size: int = 128, w
         download (bool, optional): Whether to download the dataset. Defaults to False.
 
     Returns:
-        typing.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]: The dataloaders for training and validating
+        typing.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]: The dataloaders for training and \
+            validating
     """
 
-    train_dataset = torchvision.datasets.CIFAR10(root=data_path, train=True,
-                                                 download=download,
-                                                 transform=transforms.Compose([
-                                                     transforms.RandomCrop(32, padding=4),
-                                                     transforms.Resize(img_size),
-                                                     transforms.RandomHorizontalFlip(),
-                                                     transforms.ToTensor(),
-                                                     transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                                          (0.2023, 0.1994, 0.2010))
-                                                 ]))
+    train_dataset = torchvision.datasets.CIFAR10(
+        root=data_path,
+        train=True,
+        download=download,
+        transform=transforms.Compose(
+            [
+                transforms.RandomCrop(32, padding=4),
+                transforms.Resize(img_size),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            ]
+        ),
+    )
 
     if distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(dataset=train_dataset)
     else:
         train_sampler = None
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
-                                               shuffle=(train_sampler is None), sampler=train_sampler,
-                                               num_workers=worker, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=(train_sampler is None),
+        sampler=train_sampler,
+        num_workers=worker,
+        pin_memory=True,
+    )
 
-    val_dataset = torchvision.datasets.CIFAR10(root=data_path, train=False,
-                                               download=False,
-                                               transform=transforms.Compose([
-                                                   transforms.Resize(img_size),
-                                                   transforms.ToTensor(),
-                                                   transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                                        (0.2023, 0.1994, 0.2010))
-                                               ]))
-    val_loader = torch.utils.data.DataLoader(val_dataset,
-                                             batch_size=batch_size, shuffle=False,
-                                             num_workers=worker, pin_memory=True)
+    val_dataset = torchvision.datasets.CIFAR10(
+        root=data_path,
+        train=False,
+        download=False,
+        transform=transforms.Compose(
+            [
+                transforms.Resize(img_size),
+                transforms.ToTensor(),
+                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            ]
+        ),
+    )
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=batch_size, shuffle=False, num_workers=worker, pin_memory=True
+    )
 
     return train_loader, val_loader
 
@@ -69,7 +88,7 @@ def compute_accuracy(output, target):
 
 
 def train_one_epoch(model, context: DLContext):
-    """ Train the model for one epoch
+    """Train the model for one epoch
 
     Args:
         model: The model to be trained
@@ -122,12 +141,14 @@ def train_one_epoch(model, context: DLContext):
             for param_group in context.optimizer.param_groups:
                 current_lr = param_group['lr']
                 break
-            print(f'Epoch:{context.epoch}\t'
-                  f'Iter:[{i}|{len(context.train_loader)}]\t'
-                  f'Lr:{current_lr:.5f}\t'
-                  f'Time:{avg_batch_time.avg:.5f}\t'
-                  f'Loss:{avg_losses.avg:.5f}\t'
-                  f'Accuracy:{avg_acc.avg:.5f}')
+            print(
+                f'Epoch:{context.epoch}\t'
+                f'Iter:[{i}|{len(context.train_loader)}]\t'
+                f'Lr:{current_lr:.5f}\t'
+                f'Time:{avg_batch_time.avg:.5f}\t'
+                f'Loss:{avg_losses.avg:.5f}\t'
+                f'Accuracy:{avg_acc.avg:.5f}'
+            )
 
         if context.warmup_scheduler is not None and context.warmup_iteration > context.iteration:
             context.warmup_scheduler.step()
@@ -139,7 +160,7 @@ def train_one_epoch(model, context: DLContext):
 
 
 def train_one_epoch_distill(model, context: DLContext):
-    """ Train the model for one epoch with distilling
+    """Train the model for one epoch with distilling
 
     Args:
         model: Student model
@@ -186,9 +207,11 @@ def train_one_epoch_distill(model, context: DLContext):
         with torch.no_grad():
             label_teacher = teacher(image)
 
-        distill_loss = F.kl_div(F.log_softmax(output / T, dim=1),
-                                F.softmax(label_teacher / T, dim=1),
-                                reduction='batchmean') * T * T
+        distill_loss = (
+            F.kl_div(F.log_softmax(output / T, dim=1), F.softmax(label_teacher / T, dim=1), reduction='batchmean')
+            * T
+            * T
+        )
 
         avg_origin_losses.update(origin_loss * (1 - A))
         loss = origin_loss * (1 - A) + distill_loss * A
@@ -207,12 +230,14 @@ def train_one_epoch_distill(model, context: DLContext):
             for param_group in context.optimizer.param_groups:
                 current_lr = param_group['lr']
                 break
-            print(f'Epoch:{context.epoch}\t'
-                  f'Iter:[{i}|{len(context.train_loader)}]\t'
-                  f'Lr:{current_lr:.6f}\t'
-                  f'Time:{avg_batch_time.val:.3f}\t'
-                  f'Loss:{avg_origin_losses.val:.6f} | {avg_losses.val - avg_origin_losses.val:.6f}\t'
-                  f'Accuracy:{avg_acc.val:.3f}')
+            print(
+                f'Epoch:{context.epoch}\t'
+                f'Iter:[{i}|{len(context.train_loader)}]\t'
+                f'Lr:{current_lr:.6f}\t'
+                f'Time:{avg_batch_time.val:.3f}\t'
+                f'Loss:{avg_origin_losses.val:.6f} | {avg_losses.val - avg_origin_losses.val:.6f}\t'
+                f'Accuracy:{avg_acc.val:.3f}'
+            )
 
         if context.warmup_scheduler is not None and context.warmup_iteration > context.iteration:
             context.warmup_scheduler.step()
@@ -224,7 +249,7 @@ def train_one_epoch_distill(model, context: DLContext):
 
 
 def validate(model, context: DLContext) -> float:
-    """ Retrieves the accuracy the model via validation
+    """Retrieves the accuracy the model via validation
 
     Args:
         model: The model to be validated
@@ -254,16 +279,16 @@ def validate(model, context: DLContext) -> float:
             end = time.time()
 
             if i % 10 == 0:
-                print(f'Test: [{i}/{len(context.val_loader)}]\t'
-                      f'Time {avg_batch_time.avg:.5f}\t'
-                      f'Acc@1 {avg_acc.avg:.5f}\t')
+                print(
+                    f'Test: [{i}/{len(context.val_loader)}]\tTime {avg_batch_time.avg:.5f}\tAcc@1 {avg_acc.avg:.5f}\t'
+                )
 
         print(f'Validation Acc@1 {avg_acc.avg:.3f}')
     return avg_acc.avg
 
 
 def calibrate(model, context: DLContext):
-    """ Calibrates the fake-quantized model
+    """Calibrates the fake-quantized model
 
     Args:
         model: The model to be validated
@@ -292,7 +317,6 @@ def calibrate(model, context: DLContext):
             end = time.time()
 
             if i % 10 == 0:
-                print(f'Calibrate: [{i}/{len(context.val_loader)}]\t'
-                      f'Time {avg_batch_time.avg:.5f}\t')
+                print(f'Calibrate: [{i}/{len(context.val_loader)}]\tTime {avg_batch_time.avg:.5f}\t')
 
             context.iteration += 1

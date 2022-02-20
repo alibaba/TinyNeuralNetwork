@@ -20,9 +20,9 @@ def removed_idx_group_check(removed_idx, total_idx_len, removed_idx_len, group, 
         remove_group_len = removed_idx_len // group
         for j in range(i * remove_group_len, i * remove_group_len + remove_group_len):
             idx_group_len = total_idx_len // group
-            assert removed_idx[j] in Interval(offset + i * idx_group_len,
-                                              offset + i * idx_group_len + idx_group_len,
-                                              upper_closed=False)
+            assert removed_idx[j] in Interval(
+                offset + i * idx_group_len, offset + i * idx_group_len + idx_group_len, upper_closed=False
+            )
 
 
 def get_rd_lst(length):
@@ -381,8 +381,8 @@ class ModifierTester(unittest.TestCase):
             conv1_idxes = []
 
             for i in range(8):
-                conv0_idxes += get_topk(importance_conv0[i * 2:(i + 1) * 2], 1, offset=i * 2)
-                conv1_idxes += get_topk(importance_conv1[i * 4:(i + 1) * 4], 2, offset=i * 4)
+                conv0_idxes += get_topk(importance_conv0[i * 2 : (i + 1) * 2], 1, offset=i * 2)
+                conv1_idxes += get_topk(importance_conv1[i * 4 : (i + 1) * 4], 2, offset=i * 4)
 
             pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
 
@@ -441,11 +441,11 @@ class ModifierTester(unittest.TestCase):
             importance_conv2 = l2_norm(model.conv2.weight, model.conv2).tolist()
 
             for i in range(4):
-                conv1_idxes += get_topk(importance_conv1[i * 8:(i + 1) * 8], 4, offset=i * 8)
+                conv1_idxes += get_topk(importance_conv1[i * 8 : (i + 1) * 8], 4, offset=i * 8)
 
             for i in range(8):
-                conv0_idxes += get_topk(importance_conv0[i * 2:(i + 1) * 2], 1, offset=i * 2)
-                conv2_idxes += get_topk(importance_conv2[i * 4:(i + 1) * 4], 2, offset=i * 4)
+                conv0_idxes += get_topk(importance_conv0[i * 2 : (i + 1) * 2], 1, offset=i * 2)
+                conv2_idxes += get_topk(importance_conv2[i * 4 : (i + 1) * 4], 2, offset=i * 4)
 
             pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
 
@@ -523,11 +523,11 @@ class ModifierTester(unittest.TestCase):
             conv12_idxes = []
 
             for i in range(4):
-                conv0_idxes += get_topk(importance_conv0[i * 4:(i + 1) * 4], 2, i * 4)
-                conv12_idxes += get_topk(importance_conv12[i * 8:(i + 1) * 8], 4, i * 8)
+                conv0_idxes += get_topk(importance_conv0[i * 4 : (i + 1) * 4], 2, i * 4)
+                conv12_idxes += get_topk(importance_conv12[i * 8 : (i + 1) * 8], 4, i * 8)
 
             for i in range(8):
-                conv4_idxes += get_topk(importance_conv4[i * 4:(i + 1) * 4], 2, i * 4)
+                conv4_idxes += get_topk(importance_conv4[i * 4 : (i + 1) * 4], 2, i * 4)
 
             pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
 
@@ -607,8 +607,8 @@ class ModifierTester(unittest.TestCase):
             conv3_idxes = get_topk(importance_conv3, 8)
 
             for i in range(4):
-                conv0_idxes += get_topk(importance_conv0[i * 2:(i + 1) * 2], 1, offset=i * 2)
-                conv2_idxes += get_topk(importance_conv2[i * 4:(i + 1) * 4], 2, offset=i * 4)
+                conv0_idxes += get_topk(importance_conv0[i * 2 : (i + 1) * 2], 1, offset=i * 2)
+                conv2_idxes += get_topk(importance_conv2[i * 4 : (i + 1) * 4], 2, offset=i * 4)
 
             pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
             pruner.register_mask()
@@ -675,10 +675,10 @@ class ModifierTester(unittest.TestCase):
             conv3_idxes = []
 
             for i in range(2):
-                conv2_idxes += get_topk(importance_conv12[i * 8:(i + 1) * 8], 4, offset=i * 8)
+                conv2_idxes += get_topk(importance_conv12[i * 8 : (i + 1) * 8], 4, offset=i * 8)
 
             for i in range(4):
-                conv3_idxes += get_topk(importance_conv13[i * 4:(i + 1) * 4], 2, offset=i * 4)
+                conv3_idxes += get_topk(importance_conv13[i * 4 : (i + 1) * 4], 2, offset=i * 4)
 
             conv1_idxes = conv2_idxes + [i + 16 for i in conv3_idxes]
 
@@ -746,9 +746,9 @@ class ModifierTester(unittest.TestCase):
             idxes_conv2 = []
 
             for i in range(8):
-                idxes_conv0 += get_topk(importance_conv01[i * 2:(i + 1) * 2], 1, offset=i * 2)
+                idxes_conv0 += get_topk(importance_conv01[i * 2 : (i + 1) * 2], 1, offset=i * 2)
             for i in range(4):
-                idxes_conv2 += get_topk(importance_conv2[i * 4:(i + 1) * 4], 2, offset=i * 4)
+                idxes_conv2 += get_topk(importance_conv2[i * 4 : (i + 1) * 4], 2, offset=i * 4)
 
             pruner = OneShotChannelPruner(model, torch.ones(16, 16, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
 
@@ -808,8 +808,8 @@ class ModifierTester(unittest.TestCase):
             idxes_conv1 = []
 
             for i in range(8):
-                idxes_conv0 += get_topk(importance_conv0[i * 2:(i + 1) * 2], 1, offset=i * 2)
-                idxes_conv1 += get_topk(importance_conv01[i * 2:(i + 1) * 2], 1, offset=i * 2)
+                idxes_conv0 += get_topk(importance_conv0[i * 2 : (i + 1) * 2], 1, offset=i * 2)
+                idxes_conv1 += get_topk(importance_conv01[i * 2 : (i + 1) * 2], 1, offset=i * 2)
 
             idxes_conv0 += [i + 16 for i in idxes_conv1]
 
@@ -982,11 +982,12 @@ class ModifierTester(unittest.TestCase):
                             if cell_type != nn.LSTM and proj_size > 0:
                                 continue
 
-                            kwargs = {'num_layers': num_layers,
-                                      'bidirectional': bidirectional,
-                                      'batch_first': batch_first,
-                                      'cell_type': cell_type
-                                      }
+                            kwargs = {
+                                'num_layers': num_layers,
+                                'bidirectional': bidirectional,
+                                'batch_first': batch_first,
+                                'cell_type': cell_type,
+                            }
 
                             if proj_size > 0:
                                 if LooseVersion(torch.__version__) >= LooseVersion('1.8.0'):
@@ -999,9 +1000,9 @@ class ModifierTester(unittest.TestCase):
 
                             model = TestModel(**kwargs)
 
-                            pruner = OneShotChannelPruner(model, torch.rand((3, 3, rnn_in_size)),
-                                                          {"sparsity": 0.5,
-                                                           "metrics": "l2_norm"})
+                            pruner = OneShotChannelPruner(
+                                model, torch.rand((3, 3, rnn_in_size)), {"sparsity": 0.5, "metrics": "l2_norm"}
+                            )
                             pruner.prune()
                             model(torch.rand((3, 3, rnn_in_size)))
 
@@ -1037,9 +1038,10 @@ class ModifierTester(unittest.TestCase):
         for num_layers in (1, 2):
             for bidirectional in (False, True):
 
-                kwargs = {'num_layers': num_layers,
-                          'bidirectional': bidirectional,
-                          }
+                kwargs = {
+                    'num_layers': num_layers,
+                    'bidirectional': bidirectional,
+                }
 
                 print(f'\nTesting with {kwargs}')
 
@@ -1047,9 +1049,9 @@ class ModifierTester(unittest.TestCase):
 
                 model(torch.rand((3, 3, rnn_in_size)))
 
-                pruner = OneShotChannelPruner(model, torch.rand((3, 3, rnn_in_size)),
-                                              {"sparsity": 0.5,
-                                               "metrics": "l2_norm"})
+                pruner = OneShotChannelPruner(
+                    model, torch.rand((3, 3, rnn_in_size)), {"sparsity": 0.5, "metrics": "l2_norm"}
+                )
                 pruner.prune()
 
                 model(torch.rand((3, 3, rnn_in_size)))

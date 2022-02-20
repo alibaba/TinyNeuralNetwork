@@ -4,7 +4,7 @@ from torch.quantization.observer import _with_args
 
 
 class FakeQuantizeBFloat16(Module):
-    """ Simulate the quantize and dequantize operations in training time for bfloat16 """
+    """Simulate the quantize and dequantize operations in training time for bfloat16"""
 
     def __init__(self, **observer_kwargs):
         super(FakeQuantizeBFloat16, self).__init__()

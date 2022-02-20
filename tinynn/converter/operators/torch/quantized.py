@@ -103,11 +103,15 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
 
         if transpose:
             assert fusedActivation == tfl_schema.ActivationFunctionType.NONE
-            graph_converter.add_operator(tfl.GenericTransposeConvOperator(inputs, outputs, stride, padding,
-                                                                          dilation, output_padding, groups))
+            graph_converter.add_operator(
+                tfl.GenericTransposeConvOperator(inputs, outputs, stride, padding, dilation, output_padding, groups)
+            )
         else:
-            graph_converter.add_operator(tfl.GenericConvOperator(inputs, outputs, stride, padding,
-                                                                 dilation, output_padding, groups, fusedActivation))
+            graph_converter.add_operator(
+                tfl.GenericConvOperator(
+                    inputs, outputs, stride, padding, dilation, output_padding, groups, fusedActivation
+                )
+            )
 
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
@@ -180,8 +184,9 @@ class QuantizedBatchNorm2dReluOperator(QuantizedBatchNorm2dReluSchema):
         inputs = [self.find_or_create_input(i, graph_converter) for i in range(5)]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
-        ops = self.wrap_ops_with_dequant_quants([tfl.BatchNormOperator(
-            inputs, outputs, eps, tfl_schema.ActivationFunctionType.RELU)])
+        ops = self.wrap_ops_with_dequant_quants(
+            [tfl.BatchNormOperator(inputs, outputs, eps, tfl_schema.ActivationFunctionType.RELU)]
+        )
         for op in ops:
             graph_converter.add_operator(op)
 
@@ -224,8 +229,9 @@ class QuantizedLinearOperator(QuantizedLinearSchema):
 
         keep_dims = len(output_tensor.shape) > 2
 
-        graph_converter.add_operator(tfl.FullyConnectedOperator(
-            inputs, outputs, fusedActivationFunction=fusedActivation, keepNumDims=keep_dims))
+        graph_converter.add_operator(
+            tfl.FullyConnectedOperator(inputs, outputs, fusedActivationFunction=fusedActivation, keepNumDims=keep_dims)
+        )
 
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
@@ -235,8 +241,7 @@ class QuantizedLinearOperator(QuantizedLinearSchema):
 
 
 class QuantizedAddOperator(QuantizedAddSchema):
-    def parse_common(self, node, attrs, args, graph_converter,
-                     fusedActivation=tfl_schema.ActivationFunctionType.NONE):
+    def parse_common(self, node, attrs, args, graph_converter, fusedActivation=tfl_schema.ActivationFunctionType.NONE):
         other = self.input_tensors[1]
         if type(other) not in (int, float):
             self.elementwise_binary(tfl.AddOperator, graph_converter, False, fusedActivation)
@@ -265,8 +270,9 @@ class QuantizedAddReluOperator(QuantizedAddReluSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        QuantizedAddOperator.parse_common(self, node, attrs, args, graph_converter,
-                                          tfl_schema.ActivationFunctionType.RELU)
+        QuantizedAddOperator.parse_common(
+            self, node, attrs, args, graph_converter, tfl_schema.ActivationFunctionType.RELU
+        )
 
 
 class QuantizedLinearReluOperator(QuantizedLinearReluSchema):
@@ -336,8 +342,9 @@ class QuantizedLinearDynamicOperator(QuantizedLinearDynamicSchema):
 
         keep_dims = len(output_tensor.shape) > 2
 
-        graph_converter.add_operator(tfl.FullyConnectedOperator(
-            inputs, outputs, fusedActivationFunction=fusedActivation, keepNumDims=keep_dims))
+        graph_converter.add_operator(
+            tfl.FullyConnectedOperator(inputs, outputs, fusedActivationFunction=fusedActivation, keepNumDims=keep_dims)
+        )
 
 
 class QuantizedLinearReluDynamicOperator(QuantizedLinearReluDynamicSchema):
@@ -345,8 +352,7 @@ class QuantizedLinearReluDynamicOperator(QuantizedLinearReluDynamicSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        QuantizedLinearDynamicOperator.parse_common(self, graph_converter,
-                                                    tfl_schema.ActivationFunctionType.RELU)
+        QuantizedLinearDynamicOperator.parse_common(self, graph_converter, tfl_schema.ActivationFunctionType.RELU)
 
 
 class QuantizedEluOperator(QuantizedEluSchema):

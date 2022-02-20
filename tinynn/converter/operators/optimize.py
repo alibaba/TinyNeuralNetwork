@@ -38,7 +38,9 @@ class GraphOptimizer(object):
         self.level = level
         self.fuse_quant = fuse_quant
 
-    def create_attr_tensor(self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None):
+    def create_attr_tensor(
+        self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
+    ):
         if name is None:
             if self.fuse_attr_count == 0:
                 name = 'fuse_attr'
@@ -47,7 +49,9 @@ class GraphOptimizer(object):
             self.fuse_attr_count += 1
         return tfl.Tensor(tensor, name, has_buffer=True, quantization=quantization)
 
-    def create_transform_tensor(self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None):
+    def create_transform_tensor(
+        self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
+    ):
         if name is None:
             if self.fuse_tensor_count == 0:
                 name = 'fuse_transform'
@@ -77,7 +81,8 @@ class GraphOptimizer(object):
             # For each node that is next of a batch-norm node, we connect it with the conv node
             self.graph.connect_next_tensors(bn, conv, new_output)
 
-            # Update graph, prepare to drop the output tensor of the conv node and use the output tensor of the batch-norm instead
+            # Update graph, prepare to drop the output tensor of the conv node and use the output tensor of the
+            # batch-norm instead
             conv['outputs'][0] = new_output
             conv['op'].outputs[0] = self.graph.tensor_map[new_output]
             self.graph.tensor_node_map[new_output] = conv['name']
@@ -91,13 +96,20 @@ class GraphOptimizer(object):
             weight = conv['op'].inputs[1]
             bias = conv['op'].inputs[2] if len(conv['op'].inputs) > 2 else None
             bn_w, bn_b, bn_mean, bn_var = bn['op'].inputs[1:]
-            bn_w, bn_b, bn_mean, bn_var = bn_w.tensor.copy(), bn_b.tensor.copy(), bn_mean.tensor.copy(), bn_var.tensor.copy()
+            bn_w, bn_b, bn_mean, bn_var = (
+                bn_w.tensor.copy(),
+                bn_b.tensor.copy(),
+                bn_mean.tensor.copy(),
+                bn_var.tensor.copy(),
+            )
             activ_w = weight.tensor.copy()
             activ_b = bias.tensor.copy() if bias is not None else None
             eps = bn['op'].eps
 
             # Fuse conv/fc and batch-norm
-            new_weight = fuse_bn_weight(eps, bn_w, bn_var, activ_w, conv['node_type'] == ExtendedOperator.GENERIC_DECONV)
+            new_weight = fuse_bn_weight(
+                eps, bn_w, bn_var, activ_w, conv['node_type'] == ExtendedOperator.GENERIC_DECONV
+            )
             new_bias = fuse_bn_bias(eps, bn_w, bn_var, bn_mean, bn_b, activ_b)
 
             # New attribute tensors
@@ -140,7 +152,8 @@ class GraphOptimizer(object):
             # For each node that is next of the activation node, we connect it with the previous node
             self.graph.connect_next_tensors(activ, pre_activ, new_output)
 
-            # Update graph, prepare to drop the output tensor of the conv node and use the output tensor of the batch-norm instead
+            # Update graph, prepare to drop the output tensor of the conv node and use the output tensor of the
+            # batch-norm instead
             pre_activ['outputs'][0] = new_output
             pre_activ['op'].outputs[0] = self.graph.tensor_map[new_output]
             self.graph.tensor_node_map[new_output] = pre_activ['name']
@@ -157,8 +170,9 @@ class GraphOptimizer(object):
 
     def transform_graph(self):
         # Find transformable ops
-        filtered_nodes = self.graph.graph.vs.select(functools.partial(
-            is_transformable_node, graph_converter=self.graph.graph))
+        filtered_nodes = self.graph.graph.vs.select(
+            functools.partial(is_transformable_node, graph_converter=self.graph.graph)
+        )
         remove_ids = []
         ops = []
         restore_mapping = []
@@ -197,8 +211,9 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_simple_transpose_pass(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_transpose_fusable_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(
+            functools.partial(is_transpose_fusable_edge, graph_converter=self.graph.graph)
+        )
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
 
         # Try to fuse the edges
@@ -221,8 +236,7 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_simple_reshape_pass(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_reshape_fusable_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(functools.partial(is_reshape_fusable_edge, graph_converter=self.graph.graph))
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
 
         # Try to fuse the edge
@@ -248,8 +262,7 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_simple_slice_pass(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_slice_fusable_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(functools.partial(is_slice_fusable_edge, graph_converter=self.graph.graph))
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
 
         # Try to fuse the edge
@@ -265,8 +278,10 @@ class GraphOptimizer(object):
             start, size = custom_data
             start_tensor = self.create_attr_tensor(np.array(start, dtype='int32'))
             size_tensor = self.create_attr_tensor(np.array(size, dtype='int32'))
-            actions = [(self.graph.replace_operator_input, (first_node, 1, start_tensor)),
-                       (self.graph.replace_operator_input, (first_node, 2, size_tensor))]
+            actions = [
+                (self.graph.replace_operator_input, (first_node, 1, start_tensor)),
+                (self.graph.replace_operator_input, (first_node, 2, size_tensor)),
+            ]
             return actions
 
         elinimate_sequences(self.graph, filtered_pairs, _remove_first_pred, _remove_first_action)
@@ -276,9 +291,10 @@ class GraphOptimizer(object):
         if not self.graph.graph.is_connected('weak'):
             while True:
                 for vertex in self.graph.graph.vs:
-                    if vertex['node_type'] not in (ExtendedOperator.OUTPUT_NODE,
-                                                   ExtendedOperator.UNUSED_NODE) \
-                            and vertex.outdegree() == 0:
+                    if (
+                        vertex['node_type'] not in (ExtendedOperator.OUTPUT_NODE, ExtendedOperator.UNUSED_NODE)
+                        and vertex.outdegree() == 0
+                    ):
                         if vertex['node_type'] == ExtendedOperator.INPUT_NODE:
                             continue
                         if vertex['node_type'] != ExtendedOperator.CONSTANT_NODE:
@@ -287,8 +303,11 @@ class GraphOptimizer(object):
                             log.warning('Info of the deleted node:')
                             log.warning(f'vertex: {vertex}')
                             # edge = self.graph.graph.es.select(name=vertex['outputs'][0])
-                            # assert edge is None, f'The edge {vertex["outputs"][0]} exists but the connection to the vertex {vertex["name"]} is broken, \
-                            #     probably there have some conflicts in the names of the nodes'
+                            # assert edge is None, (
+                            #     f'The edge {vertex["outputs"][0]} exists but the connection to the vertex'
+                            #     f' {vertex["name"]} is broken, probably there have some conflicts in the names of the'
+                            #     ' nodes'
+                            # )
                         cleanup_nodes.append(vertex.index)
 
                 if len(cleanup_nodes) == 0:
@@ -299,8 +318,9 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.FOLD_BUFFER)
     def fold_transpose_buffer(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_constant_transpose_fusable_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(
+            functools.partial(is_constant_transpose_fusable_edge, graph_converter=self.graph.graph)
+        )
         filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target], x) for x in edges)
 
         remove_ids = []
@@ -316,7 +336,9 @@ class GraphOptimizer(object):
             for out_edge in transpose.out_edges():
                 next_node = self.graph.graph.vs[out_edge.target]
                 self.graph.graph.add_edge(new_node, next_node, name=new_tensor.name, label=new_tensor.name)
-                log.debug(f'NEW EDGE: {new_node["label"]} -> {next_node["label"]} {self.graph.tensor_map[out_edge["name"]]}')
+                log.debug(
+                    f'NEW EDGE: {new_node["label"]} -> {next_node["label"]} {self.graph.tensor_map[out_edge["name"]]}'
+                )
                 op = next_node['op']
                 for idx in range(len(op.inputs)):
                     if op.inputs[idx].name == transpose['op'].outputs[0].name:
@@ -329,8 +351,9 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def transpose_to_reshape_pass(self):
-        filtered_nodes = self.graph.graph.vs.select(functools.partial(
-            is_transformable_transpose_node, graph_converter=self.graph.graph))
+        filtered_nodes = self.graph.graph.vs.select(
+            functools.partial(is_transformable_transpose_node, graph_converter=self.graph.graph)
+        )
 
         # Collect actions for the transformable transpose nodes
         actions = []
@@ -351,8 +374,9 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.FOLD_BUFFER)
     def fold_reshape_buffer(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_constant_reshape_fusable_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(
+            functools.partial(is_constant_reshape_fusable_edge, graph_converter=self.graph.graph)
+        )
         filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target], x) for x in edges)
 
         remove_ids = []
@@ -368,7 +392,9 @@ class GraphOptimizer(object):
             for out_edge in reshape.out_edges():
                 next_node = self.graph.graph.vs[out_edge.target]
                 self.graph.graph.add_edge(new_node, next_node, name=new_tensor.name, label=new_tensor.name)
-                log.debug(f'NEW EDGE: {new_node["label"]} -> {next_node["label"]} {self.graph.tensor_map[out_edge["name"]]}')
+                log.debug(
+                    f'NEW EDGE: {new_node["label"]} -> {next_node["label"]} {self.graph.tensor_map[out_edge["name"]]}'
+                )
                 op = next_node['op']
                 for idx in range(len(op.inputs)):
                     if op.inputs[idx].name == reshape['op'].outputs[0].name:
@@ -381,8 +407,9 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def remove_noop_pass(self, branch: bool = False):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_ending_with_noop_edge, graph_converter=self.graph.graph, branch=branch))
+        edges = self.graph.graph.es.select(
+            functools.partial(is_ending_with_noop_edge, graph_converter=self.graph.graph, branch=branch)
+        )
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
 
         # Try to fuse the edges
@@ -393,8 +420,9 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_wrapped_reshape_within_transpose_pass(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_wrapped_reshape_within_transpose_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(
+            functools.partial(is_wrapped_reshape_within_transpose_edge, graph_converter=self.graph.graph)
+        )
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
 
         # Try to fuse the edges
@@ -445,8 +473,7 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
     def branch_reshape_expand_pass(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_reshape_branch_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(functools.partial(is_reshape_branch_edge, graph_converter=self.graph.graph))
         branch_reshape_nodes = list(set(self.graph.graph.vs[edge.source] for edge in edges))
 
         def _new_reshape(node: ig.Vertex, prev_node: ig.Vertex, next_node: ig.Vertex):
@@ -482,8 +509,9 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
     def branch_transpose_expand_pass(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_transpose_branch_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(
+            functools.partial(is_transpose_branch_edge, graph_converter=self.graph.graph)
+        )
         branch_transpose_nodes = list(set(self.graph.graph.vs[edge.source] for edge in edges))
 
         def _new_transpose(node: ig.Vertex, prev_node: ig.Vertex, next_node: ig.Vertex):
@@ -494,8 +522,7 @@ class GraphOptimizer(object):
             op_perm = op.inputs[1]
 
             prev_idx = prev_node['outputs'].index(op.inputs[0].name)
-            if prev_node['node_type'] in (ExtendedOperator.INPUT_NODE,
-                                          ExtendedOperator.CONSTANT_NODE):
+            if prev_node['node_type'] in (ExtendedOperator.INPUT_NODE, ExtendedOperator.CONSTANT_NODE):
                 prev_out = self.graph.tensor_map[op.inputs[0].name]
             else:
                 prev_op = prev_node['op']
@@ -520,8 +547,9 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
     def elementwise_reshape_transpose_passthrough_pass(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_transpose_reshape_op_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(
+            functools.partial(is_transpose_reshape_op_edge, graph_converter=self.graph.graph)
+        )
         pairs = ((self.graph.graph.vs[edge.source], self.graph.graph.vs[edge.target]) for edge in edges)
         filtered_nodes = (k[0] if k[0]['node_type'] != ExtendedOperator.TRANSPOSE else k[1] for k in pairs)
         unique_nodes = list(set(filtered_nodes))
@@ -642,16 +670,18 @@ class GraphOptimizer(object):
                 else:
                     prev_out = prev_node['op'].outputs[next_idx]
                 perm_tensor = self.create_attr_tensor(inv_perm_arr)
-                prev_new_out = self.create_transform_tensor(np.transpose(
-                    prev_out.tensor, inv_perm_arr), quantization=prev_out.quantization)
+                prev_new_out = self.create_transform_tensor(
+                    np.transpose(prev_out.tensor, inv_perm_arr), quantization=prev_out.quantization
+                )
                 self.graph.add_operator(tfl.TransposeOperator([prev_out, perm_tensor], [prev_new_out]))
                 actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
 
             tensor_node_dict = {}
             for i, op_out in enumerate(op.outputs):
                 perm_tensor = self.create_attr_tensor(post_perm_arr)
-                new_out = self.create_transform_tensor(np.transpose(
-                    op_out.tensor, inv_post_perm_arr), quantization=op_out.quantization)
+                new_out = self.create_transform_tensor(
+                    np.transpose(op_out.tensor, inv_post_perm_arr), quantization=op_out.quantization
+                )
 
                 # Update relations
                 if op_out.name in self.graph.tensor_node_map:
@@ -690,8 +720,9 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
     def elementwise_op_transpose_passthrough_pass(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_transpose_elementwise_op_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(
+            functools.partial(is_transpose_elementwise_op_edge, graph_converter=self.graph.graph)
+        )
         pairs = ((self.graph.graph.vs[edge.source], self.graph.graph.vs[edge.target]) for edge in edges)
         filtered_nodes = (k[0] if k[0]['node_type'] != ExtendedOperator.TRANSPOSE else k[1] for k in pairs)
         unique_nodes = list(set(filtered_nodes))
@@ -770,8 +801,9 @@ class GraphOptimizer(object):
                     tensor_node_dict[prev_out.name] = (prev_new_out, skip)
                 else:
                     perm_tensor = self.create_attr_tensor(inv_perm_arr)
-                    prev_new_out = self.create_transform_tensor(np.transpose(
-                        prev_out.tensor, inv_perm_arr), quantization=prev_out.quantization)
+                    prev_new_out = self.create_transform_tensor(
+                        np.transpose(prev_out.tensor, inv_perm_arr), quantization=prev_out.quantization
+                    )
                     tensor_node_dict[prev_out.name] = (prev_new_out, 1)
                     self.graph.add_operator(tfl.TransposeOperator([prev_out, perm_tensor], [prev_new_out]))
                     actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
@@ -786,8 +818,9 @@ class GraphOptimizer(object):
                     continue
 
                 perm_tensor = self.create_attr_tensor(perm_arr)
-                new_out = self.create_transform_tensor(np.transpose(
-                    op_out.tensor, inv_perm_arr), quantization=op_out.quantization)
+                new_out = self.create_transform_tensor(
+                    np.transpose(op_out.tensor, inv_perm_arr), quantization=op_out.quantization
+                )
 
                 # Update relations
                 if op_out.name in self.graph.tensor_node_map:
@@ -848,8 +881,9 @@ class GraphOptimizer(object):
         self.graph.graph.delete_vertices(remove_vertices)
 
     def elementwise_op_reshape_passthrough_pass(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_reshape_elementwise_op_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(
+            functools.partial(is_reshape_elementwise_op_edge, graph_converter=self.graph.graph)
+        )
         pairs = ((self.graph.graph.vs[edge.source], self.graph.graph.vs[edge.target]) for edge in edges)
         filtered_nodes = (k[0] if k[0]['node_type'] != ExtendedOperator.RESHAPE else k[1] for k in pairs)
         unique_nodes = list(set(filtered_nodes))
@@ -872,7 +906,9 @@ class GraphOptimizer(object):
 
                 if prev_node['node_type'] == ExtendedOperator.RESHAPE:
                     mapping = dict()
-                    if not is_simple_reshape(prev_node['op'].inputs[0].shape, prev_node['op'].outputs[0].shape, mapping):
+                    if not is_simple_reshape(
+                        prev_node['op'].inputs[0].shape, prev_node['op'].outputs[0].shape, mapping
+                    ):
                         continue
 
                     new_dim = None
@@ -911,7 +947,9 @@ class GraphOptimizer(object):
 
                 if next_node['node_type'] == ExtendedOperator.RESHAPE:
                     mapping = dict()
-                    if not is_simple_reshape(next_node['op'].inputs[0].shape, next_node['op'].outputs[0].shape, mapping):
+                    if not is_simple_reshape(
+                        next_node['op'].inputs[0].shape, next_node['op'].outputs[0].shape, mapping
+                    ):
                         continue
 
                     new_dim = None
@@ -962,12 +1000,14 @@ class GraphOptimizer(object):
                     actions.append((self.graph.replace_operator_input, (node, i, prev_new_out)))
                     tensor_node_dict[prev_out.name] = prev_new_out
                 else:
-                    prev_new_out = self.create_transform_tensor(np.reshape(
-                        prev_out.tensor, prev_shape), quantization=prev_out.quantization)
+                    prev_new_out = self.create_transform_tensor(
+                        np.reshape(prev_out.tensor, prev_shape), quantization=prev_out.quantization
+                    )
                     tensor_node_dict[prev_out.name] = prev_new_out
                     shape_tensor = self.create_attr_tensor(np.array(prev_new_out.shape, dtype='int32'))
-                    self.graph.add_operator(tfl.ReshapeOperator([prev_out, shape_tensor], [
-                                            prev_new_out], newShape=shape_tensor.tensor))
+                    self.graph.add_operator(
+                        tfl.ReshapeOperator([prev_out, shape_tensor], [prev_new_out], newShape=shape_tensor.tensor)
+                    )
                     actions.append((self.graph.replace_operator_input, (node, i, prev_new_out)))
 
             tensor_node_dict = {}
@@ -978,8 +1018,9 @@ class GraphOptimizer(object):
                     op_out.shape = tuple(new_shape)
                     continue
 
-                new_out = self.create_transform_tensor(np.reshape(
-                    op_out.tensor, prev_shape), quantization=op_out.quantization)
+                new_out = self.create_transform_tensor(
+                    np.reshape(op_out.tensor, prev_shape), quantization=op_out.quantization
+                )
                 shape_tensor = self.create_attr_tensor(np.array(op_out.shape, dtype='int32'))
 
                 # Update relations
@@ -1042,12 +1083,15 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_bmm_add_pass(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_bmm_add_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(functools.partial(is_bmm_add_edge, graph_converter=self.graph.graph))
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
-        filtered_pairs = [p for p in filtered_pairs if p[0]['node_type'] != ExtendedOperator.FULLY_CONNECTED
-                          or len(p[0]['op'].inputs) == 2
-                          or not np.any(p[0]['op'].inputs[2].tensor)]
+        filtered_pairs = [
+            p
+            for p in filtered_pairs
+            if p[0]['node_type'] != ExtendedOperator.FULLY_CONNECTED
+            or len(p[0]['op'].inputs) == 2
+            or not np.any(p[0]['op'].inputs[2].tensor)
+        ]
 
         remove_ids = []
         ops = []
@@ -1077,8 +1121,10 @@ class GraphOptimizer(object):
             remove_ids.append(add.index)
 
         # Make sure the nodes are topologically sorted
-        sorted_ops = [(nodes[0]['op'], nodes[1]['op'])
-                      for nodes in sorted(ops, key=lambda x: int(re.search(r'\d+', x[1]['name'])[0]))]
+        sorted_ops = [
+            (nodes[0]['op'], nodes[1]['op'])
+            for nodes in sorted(ops, key=lambda x: int(re.search(r'\d+', x[1]['name'])[0]))
+        ]
 
         # Delete nodes before transformation in the graph
         self.graph.graph.delete_vertices(remove_ids)
@@ -1100,8 +1146,14 @@ class GraphOptimizer(object):
 
             keep_dims = output_tensor.tensor.ndim > 2
 
-            ops.append(tfl.FullyConnectedOperator([input_tensor, weight_t, bias_tensor], [
-                       output_tensor], fusedActivationFunction=add.fusedActivationFunction, keepNumDims=keep_dims))
+            ops.append(
+                tfl.FullyConnectedOperator(
+                    [input_tensor, weight_t, bias_tensor],
+                    [output_tensor],
+                    fusedActivationFunction=add.fusedActivationFunction,
+                    keepNumDims=keep_dims,
+                )
+            )
 
             for op in ops:
                 self.graph.add_operator(op, transform=True)
@@ -1142,8 +1194,9 @@ class GraphOptimizer(object):
 
                 # Create new transpose op
                 nhwc2nchw_perm_tensor = self.create_attr_tensor(nhwc2nchw_perm)
-                transposed = self.create_transform_tensor(np.transpose(
-                    last_tensor.tensor, nhwc2nchw_perm), quantization=last_tensor.quantization)
+                transposed = self.create_transform_tensor(
+                    np.transpose(last_tensor.tensor, nhwc2nchw_perm), quantization=last_tensor.quantization
+                )
                 transpose_op = tfl.TransposeOperator([last_tensor, nhwc2nchw_perm_tensor], [transposed])
                 self.graph.add_operator(transpose_op)
 
@@ -1164,8 +1217,9 @@ class GraphOptimizer(object):
         self.graph.graph.delete_edges(remove_edges)
 
     def connect_unused_tensors_pass(self):
-        filtered_nodes = self.graph.graph.vs.select(functools.partial(
-            is_multi_output_op_node, graph_converter=self.graph.graph))
+        filtered_nodes = self.graph.graph.vs.select(
+            functools.partial(is_multi_output_op_node, graph_converter=self.graph.graph)
+        )
 
         list_unpack_names = set([i for s in self.graph.iterable_map.values() for i in s])
         all_tensors = set(self.graph.graph.es['label'])
@@ -1210,8 +1264,7 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.fuse_quant)
     def fuse_quant_dequant_nodes(self):
-        edges = self.graph.graph.es.select(functools.partial(
-            is_quant_dequant_edge, graph_converter=self.graph.graph))
+        edges = self.graph.graph.es.select(functools.partial(is_quant_dequant_edge, graph_converter=self.graph.graph))
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
 
         remove_vertices = []
@@ -1342,23 +1395,41 @@ class GraphOptimizer(object):
 def is_bn_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] in (ExtendedOperator.GENERIC_CONV, ExtendedOperator.GENERIC_DECONV, ExtendedOperator.FULLY_CONNECTED) \
-        and target_vertex['node_type'] == ExtendedOperator.BATCH_NORM and source_vertex.outdegree() == 1 \
-        and target_vertex['op'].inputs[1].buffer is not None and target_vertex['op'].inputs[2].buffer is not None \
-        and source_vertex['op'].inputs[1].buffer is not None \
-        and (target_vertex['op'].fusedActivationFunction == ActivationFunctionType.NONE or
-             source_vertex['op'].fusedActivationFunction in (ActivationFunctionType.NONE, target_vertex['op'].fusedActivationFunction))
+    return (
+        source_vertex['node_type']
+        in (ExtendedOperator.GENERIC_CONV, ExtendedOperator.GENERIC_DECONV, ExtendedOperator.FULLY_CONNECTED)
+        and target_vertex['node_type'] == ExtendedOperator.BATCH_NORM
+        and source_vertex.outdegree() == 1
+        and target_vertex['op'].inputs[1].buffer is not None
+        and target_vertex['op'].inputs[2].buffer is not None
+        and source_vertex['op'].inputs[1].buffer is not None
+        and (
+            target_vertex['op'].fusedActivationFunction == ActivationFunctionType.NONE
+            or source_vertex['op'].fusedActivationFunction
+            in (ActivationFunctionType.NONE, target_vertex['op'].fusedActivationFunction)
+        )
+    )
 
 
 def is_activ_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] in (ExtendedOperator.FULLY_CONNECTED, ExtendedOperator.GENERIC_CONV,
-                                          ExtendedOperator.ADD, ExtendedOperator.SUB, ExtendedOperator.MUL,
-                                          ExtendedOperator.DIV, ExtendedOperator.MAX_POOL_2D, ExtendedOperator.AVERAGE_POOL_2D) \
-        and target_vertex['node_type'] in (ExtendedOperator.RELU, ExtendedOperator.RELU6) \
-        and source_vertex['op'].fusedActivationFunction == ActivationFunctionType.NONE \
+    return (
+        source_vertex['node_type']
+        in (
+            ExtendedOperator.FULLY_CONNECTED,
+            ExtendedOperator.GENERIC_CONV,
+            ExtendedOperator.ADD,
+            ExtendedOperator.SUB,
+            ExtendedOperator.MUL,
+            ExtendedOperator.DIV,
+            ExtendedOperator.MAX_POOL_2D,
+            ExtendedOperator.AVERAGE_POOL_2D,
+        )
+        and target_vertex['node_type'] in (ExtendedOperator.RELU, ExtendedOperator.RELU6)
+        and source_vertex['op'].fusedActivationFunction == ActivationFunctionType.NONE
         and source_vertex.outdegree() == 1
+    )
 
 
 def is_transformable_node(vertex: ig.Vertex, graph_converter: ig.Graph):
@@ -1366,89 +1437,131 @@ def is_transformable_node(vertex: ig.Vertex, graph_converter: ig.Graph):
 
 
 def is_transformable_transpose_node(vertex: ig.Vertex, graph_converter: ig.Graph):
-    return vertex['node_type'] == ExtendedOperator.TRANSPOSE and vertex.outdegree() >= 1 \
+    return (
+        vertex['node_type'] == ExtendedOperator.TRANSPOSE
+        and vertex.outdegree() >= 1
         and is_transpose_same_to_reshape_op(vertex['op'])
+    )
 
 
 def is_multi_output_op_node(vertex: ig.Vertex, graph_converter: ig.Graph):
-    return vertex['node_type'] >= 0 and len(vertex['outputs']) > 1 \
-        and vertex.outdegree() > 0
+    return vertex['node_type'] >= 0 and len(vertex['outputs']) > 1 and vertex.outdegree() > 0
 
 
 def is_transpose_reshape_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return ((source_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
-             target_vertex['node_type'] == ExtendedOperator.RESHAPE) or
-            (target_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
-             source_vertex['node_type'] == ExtendedOperator.RESHAPE)) \
-        and target_vertex['op'].inputs[0].name in source_vertex['outputs']
+    return (
+        (
+            source_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+            and target_vertex['node_type'] == ExtendedOperator.RESHAPE
+        )
+        or (
+            target_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+            and source_vertex['node_type'] == ExtendedOperator.RESHAPE
+        )
+    ) and target_vertex['op'].inputs[0].name in source_vertex['outputs']
 
 
 def is_transpose_elementwise_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return ((source_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
-             (is_elementwise_unary_op(target_vertex['node_type'], target_vertex['op']) or
-              is_elementwise_binary_op(target_vertex['node_type'], target_vertex['op']))) or
-            (target_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
-                (is_elementwise_unary_op(source_vertex['node_type'], source_vertex['op']) or
-                 is_elementwise_binary_op(source_vertex['node_type'], source_vertex['op'])))) \
-        and ((target_vertex['node_type'] != ExtendedOperator.SPLIT and
-              target_vertex['op'].inputs[0].name in source_vertex['outputs']) or
-             (target_vertex['node_type'] == ExtendedOperator.SPLIT and
-              target_vertex['op'].inputs[1].name in source_vertex['outputs']))
+    return (
+        (
+            source_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+            and (
+                is_elementwise_unary_op(target_vertex['node_type'], target_vertex['op'])
+                or is_elementwise_binary_op(target_vertex['node_type'], target_vertex['op'])
+            )
+        )
+        or (
+            target_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+            and (
+                is_elementwise_unary_op(source_vertex['node_type'], source_vertex['op'])
+                or is_elementwise_binary_op(source_vertex['node_type'], source_vertex['op'])
+            )
+        )
+    ) and (
+        (
+            target_vertex['node_type'] != ExtendedOperator.SPLIT
+            and target_vertex['op'].inputs[0].name in source_vertex['outputs']
+        )
+        or (
+            target_vertex['node_type'] == ExtendedOperator.SPLIT
+            and target_vertex['op'].inputs[1].name in source_vertex['outputs']
+        )
+    )
 
 
 def is_reshape_elementwise_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return ((source_vertex['node_type'] == ExtendedOperator.RESHAPE
-             and (is_elementwise_unary_op(target_vertex['node_type'], target_vertex['op'])
-                  or is_elementwise_binary_op(target_vertex['node_type'], target_vertex['op'])))
-            or (target_vertex['node_type'] == ExtendedOperator.RESHAPE
-                and (is_elementwise_unary_op(source_vertex['node_type'], source_vertex['op'])
-                     or is_elementwise_binary_op(source_vertex['node_type'], source_vertex['op'])))) \
-        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    return (
+        (
+            source_vertex['node_type'] == ExtendedOperator.RESHAPE
+            and (
+                is_elementwise_unary_op(target_vertex['node_type'], target_vertex['op'])
+                or is_elementwise_binary_op(target_vertex['node_type'], target_vertex['op'])
+            )
+        )
+        or (
+            target_vertex['node_type'] == ExtendedOperator.RESHAPE
+            and (
+                is_elementwise_unary_op(source_vertex['node_type'], source_vertex['op'])
+                or is_elementwise_binary_op(source_vertex['node_type'], source_vertex['op'])
+            )
+        )
+    ) and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
 
 
 def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
-    return op_code in (ExtendedOperator.RELU,
-                       ExtendedOperator.SIN,
-                       ExtendedOperator.COS,
-                       ExtendedOperator.TANH,
-                       ExtendedOperator.ELU,
-                       ExtendedOperator.PRELU,
-                       ExtendedOperator.EXP,
-                       ExtendedOperator.LOG,
-                       ExtendedOperator.NEG,
-                       ExtendedOperator.FLOOR,
-                       ExtendedOperator.RELU6,
-                       ExtendedOperator.QUANTIZE,
-                       ExtendedOperator.DEQUANTIZE,
-                       ExtendedOperator.SQRT,
-                       ExtendedOperator.RSQRT,
-                       ExtendedOperator.CAST,
-                       ExtendedOperator.LOGISTIC,
-                       ExtendedOperator.SOFTMAX,
-                       ExtendedOperator.LOG_SOFTMAX,
-                       ExtendedOperator.HARD_SWISH,
-                       ExtendedOperator.LEAKY_RELU)
+    return op_code in (
+        ExtendedOperator.RELU,
+        ExtendedOperator.SIN,
+        ExtendedOperator.COS,
+        ExtendedOperator.TANH,
+        ExtendedOperator.ELU,
+        ExtendedOperator.PRELU,
+        ExtendedOperator.EXP,
+        ExtendedOperator.LOG,
+        ExtendedOperator.NEG,
+        ExtendedOperator.FLOOR,
+        ExtendedOperator.RELU6,
+        ExtendedOperator.QUANTIZE,
+        ExtendedOperator.DEQUANTIZE,
+        ExtendedOperator.SQRT,
+        ExtendedOperator.RSQRT,
+        ExtendedOperator.CAST,
+        ExtendedOperator.LOGISTIC,
+        ExtendedOperator.SOFTMAX,
+        ExtendedOperator.LOG_SOFTMAX,
+        ExtendedOperator.HARD_SWISH,
+        ExtendedOperator.LEAKY_RELU,
+    )
 
 
 def is_elementwise_binary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
-    return (op_code in (ExtendedOperator.CONCATENATION,
-                        ExtendedOperator.ADD,
-                        ExtendedOperator.SUB,
-                        ExtendedOperator.MUL,
-                        ExtendedOperator.DIV) and
-            len(op.inputs) >= 2 and
-            op.inputs[0].tensor.ndim == op.inputs[1].tensor.ndim) \
-        or (op_code in (ExtendedOperator.SPLIT,
-                        ExtendedOperator.SPLIT_V,
-                        ExtendedOperator.PAD,
-                        ExtendedOperator.PADV2,
-                        ExtendedOperator.MIRROR_PAD))
+    return (
+        op_code
+        in (
+            ExtendedOperator.CONCATENATION,
+            ExtendedOperator.ADD,
+            ExtendedOperator.SUB,
+            ExtendedOperator.MUL,
+            ExtendedOperator.DIV,
+        )
+        and len(op.inputs) >= 2
+        and op.inputs[0].tensor.ndim == op.inputs[1].tensor.ndim
+    ) or (
+        op_code
+        in (
+            ExtendedOperator.SPLIT,
+            ExtendedOperator.SPLIT_V,
+            ExtendedOperator.PAD,
+            ExtendedOperator.PADV2,
+            ExtendedOperator.MIRROR_PAD,
+        )
+    )
 
 
 def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph, branch: bool = False):
@@ -1460,24 +1573,44 @@ def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph, branch: b
     else:
         source_cond_var = source_vertex.outdegree() == 1
 
-    return source_cond_var and target_vertex.outdegree() >= 1 \
-        and target_vertex['op'] is not None \
-        and target_vertex['op'].inputs[0].name in source_vertex['outputs'] \
-        and ((target_vertex['node_type'] == ExtendedOperator.RESHAPE and
-              target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape) or
-             (target_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
-                 (np.diff(target_vertex['op'].inputs[1].tensor) == 1).all()) or
-             (target_vertex['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2, ExtendedOperator.MIRROR_PAD) and
-                 target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape) or
-             (target_vertex['node_type'] == ExtendedOperator.TILE and
-                 target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape) or
-             (target_vertex['node_type'] == ExtendedOperator.SLICE and
-                 target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape) or
-             (target_vertex['node_type'] == ExtendedOperator.GATHER and
-                 target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape and
-                 (np.diff(target_vertex['op'].inputs[1].tensor) == 1).all()) or
-             (target_vertex['node_type'] == ExtendedOperator.CAST and
-                 target_vertex['op'].inDataType == target_vertex['op'].outDataType))
+    return (
+        source_cond_var
+        and target_vertex.outdegree() >= 1
+        and target_vertex['op'] is not None
+        and target_vertex['op'].inputs[0].name in source_vertex['outputs']
+        and (
+            (
+                target_vertex['node_type'] == ExtendedOperator.RESHAPE
+                and target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape
+            )
+            or (
+                target_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+                and (np.diff(target_vertex['op'].inputs[1].tensor) == 1).all()
+            )
+            or (
+                target_vertex['node_type']
+                in (ExtendedOperator.PAD, ExtendedOperator.PADV2, ExtendedOperator.MIRROR_PAD)
+                and target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape
+            )
+            or (
+                target_vertex['node_type'] == ExtendedOperator.TILE
+                and target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape
+            )
+            or (
+                target_vertex['node_type'] == ExtendedOperator.SLICE
+                and target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape
+            )
+            or (
+                target_vertex['node_type'] == ExtendedOperator.GATHER
+                and target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape
+                and (np.diff(target_vertex['op'].inputs[1].tensor) == 1).all()
+            )
+            or (
+                target_vertex['node_type'] == ExtendedOperator.CAST
+                and target_vertex['op'].inDataType == target_vertex['op'].outDataType
+            )
+        )
+    )
 
 
 def is_bmm_add_edge(edge: ig.Edge, graph_converter: ig.Graph):
@@ -1490,93 +1623,130 @@ def is_bmm_add_edge(edge: ig.Edge, graph_converter: ig.Graph):
     elif source_vertex['node_type'] == ExtendedOperator.FULLY_CONNECTED:
         out_dim_idx = 0
 
-    return out_dim_idx is not None \
-        and target_vertex['node_type'] == ExtendedOperator.ADD \
-        and source_vertex['op'].inputs[0].tensor.ndim >= 2 \
-        and source_vertex['op'].inputs[1].tensor.ndim == 2 \
-        and target_vertex['op'].inputs[1].tensor.ndim == 1 \
-        and target_vertex['op'].inputs[1].shape[0] == source_vertex['op'].inputs[1].shape[out_dim_idx] \
-        and source_vertex.outdegree() == 1 and target_vertex.outdegree() >= 1 \
+    return (
+        out_dim_idx is not None
+        and target_vertex['node_type'] == ExtendedOperator.ADD
+        and source_vertex['op'].inputs[0].tensor.ndim >= 2
+        and source_vertex['op'].inputs[1].tensor.ndim == 2
+        and target_vertex['op'].inputs[1].tensor.ndim == 1
+        and target_vertex['op'].inputs[1].shape[0] == source_vertex['op'].inputs[1].shape[out_dim_idx]
+        and source_vertex.outdegree() == 1
+        and target_vertex.outdegree() >= 1
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    )
 
 
 def is_wrapped_reshape_within_transpose_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return ((target_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
-             source_vertex['node_type'] == ExtendedOperator.RESHAPE) or
-            (source_vertex['node_type'] == ExtendedOperator.TRANSPOSE and
-                target_vertex['node_type'] == ExtendedOperator.RESHAPE)) \
-        and source_vertex.outdegree() == 1 and target_vertex.outdegree() >= 1 \
+    return (
+        (
+            (
+                target_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+                and source_vertex['node_type'] == ExtendedOperator.RESHAPE
+            )
+            or (
+                source_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+                and target_vertex['node_type'] == ExtendedOperator.RESHAPE
+            )
+        )
+        and source_vertex.outdegree() == 1
+        and target_vertex.outdegree() >= 1
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    )
 
 
 def is_slice_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] == ExtendedOperator.SLICE and source_vertex.outdegree() == 1 \
-        and target_vertex['node_type'] == ExtendedOperator.SLICE and target_vertex.outdegree() >= 1 \
+    return (
+        source_vertex['node_type'] == ExtendedOperator.SLICE
+        and source_vertex.outdegree() == 1
+        and target_vertex['node_type'] == ExtendedOperator.SLICE
+        and target_vertex.outdegree() >= 1
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    )
 
 
 def is_transpose_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] == ExtendedOperator.TRANSPOSE and source_vertex.outdegree() == 1 \
-        and target_vertex['node_type'] == ExtendedOperator.TRANSPOSE and target_vertex.outdegree() >= 1 \
+    return (
+        source_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+        and source_vertex.outdegree() == 1
+        and target_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+        and target_vertex.outdegree() >= 1
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    )
 
 
 def is_reshape_branch_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] == ExtendedOperator.RESHAPE and source_vertex.outdegree() > 1 \
-        and target_vertex['node_type'] == ExtendedOperator.RESHAPE \
+    return (
+        source_vertex['node_type'] == ExtendedOperator.RESHAPE
+        and source_vertex.outdegree() > 1
+        and target_vertex['node_type'] == ExtendedOperator.RESHAPE
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    )
 
 
 def is_transpose_branch_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] == ExtendedOperator.TRANSPOSE and source_vertex.outdegree() > 1 \
-        and target_vertex['node_type'] == ExtendedOperator.TRANSPOSE \
+    return (
+        source_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+        and source_vertex.outdegree() > 1
+        and target_vertex['node_type'] == ExtendedOperator.TRANSPOSE
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    )
 
 
 def is_reshape_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] == ExtendedOperator.RESHAPE and source_vertex.outdegree() == 1 \
-        and target_vertex['node_type'] == ExtendedOperator.RESHAPE and target_vertex.outdegree() >= 1 \
+    return (
+        source_vertex['node_type'] == ExtendedOperator.RESHAPE
+        and source_vertex.outdegree() == 1
+        and target_vertex['node_type'] == ExtendedOperator.RESHAPE
+        and target_vertex.outdegree() >= 1
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    )
 
 
 def is_constant_transpose_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] == ExtendedOperator.CONSTANT_NODE \
-        and target_vertex['node_type'] == ExtendedOperator.TRANSPOSE \
-        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name \
+    return (
+        source_vertex['node_type'] == ExtendedOperator.CONSTANT_NODE
+        and target_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
         and target_vertex.outdegree() >= 1
+    )
 
 
 def is_constant_reshape_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return source_vertex['node_type'] == ExtendedOperator.CONSTANT_NODE \
-        and target_vertex['node_type'] == ExtendedOperator.RESHAPE \
-        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name \
+    return (
+        source_vertex['node_type'] == ExtendedOperator.CONSTANT_NODE
+        and target_vertex['node_type'] == ExtendedOperator.RESHAPE
+        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
         and target_vertex.outdegree() >= 1
+    )
 
 
 def is_quant_dequant_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return (source_vertex['node_type'] == ExtendedOperator.INPUT_NODE
-            and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
-            and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name) or \
-           (source_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
-            and target_vertex['node_type'] == ExtendedOperator.OUTPUT_NODE)
+    return (
+        source_vertex['node_type'] == ExtendedOperator.INPUT_NODE
+        and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
+        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    ) or (
+        source_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
+        and target_vertex['node_type'] == ExtendedOperator.OUTPUT_NODE
+    )
 
 
 def is_transpose_same_to_reshape_op(op: tfl.BaseOperator):
@@ -1622,7 +1792,7 @@ def op_input_indices(op: tfl.BaseOperator):
     if isinstance(op, tfl.ConcatenationOperator):
         input_indices = range(len(op.inputs))
     elif isinstance(op, tfl.SplitOperator):
-        input_indices = (1, )
+        input_indices = (1,)
     elif isinstance(op, (tfl.AddOperator, tfl.SubOperator, tfl.MulOperator, tfl.DivOperator)):
         input_indices = range(2)
     else:
@@ -1649,7 +1819,7 @@ def fuse_bn_bias(eps, scale, var, mean, bn_b, activ_b):
             activ_b = activ_b.repeat(mean.size)
         return (activ_b - mean) * inv * scale + bn_b
     else:
-        return (- mean) * inv * scale + bn_b
+        return (-mean) * inv * scale + bn_b
 
 
 def fuse_slices(seq: typing.Iterable[ig.Vertex]):
@@ -1715,7 +1885,9 @@ def fuse_transpose_perms_extended(seq: typing.Iterable[ig.Vertex]):
     return cur_perm
 
 
-def fuse_connected_edges(filtered_pairs: typing.List[typing.Iterable[ig.Vertex]]) -> typing.List[typing.Iterable[ig.Vertex]]:
+def fuse_connected_edges(
+    filtered_pairs: typing.List[typing.Iterable[ig.Vertex]],
+) -> typing.List[typing.Iterable[ig.Vertex]]:
     while True:
         heads = {n[0]: i for i, n in enumerate(filtered_pairs)}
         tails = {n[-1]: i for i, n in enumerate(filtered_pairs)}
@@ -1842,13 +2014,16 @@ def reshape_mapping(shape_1, shape_2):
     return mapping_l, mapping_r, non_one_mapping_l, non_one_mapping_r
 
 
-def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.List[typing.Iterable[ig.Vertex]],
-                        remove_first_pred: typing.Union[bool, typing.Callable] = False,
-                        remove_first_node_action: typing.Optional[typing.Callable] = None,
-                        remove_last_pred: typing.Union[bool, typing.Callable] = True,
-                        remove_last_node_action: typing.Optional[typing.Callable] = None,
-                        skip_pred: typing.Union[bool, typing.Callable] = False,
-                        input_idx: int = 0):
+def elinimate_sequences(
+    graph_converter: CommonGraph,
+    filtered_pairs: typing.List[typing.Iterable[ig.Vertex]],
+    remove_first_pred: typing.Union[bool, typing.Callable] = False,
+    remove_first_node_action: typing.Optional[typing.Callable] = None,
+    remove_last_pred: typing.Union[bool, typing.Callable] = True,
+    remove_last_node_action: typing.Optional[typing.Callable] = None,
+    skip_pred: typing.Union[bool, typing.Callable] = False,
+    input_idx: int = 0,
+):
     remove_ids = []
     actions = []
     for seq in filtered_pairs:
@@ -1878,7 +2053,8 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
         # If the first node can also be eliminated, then set the previous node as the first node
         if remove_first:
             first_node = graph_converter.graph.vs.find(
-                name=graph_converter.tensor_node_map[first_node['op'].inputs[input_idx].name])
+                name=graph_converter.tensor_node_map[first_node['op'].inputs[input_idx].name]
+            )
 
         if not remove_last:
             last_node = seq[-2]
@@ -1903,8 +2079,7 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
         has_output_nodes = False
         for edge in last_node.out_edges():
             target_vertex = edge.target_vertex
-            if target_vertex['node_type'] in (ExtendedOperator.OUTPUT_NODE,
-                                              ExtendedOperator.UNUSED_NODE):
+            if target_vertex['node_type'] in (ExtendedOperator.OUTPUT_NODE, ExtendedOperator.UNUSED_NODE):
                 if use_forward_input:
                     # Cannot optimize away ops between i/o nodes
                     skip = True
@@ -1918,8 +2093,7 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
                 target_vertex = edge.target_vertex
                 if target_vertex == last_node:
                     continue
-                if target_vertex['node_type'] in (ExtendedOperator.OUTPUT_NODE,
-                                                  ExtendedOperator.UNUSED_NODE):
+                if target_vertex['node_type'] in (ExtendedOperator.OUTPUT_NODE, ExtendedOperator.UNUSED_NODE):
                     if has_output_nodes and edge['label'] == output_name:
                         output_outdegree += 1
                     break
@@ -1953,7 +2127,8 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
             # For each node that is next of the last node, we connect it with the first node
             graph_converter.connect_next_tensors(last_node, first_node, new_output)
 
-            # Update graph, prepare to drop the output tensor of the intermediate nodes and use the output tensor of the last node instead
+            # Update graph, prepare to drop the output tensor of the intermediate nodes and use the output tensor of
+            # the last node instead
             first_node['outputs'][output_idx] = new_output
             if first_node['op'] is not None:
                 first_node['op'].outputs[output_idx] = graph_converter.tensor_map[new_output]
@@ -1995,8 +2170,11 @@ def elinimate_sequences(graph_converter: CommonGraph, filtered_pairs: typing.Lis
     graph_converter.graph.delete_vertices(remove_ids)
 
 
-def expand_op_outputs_in_branches(nodes: typing.List[ig.Vertex], new_op_func: typing.Callable[[ig.Vertex, ig.Vertex, ig.Vertex], None],
-                                  graph_converter: CommonGraph):
+def expand_op_outputs_in_branches(
+    nodes: typing.List[ig.Vertex],
+    new_op_func: typing.Callable[[ig.Vertex, ig.Vertex, ig.Vertex], None],
+    graph_converter: CommonGraph,
+):
     actions = []
     for node in nodes:
         preserve_node = None

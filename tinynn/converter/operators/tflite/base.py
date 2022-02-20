@@ -80,7 +80,9 @@ class QuantizationParameters:
     zero_point: typing.Union[int, typing.List[int]]
     tfl_quant_args: Offset
 
-    def __init__(self, scale: typing.Union[float, typing.List[float]], zero_point: int, dim: typing.Optional[int] = None):
+    def __init__(
+        self, scale: typing.Union[float, typing.List[float]], zero_point: int, dim: typing.Optional[int] = None
+    ):
         self.scale = scale
         self.zero_point = zero_point
         self.dim = dim
@@ -94,8 +96,9 @@ class QuantizationParameters:
             scale = create_numpy_array(builder, tflite.QuantizationParameters.Scale, self.scale, 'float32')
 
         if isinstance(self.zero_point, int):
-            zero_point = create_numpy_array(builder, tflite.QuantizationParameters.ZeroPoint, [
-                                            self.zero_point], 'int64')
+            zero_point = create_numpy_array(
+                builder, tflite.QuantizationParameters.ZeroPoint, [self.zero_point], 'int64'
+            )
         else:
             zero_point = create_numpy_array(builder, tflite.QuantizationParameters.ZeroPoint, self.zero_point, 'int64')
 
@@ -153,9 +156,17 @@ class Tensor(object):
     shape: typing.Iterable[int]
     tfl_tensor: int
 
-    def __init__(self, tensor: typing.Iterable, name: str, quantization: QuantizationParameters = None,
-                 has_buffer: bool = True, dtype: str = None, is_variable: bool = False,
-                 asymmetric: bool = True, q_type: type = np.uint8):
+    def __init__(
+        self,
+        tensor: typing.Iterable,
+        name: str,
+        quantization: QuantizationParameters = None,
+        has_buffer: bool = True,
+        dtype: str = None,
+        is_variable: bool = False,
+        asymmetric: bool = True,
+        q_type: type = np.uint8,
+    ):
         self.quantization = None
         self.name = name
         self.index = 0
@@ -179,10 +190,12 @@ class Tensor(object):
                 else:
                     if not asymmetric:
                         sym_u8_offset = 128
-                        assert tensor.q_zero_point() == sym_u8_offset, "As for symmetric quantization, " \
-                            f"the zero point of the u8 tensors should be {sym_u8_offset}, but got {tensor.q_zero_point()}. " \
-                            "This could happen if you didn't train the model after QAT preparation, " \
-                            "or the OP is not supported in symmetric quantization (e.g. sigmoid)"
+                        assert tensor.q_zero_point() == sym_u8_offset, (
+                            "As for symmetric quantization, the zero point of the u8 tensors should be"
+                            f" {sym_u8_offset}, but got {tensor.q_zero_point()}. This could happen if you didn't train"
+                            " the model after QAT preparation, or the OP is not supported in symmetric quantization"
+                            " (e.g. sigmoid)"
+                        )
                     else:
                         sym_u8_offset = tensor.q_zero_point()
                     self.tensor = (self.tensor.astype(np.int32) - 128).astype(np.int8)
@@ -192,8 +205,10 @@ class Tensor(object):
                 if q_type == np.uint8:
                     if asymmetric:
                         asym_s8_offset = 0
-                        assert tensor.q_zero_point() == asym_s8_offset, "As for asymmetric quantization, " \
-                            f"the zero point of the s8 tensors should be {asym_s8_offset}, but got {tensor.q_zero_point()}. "
+                        assert tensor.q_zero_point() == asym_s8_offset, (
+                            "As for asymmetric quantization, the zero point of the s8 tensors should be"
+                            f" {asym_s8_offset}, but got {tensor.q_zero_point()}. "
+                        )
                     else:
                         asym_s8_offset = tensor.q_zero_point()
                     self.tensor = self.tensor.view(np.uint8) + 128
@@ -211,8 +226,10 @@ class Tensor(object):
                         if dim < 0:
                             dim += tensor.dim()
 
-                        assert all((t == 0 for t in zero_points)), f'As for per-channel quantization, " \
-                            "the zero point of the s8 tensors should be 0, but got ${zero_points}'
+                        assert all((t == 0 for t in zero_points)), (
+                            'As for per-channel quantization, "                             "the zero point of the s8'
+                            f' tensors should be 0, but got ${zero_points}'
+                        )
 
                         self.quantization = QuantizationParameters(scales, zero_points, dim)
             else:
@@ -411,20 +428,24 @@ def create_byte_array(builder: flatbuffers.Builder, prop: typing.Callable, val: 
     return builder.CreateByteVector(val)
 
 
-numpy_tflite_dtype_mappings = {'bool': tflite.TensorType.BOOL,
-                               'int32': tflite.TensorType.INT32,
-                               'int64': tflite.TensorType.INT64,
-                               'int8': tflite.TensorType.INT8,
-                               'uint8': tflite.TensorType.UINT8,
-                               'float32': tflite.TensorType.FLOAT32,
-                               'float64': tflite.TensorType.FLOAT64}
+numpy_tflite_dtype_mappings = {
+    'bool': tflite.TensorType.BOOL,
+    'int32': tflite.TensorType.INT32,
+    'int64': tflite.TensorType.INT64,
+    'int8': tflite.TensorType.INT8,
+    'uint8': tflite.TensorType.UINT8,
+    'float32': tflite.TensorType.FLOAT32,
+    'float64': tflite.TensorType.FLOAT64,
+}
 
-torch_tflite_dtype_mappings = {torch.bool: tflite.TensorType.BOOL,
-                               torch.int32: tflite.TensorType.INT32,
-                               torch.int64: tflite.TensorType.INT64,
-                               torch.qint8: tflite.TensorType.INT8,
-                               torch.quint8: tflite.TensorType.UINT8,
-                               torch.float32: tflite.TensorType.FLOAT32,
-                               torch.float64: tflite.TensorType.FLOAT64}
+torch_tflite_dtype_mappings = {
+    torch.bool: tflite.TensorType.BOOL,
+    torch.int32: tflite.TensorType.INT32,
+    torch.int64: tflite.TensorType.INT64,
+    torch.qint8: tflite.TensorType.INT8,
+    torch.quint8: tflite.TensorType.UINT8,
+    torch.float32: tflite.TensorType.FLOAT32,
+    torch.float64: tflite.TensorType.FLOAT64,
+}
 
 OptionalTensorInstance = OptionalTensor()

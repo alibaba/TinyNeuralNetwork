@@ -9,12 +9,12 @@ loggers = []
 
 
 class LazyExpression(object):
-    """ An expression object that can be lazily evaluated """
+    """An expression object that can be lazily evaluated"""
 
     expr: typing.Callable[[], typing.Any]
 
     def __init__(self, expr: typing.Callable[[], typing.Any]):
-        """ Constructs a new LazyExpression object
+        """Constructs a new LazyExpression object
 
         Args:
             expr (typing.Callable[[], typing.Any]): the expression
@@ -23,7 +23,7 @@ class LazyExpression(object):
         self.expr = expr
 
     def eval(self) -> typing.Any:
-        """ Evaluates the lazy expression
+        """Evaluates the lazy expression
 
         Returns:
             typing.Any: the value of the expression
@@ -32,16 +32,20 @@ class LazyExpression(object):
 
 
 class LazyObject(object):
-    """ An object that can be construct lazily using lazy expressions """
+    """An object that can be construct lazily using lazy expressions"""
 
     cls: type
     pos_options: list
     kw_options: typing.Dict[str, typing.Any]
     current_obj: typing.Any
 
-    def __init__(self, cls: type, pos_options: typing.Optional[list] = None,
-                 kw_options: typing.Optional[typing.Dict[str, typing.Any]] = None):
-        """ Constructs a new lazy object
+    def __init__(
+        self,
+        cls: type,
+        pos_options: typing.Optional[list] = None,
+        kw_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ):
+        """Constructs a new lazy object
 
         Args:
             cls (type): The type of the class to be construct lazily
@@ -64,7 +68,7 @@ class LazyObject(object):
         self.get_next()
 
     def __str__(self) -> str:
-        """ Proxy __str__ to the underlying the object
+        """Proxy __str__ to the underlying the object
 
         Returns:
             str: String representation of the underlying object
@@ -73,7 +77,7 @@ class LazyObject(object):
         return str(self.current_obj)
 
     def __repr__(self) -> str:
-        """ Proxy __repr__ to the underlying the object
+        """Proxy __repr__ to the underlying the object
 
         Returns:
             str: String representation of the underlying object
@@ -82,7 +86,7 @@ class LazyObject(object):
         return self.current_obj.__repr__()
 
     def get_current(self) -> typing.Any:
-        """ Gets the current copy of the lazily-constructed object
+        """Gets the current copy of the lazily-constructed object
 
         Returns:
             typing.Any: The current copy of the lazily-constructed object
@@ -91,7 +95,7 @@ class LazyObject(object):
         return self.current_obj
 
     def get_next(self):
-        """ Create a new object with the class and the arguments """
+        """Create a new object with the class and the arguments"""
 
         pos_options = []
         kw_options = {}
@@ -116,7 +120,7 @@ class LazyObject(object):
 
 
 def get_actual_type(param_type: type) -> typing.List[type]:
-    """ Gets the candidate actual types of a given type
+    """Gets the candidate actual types of a given type
 
     Args:
         param_type (type): The type to extract actual type from
@@ -138,7 +142,7 @@ def get_actual_type(param_type: type) -> typing.List[type]:
 
 
 def conditional(cond: typing.Callable[[], bool]) -> typing.Callable:
-    """ A function wrapper that only runs the code of the function under given condition
+    """A function wrapper that only runs the code of the function under given condition
 
     Args:
         cond (typing.Callable[[], bool]): The predicate given
@@ -159,7 +163,7 @@ def conditional(cond: typing.Callable[[], bool]) -> typing.Callable:
 
 
 def class_conditional(cond: typing.Callable[[typing.Any], bool]) -> typing.Callable:
-    """ A class function wrapper that only runs the code of the function under given condition
+    """A class function wrapper that only runs the code of the function under given condition
 
     Args:
         cond (typing.Callable[[], bool]): The predicate given
@@ -180,7 +184,7 @@ def class_conditional(cond: typing.Callable[[typing.Any], bool]) -> typing.Calla
 
 
 def tensors2ndarray(tensors) -> list:
-    """ Convert tensors in arbitrary format into list of ndarray
+    """Convert tensors in arbitrary format into list of ndarray
 
     Args:
         output: tensors in arbitrary format
@@ -207,7 +211,7 @@ def tensors2ndarray(tensors) -> list:
 
 
 def import_from(module: str, name: str):
-    """ Import a module with the given name (Equivalent of `from module import name`)
+    """Import a module with the given name (Equivalent of `from module import name`)
 
     Args:
         module (str): The namespace of the module
@@ -222,7 +226,7 @@ def import_from(module: str, name: str):
 
 
 def import_from_path(module: str, path: str, name: str):
-    """ Import a module with the given name and path (Equivalent of `from module import name`)
+    """Import a module with the given name and path (Equivalent of `from module import name`)
 
     Args:
         module (str): The namespace of the module
@@ -240,7 +244,7 @@ def import_from_path(module: str, path: str, name: str):
 
 
 def get_logger(name: str, level: typing.Optional[str] = None) -> logging.Logger:
-    """ Acquires the logger for a module with the given name
+    """Acquires the logger for a module with the given name
 
     Args:
         name (str): The name of the module

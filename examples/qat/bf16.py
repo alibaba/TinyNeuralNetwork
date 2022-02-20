@@ -52,7 +52,7 @@ def main_worker(args):
         qat_model.eval()
         qat_model.cpu()
 
-        # The step below disables fake quants before exporting the model so that the model will behave the same as before.
+        # Disabling fake quants before exporting the model so that the model will behave the same as before.
         qat_model.apply(disable_fake_quant)
 
         # The code section below is used to convert the model to the TFLite format

@@ -36,9 +36,9 @@ def main_worker():
     # will ensure comparsion of the outputs in almost every layer,
     # while with `GraphOptimizer.ALL_OPTIMIZE` or `GraphOptimizer.COMMON_OPTIMIZE`,
     # some intermediate layers will be skipped because they may be fused with other layers.
-    converter = TFLiteConverter(model, dummy_input, output_path,
-                                preserve_tensors=True,
-                                optimize=GraphOptimizer.ALL_OPTIMIZE)
+    converter = TFLiteConverter(
+        model, dummy_input, output_path, preserve_tensors=True, optimize=GraphOptimizer.ALL_OPTIMIZE
+    )
     converter.convert()
 
     # Flag variable whether you want to compare the output tensors or all the intermediate tensors
@@ -113,7 +113,10 @@ def main_worker():
         diff_max = np.max(diff)
 
         abs_err_percent = np.mean((diff > atol).astype('float32')) * 100
-        print(f'Output {n} absolute difference min,mean,max: {diff_min},{diff_mean},{diff_max} (error: {abs_err_percent:.2f}%)')
+        print(
+            f'Output {n} absolute difference min,mean,max: {diff_min},{diff_mean},{diff_max} (error:'
+            f' {abs_err_percent:.2f}%)'
+        )
 
         # Calculate relative difference
         torch_v_nonzero = (torch_v != 0).astype('bool')
@@ -127,7 +130,10 @@ def main_worker():
         rel_diff_max = np.max(rel_err)
 
         rel_err_percent = np.mean((rel_err > rtol).astype('float32')) * 100
-        print(f'Output {n} relative difference min,mean,max: {rel_diff_min},{rel_diff_mean},{rel_diff_max} (error: {rel_err_percent:.2f}%)')
+        print(
+            f'Output {n} relative difference min,mean,max: {rel_diff_min},{rel_diff_mean},{rel_diff_max} (error:'
+            f' {rel_err_percent:.2f}%)'
+        )
 
 
 if __name__ == '__main__':

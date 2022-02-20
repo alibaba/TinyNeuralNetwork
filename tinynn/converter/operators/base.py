@@ -8,7 +8,7 @@ from tflite.BuiltinOperator import BuiltinOperator
 
 # In Python 3.6, we cannot make ExtendedOperator derive from IntEnum
 if sys.version_info >= (3, 7):
-    bases = (IntEnum, )
+    bases = (IntEnum,)
 else:
     bases = ()
 
@@ -32,9 +32,12 @@ class _ExtendedOperatorBase(BuiltinOperator, *bases):
 if sys.version_info >= (3, 7):
     ExtendedOperator = _ExtendedOperatorBase
 else:
-    ExtendedOperator = IntEnum('ExtendedOperator', dict(
-        filter(lambda x: not x[0].startswith('__'), inspect.getmembers(_ExtendedOperatorBase))))
+    ExtendedOperator = IntEnum(
+        'ExtendedOperator', dict(filter(lambda x: not x[0].startswith('__'), inspect.getmembers(_ExtendedOperatorBase)))
+    )
 
-FUSE_ACTIVATION_MAP = {BuiltinOperator.RELU: ActivationFunctionType.RELU,
-                       BuiltinOperator.RELU6: ActivationFunctionType.RELU6,
-                       BuiltinOperator.TANH: ActivationFunctionType.TANH}
+FUSE_ACTIVATION_MAP = {
+    BuiltinOperator.RELU: ActivationFunctionType.RELU,
+    BuiltinOperator.RELU6: ActivationFunctionType.RELU6,
+    BuiltinOperator.TANH: ActivationFunctionType.TANH,
+}

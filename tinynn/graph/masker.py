@@ -3,7 +3,7 @@ import torch
 
 
 class Masker(object):
-    """ Manage mask of module """
+    """Manage mask of module"""
 
     def __init__(self, module, unique_name):
         self.module = module
@@ -22,7 +22,7 @@ class Masker(object):
         setattr(module, "masker", self)
 
     def __call__(self, module, inputs):
-        """ Apply mask when module forward """
+        """Apply mask when module forward"""
         if not self.enabled:
             return
 
@@ -40,7 +40,7 @@ class Masker(object):
         return self.masks.get(tensor_name, None)
 
     def register_mask(self, tensor_name, mask):
-        """ Register a mask to the module, a module can have multiple masks """
+        """Register a mask to the module, a module can have multiple masks"""
         if self.masks.get(tensor_name, None) is not None:
             del self.masks[tensor_name]
 
@@ -48,7 +48,7 @@ class Masker(object):
         setattr(self.module, f"{tensor_name}_mask", self.masks[tensor_name])
 
     def unregister_all(self):
-        """ Unregister all masks """
+        """Unregister all masks"""
         if isinstance(self.module, torch.nn.Module):
             self.hook.remove()
 
@@ -64,7 +64,7 @@ class Masker(object):
 
 
 class ChannelMasker(Masker):
-    """ Channel-wise module masking """
+    """Channel-wise module masking"""
 
     def __init__(self, module, unique_name):
         super(ChannelMasker, self).__init__(module, unique_name)
