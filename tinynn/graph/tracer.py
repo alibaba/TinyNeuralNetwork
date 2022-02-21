@@ -2265,46 +2265,66 @@ class TraceGraph(object):
         del self.nodes_map[node.unique_name]
 
 
+def load_overridable_modules():
+    if overridable_modules_loaded():
+        modules = overridable_modules
+    else:
+        modules = fetch_modules()
+        overridable_modules.extend(modules)
+        overridable_modules_loaded(True)
+    return modules
+
+
+def load_overridable_funcs():
+    if overridable_funcs_loaded():
+        funcs = overridable_funcs
+    else:
+        funcs = fetch_funcs()
+        overridable_funcs.update(funcs)
+        overridable_funcs_loaded(True)
+    return funcs
+
+
+def load_torch_overrides_funcs(funcs):
+    if not torch_overrides_funcs_loaded():
+        o_funcs, o_wrappers = prepare_torch_overrides_funcs(funcs)
+        torch_overrides_funcs.extend(o_funcs)
+        torch_overrides_wrappers.extend(o_wrappers)
+        torch_overrides_funcs_loaded(True)
+    else:
+        o_funcs, o_wrappers = torch_overrides_funcs, torch_overrides_wrappers
+    return o_funcs, o_wrappers
+
+
+def load_creation_funcs():
+    if overridable_creation_funcs_loaded():
+        creation_funcs = overridable_creation_funcs
+    else:
+        creation_funcs = fetch_funcs(os.path.join(current_dir, 'configs/torch_creation_funcs_override.yml'))
+        overridable_creation_funcs.update(creation_funcs)
+        overridable_creation_funcs_loaded(True)
+    return creation_funcs
+
+
 @contextlib.contextmanager
 def patch_helper(wrap_modules: bool = True, wrap_funcs: bool = True, wrap_creation_funcs: bool = True):
     """ Temporarily monkeypatches the functions and the modules in PyTorch. """
     if wrap_modules:
         if not modules_overrided():
-            if overridable_modules_loaded():
-                modules = overridable_modules
-            else:
-                modules = fetch_modules()
-                overridable_modules.extend(modules)
-                overridable_modules_loaded(True)
+            modules = load_overridable_modules()
             modules_overrided(True)
         else:
             wrap_modules = False
     if wrap_funcs:
         if not funcs_overrided():
-            if overridable_funcs_loaded():
-                funcs = overridable_funcs
-            else:
-                funcs = fetch_funcs()
-                overridable_funcs.update(funcs)
-                overridable_funcs_loaded(True)
-            if not torch_overrides_funcs_loaded():
-                o_funcs, o_wrappers = prepare_torch_overrides_funcs(funcs)
-                torch_overrides_funcs.extend(o_funcs)
-                torch_overrides_wrappers.extend(o_wrappers)
-                torch_overrides_funcs_loaded(True)
-            else:
-                o_funcs, o_wrappers = torch_overrides_funcs, torch_overrides_wrappers
+            funcs = load_overridable_funcs()
+            o_funcs, o_wrappers = load_torch_overrides_funcs(funcs)
             funcs_overrided(True)
         else:
             wrap_funcs = False
     if wrap_creation_funcs:
         if not creation_funcs_overrided():
-            if overridable_creation_funcs_loaded():
-                creation_funcs = overridable_creation_funcs
-            else:
-                creation_funcs = fetch_funcs(os.path.join(current_dir, 'configs/torch_creation_funcs_override.yml'))
-                overridable_creation_funcs.update(creation_funcs)
-                overridable_creation_funcs_loaded(True)
+            creation_funcs = load_creation_funcs()
             creation_funcs_overrided(True)
         else:
             wrap_creation_funcs = False

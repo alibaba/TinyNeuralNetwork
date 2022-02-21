@@ -23,7 +23,8 @@ from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16
 from tinynn.graph.quantization.modules import QPReLU
 from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver
 from tinynn.graph.tracer import (ConstantNode, TraceFunction, TraceGraph,
-                                 TraceNode, module_constructor_lines,
+                                 TraceNode, load_creation_funcs,
+                                 module_constructor_lines,
                                  override_current_trace_graph, qualified_name,
                                  trace)
 from tinynn.util.train_util import get_module_device
@@ -47,6 +48,9 @@ FUSE_RULE_LIST = {
 
 # Processed QAT fuse rules
 processed_qat_rules = {}
+
+# Constant func names
+creation_func_names = []
 
 log = logging.getLogger(__name__)
 
@@ -201,8 +205,17 @@ class QATQuantizer(object):
             for n in graph.input_nodes:
                 qat_analysis_queue.put((n, False))
 
-        for n in graph.constant_nodes:
-            qat_analysis_queue.put((n, not n.module.dtype == 'torch.float32'))
+        if len(creation_func_names) == 0:
+            funcs_d = load_creation_funcs()
+            for ns, funcs_v in funcs_d.items():
+                creation_func_names.extend([f'{ns}.{x}' for x in funcs_v])
+
+        def _is_extra_constant_nodes(node, custom_data):
+            return node.full_name() in creation_func_names
+
+        extra_constant_nodes = graph.filter_forward_nodes(_is_extra_constant_nodes)
+        for n in graph.constant_nodes + extra_constant_nodes:
+            qat_analysis_queue.put((n, not n.next_tensors[0].dtype == torch.float32))
 
         while not qat_analysis_queue.empty():
             node, quantized = qat_analysis_queue.get()
