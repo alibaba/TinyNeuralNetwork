@@ -382,6 +382,7 @@ class TraceFunction(object):
         self.tensor_names = None
         self.args_template = None
         self.args_template_no_self = None
+        self.args_offset = None
 
     def __repr__(self) -> str:
         """ Returns the string representation of the object """
@@ -575,16 +576,35 @@ class TraceFunction(object):
 
         try:
             self.args_template = ", ".join(arg_str)
-            self.args_string = self.args_template.format(*self.tensor_names)
             self.args_template_no_self = ", ".join(arg_str[1:])
-            offset = 1 if arg_str[0] == '{}' else 0
-            self.args_string_no_self = self.args_template_no_self.format(*self.tensor_names[offset:])
+            self.args_offset = 1 if arg_str[0] == '{}' else 0
+            self.update_args_string()
         except Exception:
             log.error(f"Error generating argument string for function {self.full_name}")
             assert False
 
         return self
 
+    def update_tensor_name(self, index, new_name):
+        """ Updates the tensor name at the given index """
+        self.tensor_names[index] = new_name
+
+    def replace_tensor_name(self, old_name, new_name):
+        """ Replaces the specific tensor name with the given one """
+        for i, name in enumerate(self.tensor_names):
+            if name == old_name:
+                self.tensor_names[i] = new_name
+
+    def update_args_string(self):
+        """ Updates the string representation according to the templates and the tensor names """
+        if self.args_template:
+            self.args_string = self.args_template.format(*self.tensor_names)
+        if self.args_template_no_self:
+            self.args_string_no_self = self.args_template_no_self.format(*self.tensor_names[self.args_offset:])
+
+    def get_tensor_name(self, index):
+        """ Retrieves the tensor name at the given index """
+        return self.tensor_names[index]
 
 @contextlib.contextmanager
 def no_catch():
@@ -1928,10 +1948,8 @@ class TraceGraph(object):
                     if type(node.module) == ConstantNode:
                         ns = 'self.'
                     node_unique_name = f'{ns}{node.unique_name}'
-                    next_node.module.args_string = next_node.module.args_string.replace(
-                        node_unique_name, new_node.unique_name)
-                    next_node.module.args_string_no_self = next_node.module.args_string_no_self.replace(
-                        node_unique_name, new_node.unique_name)
+                    next_node.module.replace_tensor_name(node_unique_name, new_node.unique_name)
+                    next_node.module.update_args_string()
 
     def insert_between(self, prev_node: TraceNode, next_node: TraceNode, module,
                        next_tensors: typing.Optional[typing.List[torch.Tensor]] = None, move_idx: bool = False):
@@ -2008,10 +2026,8 @@ class TraceGraph(object):
                 ns = 'self.'
             prev_unique_name = f'{ns}{old_unique_name}'
             log.debug('node rename: ', old_unique_name, '->', new_node.unique_name)
-            if n.module.args_string_no_self is not None:
-                n.module.args_string_no_self = n.module.args_string_no_self.replace(
-                    prev_unique_name, new_node.unique_name)
-                n.module.args_string = n.module.args_string.replace(prev_unique_name, new_node.unique_name)
+            n.module.replace_tensor_name(prev_unique_name, new_node.unique_name)
+            n.module.update_args_string()
 
     def insert_before(self, node: TraceNode, module, next_tensors: typing.Optional[typing.List[torch.Tensor]] = None):
         """ Insert a module or an existing node before a node in the computation graph """
@@ -2101,10 +2117,8 @@ class TraceGraph(object):
                 ns = 'self.'
             prev_unique_name = f'{ns}{old_unique_name}'
             log.debug('node rename: ', old_unique_name, '->', new_node.unique_name)
-            if node.module.args_string_no_self is not None:
-                node.module.args_string_no_self = node.module.args_string_no_self.replace(
-                    prev_unique_name, new_node.unique_name)
-                node.module.args_string = node.module.args_string.replace(prev_unique_name, new_node.unique_name)
+            n.module.replace_tensor_name(prev_unique_name, new_node.unique_name)
+            n.module.update_args_string()
 
     def replace_node_module(self, node: TraceNode, module: torch.nn.Module) -> None:
         """ Replaces a module in a node with another """
@@ -2132,10 +2146,8 @@ class TraceGraph(object):
                     ns = 'self.'
                 prev_unique_name = f'{ns}{old_unique_name}'
                 log.debug('node rename: ', old_unique_name, '->', node.unique_name)
-                if n.module.args_string_no_self is not None:
-                    n.module.args_string_no_self = n.module.args_string_no_self.replace(
-                        prev_unique_name, node.unique_name)
-                    n.module.args_string = n.module.args_string.replace(prev_unique_name, node.unique_name)
+                n.module.replace_tensor_name(prev_unique_name, node.unique_name)
+                n.module.update_args_string()
 
     def fuse_nodes_to_func(self, nodes: typing.List[TraceNode], full_name: str, kind: str, func_type: str,
                            is_class: bool) -> None:
@@ -2182,11 +2194,8 @@ class TraceGraph(object):
                             n.prev_nodes[i] = node
                     # Rewrite func calls in next nodes
                     if type(n.module) == TraceFunction:
-                        if n.module.args_string is not None:
-                            n.module.args_string = n.module.args_string.replace(
-                                last_node_unique_name, first_node_unique_name)
-                            n.module.args_string_no_self = n.module.args_string_no_self.replace(
-                                last_node_unique_name, first_node_unique_name)
+                        n.module.replace_tensor_name(last_node_unique_name, first_node_unique_name)
+                        n.module.update_args_string()
 
             else:
                 # TODO: Implement this codepath
@@ -2247,9 +2256,8 @@ class TraceGraph(object):
                     if is_constant_node:
                         ns = 'self.'
                     prev_unique_name = f'{ns}{node}'
-                    n.module.args_string = n.module.args_string.replace(prev_unique_name, prev_node.unique_name)
-                    n.module.args_string_no_self = n.module.args_string_no_self.replace(
-                        prev_unique_name, prev_node.unique_name)
+                    n.module.replace_tensor_name(prev_unique_name, prev_node.unique_name)
+                    n.module.update_args_string()
 
         # Remove this node
         self.forward_nodes.remove(node)
