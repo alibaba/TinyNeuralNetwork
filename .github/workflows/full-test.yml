@@ -1,10 +1,10 @@
-name: Unit tests
+name: Full tests
 
 on: [pull_request]
 
 jobs:
   unit-test:
-    name: Unit tests for ${{ matrix.os }}
+    name: Full tests for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

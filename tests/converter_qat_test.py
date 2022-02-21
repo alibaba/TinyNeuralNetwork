@@ -128,7 +128,7 @@ class TestModelMeta(type):
         return f
 
 
-@unittest.skipIf(sys.platform == 'win32')
+@unittest.skipIf(sys.platform == 'win32', 'Quantization cannot be performed on Windows')
 class TestModel(unittest.TestCase, metaclass=TestModelMeta):
     pass
 
