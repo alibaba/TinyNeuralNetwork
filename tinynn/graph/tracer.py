@@ -606,6 +606,7 @@ class TraceFunction(object):
         """ Retrieves the tensor name at the given index """
         return self.tensor_names[index]
 
+
 @contextlib.contextmanager
 def no_catch():
     """ Context manager for tracing nodes. Use it to avoid tracing the nodes recursively. """
