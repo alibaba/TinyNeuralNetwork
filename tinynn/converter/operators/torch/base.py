@@ -476,7 +476,7 @@ class OperatorConverter(ABC):
 
     def quantize_scalar_tensor(self, tensor: torch.Tensor):
         assert tensor.numel() == 1
-        assert torch.dtype == torch.float32
+        assert tensor.dtype == torch.float32
         if not tensor.is_nonzero():
             if self.q_type == np.uint8:
                 return torch.quantize_per_tensor(tensor, 0.5, 128, torch.quint8)
