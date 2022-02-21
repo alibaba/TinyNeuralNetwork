@@ -904,7 +904,8 @@ class QATQuantizer(object):
                                      nn.GRU,
                                      nn.LayerNorm,
                                      nn.InstanceNorm1d,
-                                     nn.InstanceNorm2d)
+                                     nn.InstanceNorm2d,
+                                     nn.Hardsigmoid)
 
         unsupported_nodes = graph.filter_forward_nodes(_is_not_quantizable)
         for idx, node in enumerate(reversed(unsupported_nodes)):
