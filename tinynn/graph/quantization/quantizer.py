@@ -208,7 +208,7 @@ class QATQuantizer(object):
         if len(creation_func_names) == 0:
             funcs_d = load_creation_funcs()
             for ns, funcs_v in funcs_d.items():
-                creation_func_names.extend([f'{ns}.{x}' for x in funcs_v])
+                creation_func_names.extend([f'{qualified_name(ns)}.{x}' for x in funcs_v])
 
         def _is_extra_constant_nodes(node, custom_data):
             return node.full_name() in creation_func_names
