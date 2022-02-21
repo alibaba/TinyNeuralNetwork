@@ -205,10 +205,7 @@ class QATQuantizer(object):
             for n in graph.input_nodes:
                 qat_analysis_queue.put((n, False))
 
-        if len(creation_func_names) == 0:
-            funcs_d = load_creation_funcs()
-            for ns, funcs_v in funcs_d.items():
-                creation_func_names.extend([f'{qualified_name(ns)}.{x}' for x in funcs_v])
+        creation_func_names = load_creation_func_names()
 
         def _is_extra_constant_nodes(node, custom_data):
             return node.full_name() in creation_func_names
@@ -223,22 +220,7 @@ class QATQuantizer(object):
 
         log.debug("qat analysis over")
 
-        def _process_rules():
-            # Constructor a prefix tree for the QAT rules
-            fuse_rules = sorted(FUSE_RULE_LIST, key=lambda x: len(x), reverse=True)
-            rule_dict = {}
-            for fuse_rule in fuse_rules:
-                base_rule_dict = rule_dict
-                for module_cls in reversed(fuse_rule):
-                    # Node properties (has_key, child_nodes)
-                    base_rule_dict.setdefault(module_cls, [False, {}])
-                    base_rule_pair = base_rule_dict[module_cls]
-                    base_rule_dict = base_rule_pair[1]
-                base_rule_pair[0] = True
-            return rule_dict
-
-        if len(processed_qat_rules) == 0:
-            processed_qat_rules.update(_process_rules())
+        processed_qat_rules = load_processed_qat_rules()
 
         def _find_quantized_prelu_nodes(node: TraceNode, custom_node):
             # Find quantized PReLU nodes
@@ -484,8 +466,15 @@ class QATQuantizer(object):
         if graph.quantized:
             return
 
+        creation_func_names = load_creation_func_names()
+
+        def _is_extra_constant_nodes(node, custom_data):
+            return node.full_name() in creation_func_names
+
+        extra_constant_nodes = graph.filter_forward_nodes(_is_extra_constant_nodes)
+
         # First, we insert the QuantStub nodes for every input/constant node
-        for idx, node in reversed(list(enumerate(graph.input_nodes + graph.constant_nodes))):
+        for idx, node in reversed(list(enumerate(graph.input_nodes + graph.constant_nodes + extra_constant_nodes))):
             fake_quant = torch_q.QuantStub()
 
             graph.module_unique_name_dict[id(fake_quant)] = f'fake_quant_{idx}'
@@ -1148,3 +1137,29 @@ class DynamicQuantizer(QATQuantizer):
         torch_q.quantize_dynamic(self.model, inplace=True)
 
         return self.model
+
+
+def load_creation_func_names():
+    if len(creation_func_names) == 0:
+        funcs_d = load_creation_funcs()
+        for ns, funcs_v in funcs_d.items():
+            ns_str = qualified_name(ns)
+            creation_func_names.extend([f'{ns_str}.{x}' for x in funcs_v])
+    return creation_func_names
+
+
+def load_processed_qat_rules():
+    if len(processed_qat_rules) == 0:
+        # Constructor a prefix tree for the QAT rules
+        fuse_rules = sorted(FUSE_RULE_LIST, key=lambda x: len(x), reverse=True)
+        rule_dict = {}
+        for fuse_rule in fuse_rules:
+            base_rule_dict = rule_dict
+            for module_cls in reversed(fuse_rule):
+                # Node properties (has_key, child_nodes)
+                base_rule_dict.setdefault(module_cls, [False, {}])
+                base_rule_pair = base_rule_dict[module_cls]
+                base_rule_dict = base_rule_pair[1]
+            base_rule_pair[0] = True
+        processed_qat_rules.update(rule_dict)
+        return processed_qat_rules
