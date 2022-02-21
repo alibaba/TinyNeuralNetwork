@@ -1,0 +1,38 @@
+name: Unit tests
+
+on: [pull_request]
+
+jobs:
+  unit-test:
+    name: Unit tests for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: 3.8
+      - name: Install PyTorch
+        run: |
+         if [ "$RUNNER_OS" == "macOS" ]; then
+              conda install pytorch torchvision -c pytorch
+         else
+              conda install pytorch torchvision cpuonly -c pytorch
+         fi
+      - name: Install TinyNeuralNetwork
+        run: python setup.py install
+      - name: Install test dependencies
+        run: pip install flake8 tensorflow
+      - name: Lint checks
+        run: python -m flake8
+      - name: Run tests
+        run: |
+          source activate.sh
+          pytest tests

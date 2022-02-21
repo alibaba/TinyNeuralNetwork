@@ -6,6 +6,7 @@ import io
 import inspect
 import logging
 import os
+import sys
 import unittest
 
 import numpy as np
@@ -84,7 +85,7 @@ class TestModelMeta(type):
         def f(self):
             model_name = model_class.__name__
             model_file = model_name
-            model_file += '_simple'
+            model_file += 'qat_simple'
 
             if model_name in BLACKLIST:
                 raise unittest.SkipTest('IN BLACKLIST')
@@ -127,9 +128,10 @@ class TestModelMeta(type):
         return f
 
 
+@unittest.skipIf(sys.platform == 'win32')
 class TestModel(unittest.TestCase, metaclass=TestModelMeta):
     pass
 
 
 if __name__ == '__main__':
-    unittest.main(failfast=True)
+    unittest.main()
