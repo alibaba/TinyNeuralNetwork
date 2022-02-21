@@ -43,5 +43,9 @@ jobs:
           cd tests
           rm -rf out || true
           python converter_test.py -v -k mobilenet
+          if [ "$RUNNER_OS" != "Windows" ]; then
+            rm -rf out || true
+            python converter_qat_test.py -v -k mobilenet
+          fi
           rm -rf out || true
           python tracer_test.py -v -k mobilenet
