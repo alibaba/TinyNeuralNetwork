@@ -1162,4 +1162,4 @@ def load_processed_qat_rules():
                 base_rule_dict = base_rule_pair[1]
             base_rule_pair[0] = True
         processed_qat_rules.update(rule_dict)
-        return processed_qat_rules
+    return processed_qat_rules
