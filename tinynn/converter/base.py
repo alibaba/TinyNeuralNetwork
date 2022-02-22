@@ -112,6 +112,9 @@ class TFLiteConverter(object):
             with torch.no_grad():
                 script = torch.jit.trace(self.model, self.dummy_input)
 
+                # Remove reference to original model to save memory
+                self.model = None
+
                 # Have to save it once, otherwise something weird happens
                 if self.dump_jit_model_path is None:
                     with io.BytesIO() as f:

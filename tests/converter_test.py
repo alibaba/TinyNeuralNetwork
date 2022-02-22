@@ -101,6 +101,10 @@ class TestModelMeta(type):
             with torch.no_grad():
                 out_path = f'out/{model_file}.tflite'
                 converter = TFLiteConverter(m, inputs, out_path)
+
+                # Remove original model to lower memory usage
+                del m
+
                 converter.convert()
 
                 if HAS_TF:
