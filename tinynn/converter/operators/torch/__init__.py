@@ -173,6 +173,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {"prim::Constant"
                                                                 "quantized::leaky_relu": QuantizedLeakyReluOperator,
                                                                 "quantized::linear_dynamic": QuantizedLinearDynamicOperator,
                                                                 "quantized::linear_relu_dynamic": QuantizedLinearReluDynamicOperator,
+                                                                "quantized::elu": QuantizedEluOperator,
 
                                                                 # non tracking
                                                                 "aten::Int": NoTrackOperator,

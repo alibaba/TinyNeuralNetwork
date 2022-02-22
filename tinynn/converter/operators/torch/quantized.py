@@ -347,3 +347,25 @@ class QuantizedLinearReluDynamicOperator(QuantizedLinearReluDynamicSchema):
         self.run(node)
         QuantizedLinearDynamicOperator.parse_common(self, graph_converter,
                                                     tfl_schema.ActivationFunctionType.RELU)
+
+
+class QuantizedEluOperator(QuantizedEluSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        # Only int8 kernel is supported
+        if self.q_type == 'int8':
+            self.elementwise_unary(tfl.EluOperator, graph_converter)
+        else:
+            ops = []
+
+            inputs = [self.find_or_create_input(0, graph_converter)]
+            outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+
+            ops.append(tfl.EluOperator(inputs, outputs))
+            ops = self.wrap_ops_with_dequant_quants(ops)
+
+            for op in ops:
+                graph_converter.add_operator(op)
