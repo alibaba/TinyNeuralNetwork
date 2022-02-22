@@ -2,6 +2,7 @@ import torch
 import torchvision
 import torchvision.models
 
+import gc
 import io
 import inspect
 import logging
@@ -100,12 +101,16 @@ class TestModelMeta(type):
 
             with torch.no_grad():
                 out_path = f'out/{model_file}.tflite'
-                converter = TFLiteConverter(m, inputs, out_path)
+                out_pt = f'out/{model_file}.tflite'
+                converter = TFLiteConverter(m, inputs, out_path, dump_jit_model_path=out_pt,
+                                            gc_when_reload=True)
 
                 # Remove original model to lower memory usage
                 del m
 
                 converter.convert()
+
+                os.remove(out_pt)
 
                 if HAS_TF:
                     outputs = converter.get_outputs()

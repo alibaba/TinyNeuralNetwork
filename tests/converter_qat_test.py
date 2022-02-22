@@ -2,6 +2,7 @@ import torch
 import torchvision
 import torchvision.models
 
+import gc
 import io
 import inspect
 import logging
@@ -120,8 +121,12 @@ class TestModelMeta(type):
                 qat_model = torch.quantization.convert(qat_model)
 
                 out_path = f'out/{model_file}.tflite'
-                converter = TFLiteConverter(qat_model, inputs, out_path)
+                out_pt = f'out/{model_file}.pt'
+                converter = TFLiteConverter(qat_model, inputs, out_path, dump_jit_model_path=out_pt,
+                                            gc_when_reload=True)
                 converter.convert()
+
+                os.remove(out_pt)
 
                 if HAS_TF:
                     outputs = converter.get_outputs()

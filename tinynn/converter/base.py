@@ -31,7 +31,8 @@ class TFLiteConverter(object):
                  hybrid_quantization_from_float: bool = False,
                  hybrid_per_channel: bool = False,
                  hybrid_asymmetric_inputs: bool = True,
-                 fuse_quant_dequant: bool = False) -> None:
+                 fuse_quant_dequant: bool = False,
+                 gc_when_reload: bool = False) -> None:
         """ The TFLiteConverter class
 
         Args:
@@ -51,6 +52,7 @@ class TFLiteConverter(object):
             hybrid_per_channel (bool): Prefer per-channel kernels in hybrid quantization. Defaults to False
             hybrid_asymmetric_inputs (bool): Prefer asymmetric inputs while performing hybrid quantization
             fuse_quant_dequant (bool): Remove quant and dequant nodes directly connected to i/o nodes. Defaults to False
+            gc_when_reload (bool): Apply GC when reloading the torchscript into memory
         """
 
         self.model = model
@@ -78,6 +80,7 @@ class TFLiteConverter(object):
         self.hybrid_per_channel = hybrid_per_channel
         self.hybrid_asymmetric_inputs = hybrid_asymmetric_inputs
         self.fuse_quant_dequant = fuse_quant_dequant
+        self.gc_when_reload = gc_when_reload
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -123,6 +126,12 @@ class TFLiteConverter(object):
                         script = torch.jit.load(f)
                 else:
                     torch.jit.save(script, self.dump_jit_model_path)
+                    if self.gc_when_reload:
+                        import gc
+
+                        script = None
+                        gc.collect()
+
                     script = torch.jit.load(self.dump_jit_model_path)
 
             self.model = script
