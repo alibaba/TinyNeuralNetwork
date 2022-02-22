@@ -101,7 +101,7 @@ class TestModelMeta(type):
 
             with torch.no_grad():
                 out_path = f'out/{model_file}.tflite'
-                out_pt = f'out/{model_file}.tflite'
+                out_pt = f'out/{model_file}.pt'
                 converter = TFLiteConverter(m, inputs, out_path, dump_jit_model_path=out_pt,
                                             gc_when_reload=True)
 
