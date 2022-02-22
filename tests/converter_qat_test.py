@@ -82,17 +82,7 @@ class TestModelMeta(type):
 
     @classmethod
     def build_model_test(cls, model_class):
-        def f(self):
-            model_name = model_class.__name__
-            model_file = model_name
-            model_file += 'qat_simple'
-
-            if model_name in BLACKLIST:
-                raise unittest.SkipTest('IN BLACKLIST')
-
-            if os.path.exists(f'out/{model_file}.tflite'):
-                raise unittest.SkipTest('TESTED')
-
+        def prepare_q_model(model_name):
             args = ()
             kwargs = dict()
             if model_name in ('googlenet', 'inception_v3'):
@@ -107,6 +97,21 @@ class TestModelMeta(type):
 
                 quantizer = QATQuantizer(m, inputs, work_dir='out', config={'remove_weights_after_load': True})
                 qat_model = quantizer.quantize()
+
+            return qat_model, inputs
+
+        def f(self):
+            model_name = model_class.__name__
+            model_file = model_name
+            model_file += '_qat_simple'
+
+            if model_name in BLACKLIST:
+                raise unittest.SkipTest('IN BLACKLIST')
+
+            if os.path.exists(f'out/{model_file}.tflite'):
+                raise unittest.SkipTest('TESTED')
+
+            qat_model, inputs = prepare_q_model(model_name)
 
             with torch.no_grad():
                 qat_model.eval()

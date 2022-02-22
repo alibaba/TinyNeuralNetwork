@@ -150,6 +150,9 @@ class QATQuantizer(object):
             # Set the model to training mode before tracing again, since we need to perform QAT
             rewritten_model.train()
             rewritten_graph = trace(rewritten_model, self.dummy_input)
+
+            # Update the model so that the original one can be released
+            self.model = rewritten_model
         else:
             rewritten_graph = graph
 
