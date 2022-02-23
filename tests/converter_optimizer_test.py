@@ -261,6 +261,37 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
+    def test_unary_elementwise_transpose_with_output(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                y = torch.permute(x, [0, 2, 3, 1])
+                y = F.relu(y)
+                z = torch.permute(y, [0, 3, 1, 2])
+                z = F.relu(z)
+                return y, z
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 3)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(1).BuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(2).BuiltinCode(), tflite.BuiltinOperator.TRANSPOSE)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 3)
+        for i in range(3):
+            self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 1)
+            self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
     def test_simple_reshape(self):
         class TestModel(nn.Module):
             def forward(self, x):
@@ -364,6 +395,37 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_unary_elementwise_reshape_with_output(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                y = torch.reshape(x, (3, 224, 224))
+                y = F.relu(y)
+                z = torch.reshape(y, (1, 3, 224, 224))
+                z = F.relu(z)
+                return y, z
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 3)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(1).BuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(2).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 3)
+        for i in range(3):
+            self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 1)
+            self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
     def test_pad_with_paired_reshape_and_transpose(self):
         class TestModel(nn.Module):
@@ -591,6 +653,48 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).Operators(2).OutputsLength(), 1)
         self.assertEqual(tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(
             2).OpcodeIndex()).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
+
+    def test_transpose_across_channel_shuffle_with_output(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.permute(x, [0, 2, 3, 1])
+                x = torch.reshape(x, [1, 2, 112, 224, 3])
+                x = torch.transpose(x, 1, 2)
+                y = torch.reshape(x, [1, 224, 224, 3])
+                y = torch.permute(y, [0, 3, 1, 2])
+                return x, y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 4)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 4)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(
+            0).OpcodeIndex()).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(1).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(1).OutputsLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(
+            1).OpcodeIndex()).BuiltinCode(), tflite.BuiltinOperator.TRANSPOSE)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(2).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(2).OutputsLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(
+            2).OpcodeIndex()).BuiltinCode(), tflite.BuiltinOperator.TRANSPOSE)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(3).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(3).OutputsLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(
+            3).OpcodeIndex()).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
 
     def test_transpose_across_squeeze(self):
         class TestModel(nn.Module):

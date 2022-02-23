@@ -615,9 +615,9 @@ class GraphOptimizer(object):
             remove_edges.extend([x.index for x in next_edges])
             remove_vertices.extend([x.index for x in out_nodes])
 
-            for node in out_nodes:
-                del self.graph.tensor_map[node['outputs'][0]]
-                del self.graph.tensor_node_map[node['outputs'][0]]
+            for n in out_nodes:
+                del self.graph.tensor_map[n['outputs'][0]]
+                del self.graph.tensor_node_map[n['outputs'][0]]
 
             perm = max(cand_perms.items(), key=lambda x: x[1])[0]
             perm_arr = np.array(perm, dtype='int32')
@@ -637,7 +637,10 @@ class GraphOptimizer(object):
                 inv_post_perm_arr = np.argsort(post_perm_arr).astype('int32')
 
             for prev_node, prev_idx, next_idx in zip(prev_nodes, input_indices, prev_output_indices):
-                prev_out = prev_node['op'].outputs[next_idx]
+                if prev_node['op'] is None:
+                    prev_out = self.graph.tensor_map[prev_node['outputs'][0]]
+                else:
+                    prev_out = prev_node['op'].outputs[next_idx]
                 perm_tensor = self.create_attr_tensor(inv_perm_arr)
                 prev_new_out = self.create_transform_tensor(np.transpose(
                     prev_out.tensor, inv_perm_arr), quantization=prev_out.quantization)
@@ -746,9 +749,9 @@ class GraphOptimizer(object):
             remove_edges.extend([x.index for x in next_edges])
             remove_vertices.extend([x.index for x in out_nodes])
 
-            for node in out_nodes:
-                del self.graph.tensor_map[node['outputs'][0]]
-                del self.graph.tensor_node_map[node['outputs'][0]]
+            for n in out_nodes:
+                del self.graph.tensor_map[n['outputs'][0]]
+                del self.graph.tensor_node_map[n['outputs'][0]]
 
             perm = max(cand_perms.items(), key=lambda x: x[1])[0]
             perm_arr = np.array(perm, dtype='int32')
@@ -756,7 +759,10 @@ class GraphOptimizer(object):
 
             tensor_node_dict = {}
             for prev_node, prev_idx, next_idx in zip(prev_nodes, input_indices, prev_output_indices):
-                prev_out = prev_node['op'].outputs[next_idx]
+                if prev_node['op'] is None:
+                    prev_out = self.graph.tensor_map[prev_node['outputs'][0]]
+                else:
+                    prev_out = prev_node['op'].outputs[next_idx]
                 if prev_out.name in tensor_node_dict:
                     prev_new_out, skip = tensor_node_dict[prev_out.name]
                     actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True, skip)))
@@ -938,16 +944,19 @@ class GraphOptimizer(object):
             remove_edges.extend([x.index for x in next_edges])
             remove_vertices.extend([x.index for x in out_nodes])
 
-            for node in out_nodes:
-                del self.graph.tensor_map[node['outputs'][0]]
-                del self.graph.tensor_node_map[node['outputs'][0]]
+            for n in out_nodes:
+                del self.graph.tensor_map[n['outputs'][0]]
+                del self.graph.tensor_node_map[n['outputs'][0]]
 
             prev_shape = max(cand_shapes.items(), key=lambda x: x[1])[0]
             next_shape = max(cand_next_shapes.items(), key=lambda x: x[1])[0]
 
             tensor_node_dict = {}
             for i, prev_node in enumerate(prev_nodes):
-                prev_out = prev_node['op'].outputs[0]
+                if prev_node['op'] is None:
+                    prev_out = self.graph.tensor_map[prev_node['outputs'][0]]
+                else:
+                    prev_out = prev_node['op'].outputs[0]
                 if prev_out.name in tensor_node_dict:
                     prev_new_out = tensor_node_dict[prev_out.name]
                     actions.append((self.graph.replace_operator_input, (node, i, prev_new_out)))
@@ -1452,6 +1461,7 @@ def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph, branch: b
         source_cond_var = source_vertex.outdegree() == 1
 
     return source_cond_var and target_vertex.outdegree() >= 1 \
+        and target_vertex['op'] is not None \
         and target_vertex['op'].inputs[0].name in source_vertex['outputs'] \
         and ((target_vertex['node_type'] == ExtendedOperator.RESHAPE and
               target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape) or
