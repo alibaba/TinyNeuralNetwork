@@ -658,6 +658,11 @@ class QATQuantizer(object):
                 log.error('rewrite doesn\'t support multiple args for torch.stack')
                 assert False
             if len(args) > 0:
+                if '=' in args:
+                    k, v = args.split('=')
+                    assert k == 'dim'
+                    dim = int(v)
+                else:
                 dim = int(args)
             else:
                 dim = 0
