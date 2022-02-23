@@ -1,5 +1,6 @@
 import collections
 import io
+import os
 import typing
 import torch
 
@@ -125,6 +126,8 @@ class TFLiteConverter(object):
                         f.seek(0)
                         script = torch.jit.load(f)
                 else:
+                    jit_model_dir = os.path.abspath(os.path.dirname(self.dump_jit_model_path))
+                    os.makedirs(jit_model_dir, exist_ok=True)
                     torch.jit.save(script, self.dump_jit_model_path)
                     if self.gc_when_reload:
                         import gc
