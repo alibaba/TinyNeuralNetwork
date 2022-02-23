@@ -1,6 +1,8 @@
 name: Full tests
 
-on: [pull_request]
+on:
+  schedule:
+    - cron:  '00 19 * * *'
 
 jobs:
   unit-test:
@@ -15,7 +17,7 @@ jobs:
         shell: bash -l {0}
     steps:
       - uses: actions/checkout@v2
-      - name: configure Pagefile
+      - name: Configure pagefile
         if: runner.os == 'Windows'
         uses: al-cheb/configure-pagefile-action@v1.2
         with:

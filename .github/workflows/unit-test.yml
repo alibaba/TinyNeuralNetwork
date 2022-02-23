@@ -1,6 +1,14 @@
 name: Unit tests
 
-on: []
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+    branches:    
+      - 'main'
 
 jobs:
   unit-test:
