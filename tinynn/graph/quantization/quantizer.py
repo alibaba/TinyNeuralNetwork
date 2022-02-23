@@ -663,7 +663,7 @@ class QATQuantizer(object):
                     assert k == 'dim'
                     dim = int(v)
                 else:
-                dim = int(args)
+                    dim = int(args)
             else:
                 dim = 0
             for n in node.prev_nodes:
