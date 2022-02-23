@@ -264,7 +264,7 @@ class TraceNode(object):
             if node_idx is None:
                 return f'{ns}{node_name}'
             else:
-                if type(node_idx) in (list, tuple):
+                if isinstance(node_idx, (list, tuple)):
                     indices_str = ''.join([f'[{i}]' for i in node_idx])
                     return f'{ns}{node_name}{indices_str}'
                 else:
@@ -303,7 +303,7 @@ class ConstantNode(object):
     def parse(self, convert_to_parameter: bool = False):
         def _stringify_list(content) -> str:
             """ Convert a list of objects to a string """
-            if type(content) in (list, tuple):
+            if isinstance(content, (list, tuple)):
                 sub_contents = []
                 for item in content:
                     sub_contents.append(_stringify_list(item))
@@ -487,7 +487,7 @@ class TraceFunction(object):
             if id(a) in current_graph().tensor_pre_index_dict:
                 pre_node_index = current_graph().tensor_pre_index_dict[id(a)]
                 log.debug(f'pre_index gen func {self.kind}: {pre_node_index}')
-                if type(pre_node_index) in (list, tuple):
+                if isinstance(pre_node_index, (list, tuple)):
                     indices_str = ''.join([f'[{i}]' for i in pre_node_index])
                     return f"{ns}{pre_node_name}{indices_str}"
                 else:
@@ -507,7 +507,7 @@ class TraceFunction(object):
             new_arg = []
 
             for a in arg:
-                if type(a) in [list, tuple, torch.Size]:
+                if isinstance(a, (list, tuple, torch.Size)):
                     new_arg.append(_parse_args(a))
                 elif type(a) in (torch.Tensor, torch.nn.Parameter) or \
                         (type(a) in (torch.dtype, torch.device, torch.Size) and
@@ -543,7 +543,7 @@ class TraceFunction(object):
 
         def _flatten_list(content):
             """ Flatten a list of nested list or string into a string """
-            if type(content) == list:
+            if isinstance(content, list):
                 sub_contents = []
                 for item in content:
                     sub_contents.append(_flatten_list(item))
@@ -1066,7 +1066,7 @@ def patch(object, name, gen, *args, **kwargs):
 @contextlib.contextmanager
 def patch_modules(objects, names, gens):
     """ Temporarily monkeypatches the modules in PyTorch. """
-    if type(names) not in (tuple, list) and type(gens) not in (tuple, list):
+    if not isinstance(names, (tuple, list)) and not isinstance(gens, (tuple, list)):
         names = (names,)
         gens = (gens,)
     pre_patched_values = {}
@@ -1086,7 +1086,7 @@ def patch_modules(objects, names, gens):
 @contextlib.contextmanager
 def patch_funcs(object_dicts, gens):
     """ Temporarily monkeypatches the functions in PyTorch. """
-    if type(object_dicts) not in (tuple, list) and type(gens) not in (tuple, list):
+    if not isinstance(object_dicts, (tuple, list)) and not isinstance(gens, (tuple, list)):
         object_dicts = (object_dicts,)
         gens = (gens,)
     pre_patched_value_dict = {}
@@ -1239,7 +1239,7 @@ def noop_handler(node, inputs, outputs):
 def add_input_node(node: TraceNode, output_tensors):
     """ Adds an input node to the current computation graph """
     assert node is not None
-    if type(output_tensors) not in [list, tuple]:
+    if not isinstance(output_tensors, (list, tuple)):
         output_tensors = [output_tensors]
 
     node.next_tensors.extend(output_tensors)
@@ -1270,7 +1270,7 @@ def add_output_node(node: TraceNode, input_tensors):
     """ Adds an output node to the current computation graph """
     assert node is not None
     need_idx = True
-    if type(input_tensors) not in [list, tuple]:
+    if not isinstance(input_tensors, (list, tuple)):
         input_tensors = [input_tensors]
         need_idx = False
 
@@ -1291,11 +1291,11 @@ def add_output_node(node: TraceNode, input_tensors):
 def add_forward_node(node: TraceNode, input_tensors, output_tensors):
     """ Adds a forward node to the current computation graph """
     assert node is not None
-    if type(input_tensors) not in [list, tuple]:
+    if not isinstance(input_tensors, (list, tuple)):
         input_tensors = [input_tensors]
 
     need_idx = True
-    if type(output_tensors) not in [list, tuple]:
+    if not isinstance(output_tensors, (list, tuple)):
         output_tensors = [output_tensors]
         need_idx = False
 
@@ -1333,7 +1333,7 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
             node.prev_tensors[i] = node.prev_tensors[i].data
 
     for i, t in enumerate(output_tensors):
-        if type(t) in (list, tuple):
+        if isinstance(t, (list, tuple)):
             for j, rt in enumerate(t):
                 assert type(rt) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), \
                     f'Output [{i}][{j}] of {node.unique_name}({node.type()}) should be one of the following type \
@@ -1412,9 +1412,9 @@ def hook_modules(module):
         if type(outputs) == torch.Tensor:
             node = TraceNode(TraceFunction("output"))
             add_output_node(node, outputs)
-        elif type(outputs) in (list, tuple):
+        elif isinstance(outputs, (list, tuple)):
             for i in outputs:
-                if type(i) == torch.Tensor or (type(i) in (list, tuple) and all((type(x) == torch.Tensor for x in i))):
+                if type(i) == torch.Tensor or (isinstance(i, (list, tuple)) and all((type(x) == torch.Tensor for x in i))):
                     node = TraceNode(TraceFunction("output"))
                     add_output_node(node, i)
                 else:
@@ -1422,7 +1422,7 @@ def hook_modules(module):
                         "Only tensors or list, tuple of tensors are supported when nested in a class, dict, list or tuple")
         elif isinstance(outputs, dict):
             for k, v in outputs.items():
-                if type(v) == torch.Tensor or (type(v) in (list, tuple) and all((type(x) == torch.Tensor for x in v))):
+                if type(v) == torch.Tensor or (isinstance(v, (list, tuple)) and all((type(x) == torch.Tensor for x in v))):
                     node = TraceNode(TraceFunction("output"))
                     add_output_node(node, v)
                 else:
@@ -1604,7 +1604,7 @@ class TraceGraph(object):
         with self.__numbering_context():
             if type(self.dummy_input) == torch.Tensor:
                 actual_input = [self.dummy_input]
-            elif type(self.dummy_input) in (tuple, list):
+            elif isinstance(self.dummy_input, (tuple, list)):
                 actual_input = list(self.dummy_input)
             else:
                 log.error(f'Unsupported type {type(self.dummy_input)} for dummy input')
@@ -1934,7 +1934,7 @@ class TraceGraph(object):
                     break
 
             # Make sure the data is writable
-            if type(next_node.prev_tensors) == tuple:
+            if isinstance(next_node.prev_tensors, tuple):
                 next_node.prev_tensors = list(next_node.prev_tensors)
 
             for i, t in enumerate(next_node.prev_tensors):
@@ -2034,7 +2034,7 @@ class TraceGraph(object):
         """ Insert a module or an existing node before a node in the computation graph """
         # Create a new node and connects it to the previous node/tensors
         if type(module) != TraceNode:
-            if type(module) not in (tuple, list):
+            if not isinstance(module, (tuple, list)):
                 modules = [module]
             else:
                 if not node.rev_index:
@@ -2356,18 +2356,18 @@ def patch_helper(wrap_modules: bool = True, wrap_funcs: bool = True, wrap_creati
 def check_types(values: typing.Iterable) -> bool:
     """ Checks whether unsupported types are in the args. """
     for value in values:
-        if type(value) in (tuple, list):
+        if isinstance(value, (tuple, list)):
             res = check_types(value)
             if res is not None:
                 return res
-        elif type(value) not in (int, float, bool, str, type(None)):
+        elif not isinstance(value, (int, float, bool, str, type(None))):
             return type(value).__name__
     return None
 
 
 def check_tensor_type(value) -> bool:
     """ Check whether types are related to torch.Tensor. """
-    if type(value) in (tuple, list):
+    if isinstance(value, (tuple, list)):
         for item in value:
             res = check_tensor_type(item)
             if res:
@@ -2381,7 +2381,7 @@ def check_creation_args(args: typing.Iterable) -> typing.Tuple:
     """ Cast arguments of type of Tensor to normal values """
     new_args = []
     for arg in args:
-        if type(arg) in (tuple, list):
+        if isinstance(arg, (tuple, list)):
             new_args.append(check_creation_args(arg))
         elif type(arg) == torch.Tensor:
             if arg.dim() == 0:
