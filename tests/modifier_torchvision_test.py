@@ -107,4 +107,4 @@ class TestModel(unittest.TestCase, metaclass=TestModelMeta):
 
 
 if __name__ == '__main__':
-    unittest.main(failfast=True)
+    unittest.main()

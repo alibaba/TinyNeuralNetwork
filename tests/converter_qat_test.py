@@ -2,10 +2,12 @@ import torch
 import torchvision
 import torchvision.models
 
+import gc
 import io
 import inspect
 import logging
 import os
+import sys
 import unittest
 
 import numpy as np
@@ -81,17 +83,7 @@ class TestModelMeta(type):
 
     @classmethod
     def build_model_test(cls, model_class):
-        def f(self):
-            model_name = model_class.__name__
-            model_file = model_name
-            model_file += '_simple'
-
-            if model_name in BLACKLIST:
-                raise unittest.SkipTest('IN BLACKLIST')
-
-            if os.path.exists(f'out/{model_file}.tflite'):
-                raise unittest.SkipTest('TESTED')
-
+        def prepare_q_model(model_name):
             args = ()
             kwargs = dict()
             if model_name in ('googlenet', 'inception_v3'):
@@ -107,6 +99,21 @@ class TestModelMeta(type):
                 quantizer = QATQuantizer(m, inputs, work_dir='out', config={'remove_weights_after_load': True})
                 qat_model = quantizer.quantize()
 
+            return qat_model, inputs
+
+        def f(self):
+            model_name = model_class.__name__
+            model_file = model_name
+            model_file += '_qat_simple'
+
+            if model_name in BLACKLIST:
+                raise unittest.SkipTest('IN BLACKLIST')
+
+            if os.path.exists(f'out/{model_file}.tflite'):
+                raise unittest.SkipTest('TESTED')
+
+            qat_model, inputs = prepare_q_model(model_name)
+
             with torch.no_grad():
                 qat_model.eval()
                 qat_model.cpu()
@@ -114,8 +121,12 @@ class TestModelMeta(type):
                 qat_model = torch.quantization.convert(qat_model)
 
                 out_path = f'out/{model_file}.tflite'
-                converter = TFLiteConverter(qat_model, inputs, out_path)
+                out_pt = f'out/{model_file}.pt'
+                converter = TFLiteConverter(qat_model, inputs, out_path, dump_jit_model_path=out_pt,
+                                            gc_when_reload=True)
                 converter.convert()
+
+                os.remove(out_pt)
 
                 if HAS_TF:
                     outputs = converter.get_outputs()
@@ -127,9 +138,10 @@ class TestModelMeta(type):
         return f
 
 
+@unittest.skipIf(sys.platform == 'win32', 'Quantization cannot be performed on Windows')
 class TestModel(unittest.TestCase, metaclass=TestModelMeta):
     pass
 
 
 if __name__ == '__main__':
-    unittest.main(failfast=True)
+    unittest.main()
