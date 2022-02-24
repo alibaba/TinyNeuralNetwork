@@ -946,6 +946,7 @@ class QATQuantizer(object):
                     'layer_norm',
                     'instance_norm',
                     'softmax',
+                    'log_softmax',
                 )
             else:
                 if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
@@ -963,6 +964,7 @@ class QATQuantizer(object):
                     nn.InstanceNorm2d,
                     nn.Hardsigmoid,
                     nn.Softmax,
+                    nn.LogSoftmax,
                 )
 
         unsupported_nodes = graph.filter_forward_nodes(_is_not_quantizable)
