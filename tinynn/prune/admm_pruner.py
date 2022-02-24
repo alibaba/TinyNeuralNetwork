@@ -14,12 +14,16 @@ class ADMMPruner(OneShotChannelPruner):
     required_params = ('sparsity', 'metrics', 'admm_iterations', 'admm_epoch', 'rho', 'admm_lr')
     required_context_params = ('val_loader', 'train_loader', 'train_func', 'validate_func', 'optimizer', 'criterion')
     default_values = {'admm_save_freq': 1, 'admm_valid_freq': 1, 'admm_dir': 'admm_train/'}
-    context_from_params_dict = {'optimizer': ['admm_optimizer', 'optimizer'],
-                                'criterion': ['admm_criterion', 'criterion']}
-    condition_dict = {'admm_iterations': lambda x: 0 < x,
-                      'admm_epoch': lambda x: 0 < x,
-                      'rho': lambda x: 0 < x < 1,
-                      'admm_lr': lambda x: 0 < x < 1}
+    context_from_params_dict = {
+        'optimizer': ['admm_optimizer', 'optimizer'],
+        'criterion': ['admm_criterion', 'criterion'],
+    }
+    condition_dict = {
+        'admm_iterations': lambda x: 0 < x,
+        'admm_epoch': lambda x: 0 < x,
+        'rho': lambda x: 0 < x < 1,
+        'admm_lr': lambda x: 0 < x < 1,
+    }
 
     admm_iterations: int
     admm_epoch: int
@@ -38,7 +42,7 @@ class ADMMPruner(OneShotChannelPruner):
         self.U = {}
 
     def prune(self):
-        """ The main function for pruning """
+        """The main function for pruning"""
 
         log.info('Start ADMM training')
         old_criterion = self.context.criterion
@@ -94,7 +98,11 @@ class ADMMPruner(OneShotChannelPruner):
         def criterion_func(output, target):
             loss = old_criterion(output, target)
             for n in self.center_nodes:
-                loss += 0.5 * self.rho * (torch.norm(n.module.weight - self.Z[n.unique_name] + self.U[n.unique_name], p=2) ** 2)
+                loss += (
+                    0.5
+                    * self.rho
+                    * (torch.norm(n.module.weight - self.Z[n.unique_name] + self.U[n.unique_name], p=2) ** 2)
+                )
             return loss
 
         return criterion_func

@@ -27,13 +27,15 @@ for k in torch.nn.__dict__:
         # Skip container modules
         if '.container' in c.__module__:
             continue
-        if c.__name__ in ('Parameter',
-                          'Module',
-                          'DataParallel',
-                          'TransformerEncoder',
-                          'TransformerDecoder',
-                          'TransformerEncoderLayer',
-                          'TransformerDecoderLayer'):
+        if c.__name__ in (
+            'Parameter',
+            'Module',
+            'DataParallel',
+            'TransformerEncoder',
+            'TransformerDecoder',
+            'TransformerEncoderLayer',
+            'TransformerDecoderLayer',
+        ):
             continue
         final_dict.setdefault('torch.nn', [])
         final_dict['torch.nn'].append(k)
@@ -47,7 +49,7 @@ for k in torchvision.ops.__dict__:
         print(k, c, issubclass(c, torch.nn.Module))
         print(c.__module__)
         # Skip container modules
-        if c.__name__ in ('FeaturePyramidNetwork', ):
+        if c.__name__ in ('FeaturePyramidNetwork',):
             continue
         final_dict.setdefault('torchvision.ops', [])
         final_dict['torchvision.ops'].append(k)

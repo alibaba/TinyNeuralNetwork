@@ -22,11 +22,17 @@ from torch.nn.parallel.distributed import DistributedDataParallel
 from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16
 from tinynn.graph.quantization.modules import QPReLU
 from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver
-from tinynn.graph.tracer import (ConstantNode, TraceFunction, TraceGraph,
-                                 TraceNode, load_creation_funcs,
-                                 module_constructor_lines,
-                                 override_current_trace_graph, qualified_name,
-                                 trace)
+from tinynn.graph.tracer import (
+    ConstantNode,
+    TraceFunction,
+    TraceGraph,
+    TraceNode,
+    load_creation_funcs,
+    module_constructor_lines,
+    override_current_trace_graph,
+    qualified_name,
+    trace,
+)
 from tinynn.util.train_util import get_module_device
 from tinynn.util.util import import_from_path
 
@@ -70,8 +76,8 @@ class QATQuantizer(object):
         Args:
             model: The model to be quantized
             dummy_input: A viable input to the model
-            work_dir (typing.Optional[str], optional): The working directory in which the intermediate files will be generated. \
-                Defaults to None, in which case "output" will be used.
+            work_dir (typing.Optional[str], optional): The working directory in which the intermediate files will be \
+                generated. Defaults to None, in which case "output" will be used.
             config (typing.Optional[dict]): Options for the quantizer
         """
 
@@ -91,10 +97,15 @@ class QATQuantizer(object):
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
 
     def parse_config(self, config: typing.Optional[dict]):
-        default_values = {'rewrite_graph': True, 'force_overwrite': True,
-                          'is_input_quantized': None, 'backend': 'qnnpack',
-                          'remove_weights_after_load': False,
-                          'asymmetric': True, 'per_tensor': True}
+        default_values = {
+            'rewrite_graph': True,
+            'force_overwrite': True,
+            'is_input_quantized': None,
+            'backend': 'qnnpack',
+            'remove_weights_after_load': False,
+            'asymmetric': True,
+            'per_tensor': True,
+        }
 
         if config is None:
             config = dict()
@@ -104,7 +115,7 @@ class QATQuantizer(object):
             setattr(self, k, actual_v)
 
     def quantize(self) -> nn.Module:
-        """ Performs QAT rewrite and preparation
+        """Performs QAT rewrite and preparation
 
         Returns:
             nn.Module: The QAT-ready model
@@ -128,9 +139,10 @@ class QATQuantizer(object):
 
             # Generate the code for the modified model
             # We will try to do some op fusion and rewriting in the `rewrite_quantize_graph` function.
-            # By default, we will try to insert QuantStubs before every input and DeQuantStubs after every output in the generated graph.
-            # If this doesn't suit your needs, e.g. you have intergal/quantized inputs or want to skip the quantization rewrite for some ops,
-            # then you may modify the code generated freely and remember to skip this step so it won't be overwritten.
+            # By default, we will try to insert QuantStubs before every input and DeQuantStubs after every output in
+            # the generated graph. If this doesn't suit your needs, e.g. you have intergal/quantized inputs or want to
+            # skip the quantization rewrite for some ops, then you may modify the code generated freely and remember to
+            # skip this step so it won't be overwritten.
             if self.force_overwrite or not os.path.exists(model_code_path) or not os.path.exists(model_weights_path):
                 self.rewrite_quantize_graph(graph)
                 graph.generate_code(model_code_path, model_weights_path, model_name_qat)
@@ -163,12 +175,18 @@ class QATQuantizer(object):
 
         return qat_model
 
-    def prepare_qat_prep(self, graph: TraceGraph, is_input_quantized: typing.Optional[typing.Tuple[bool]] = None, backend: str = 'qnnpack'):
-        """ Some common logic before calling torch.quantization.prepare[_qat]
+    def prepare_qat_prep(
+        self,
+        graph: TraceGraph,
+        is_input_quantized: typing.Optional[typing.Tuple[bool]] = None,
+        backend: str = 'qnnpack',
+    ):
+        """Some common logic before calling torch.quantization.prepare[_qat]
 
         Args:
             graph (TraceGraph): The computation graph of the model
-            is_input_quantized (typing.Union[typing.Tuple[bool]], optional): Whether the input tensor(s) is (are) quantized. Defaults to None.
+            is_input_quantized (typing.Union[typing.Tuple[bool]], optional): Whether the input tensor(s) is (are) \
+                quantized. Defaults to None.
             backend (str, optional): The backend of quantization. Defaults to 'qnnpack'.
 
         """
@@ -291,7 +309,7 @@ class QATQuantizer(object):
         self.prepare_qconfig(graph, backend)
 
     def prepare_qconfig(self, graph: TraceGraph, backend: str):
-        """ Prepare qconfig for various configurations.
+        """Prepare qconfig for various configurations.
 
         Args:
             graph (TraceGraph): The computation graph of the model
@@ -303,13 +321,25 @@ class QATQuantizer(object):
         qconfig_c = None
         if self.backend == 'qnnpack':
             if not self.asymmetric:
-                sym_fq = qconfig.activation.with_args(observer=torch_q.MovingAverageMinMaxObserver, quant_min=0, quant_max=255,
-                                                      dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
+                sym_fq = qconfig.activation.with_args(
+                    observer=torch_q.MovingAverageMinMaxObserver,
+                    quant_min=0,
+                    quant_max=255,
+                    dtype=torch.quint8,
+                    qscheme=torch.per_tensor_symmetric,
+                    reduce_range=False,
+                )
                 qconfig = torch_q.QConfig(sym_fq, qconfig.weight)
             if not self.per_tensor:
-                sym_fq = qconfig.weight.with_args(observer=torch_q.MovingAveragePerChannelMinMaxObserver.with_args(quant_min=-127, quant_max=127),
-                                                  quant_min=-127, quant_max=127, dtype=torch.qint8, qscheme=torch.per_channel_symmetric,
-                                                  reduce_range=False, ch_axis=0)
+                sym_fq = qconfig.weight.with_args(
+                    observer=torch_q.MovingAveragePerChannelMinMaxObserver.with_args(quant_min=-127, quant_max=127),
+                    quant_min=-127,
+                    quant_max=127,
+                    dtype=torch.qint8,
+                    qscheme=torch.per_channel_symmetric,
+                    reduce_range=False,
+                    ch_axis=0,
+                )
                 qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
         else:
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
@@ -328,12 +358,18 @@ class QATQuantizer(object):
                     for c in m.children():
                         q.put(c)
 
-    def prepare_qat(self, graph: TraceGraph, is_input_quantized: typing.Optional[typing.Tuple[bool]] = None, backend: str = 'qnnpack') -> torch.nn.Module:
-        """ Prepare model for QAT training
+    def prepare_qat(
+        self,
+        graph: TraceGraph,
+        is_input_quantized: typing.Optional[typing.Tuple[bool]] = None,
+        backend: str = 'qnnpack',
+    ) -> torch.nn.Module:
+        """Prepare model for QAT training
 
         Args:
             graph (TraceGraph): The computation graph of the model
-            is_input_quantized (typing.Union[typing.Tuple[bool]], optional): Whether the input tensor(s) is (are) quantized. Defaults to None.
+            is_input_quantized (typing.Union[typing.Tuple[bool]], optional): Whether the input tensor(s) is (are) \
+                quantized. Defaults to None.
             backend (str, optional): The backend of quantization. Defaults to 'qnnpack'.
 
         Returns:
@@ -465,7 +501,7 @@ class QATQuantizer(object):
                     setattr(parent, prop, unified)
 
     def rewrite_quantize_graph(self, graph: TraceGraph) -> None:
-        """ Rewrites the computation graph for quantization """
+        """Rewrites the computation graph for quantization"""
         if graph.quantized:
             return
 
@@ -540,11 +576,13 @@ class QATQuantizer(object):
             # Current, only the following condition could be handled.
             #   a / constant => a * (1 / constant)
             if cur_class == TraceFunction:
-                return cur_module.kind == 'truediv' and \
-                    len(cur_module.prev_tensors) == 1 and \
-                    cur_module.prev_tensors[0].dtype == torch.float32 and \
-                    cur_module.func_type != '__rtruediv__' and \
-                    node.next_tensors[0].dtype == torch.float32
+                return (
+                    cur_module.kind == 'truediv'
+                    and len(cur_module.prev_tensors) == 1
+                    and cur_module.prev_tensors[0].dtype == torch.float32
+                    and cur_module.func_type != '__rtruediv__'
+                    and node.next_tensors[0].dtype == torch.float32
+                )
 
         div_nodes = graph.filter_forward_nodes(_is_div_node)
         log.info(f'rewriting div for {[node.unique_name for node in div_nodes]}')
@@ -572,8 +610,11 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind == 'sub' and cur_module.prev_tensors[0].dtype == torch.float32 and \
-                    node.next_tensors[0].dtype == torch.float32
+                return (
+                    cur_module.kind == 'sub'
+                    and cur_module.prev_tensors[0].dtype == torch.float32
+                    and node.next_tensors[0].dtype == torch.float32
+                )
 
         sub_nodes = graph.filter_forward_nodes(_is_sub_node)
         log.info(f'rewriting sub for {[node.unique_name for node in sub_nodes]}')
@@ -852,7 +893,7 @@ class QATQuantizer(object):
             if cur_class == ConstantNode:
                 return False
             elif cur_class == TraceFunction:
-                return cur_module.kind in ('pad', )
+                return cur_module.kind in ('pad',)
             else:
                 return cur_class in (nn.ConstantPad1d, nn.ConstantPad2d, nn.ConstantPad3d, nn.ZeroPad2d)
 
@@ -865,8 +906,9 @@ class QATQuantizer(object):
                     log.error('rewrite for partially-supported ops supports with nodes with exact one input')
                     assert False
                 with override_current_trace_graph(graph):
-                    trace_func = TraceFunction('torch.Tensor.contiguous', True,
-                                               prefix='fuse_').parse_args(shared_tensors[0])
+                    trace_func = TraceFunction('torch.Tensor.contiguous', True, prefix='fuse_').parse_args(
+                        shared_tensors[0]
+                    )
                 next_tensors = [x.contiguous() for x in shared_tensors]
                 graph.insert_between(n, node, trace_func, next_tensors)
 
@@ -889,19 +931,21 @@ class QATQuantizer(object):
             if cur_class == ConstantNode:
                 return False
             elif cur_class == TraceFunction:
-                return cur_module.kind in ('pow',
-                                           'truediv',
-                                           'sqrt',
-                                           'atan2',
-                                           'atan',
-                                           'sin',
-                                           'cos',
-                                           'hardsigmoid',
-                                           'silu',
-                                           'reciprocal',
-                                           'exp',
-                                           'layer_norm',
-                                           'instance_norm')
+                return cur_module.kind in (
+                    'pow',
+                    'truediv',
+                    'sqrt',
+                    'atan2',
+                    'atan',
+                    'sin',
+                    'cos',
+                    'hardsigmoid',
+                    'silu',
+                    'reciprocal',
+                    'exp',
+                    'layer_norm',
+                    'instance_norm',
+                )
             else:
                 if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
                     if cur_class == nn.ConvTranspose2d:
@@ -909,13 +953,15 @@ class QATQuantizer(object):
                 else:
                     if cur_class == nn.SiLU:
                         return True
-                return cur_class in (nn.LSTM,
-                                     nn.RNN,
-                                     nn.GRU,
-                                     nn.LayerNorm,
-                                     nn.InstanceNorm1d,
-                                     nn.InstanceNorm2d,
-                                     nn.Hardsigmoid)
+                return cur_class in (
+                    nn.LSTM,
+                    nn.RNN,
+                    nn.GRU,
+                    nn.LayerNorm,
+                    nn.InstanceNorm1d,
+                    nn.InstanceNorm2d,
+                    nn.Hardsigmoid,
+                )
 
         unsupported_nodes = graph.filter_forward_nodes(_is_not_quantizable)
         for idx, node in enumerate(reversed(unsupported_nodes)):
@@ -971,8 +1017,8 @@ class BF16Quantizer(QATQuantizer):
         Args:
             model: The model to be quantized
             dummy_input: A viable input to the model
-            work_dir (typing.Optional[str], optional): The working directory in which the intermediate files will be generated. \
-                Defaults to None, in which case "output" will be used.
+            work_dir (typing.Optional[str], optional): The working directory in which the intermediate files will be \
+                generated. Defaults to None, in which case "output" will be used.
             config (typing.Optional[dict]): Options for the quantizer
         """
 
@@ -984,7 +1030,7 @@ class BF16Quantizer(QATQuantizer):
         self.rewrite_graph = False
 
     def quantize(self) -> nn.Module:
-        """ Prepare model for BFloat16 training """
+        """Prepare model for BFloat16 training"""
 
         self.model.train()
 
@@ -1009,15 +1055,15 @@ class PostQuantizer(QATQuantizer):
         Args:
             model: The model to be quantized
             dummy_input: A viable input to the model
-            work_dir (typing.Optional[str], optional): The working directory in which the intermediate files will be generated. \
-                Defaults to None, in which case "output" will be used.
+            work_dir (typing.Optional[str], optional): The working directory in which the intermediate files will be \
+                generated. Defaults to None, in which case "output" will be used.
             config (typing.Optional[dict]): Options for the quantizer
         """
 
         super().__init__(model, dummy_input, work_dir, config)
 
     def prepare_qconfig(self, graph: TraceGraph, backend: str):
-        """ Prepare qconfig for various configurations.
+        """Prepare qconfig for various configurations.
 
         Args:
             graph (TraceGraph): The computation graph of the model
@@ -1030,14 +1076,17 @@ class PostQuantizer(QATQuantizer):
         if self.backend == 'qnnpack':
             if not self.asymmetric:
                 sym_fq = torch_q.HistogramObserver.with_args(
-                    dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
+                    dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False
+                )
                 qconfig = torch_q.QConfig(sym_fq, qconfig.weight)
             if not self.per_tensor:
                 sym_fq = MinMaxObserver.with_args(
-                    dtype=torch.qint8, qscheme=torch.per_tensor_symmetric, reduce_range=False)
+                    dtype=torch.qint8, qscheme=torch.per_tensor_symmetric, reduce_range=False
+                )
                 qconfig = torch_q.QConfig(qconfig.activation, sym_fq)
                 sym_fq = PerChannelMinMaxObserver.with_args(
-                    dtype=torch.qint8, qscheme=torch.per_channel_symmetric, reduce_range=False, ch_axis=0)
+                    dtype=torch.qint8, qscheme=torch.per_channel_symmetric, reduce_range=False, ch_axis=0
+                )
                 qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
         else:
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
@@ -1056,12 +1105,18 @@ class PostQuantizer(QATQuantizer):
                     for c in m.children():
                         q.put(c)
 
-    def prepare_qat(self, graph: TraceGraph, is_input_quantized: typing.Optional[typing.Tuple[bool]] = None, backend: str = 'qnnpack') -> torch.nn.Module:
-        """ Prepare model for QAT training
+    def prepare_qat(
+        self,
+        graph: TraceGraph,
+        is_input_quantized: typing.Optional[typing.Tuple[bool]] = None,
+        backend: str = 'qnnpack',
+    ) -> torch.nn.Module:
+        """Prepare model for QAT training
 
         Args:
             graph (TraceGraph): The computation graph of the model
-            is_input_quantized (typing.Union[typing.Tuple[bool]], optional): Whether the input tensor(s) is (are) quantized. Defaults to None.
+            is_input_quantized (typing.Union[typing.Tuple[bool]], optional): Whether the input tensor(s) is (are) \
+                quantized. Defaults to None.
             backend (str, optional): The backend of quantization. Defaults to 'qnnpack'.
 
         Returns:
@@ -1122,8 +1177,8 @@ class DynamicQuantizer(QATQuantizer):
         Args:
             model: The model to be quantized
             dummy_input: A viable input to the model
-            work_dir (typing.Optional[str], optional): The working directory in which the intermediate files will be generated. \
-                Defaults to None, in which case "output" will be used.
+            work_dir (typing.Optional[str], optional): The working directory in which the intermediate files will be \
+                generated. Defaults to None, in which case "output" will be used.
             config (typing.Optional[dict]): Options for the quantizer
         """
 
@@ -1138,7 +1193,7 @@ class DynamicQuantizer(QATQuantizer):
         assert self.per_tensor, "Per-channel quantization is not supported for DynamicQuantizer"
 
     def quantize(self) -> nn.Module:
-        """ Prepare model for dynamic quantization """
+        """Prepare model for dynamic quantization"""
 
         self.model.eval()
 

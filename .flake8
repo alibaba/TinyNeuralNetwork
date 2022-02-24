@@ -1,8 +1,9 @@
 [flake8]
 select = B,C,E,F,P,T4,W,B9
-max-line-length = 160
+max-line-length = 120
 ignore = 
         F401,F403,F405,W503,W504
+extend-ignore = E203
 per-file-ignores = 
         tinynn/converter/operators/tflite/generated_ops.py: E501
         tinynn/converter/operators/torch/aten_schema.py: E501
@@ -22,3 +23,4 @@ exclude =
         ./build/
         ./debugging/
         ./examples/mixed_qat/mobilenet_mixed_qat.py
+        ./examples/models

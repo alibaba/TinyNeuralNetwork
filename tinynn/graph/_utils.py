@@ -31,8 +31,7 @@ from functools import wraps
 
 import builtins as __builtin__
 
-Py_ssize_t = ctypes.c_int64 if ctypes.sizeof(
-    ctypes.c_void_p) == 8 else ctypes.c_int32
+Py_ssize_t = ctypes.c_int64 if ctypes.sizeof(ctypes.c_void_p) == 8 else ctypes.c_int32
 
 
 class PyObject(ctypes.Structure):
@@ -53,15 +52,12 @@ Inquiry_p = ctypes.CFUNCTYPE(ctypes.c_int, PyObject_p)
 # plain PyObject*
 UnaryFunc_p = ctypes.CFUNCTYPE(ctypes.py_object, PyObject_p)
 BinaryFunc_p = ctypes.CFUNCTYPE(ctypes.py_object, PyObject_p, PyObject_p)
-TernaryFunc_p = ctypes.CFUNCTYPE(
-    ctypes.py_object, PyObject_p, PyObject_p, PyObject_p)
+TernaryFunc_p = ctypes.CFUNCTYPE(ctypes.py_object, PyObject_p, PyObject_p, PyObject_p)
 LenFunc_p = ctypes.CFUNCTYPE(Py_ssize_t, PyObject_p)
 SSizeArgFunc_p = ctypes.CFUNCTYPE(ctypes.py_object, PyObject_p, Py_ssize_t)
-SSizeObjArgProc_p = ctypes.CFUNCTYPE(
-    ctypes.c_int, PyObject_p, Py_ssize_t, PyObject_p)
+SSizeObjArgProc_p = ctypes.CFUNCTYPE(ctypes.c_int, PyObject_p, Py_ssize_t, PyObject_p)
 ObjObjProc_p = ctypes.CFUNCTYPE(ctypes.c_int, PyObject_p, PyObject_p)
-ObjObjArgProc_p = ctypes.CFUNCTYPE(
-    ctypes.c_int, PyObject_p, PyObject_p, PyObject_p)
+ObjObjArgProc_p = ctypes.CFUNCTYPE(ctypes.c_int, PyObject_p, PyObject_p, PyObject_p)
 
 FILE_p = ctypes.POINTER(PyFile)
 
@@ -69,14 +65,9 @@ FILE_p = ctypes.POINTER(PyFile)
 def get_not_implemented():
     namespace = {}
     name = "_Py_NotImplmented"
-    not_implemented = ctypes.cast(
-        ctypes.pythonapi._Py_NotImplementedStruct, ctypes.py_object)
+    not_implemented = ctypes.cast(ctypes.pythonapi._Py_NotImplementedStruct, ctypes.py_object)
 
-    ctypes.pythonapi.PyDict_SetItem(
-        ctypes.py_object(namespace),
-        ctypes.py_object(name),
-        not_implemented
-    )
+    ctypes.pythonapi.PyDict_SetItem(ctypes.py_object(namespace), ctypes.py_object(name), not_implemented)
     return namespace[name]
 
 
@@ -105,7 +96,6 @@ class PyNumberMethods(ctypes.Structure):
         ('nb_int', UnaryFunc_p),
         ('nb_reserved', ctypes.c_void_p),
         ('nb_float', UnaryFunc_p),
-
         ('nb_inplace_add', BinaryFunc_p),
         ('nb_inplace_subtract', BinaryFunc_p),
         ('nb_inplace_multiply', BinaryFunc_p),
@@ -116,14 +106,11 @@ class PyNumberMethods(ctypes.Structure):
         ('nb_inplace_and', BinaryFunc_p),
         ('nb_inplace_xor', BinaryFunc_p),
         ('nb_inplace_or', BinaryFunc_p),
-
         ('nb_floor_divide', BinaryFunc_p),
         ('nb_true_divide', BinaryFunc_p),
         ('nb_inplace_floor_divide', BinaryFunc_p),
         ('nb_inplace_true_divide', BinaryFunc_p),
-
         ('nb_index', BinaryFunc_p),
-
         ('nb_matrix_multiply', BinaryFunc_p),
         ('nb_inplace_matrix_multiply', BinaryFunc_p),
     ]
@@ -176,8 +163,7 @@ PyTypeObject._fields_ = [
     ('tp_dealloc', ctypes.CFUNCTYPE(None, PyObject_p)),
     ('printfunc', ctypes.CFUNCTYPE(ctypes.c_int, PyObject_p, FILE_p, ctypes.c_int)),
     ('getattrfunc', ctypes.CFUNCTYPE(PyObject_p, PyObject_p, ctypes.c_char_p)),
-    ('setattrfunc', ctypes.CFUNCTYPE(ctypes.c_int,
-                                     PyObject_p, ctypes.c_char_p, PyObject_p)),
+    ('setattrfunc', ctypes.CFUNCTYPE(ctypes.c_int, PyObject_p, ctypes.c_char_p, PyObject_p)),
     ('tp_as_async', ctypes.CFUNCTYPE(PyAsyncMethods)),
     ('tp_repr', ctypes.CFUNCTYPE(PyObject_p, PyObject_p)),
     ('tp_as_number', ctypes.POINTER(PyNumberMethods)),
@@ -220,8 +206,7 @@ def patch_getitem(base_cls, func):
     if not tp_as_ptr:
         # allocate new array
         tp_as_obj = struct_ty()
-        tp_as_new_ptr = ctypes.cast(ctypes.addressof(tp_as_obj),
-                                    ctypes.POINTER(struct_ty))
+        tp_as_new_ptr = ctypes.cast(ctypes.addressof(tp_as_obj), ctypes.POINTER(struct_ty))
 
         setattr(tyobj, tp_as_name, tp_as_new_ptr)
     tp_as = tp_as_ptr[0]

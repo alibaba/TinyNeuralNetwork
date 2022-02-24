@@ -18,30 +18,34 @@ log = get_logger(__name__, 'INFO')
 
 
 class TFLiteConverter(object):
-    def __init__(self, model: typing.Union[torch.jit.ScriptFunction, torch.jit.ScriptModule, torch.nn.Module],
-                 dummy_input: typing.Union[torch.Tensor, typing.Iterable[torch.Tensor]],
-                 tflite_path: str,
-                 input_transpose: typing.Optional[typing.Union[bool, typing.Iterable[bool]]] = None,
-                 dump_jit_model_path: typing.Optional[str] = None,
-                 dump_dummy_input_path: typing.Optional[str] = None,
-                 dump_config_path: typing.Optional[str] = None,
-                 strict_symmetric_check: bool = False,
-                 preserve_tensors: bool = False,
-                 optimize: int = GraphOptimizer.ALL_OPTIMIZE,
-                 quantize_target_type: str = 'uint8',
-                 hybrid_quantization_from_float: bool = False,
-                 hybrid_per_channel: bool = False,
-                 hybrid_asymmetric_inputs: bool = True,
-                 fuse_quant_dequant: bool = False,
-                 gc_when_reload: bool = False) -> None:
+    def __init__(
+        self,
+        model: typing.Union[torch.jit.ScriptFunction, torch.jit.ScriptModule, torch.nn.Module],
+        dummy_input: typing.Union[torch.Tensor, typing.Iterable[torch.Tensor]],
+        tflite_path: str,
+        input_transpose: typing.Optional[typing.Union[bool, typing.Iterable[bool]]] = None,
+        dump_jit_model_path: typing.Optional[str] = None,
+        dump_dummy_input_path: typing.Optional[str] = None,
+        dump_config_path: typing.Optional[str] = None,
+        strict_symmetric_check: bool = False,
+        preserve_tensors: bool = False,
+        optimize: int = GraphOptimizer.ALL_OPTIMIZE,
+        quantize_target_type: str = 'uint8',
+        hybrid_quantization_from_float: bool = False,
+        hybrid_per_channel: bool = False,
+        hybrid_asymmetric_inputs: bool = True,
+        fuse_quant_dequant: bool = False,
+        gc_when_reload: bool = False,
+    ) -> None:
         """ The TFLiteConverter class
 
         Args:
-            model (typing.Union[torch.jit.ScriptFunction, torch.jit.ScriptModule, torch.nn.Module]): The input model (either traced or non-traced)
+            model (typing.Union[torch.jit.ScriptFunction, torch.jit.ScriptModule, torch.nn.Module]): The input model \
+                (either traced or non-traced)
             dummy_input (typing.Union[torch.Tensor, typing.Iterable[torch.Tensor]]): A viable input to the model
             tflite_path (str): Path to use for exporting
-            input_transpose (typing.Optional[typing.Union[bool, typing.Iterable[bool]]], optional): Whether to transpose the input(s). \
-                 Defaults to None(True for 4d-input, False otherwise).
+            input_transpose (typing.Optional[typing.Union[bool, typing.Iterable[bool]]], optional): Whether to \
+                transpose the input(s). Defaults to None(True for 4d-input, False otherwise).
             dump_jit_model_path (typing.Optional[str]): The path for dumping the jit model. Defaults to None
             dump_dummy_input_path (typing.Optional[str]): The path for dumping the dummy input. Defaults to None
             dump_config_path (typing.Optional[str]): The path for dumping the json config. Defaults to None
@@ -147,13 +151,22 @@ class TFLiteConverter(object):
             np.savez(self.dump_dummy_input_path, *dummy_arrs)
 
         if self.dump_config_path is not None:
-            generate_converter_config(self.dummy_input, [], self.input_transpose, [],
-                                      self.dump_jit_model_path, self.tflite_path, self.dump_config_path)
+            generate_converter_config(
+                self.dummy_input,
+                [],
+                self.input_transpose,
+                [],
+                self.dump_jit_model_path,
+                self.tflite_path,
+                self.dump_config_path,
+            )
 
     def init_lowered_module(self):
-        assert (isinstance(self.model, torch.jit.ScriptFunction) or
-                self.model.training is False or
-                str(next(self.model.graph.inputs()).type()) == '__torch__.PlaceholderModule'), 'Model is in training model'
+        assert (
+            isinstance(self.model, torch.jit.ScriptFunction)
+            or self.model.training is False
+            or str(next(self.model.graph.inputs()).type()) == '__torch__.PlaceholderModule'
+        ), 'Model is in training model'
 
         graph = self.model.graph
 
@@ -201,15 +214,22 @@ class TFLiteConverter(object):
         self.input_transpose = input_transpose
 
     def init_common_graph(self):
-        graph_inputs = [x.debugName() for x in list(self.graph.inputs())][self.input_offset:]
+        graph_inputs = [x.debugName() for x in list(self.graph.inputs())][self.input_offset :]
         graph_outputs = [x.debugName() for x in list(self.graph.outputs())]
         self.common_graph.inputs.extend(graph_inputs)
         self.common_graph.outputs.extend(graph_outputs)
         self.common_graph.input_transpose.extend(self.input_transpose)
         tensors = []
         for i, node in enumerate(graph_inputs):
-            tensors.append(Tensor(self.dummy_input[i], node, has_buffer=False,
-                           asymmetric=not self.strict_symmetric_check, q_type=self.q_type))
+            tensors.append(
+                Tensor(
+                    self.dummy_input[i],
+                    node,
+                    has_buffer=False,
+                    asymmetric=not self.strict_symmetric_check,
+                    q_type=self.q_type,
+                )
+            )
         self.common_graph.add_nodes(tensors, ExtendedOperator.INPUT_NODE)
 
     def init_inputs(self):
@@ -221,7 +241,7 @@ class TFLiteConverter(object):
                 self.tensor_map[graph_inputs[i]] = self.dummy_input[i - self.input_offset]
 
     def unsupported_operations(self, unique=True) -> typing.List[str]:
-        """ Returns unsupported operations in the graph """
+        """Returns unsupported operations in the graph"""
 
         if self.graph is None:
             self.init_lowered_module()
@@ -250,7 +270,8 @@ class TFLiteConverter(object):
 
             converter_type = OPERATOR_CONVERTER_DICT.get(k, NoTrackOperator)
             converter = converter_type(node, self.tensor_map, not self.strict_symmetric_check, self.q_type)
-            # Don't track the operator if all the input nodes are not tracked unless it has custom implementation (e.g prim::* ops)
+            # Don't track the operator if all the input nodes are not tracked unless it has custom implementation
+            # (e.g prim::* ops)
             if converter_type.run == NoTrackOperator.run and converter_type != NoTrackOperator:
                 no_track_flag = True
                 for n in converter.input_names:
@@ -303,7 +324,7 @@ class TFLiteConverter(object):
         return NoTrackOperator.unpack_params(None, params)
 
     def convert(self):
-        """ Converts the model to the TFLite format
+        """Converts the model to the TFLite format
 
         Raises:
             Exception: If unsupported ops are found, an Exception will be raised
@@ -324,8 +345,9 @@ class TFLiteConverter(object):
             optimizer.optimize()
 
             if self.hybrid:
-                quantizer = HybridQuantizer(self.common_graph, self.hybrid_asymmetric_inputs,
-                                            self.q_type, self.hybrid_per_channel)
+                quantizer = HybridQuantizer(
+                    self.common_graph, self.hybrid_asymmetric_inputs, self.q_type, self.hybrid_per_channel
+                )
                 quantizer.quantize()
                 optimizer.cleanup_dead_nodes()
 
@@ -337,7 +359,7 @@ class TFLiteConverter(object):
         log.info(f'Generated model saved to {self.tflite_path}')
 
     def visualize(self, hide_constants=True):
-        """ Visualize the TinyNeuralNetwork Graph
+        """Visualize the TinyNeuralNetwork Graph
 
         Args:
             hide_constants (bool, optional): Hide the constant nodes in the graph. Defaults to True.
@@ -346,7 +368,7 @@ class TFLiteConverter(object):
         self.common_graph.visualize(hide_constants)
 
     def get_outputs(self):
-        """ Returns the output of the model, which is evaluated via tracing nodes one by one """
+        """Returns the output of the model, which is evaluated via tracing nodes one by one"""
 
         outputs = []
         for name in self.common_graph.outputs:
@@ -354,7 +376,7 @@ class TFLiteConverter(object):
         return outputs
 
     def get_value(self, name, default_val=None):
-        """ Returns the output according to the name of the node. If the name doesn't exist, `default_val` is returned """
+        """Returns the output according to the name of the node. If the name doesn't exist, `default_val` is returned"""
 
         if self.preserve_tensors:
             val = self.tensor_map_copies.get(name, default_val)
@@ -368,7 +390,7 @@ class TFLiteConverter(object):
         return val
 
     def tensor_names(self) -> typing.List[str]:
-        """ Returns the all the names of the intermediate tensors
+        """Returns the all the names of the intermediate tensors
 
         Returns:
             typing.List[str]: The names of the intermediate tensors
@@ -380,7 +402,7 @@ class TFLiteConverter(object):
             return list(self.tensor_map.keys())
 
     def inputs_for_tflite(self) -> typing.List[np.ndarray]:
-        """ Prepare inputs for the TFLite backend
+        """Prepare inputs for the TFLite backend
 
         Returns:
             typing.List[np.ndarray]: The input tensors

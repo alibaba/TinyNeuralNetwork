@@ -74,8 +74,9 @@ def main_worker(args):
     if args.warmup:
         print("Use warmup")
         context.warmup_iteration = len(context.train_loader) * 10  # warmup 10 epoch
-        context.warmup_scheduler = CyclicLR(context.optimizer, base_lr=0, max_lr=0.1,
-                                            step_size_up=context.warmup_iteration)
+        context.warmup_scheduler = CyclicLR(
+            context.optimizer, base_lr=0, max_lr=0.1, step_size_up=context.warmup_iteration
+        )
 
     if args.distillation:
         # The utilization of distillation may leads to better accuracy at the price of longer training time.

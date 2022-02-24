@@ -67,7 +67,9 @@ def main_worker(args):
 
     context = DLContext()
     context.device = device
-    context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size * 2 // 3, args.workers)
+    context.train_loader, context.val_loader = get_dataloader(
+        args.data_path, 224, args.batch_size * 2 // 3, args.workers
+    )
     context.max_epoch = 3
     context.criterion = nn.BCEWithLogitsLoss()
     context.optimizer = torch.optim.SGD(qat_model.parameters(), 0.01, momentum=0.9, weight_decay=5e-4)

@@ -12,7 +12,7 @@ log = get_logger(__name__)
 
 
 def tensor_config(tensors: typing.List[torch.Tensor], transpose: typing.List[bool], with_shape: bool) -> OrderedDict:
-    """ Generate the tensor info needed for the config file for the TinyNeuralNetwork converter
+    """Generate the tensor info needed for the config file for the TinyNeuralNetwork converter
 
     Args:
         tensors (typing.List[torch.Tensor]): The tensors to gather info
@@ -44,18 +44,24 @@ def tensor_config(tensors: typing.List[torch.Tensor], transpose: typing.List[boo
     return tensor_list
 
 
-def generate_converter_config(inputs: typing.List[torch.Tensor], outputs: typing.List[torch.Tensor],
-                              input_transpose: typing.Union[typing.Iterable[bool], bool],
-                              output_transpose: typing.Union[typing.Iterable[bool], bool],
-                              export_file: str, tflite_path: typing.Optional[str] = None,
-                              config_path: typing.Optional[str] = None):
+def generate_converter_config(
+    inputs: typing.List[torch.Tensor],
+    outputs: typing.List[torch.Tensor],
+    input_transpose: typing.Union[typing.Iterable[bool], bool],
+    output_transpose: typing.Union[typing.Iterable[bool], bool],
+    export_file: str,
+    tflite_path: typing.Optional[str] = None,
+    config_path: typing.Optional[str] = None,
+):
     """ Generate a config file that will work for the TinyNeuralNetwork converter
 
     Args:
         inputs (typing.List[torch.Tensor]): The input tensors
         outputs (typing.List[torch.Tensor]): The output tensors
-        input_transpose (typing.Union[typing.Iterable[bool], bool]): The flag whether to insert transpose after the input nodes
-        output_transpose (typing.Union[typing.Iterable[bool], bool]): The flag whether to insert transpose after the output nodes
+        input_transpose (typing.Union[typing.Iterable[bool], bool]): The flag whether to insert transpose after the \
+            input nodes
+        output_transpose (typing.Union[typing.Iterable[bool], bool]): The flag whether to insert transpose after the \
+            output nodes
         export_file (str): The path of the generate torchscript model
         tflite_path (str): The path of the generate tflite model. Defaults to None.
         config_path (str): The path of the generate config. Defaults to None.
@@ -75,12 +81,14 @@ def generate_converter_config(inputs: typing.List[torch.Tensor], outputs: typing
     if tflite_path is None:
         tflite_path = export_file.replace('.pt', '.tflite')
 
-    json_obj = OrderedDict({
-        'src_model': export_file,
-        'dst_model': tflite_path,
-        'inputs': tensor_config(inputs, input_transpose, True),
-        'outputs': tensor_config(outputs, output_transpose, False)
-    })
+    json_obj = OrderedDict(
+        {
+            'src_model': export_file,
+            'dst_model': tflite_path,
+            'inputs': tensor_config(inputs, input_transpose, True),
+            'outputs': tensor_config(outputs, output_transpose, False),
+        }
+    )
 
     if config_path is None:
         config_path = export_file.replace('.pt', '.json')
@@ -89,10 +97,14 @@ def generate_converter_config(inputs: typing.List[torch.Tensor], outputs: typing
         json.dump(json_obj, f, indent=4)
 
 
-def export_converter_files(model: nn.Module, dummy_input: typing.Union[torch.Tensor, typing.Iterable[torch.Tensor]],
-                           export_dir: typing.Optional[str] = None, model_name: typing.Optional[str] = None,
-                           input_transpose: typing.Optional[typing.Union[bool, typing.Iterable[bool]]] = None,
-                           dump_graph: bool = False):
+def export_converter_files(
+    model: nn.Module,
+    dummy_input: typing.Union[torch.Tensor, typing.Iterable[torch.Tensor]],
+    export_dir: typing.Optional[str] = None,
+    model_name: typing.Optional[str] = None,
+    input_transpose: typing.Optional[typing.Union[bool, typing.Iterable[bool]]] = None,
+    dump_graph: bool = False,
+):
     """ Automatically generate required files for the model converter
 
     Args:
@@ -100,8 +112,8 @@ def export_converter_files(model: nn.Module, dummy_input: typing.Union[torch.Ten
         dummy_input (typing.Union[torch.Tensor, typing.Iterable[torch.Tensor]]): A viable input to the model
         export_dir (typing.Optional[str], optional): Directory to use for exporting. Defaults to None(os.getcwd()).
         model_name (typing.Optional[str], optional): File name for exporting. Defaults to None("jit_model").
-        input_transpose (typing.Optional[typing.Union[bool, typing.Iterable[bool]]], optional): Whether to transpose the input(s). \
-            Defaults to None(True for 4d-input, False otherwise).
+        input_transpose (typing.Optional[typing.Union[bool, typing.Iterable[bool]]], optional): Whether to transpose \
+            the input(s). Defaults to None(True for 4d-input, False otherwise).
         dump_graph (bool, optional): Whether to print the traced graph. Defaults to False.
     """
 
@@ -178,8 +190,10 @@ def data_to_pytorch(inputs, input_transpose):
     return torch_inputs
 
 
-def parse_config(json_file: str, prepare_inputs: bool = True) -> typing.Tuple[str, str, typing.List[bool], typing.List[torch.Tensor]]:
-    """ Parses the configuration file for converter
+def parse_config(
+    json_file: str, prepare_inputs: bool = True
+) -> typing.Tuple[str, str, typing.List[bool], typing.List[torch.Tensor]]:
+    """Parses the configuration file for converter
 
     Args:
         json_file (str): The path of the configuration file

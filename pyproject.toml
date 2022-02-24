@@ -1,0 +1,33 @@
+[tool.isort]
+profile = "black"
+
+[tool.pylint.messages_control]
+disable = "C0330, C0326"
+
+[tool.pylint.format]
+max-line-length = "120"
+
+[tool.black]
+line-length = 120
+experimental-string-processing = true
+target-version = ['py36', 'py37', 'py38', 'py39']
+include = '\.pyi?$'
+skip-string-normalization = true
+extend-exclude = '''
+^/.git
+| ^/docs
+| ^/examples/qat/out/
+| ^/examples/tracer/out
+| ^/examples/mixed_qat/mobilenet_mixed_qat\.py
+| ^/examples/models
+| ^/models
+| ^/myenv
+| ^/tests/models/
+| ^/tests/out/
+| ^/build/
+| ^/debugging/
+| ^/tinynn/converter/operators/tflite/generated_ops\.py
+| ^/tinynn/converter/operators/torch/aten_schema\.py
+| ^/tinynn/converter/operators/torch/quantized_schema\.py
+| ^/tinynn/converter/operators/torch/torchvision_schema\.py
+'''

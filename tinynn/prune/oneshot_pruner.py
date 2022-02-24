@@ -23,7 +23,7 @@ class OneShotChannelPruner(BasePruner):
     metric_func: typing.Callable[[torch.Tensor, torch.nn.Module], float]
 
     def __init__(self, model, dummy_input, config):
-        """ Constructs a new OneShotPruner (including random, l1_norm, l2_norm, fpgm)
+        """Constructs a new OneShotPruner (including random, l1_norm, l2_norm, fpgm)
 
         Args:
             model: The model to be pruned
@@ -43,9 +43,14 @@ class OneShotChannelPruner(BasePruner):
 
         for n in self.graph.forward_nodes:
             # Only prune the specific operators
-            if (n.type() in [nn.Conv2d, nn.ConvTranspose2d, nn.Conv1d, nn.ConvTranspose1d]
-                    and not is_dw_conv(n.module)) or (n.type() in [nn.Linear]) \
-                    or (n.type() in [nn.RNN, nn.GRU, nn.LSTM] and len(n.prev_tensors) == 1):
+            if (
+                (
+                    n.type() in [nn.Conv2d, nn.ConvTranspose2d, nn.Conv1d, nn.ConvTranspose1d]
+                    and not is_dw_conv(n.module)
+                )
+                or (n.type() in [nn.Linear])
+                or (n.type() in [nn.RNN, nn.GRU, nn.LSTM] and len(n.prev_tensors) == 1)
+            ):
                 self.center_nodes.append(n)
                 if n.unique_name not in self.sparsity:
                     self.sparsity[n.unique_name] = self.default_sparsity
@@ -78,7 +83,7 @@ class OneShotChannelPruner(BasePruner):
                         self.sparsity[m.unique_name()] = 0.0
 
     def parse_config(self):
-        """ Parses the context and copy the needed items to the pruner """
+        """Parses the context and copy the needed items to the pruner"""
 
         super().parse_config()
 
@@ -109,15 +114,15 @@ class OneShotChannelPruner(BasePruner):
             raise Exception(f'{metrics} is not a known metrics for {type(self).__name__}')
 
     def prune(self):
-        """ The main function for pruning.
-            As for oneshot pruning, it is simply calculating the masks (`register_mask`) and them apply them (`apply_mask`).
+        """The main function for pruning.
+        As for oneshot pruning, it is simply calculating the masks (`register_mask`) and them apply them (`apply_mask`).
         """
 
         self.register_mask()
         self.apply_mask()
 
     def register_mask(self):
-        """ Computes the mask for the parameters in the model and register them through the maskers """
+        """Computes the mask for the parameters in the model and register them through the maskers"""
 
         for sub_graph in self.graph_modifier.sub_graphs:
             importance = {}
@@ -130,7 +135,7 @@ class OneShotChannelPruner(BasePruner):
             modifier.register_sub_masker(sub_graph, importance, self.sparsity)
 
     def apply_mask(self):
-        """ Applies the masks for the parameters and updates the shape and properties of the tensors and modules """
+        """Applies the masks for the parameters and updates the shape and properties of the tensors and modules"""
 
         for modifiers in self.graph_modifier.sub_graphs:
             for m in modifiers:
@@ -144,7 +149,7 @@ class OneShotChannelPruner(BasePruner):
                 dist.broadcast(ps, 0)
 
     def generate_config(self, path: str) -> None:
-        """ Generates a new copy the updated configuration with the given path """
+        """Generates a new copy the updated configuration with the given path"""
 
         config = copy.deepcopy(self.config)
         config['sparsity'] = dict()
@@ -154,7 +159,7 @@ class OneShotChannelPruner(BasePruner):
         super().generate_config(path, config)
 
     def reset(self) -> None:
-        """ Regenerate the TraceGraph and the Graph Modifier when they are invalidated """
+        """Regenerate the TraceGraph and the Graph Modifier when they are invalidated"""
 
         self.graph = self.trace()
         self.center_nodes.clear()

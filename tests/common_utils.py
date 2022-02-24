@@ -55,7 +55,7 @@ def prepare_inputs(model):
         input_shape = (1, 3, 224, 224)
 
     if type(input_shape[0]) not in (tuple, list):
-        input_shape = (input_shape, )
+        input_shape = (input_shape,)
 
     inputs = []
     for shape in input_shape:

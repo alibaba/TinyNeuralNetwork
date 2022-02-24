@@ -30,16 +30,18 @@ class QPReLU(nn.Module):
         if self.weight.numel() == 1:
             weight = self.weight.view(())
         else:
-            weight_shape = self.weight.shape + (1, ) * (input.dim() - 2)
+            weight_shape = self.weight.shape + (1,) * (input.dim() - 2)
             weight = self.weight.view(*weight_shape)
 
         weight_q = self.quant(weight)
         x2 = self.f_mul_alpha.mul(
-            weight_q, self.f_mul_neg_one2.mul_scalar(
+            weight_q,
+            self.f_mul_neg_one2.mul_scalar(
                 self.relu2(
                     self.f_mul_neg_one1.mul_scalar(input, -1.0),
                 ),
-                -1.0)
+                -1.0,
+            ),
         )
 
         x = self.f_add.add(x1, x2)

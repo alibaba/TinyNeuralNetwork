@@ -21,6 +21,7 @@ from common_utils import collect_custom_models, collect_torchvision_models, prep
 HAS_TF = False
 try:
     import tensorflow as tf
+
     HAS_TF = True
 except ImportError:
     pass
@@ -59,13 +60,28 @@ def get_tflite_out(model_path, inputs):
 # resnext: group convs
 # regnet: group convs
 # yolov4: 5-d slices
-BLACKLIST = ('resnext50_32x4d', 'resnext101_32x8d', 'Build_Model', 'regnet_x_16gf', 'regnet_x_1_6gf', 'regnet_x_32gf',
-             'regnet_x_3_2gf', 'regnet_x_400mf', 'regnet_x_800mf', 'regnet_x_8gf', 'regnet_y_16gf', 'regnet_y_1_6gf',
-             'regnet_y_32gf', 'regnet_y_3_2gf', 'regnet_y_400mf', 'regnet_y_800mf', 'regnet_y_8gf')
+BLACKLIST = (
+    'resnext50_32x4d',
+    'resnext101_32x8d',
+    'Build_Model',
+    'regnet_x_16gf',
+    'regnet_x_1_6gf',
+    'regnet_x_32gf',
+    'regnet_x_3_2gf',
+    'regnet_x_400mf',
+    'regnet_x_800mf',
+    'regnet_x_8gf',
+    'regnet_y_16gf',
+    'regnet_y_1_6gf',
+    'regnet_y_32gf',
+    'regnet_y_3_2gf',
+    'regnet_y_400mf',
+    'regnet_y_800mf',
+    'regnet_y_8gf',
+)
 
 
 class TestModelMeta(type):
-
     @classmethod
     def __prepare__(mcls, name, bases):
         d = dict()
@@ -122,8 +138,9 @@ class TestModelMeta(type):
 
                 out_path = f'out/{model_file}.tflite'
                 out_pt = f'out/{model_file}.pt'
-                converter = TFLiteConverter(qat_model, inputs, out_path, dump_jit_model_path=out_pt,
-                                            gc_when_reload=True)
+                converter = TFLiteConverter(
+                    qat_model, inputs, out_path, dump_jit_model_path=out_pt, gc_when_reload=True
+                )
                 converter.convert()
 
                 os.remove(out_pt)

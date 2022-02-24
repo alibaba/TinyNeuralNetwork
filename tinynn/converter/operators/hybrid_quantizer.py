@@ -59,9 +59,11 @@ class HybridQuantizer(object):
 
 
 def is_quantizable_node(vertex: ig.Vertex):
-    return vertex['node_type'] in (ExtendedOperator.CONV_2D,
-                                   ExtendedOperator.DEPTHWISE_CONV_2D,
-                                   ExtendedOperator.FULLY_CONNECTED)
+    return vertex['node_type'] in (
+        ExtendedOperator.CONV_2D,
+        ExtendedOperator.DEPTHWISE_CONV_2D,
+        ExtendedOperator.FULLY_CONNECTED,
+    )
 
 
 def quantize(name, tensor, dtype, qscheme, axis=None, q_type=np.uint8):

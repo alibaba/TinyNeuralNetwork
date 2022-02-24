@@ -41,8 +41,14 @@ class ModifierTester(unittest.TestCase):
             import timm
         except ImportError:
             print('Timm can not find!')
-        model_list = ['gluon_xception65', 'resnest14d', 'legacy_seresnet18', 'inception_v4', 'resnest14d',
-                      'mnasnet_050']
+        model_list = [
+            'gluon_xception65',
+            'resnest14d',
+            'legacy_seresnet18',
+            'inception_v4',
+            'resnest14d',
+            'mnasnet_050',
+        ]
         for model_name in model_list:
             print(f"prune {model_name} ing!\n")
             model = timm.create_model(model_name, pretrained=False)

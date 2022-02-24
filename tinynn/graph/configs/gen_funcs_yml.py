@@ -5,8 +5,7 @@ import operator
 import torch
 import torchvision.ops
 import yaml
-from torch.overrides import (get_ignored_functions, get_overridable_functions,
-                             get_testing_overrides)
+from torch.overrides import get_ignored_functions, get_overridable_functions, get_testing_overrides
 
 # TODO: Better detection
 
@@ -96,7 +95,7 @@ for f, s in func_dict.items():
     rdot = fullname.rfind('.')
 
     ns = fullname[:rdot]
-    func = fullname[rdot + 1:]
+    func = fullname[rdot + 1 :]
 
     final_dict.setdefault(ns, [])
     final_dict[ns].append(func)

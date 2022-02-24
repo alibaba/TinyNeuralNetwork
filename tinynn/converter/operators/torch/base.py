@@ -142,7 +142,9 @@ class OperatorConverter(ABC):
         else:
             self.output_tensors.extend(o)
 
-    def to_tfl_tensors(self, names, tensors, has_buffers=None, graph_converter=None, non_existent_as_buffer=False) -> typing.List[tfl.Tensor]:
+    def to_tfl_tensors(
+        self, names, tensors, has_buffers=None, graph_converter=None, non_existent_as_buffer=False
+    ) -> typing.List[tfl.Tensor]:
         tfl_tensors = []
         if has_buffers is None:
             has_buffers = [None] * len(tensors)
@@ -154,8 +156,9 @@ class OperatorConverter(ABC):
                 if graph_converter is not None and n in graph_converter.tensor_map:
                     t = graph_converter.tensor_map[n]
                 else:
-                    t = tfl.Tensor(t, n, has_buffer=non_existent_as_buffer,
-                                   asymmetric=self.asymmetric, q_type=self.q_type)
+                    t = tfl.Tensor(
+                        t, n, has_buffer=non_existent_as_buffer, asymmetric=self.asymmetric, q_type=self.q_type
+                    )
             else:
                 t = tfl.Tensor(t, n, has_buffer=b, asymmetric=self.asymmetric, q_type=self.q_type)
             tfl_tensors.append(t)
@@ -191,8 +194,9 @@ class OperatorConverter(ABC):
     def create_transform_tensor(self, tensor, name=None, quantization=None):
         if name is None:
             name = self.get_unique_transform_name()
-        return tfl.Tensor(tensor, name, has_buffer=False, quantization=quantization,
-                          asymmetric=self.asymmetric, q_type=self.q_type)
+        return tfl.Tensor(
+            tensor, name, has_buffer=False, quantization=quantization, asymmetric=self.asymmetric, q_type=self.q_type
+        )
 
     def create_attr_tensor(self, tensor, name=None):
         if name is None:
@@ -207,7 +211,9 @@ class OperatorConverter(ABC):
         state = params.__getstate__()
         return result, state
 
-    def rescale_weight_scale_for_qnnpack(self, input_tensor: tfl.Tensor, weight_tensor: tfl.Tensor, output_tensor: tfl.Tensor):
+    def rescale_weight_scale_for_qnnpack(
+        self, input_tensor: tfl.Tensor, weight_tensor: tfl.Tensor, output_tensor: tfl.Tensor
+    ):
         updated = False
         orig_scale = weight_tensor.quantization.scale
         while True:
@@ -268,8 +274,14 @@ class OperatorConverter(ABC):
                     inp_t = self.find_or_create_input(i, graph_converter)
                     if inp_t.buffer is None:
                         new_inp = self.create_transform_tensor(casted)
-                        graph_converter.add_operator(tfl.CastOperator(
-                            [inp_t], [new_inp], tfl.torch_tflite_dtype_mappings[t.dtype], tfl.torch_tflite_dtype_mappings[result_dtype]))
+                        graph_converter.add_operator(
+                            tfl.CastOperator(
+                                [inp_t],
+                                [new_inp],
+                                tfl.torch_tflite_dtype_mappings[t.dtype],
+                                tfl.torch_tflite_dtype_mappings[result_dtype],
+                            )
+                        )
                         self.input_names[i] = new_inp.name
                     self.input_tensors[i] = casted
 
@@ -286,7 +298,9 @@ class OperatorConverter(ABC):
 
         graph_converter.add_operator(tfl.ReshapeOperator(inputs, outputs, new_shape))
 
-    def wrap_ops_with_dequant_quants(self, ops: typing.List[tfl.BaseOperator], input_idx: int = 0, output_idx: int = 0) -> typing.List[tfl.BaseOperator]:
+    def wrap_ops_with_dequant_quants(
+        self, ops: typing.List[tfl.BaseOperator], input_idx: int = 0, output_idx: int = 0
+    ) -> typing.List[tfl.BaseOperator]:
         orig_input = ops[0].inputs[input_idx]
         orig_output = ops[-1].outputs[output_idx]
 
@@ -301,7 +315,9 @@ class OperatorConverter(ABC):
 
         return [dequant_op] + ops + [quant_op]
 
-    def wrap_ops_with_2d_3d_reshapes(self, ops: typing.List[tfl.BaseOperator], input_idx: int = 0, output_idx: int = 0) -> typing.List[tfl.BaseOperator]:
+    def wrap_ops_with_2d_3d_reshapes(
+        self, ops: typing.List[tfl.BaseOperator], input_idx: int = 0, output_idx: int = 0
+    ) -> typing.List[tfl.BaseOperator]:
         orig_input = ops[0].inputs[input_idx]
         orig_output = ops[-1].outputs[output_idx]
 
@@ -311,10 +327,12 @@ class OperatorConverter(ABC):
         input_shape_tensor = self.create_attr_tensor(input_shape)
         output_shape_tensor = self.create_attr_tensor(output_shape)
 
-        new_input = self.create_transform_tensor(orig_input.tensor.reshape(
-            input_shape), quantization=orig_input.quantization)
-        new_output = self.create_transform_tensor(orig_output.tensor.reshape(
-            output_shape[1:]), quantization=orig_output.quantization)
+        new_input = self.create_transform_tensor(
+            orig_input.tensor.reshape(input_shape), quantization=orig_input.quantization
+        )
+        new_output = self.create_transform_tensor(
+            orig_output.tensor.reshape(output_shape[1:]), quantization=orig_output.quantization
+        )
 
         input_reshape_op = tfl.ReshapeOperator([orig_input, input_shape_tensor], [new_input], input_shape)
         output_reshape_op = tfl.ReshapeOperator([new_output, output_shape_tensor], [orig_output], output_shape)
@@ -324,7 +342,9 @@ class OperatorConverter(ABC):
 
         return [input_reshape_op] + ops + [output_reshape_op]
 
-    def wrap_ops_with_nhwc_nchw_transposes(self, ops: typing.List[tfl.BaseOperator], input_idx: int = 0, output_idx: int = 0) -> typing.List[tfl.BaseOperator]:
+    def wrap_ops_with_nhwc_nchw_transposes(
+        self, ops: typing.List[tfl.BaseOperator], input_idx: int = 0, output_idx: int = 0
+    ) -> typing.List[tfl.BaseOperator]:
         orig_input = ops[0].inputs[input_idx]
         orig_output = ops[-1].outputs[output_idx]
 
@@ -334,10 +354,12 @@ class OperatorConverter(ABC):
         nhwc2nchw_perm_tensor = self.create_attr_tensor(nhwc2nchw_perm)
         nchw2nhwc_perm_tensor = self.create_attr_tensor(nchw2nhwc_perm)
 
-        new_input = self.create_transform_tensor(np.transpose(
-            orig_input.tensor, nchw2nhwc_perm), quantization=orig_input.quantization)
-        new_output = self.create_transform_tensor(np.transpose(
-            orig_output.tensor, nchw2nhwc_perm), quantization=orig_output.quantization)
+        new_input = self.create_transform_tensor(
+            np.transpose(orig_input.tensor, nchw2nhwc_perm), quantization=orig_input.quantization
+        )
+        new_output = self.create_transform_tensor(
+            np.transpose(orig_output.tensor, nchw2nhwc_perm), quantization=orig_output.quantization
+        )
 
         nchw2nhwc_transpose = tfl.TransposeOperator([orig_input, nchw2nhwc_perm_tensor], [new_input])
         nhwc2nchw_transpose = tfl.TransposeOperator([new_output, nhwc2nchw_perm_tensor], [orig_output])
@@ -383,13 +405,17 @@ class OperatorConverter(ABC):
             pad_input = ops[fill_nan_index - 1].outputs[0]
             if pad_input.quantization is not None:
                 if self.q_type == np.uint8:
-                    constant_arr = tfl.FakeQuantTensor(np.zeros(1, dtype=pad_input.dtype),
-                                                       pad_input.quantization.scale,
-                                                       pad_input.quantization.zero_point)
+                    constant_arr = tfl.FakeQuantTensor(
+                        np.zeros(1, dtype=pad_input.dtype),
+                        pad_input.quantization.scale,
+                        pad_input.quantization.zero_point,
+                    )
                 else:
-                    constant_arr = tfl.FakeQuantTensor(np.array([-128], dtype=pad_input.dtype),
-                                                       pad_input.quantization.scale,
-                                                       pad_input.quantization.zero_point)
+                    constant_arr = tfl.FakeQuantTensor(
+                        np.array([-128], dtype=pad_input.dtype),
+                        pad_input.quantization.scale,
+                        pad_input.quantization.zero_point,
+                    )
             else:
                 constant_arr = np.array([nan], dtype='float32')
             constant_tensor = self.create_attr_tensor(constant_arr)
@@ -436,12 +462,17 @@ class OperatorConverter(ABC):
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
         if len(outputs) > 1:
-            log.warning('Reduce ops like `torch.min` have multiple outputs. However, only the first '
-                        'output will be preserved in our converter. If you need that tensor, please '
-                        'use the `torch.argmin` instead.')
+            log.warning(
+                'Reduce ops like `torch.min` have multiple outputs. However, only the first '
+                'output will be preserved in our converter. If you need that tensor, please '
+                'use the `torch.argmin` instead.'
+            )
             outputs = outputs[:1]
 
-        if hasattr(converter_class, '__init__') and 'keepDims' in inspect.signature(converter_class.__init__).parameters:
+        if (
+            hasattr(converter_class, '__init__')
+            and 'keepDims' in inspect.signature(converter_class.__init__).parameters
+        ):
             ops.append(converter_class(inputs, outputs, keep_dim, *args, **kwargs))
         else:
             if keep_dim:
@@ -463,8 +494,9 @@ class OperatorConverter(ABC):
                 nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
                 nchw2nhwc_perm_tensor = self.create_attr_tensor(nchw2nhwc_perm)
 
-                new_input = self.create_transform_tensor(np.transpose(
-                    orig_input.tensor, nchw2nhwc_perm), quantization=orig_input.quantization)
+                new_input = self.create_transform_tensor(
+                    np.transpose(orig_input.tensor, nchw2nhwc_perm), quantization=orig_input.quantization
+                )
 
                 nchw2nhwc_transpose = tfl.TransposeOperator([orig_input, nchw2nhwc_perm_tensor], [new_input])
 
@@ -510,9 +542,13 @@ def get_prop_from_node(node, prop, assert_type=None, return_type=False):
         elif vk == 't':
             v = getattr(node, vk)(prop)
             if v.dtype == torch.float64:
-                log.warning(f'{output_name} is of type float64, which is unsupported in TFLite, trying to downcast to float32')
+                log.warning(
+                    f'{output_name} is of type float64, which is unsupported in TFLite, trying to downcast to float32'
+                )
                 v = v.to(dtype=torch.float32)
-        elif node.output().type().isSubtypeOf(torch._C.ListType.ofInts()) or node.output().type().isSubtypeOf(torch._C.ListType.ofFloats()):
+        elif node.output().type().isSubtypeOf(torch._C.ListType.ofInts()) or node.output().type().isSubtypeOf(
+            torch._C.ListType.ofFloats()
+        ):
             v = node.output().toIValue()
         elif vk == 'ival':
             v = node.output().toIValue()
@@ -538,25 +574,31 @@ def get_pool_ceil_padding(input, kernel_size, stride, padding):
     # Copied from the PyTorch repo
     # https://github.com/pytorch/pytorch/blob/master/torch/onnx/symbolic_opset9.py
     sizes = input.shape
-    dim = sizes[-len(padding):] if sizes is not None else None
-    ceiled_output_dim = [int(math.ceil((dim[i] + 2 * padding[i] - kernel_size[i]) / float(stride[i]))) + 1
-                         for i in range(0, len(padding))]
+    dim = sizes[-len(padding) :] if sizes is not None else None
+    ceiled_output_dim = [
+        int(math.ceil((dim[i] + 2 * padding[i] - kernel_size[i]) / float(stride[i]))) + 1
+        for i in range(0, len(padding))
+    ]
     # ensure last pooling starts inside
-    ceiled_output_dim = [ceiled_output_dim[i] - 1
-                         if (((ceiled_output_dim[i] - 1) * stride[i]) >= (dim[i] + padding[i]))
-                         else ceiled_output_dim[i]
-                         for i in range(0, len(ceiled_output_dim))]
-    padding_ceil = [0
-                    if (stride[i] == 1)
-                    else
-                    (kernel_size[i] - (dim[i] + 2 * padding[i] - ((ceiled_output_dim[i] - 1) * stride[i] + 1)))
-                    for i in range(0, len(padding))]
+    ceiled_output_dim = [
+        ceiled_output_dim[i] - 1
+        if (((ceiled_output_dim[i] - 1) * stride[i]) >= (dim[i] + padding[i]))
+        else ceiled_output_dim[i]
+        for i in range(0, len(ceiled_output_dim))
+    ]
+    padding_ceil = [
+        0
+        if (stride[i] == 1)
+        else (kernel_size[i] - (dim[i] + 2 * padding[i] - ((ceiled_output_dim[i] - 1) * stride[i] + 1)))
+        for i in range(0, len(padding))
+    ]
     # ensure padding is not > kernel_size
-    padding_ceil = [(int(padding_ceil[i]) if padding_ceil[i] < kernel_size[i] - 1 else int(kernel_size[i] - 1))
-                    if ((padding_ceil[i] + 2 * padding[i]) >= (kernel_size[i]))
-                    else
-                    int(padding_ceil[i])
-                    for i in range(0, len(padding_ceil))]
+    padding_ceil = [
+        (int(padding_ceil[i]) if padding_ceil[i] < kernel_size[i] - 1 else int(kernel_size[i] - 1))
+        if ((padding_ceil[i] + 2 * padding[i]) >= (kernel_size[i]))
+        else int(padding_ceil[i])
+        for i in range(0, len(padding_ceil))
+    ]
     return padding_ceil
 
 

@@ -30,6 +30,7 @@ def main_worker(args):
     # The modification method can refer to mobilenet_qat.py
     with model_tracer():
         from mobilenet_mixed_qat import Mobilenet_qat
+
         qat_mobilenet = Mobilenet_qat()
         qat_mobilenet.load_state_dict(torch.load("./out/mobilenet_qat.pth"))
 

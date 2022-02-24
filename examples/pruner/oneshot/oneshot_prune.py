@@ -11,9 +11,13 @@ sys.path.append('../../../')
 from examples.models.cifar10 import mobilenet
 from tinynn.prune import OneShotChannelPruner
 from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate
-from tinynn.util.distributed_util import (deinit_distributed, get_device,
-                                          init_distributed, is_distributed,
-                                          is_main_process)
+from tinynn.util.distributed_util import (
+    deinit_distributed,
+    get_device,
+    init_distributed,
+    is_distributed,
+    is_main_process,
+)
 from tinynn.util.train_util import DLContext, train
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
@@ -49,8 +53,9 @@ def main_worker(args):
 
     context = DLContext()
     context.device = device
-    context.train_loader, context.val_loader = get_dataloader(args.data_path, 224,
-                                                              args.batch_size, args.workers, distributed)
+    context.train_loader, context.val_loader = get_dataloader(
+        args.data_path, 224, args.batch_size, args.workers, distributed
+    )
     validate(model, context)
 
     # (Optional) Use SyncBN to get better performance in distributed training

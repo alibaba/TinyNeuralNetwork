@@ -3,7 +3,7 @@ import torch.distributed as dist
 
 
 def is_distributed(args: dict) -> bool:
-    """ Whether DDP is activated
+    """Whether DDP is activated
 
     Args:
         args (dict): The arguments passed in
@@ -16,7 +16,7 @@ def is_distributed(args: dict) -> bool:
 
 
 def is_main_process(args: dict):
-    """ Whether the process is running as the main process
+    """Whether the process is running as the main process
 
     Args:
         args (dict): The arguments passed in
@@ -29,7 +29,7 @@ def is_main_process(args: dict):
 
 
 def init_distributed(args: dict):
-    """ Initializes the DDP process pool and sets the default device
+    """Initializes the DDP process pool and sets the default device
 
     Args:
         args (dict): The arguments passed in
@@ -41,7 +41,7 @@ def init_distributed(args: dict):
 
 
 def get_device(args: dict) -> torch.device:
-    """ Gets the default device
+    """Gets the default device
 
     Args:
         args (dict): The arguments passed in
@@ -61,7 +61,7 @@ def get_device(args: dict) -> torch.device:
 
 
 def deinit_distributed(args: dict):
-    """ Cleanups ddp process group
+    """Cleanups ddp process group
 
     Args:
         args (dict): The arguments passed in

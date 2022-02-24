@@ -23,22 +23,27 @@ def main_worker(args):
         # Provide a viable input for the model
         dummy_input = torch.rand((1, 3, 224, 224))
 
-        # TinyNeuralNetwork provides a QATQuantizer class that may rewrite the graph for and perform model fusion for quantization
-        # The model returned by the `quantize` function is ready for QAT training
+        # TinyNeuralNetwork provides a QATQuantizer class that may rewrite the graph for and perform model fusion for
+        # quantization. The model returned by the `quantize` function is ready for QAT.
         # By default, the rewritten model (in the format of a single file) will be generated in the working directory.
-        # You may also pass some custom configuration items through the argument `config` in the following line.
-        # For example, if you have a QAT-ready model (e.g models in torchvision.models.quantization), then you may use the following line.
+        # You may also pass some custom configuration items through the argument `config` in the following line. For
+        # example, if you have a QAT-ready model (e.g models in torchvision.models.quantization),
+        # then you may use the following line.
         #   quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'rewrite_graph': False})
-        # Alternatively, if you have modified the generated model description file and want the quantizer to load it instead, then use the code below.
-        #   quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'force_overwrite': False, 'is_input_quantized': None})
-        # The `is_input_quantized` in the previous line is a flag on the input tensors whether they are quantized or not,
-        # which can be None (False for all inputs) or a list of booleans that corresponds to the inputs.
+        # Alternatively, if you have modified the generated model description file and want the quantizer to load it
+        # instead, then use the code below.
+        #     quantizer = QATQuantizer(
+        #         model, dummy_input, work_dir='out', config={'force_overwrite': False, 'is_input_quantized': None}
+        #     )
+        # The `is_input_quantized` in the previous line is a flag on the input tensors whether they are quantized or
+        # not, which can be None (False for all inputs) or a list of booleans that corresponds to the inputs.
         # Also, we support multiple qschemes for quantization preparation. There are several common choices.
         #   a. Asymmetric uint8. (default) config={'asymmetric': True, 'per_tensor': True}
         #      The is the most common choice and also conforms to the legacy TFLite quantization spec.
         #   b. Asymmetric int8. config={'asymmetric': True, 'per_tensor': False}
-        #      The conforms to the new TFLite quantization spec. In legacy TF versions, this is usually used in post quantization.
-        #      Compared with (a), it has support for per-channel quantization in supported kernels (e.g Conv), while (a) does not.
+        #      The conforms to the new TFLite quantization spec. In legacy TF versions, this is usually used in post
+        #      quantization. Compared with (a), it has support for per-channel quantization in supported kernels
+        #      (e.g Conv), while (a) does not.
         #   c. Symmetric int8. config={'asymmetric': False, 'per_tensor': False}
         #      The is same to (b) with no offsets, which may be used on some low-end embedded chips.
         #   d. Symmetric uint8. config={'asymmetric': False, 'per_tensor': True}

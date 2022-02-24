@@ -83,7 +83,7 @@ def random(tensor, module):
 
 
 def l1_norm(tensor, module):
-    """ Calculate the L1-normalization of each channel """
+    """Calculate the L1-normalization of each channel"""
     if type(module) in [nn.Conv2d]:
         return torch.norm(tensor, p=1, dim=[1, 2, 3])
     if type(module) in [nn.Conv1d]:
@@ -100,7 +100,7 @@ def l1_norm(tensor, module):
 
 
 def l2_norm(tensor, module):
-    """ Calculate the L2-normalization of each channel """
+    """Calculate the L2-normalization of each channel"""
     if type(module) in [nn.Conv2d]:
         return torch.norm(tensor, p=2, dim=[1, 2, 3])
     if type(module) in [nn.Conv1d]:
@@ -117,8 +117,8 @@ def l2_norm(tensor, module):
 
 
 def fpgm(tensor, module):
-    """ Calculate the geometric median (Filter Pruning via Geometric Median for Deep Convolutional Neural
-    Networks Acceleration, https://arxiv.org/abs/1811.00250) """
+    """Calculate the geometric median (Filter Pruning via Geometric Median for Deep Convolutional Neural
+    Networks Acceleration, https://arxiv.org/abs/1811.00250)"""
     assert type(module) in [nn.Linear, nn.Conv2d]
     num_channels = tensor.shape[0]
     batched_weight = tensor.view(num_channels, -1)
@@ -126,7 +126,7 @@ def fpgm(tensor, module):
 
 
 def is_dw_conv(module):
-    """ Check whether the model is depth-wise convolution """
+    """Check whether the model is depth-wise convolution"""
     if isinstance(module, (nn.Conv2d, nn.ConvTranspose2d, nn.Conv1d, nn.ConvTranspose1d)):
         if module.in_channels == module.groups == module.out_channels:
             return True
@@ -134,12 +134,12 @@ def is_dw_conv(module):
 
 
 def lcm(denominators):
-    """ least common multiple """
+    """least common multiple"""
     return reduce(lambda a, b: a * b // math.gcd(a, b), denominators)
 
 
 def gate_size(module: nn.Module) -> int:
-    """ the gate size of the recurrent modules """
+    """the gate size of the recurrent modules"""
     if isinstance(module, nn.RNN):
         return 1
     elif isinstance(module, nn.GRU):
@@ -214,7 +214,7 @@ def list_group(flatten_list, offset_list):
     """list_flatten的逆操作"""
     pos_lists = []
     for offset in offset_list:
-        pos_lists.append(flatten_list[offset[0]:offset[1]])
+        pos_lists.append(flatten_list[offset[0] : offset[1]])
     return pos_lists
 
 
@@ -256,8 +256,9 @@ class Modifier(object):
         if hasattr(self.module(), "weight"):
             self.weight_mask["weight"] = torch.ones_like(self.module().weight)
         if hasattr(self.module(), "bias"):
-            self.bias_mask["bias"] = torch.ones_like(self.module().bias) if type(
-                self.module().bias) is torch.nn.Parameter else None
+            self.bias_mask["bias"] = (
+                torch.ones_like(self.module().bias) if type(self.module().bias) is torch.nn.Parameter else None
+            )
 
     def traversal(self, input_modify: bool, output_modify: bool, sub_graph):
         pass
@@ -289,6 +290,7 @@ class IdxMap(object):
     表示conv1的8号通道对应节点n的第1个通道。由于存在分组的情况(group convolution, split等算子），
     我们需要将通道进行分组再计算删除的通道位置，所以IdxMap的格式为[[...],[...],[...],[...]]表示多个group
     """
+
     map_dict: typing.Dict[str, typing.List]
 
     def __init__(self):
@@ -298,7 +300,7 @@ class IdxMap(object):
         self.map_dict[unique_name] = idxs
 
     def get_grouped_idx(self, group):
-        """Group the index (only use for leaf node) """
+        """Group the index (only use for leaf node)"""
 
         new_dict = {}
         for k, v in self.map_dict.items():
@@ -340,7 +342,7 @@ class IdxMap(object):
 
 
 class ChannelModifier(Modifier):
-    """ Automatically handle the dependency of the operator and modify the number of channels """
+    """Automatically handle the dependency of the operator and modify the number of channels"""
 
     def __init__(self, node: TraceNode = None):
         super().__init__(node=node)
@@ -356,7 +358,7 @@ class ChannelModifier(Modifier):
         return self.node.module.masker if hasattr(self.node.module, "masker") else None
 
     def apply_mask(self):
-        """ Use mask to modify the channel of the operator """
+        """Use mask to modify the channel of the operator"""
 
         if self.masker() is not None and self.masker().in_remove_idx is not None:
             self.modify_input(self.masker().in_remove_idx)
@@ -367,11 +369,11 @@ class ChannelModifier(Modifier):
         self.mask_applied = True
 
     def modify_input(self, remove_idx):
-        """ Modify the input channel of the operator """
+        """Modify the input channel of the operator"""
         pass
 
     def modify_output(self, remove_idx):
-        """ Modify the output channel of the operator """
+        """Modify the output channel of the operator"""
         pass
 
     def in_channel(self):
@@ -394,7 +396,7 @@ class ChannelModifier(Modifier):
             self.masker().set_ot_remove_idx(remove_idx)
 
     def traversal(self, input_modify, output_modify, sub_graph):
-        """ Traverse the entire subgraph that depends on each other """
+        """Traverse the entire subgraph that depends on each other"""
 
         self.input_modify_ = True
         self.output_modify_ = True
@@ -414,7 +416,7 @@ class ChannelModifier(Modifier):
         return self
 
     def idx_forward(self, pre_name, center_name, idxes, sub_graph_dict, leaf_names):
-        """ Starting from the center node, pass the channel index to the all downstream nodes """
+        """Starting from the center node, pass the channel index to the all downstream nodes"""
 
         if self.input_modify_:
             self.in_idx_map.set_idx(center_name, idxes)
@@ -424,14 +426,12 @@ class ChannelModifier(Modifier):
             return
         for n in self.node.next_nodes:
             if n.unique_name in sub_graph_dict.keys():
-                sub_graph_dict[n.unique_name].idx_forward(self.unique_name(),
-                                                          center_name,
-                                                          idxes,
-                                                          sub_graph_dict,
-                                                          leaf_names)
+                sub_graph_dict[n.unique_name].idx_forward(
+                    self.unique_name(), center_name, idxes, sub_graph_dict, leaf_names
+                )
 
     def idx_back(self, pre_name, leaf_names, center_names, leaf_map_dict, sub_graph_dict):
-        """ Starting from the leaf node, pass the channel index to all neighboring nodes """
+        """Starting from the leaf node, pass the channel index to all neighboring nodes"""
 
         if self.unique_name() == pre_name:  # 一次反向传播的起点
             justify_group(leaf_map_dict, self.in_idx_map)
@@ -442,23 +442,20 @@ class ChannelModifier(Modifier):
                 self.in_idx_map.set_idx_map(self.ot_idx_map)
             for n in self.node.next_nodes:
                 if n.unique_name in sub_graph_dict.keys() and sub_graph_dict[n.unique_name].input_modify_:
-                    sub_graph_dict[n.unique_name].idx_back_forward(leaf_names,
-                                                                   leaf_map_dict,
-                                                                   sub_graph_dict,
-                                                                   self.unique_name())
+                    sub_graph_dict[n.unique_name].idx_back_forward(
+                        leaf_names, leaf_map_dict, sub_graph_dict, self.unique_name()
+                    )
 
         if self.unique_name() in center_names and pre_name != self.node.unique_name:
             return
         for n in self.node.prev_nodes:
             if n.unique_name in sub_graph_dict.keys() and sub_graph_dict[n.unique_name].output_modify_:
-                sub_graph_dict[n.unique_name].idx_back(self.unique_name(),
-                                                       leaf_names,
-                                                       center_names,
-                                                       leaf_map_dict,
-                                                       sub_graph_dict)
+                sub_graph_dict[n.unique_name].idx_back(
+                    self.unique_name(), leaf_names, center_names, leaf_map_dict, sub_graph_dict
+                )
 
     def idx_back_forward(self, leaf_names, leaf_map_dict, sub_graph_dict, pre_name):
-        """ Broadcast the information of the leaf node to all downstream nodes """
+        """Broadcast the information of the leaf node to all downstream nodes"""
 
         if self.input_modify_:
             justify_group(leaf_map_dict, self.in_idx_map)
@@ -468,10 +465,9 @@ class ChannelModifier(Modifier):
             self.ot_idx_map.set_idx_map(self.in_idx_map)
         for n in self.node.next_nodes:
             if n.unique_name in sub_graph_dict.keys() and sub_graph_dict[n.unique_name].input_modify_:
-                sub_graph_dict[n.unique_name].idx_back_forward(leaf_names,
-                                                               leaf_map_dict,
-                                                               sub_graph_dict,
-                                                               self.unique_name())
+                sub_graph_dict[n.unique_name].idx_back_forward(
+                    leaf_names, leaf_map_dict, sub_graph_dict, self.unique_name()
+                )
 
 
 class ConvChannelModifier(ChannelModifier):
@@ -494,17 +490,18 @@ class ConvChannelModifier(ChannelModifier):
 
         for n in self.node.next_nodes:
             if n.unique_name in sub_graph_dict.keys():
-                sub_graph_dict[n.unique_name].idx_forward(self.unique_name(),
-                                                          center_name,
-                                                          idxes,
-                                                          sub_graph_dict,
-                                                          leaf_names)
+                sub_graph_dict[n.unique_name].idx_forward(
+                    self.unique_name(), center_name, idxes, sub_graph_dict, leaf_names
+                )
 
     def register_mask(self, importance, graph_sparsity):
 
         if is_dw_conv(self.module()):
             remove_idx = calc_remove_idx(self.in_idx_map, importance, graph_sparsity, self.unique_name())
-            self.weight_mask["weight"][remove_idx, :, ] = 0
+            self.weight_mask["weight"][
+                remove_idx,
+                :,
+            ] = 0
             self.masker().set_in_remove_idx(remove_idx)
             self.masker().set_ot_remove_idx(remove_idx)
 
@@ -529,10 +526,16 @@ class ConvChannelModifier(ChannelModifier):
                             if start_in <= idx < end_in:
                                 g_remove_idx.append(idx)
                         g_remove_idx = [(idx - weight_2 * i) for idx in g_remove_idx]
-                        self.weight_mask["weight"][num_g_out * i:num_g_out * (i + 1), g_remove_idx, ] = 0
+                        self.weight_mask["weight"][
+                            num_g_out * i : num_g_out * (i + 1),
+                            g_remove_idx,
+                        ] = 0
                         start_in = end_in
                 else:
-                    self.weight_mask["weight"][:, remove_idx, ] = 0
+                    self.weight_mask["weight"][
+                        :,
+                        remove_idx,
+                    ] = 0
                 self.masker().set_in_remove_idx(remove_idx)
             if self.output_modify_:
                 remove_idx = calc_remove_idx(self.ot_idx_map, importance, graph_sparsity, self.unique_name())
@@ -541,7 +544,10 @@ class ConvChannelModifier(ChannelModifier):
         self.masker().register_mask("weight", self.weight_mask["weight"])
 
     def register_out_mask(self, remove_idx):
-        self.weight_mask["weight"][remove_idx, :, ] = 0
+        self.weight_mask["weight"][
+            remove_idx,
+            :,
+        ] = 0
         self.masker().set_ot_remove_idx(remove_idx)
 
         bias_mask = self.bias_mask.get("bias", None)
@@ -560,7 +566,12 @@ class ConvChannelModifier(ChannelModifier):
                 conv.groups = len(preserve_idx)
                 conv.in_channels = len(preserve_idx)
                 conv.out_channels = len(preserve_idx)
-                conv.weight = torch.nn.Parameter(conv.weight[preserve_idx, :, ])
+                conv.weight = torch.nn.Parameter(
+                    conv.weight[
+                        preserve_idx,
+                        :,
+                    ]
+                )
                 if conv.bias is not None:
                     log.info(f'[DW_CONV] {self.unique_name()}: bias {conv.bias.shape[0]} -> {len(preserve_idx)}')
                     conv.bias = torch.nn.Parameter(conv.bias[preserve_idx])
@@ -575,10 +586,15 @@ class ConvChannelModifier(ChannelModifier):
                 weight_2 = self.weight_mask["weight"].shape[1]
                 conv_weight = None
                 for i in range(group):
-                    g_remove_idx = remove_idx[num_g_remove_idx * i:num_g_remove_idx * (i + 1)]
+                    g_remove_idx = remove_idx[num_g_remove_idx * i : num_g_remove_idx * (i + 1)]
                     g_remove_idx = [idx - weight_2 * i for idx in g_remove_idx]
-                    preserve_idx = complementary_list([j for j in range(self.weight_mask["weight"].shape[1])], g_remove_idx)
-                    weight = conv.weight[num_g_out * i:num_g_out * (i + 1), preserve_idx, ]
+                    preserve_idx = complementary_list(
+                        [j for j in range(self.weight_mask["weight"].shape[1])], g_remove_idx
+                    )
+                    weight = conv.weight[
+                        num_g_out * i : num_g_out * (i + 1),
+                        preserve_idx,
+                    ]
                     if conv_weight is None:
                         conv_weight = weight
                     else:
@@ -592,7 +608,12 @@ class ConvChannelModifier(ChannelModifier):
                 preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[1])], remove_idx)
                 if conv.in_channels != len(preserve_idx):
                     log.info(f'[CONV] {self.unique_name()}: input {conv.in_channels} -> {len(preserve_idx)}')
-                    conv.weight = torch.nn.Parameter(conv.weight[:, preserve_idx, ])
+                    conv.weight = torch.nn.Parameter(
+                        conv.weight[
+                            :,
+                            preserve_idx,
+                        ]
+                    )
                     conv.in_channels = len(preserve_idx)
 
     def modify_output(self, remove_idx):
@@ -606,7 +627,12 @@ class ConvChannelModifier(ChannelModifier):
                 conv.groups = len(preserve_idx)
                 conv.in_channels = len(preserve_idx)
                 conv.out_channels = len(preserve_idx)
-                conv.weight = torch.nn.Parameter(conv.weight[preserve_idx, :, ])
+                conv.weight = torch.nn.Parameter(
+                    conv.weight[
+                        preserve_idx,
+                        :,
+                    ]
+                )
 
                 if conv.bias is not None:
                     log.info(f'[DW_CONV] {self.unique_name()}: bias {conv.bias.shape[0]} -> {len(preserve_idx)}')
@@ -615,7 +641,12 @@ class ConvChannelModifier(ChannelModifier):
         else:
             if conv.out_channels != len(preserve_idx):
                 log.info(f'[CONV] {self.unique_name()}: output {conv.out_channels} -> {len(preserve_idx)}')
-                conv.weight = torch.nn.Parameter(conv.weight[preserve_idx, :, ])
+                conv.weight = torch.nn.Parameter(
+                    conv.weight[
+                        preserve_idx,
+                        :,
+                    ]
+                )
                 conv.out_channels = len(preserve_idx)
 
                 if conv.bias is not None:
@@ -630,7 +661,7 @@ class ConvChannelModifier(ChannelModifier):
             self.output_modify_ |= output_modify
             return self
 
-        assert (((input_modify and output_modify) is False) and ((input_modify or output_modify) is True))
+        assert ((input_modify and output_modify) is False) and ((input_modify or output_modify) is True)
 
         if is_dw_conv(self.module()):
             if input_modify:
@@ -656,11 +687,17 @@ class ConvTransChannelModifier(ConvChannelModifier):
     def register_mask(self, importance, graph_sparsity):
         if self.input_modify_:
             remove_idx = calc_remove_idx(self.in_idx_map, importance, graph_sparsity, self.unique_name())
-            self.weight_mask["weight"][remove_idx, :, ] = 0
+            self.weight_mask["weight"][
+                remove_idx,
+                :,
+            ] = 0
             self.masker().set_in_remove_idx(remove_idx)
         if self.output_modify_:
             remove_idx = calc_remove_idx(self.ot_idx_map, importance, graph_sparsity, self.unique_name())
-            self.weight_mask["weight"][:, remove_idx, ] = 0
+            self.weight_mask["weight"][
+                :,
+                remove_idx,
+            ] = 0
             self.masker().set_ot_remove_idx(remove_idx)
 
             # 普通conv中bias仅在output改变时改变
@@ -677,7 +714,12 @@ class ConvTransChannelModifier(ConvChannelModifier):
 
         if conv.in_channels != len(preserve_idx):
             log.info(f'[TRANS_CONV2D] {self.unique_name()}: input {conv.in_channels} -> {len(preserve_idx)}')
-            conv.weight = torch.nn.Parameter(conv.weight[preserve_idx, :, ])
+            conv.weight = torch.nn.Parameter(
+                conv.weight[
+                    preserve_idx,
+                    :,
+                ]
+            )
             conv.in_channels = len(preserve_idx)
 
     def modify_output(self, remove_idx):
@@ -686,7 +728,12 @@ class ConvTransChannelModifier(ConvChannelModifier):
 
         if conv.out_channels != len(preserve_idx):
             log.info(f'[TRANS_CONV2D] {self.unique_name()}: output {conv.out_channels} -> {len(preserve_idx)}')
-            conv.weight = torch.nn.Parameter(conv.weight[:, preserve_idx, ])
+            conv.weight = torch.nn.Parameter(
+                conv.weight[
+                    :,
+                    preserve_idx,
+                ]
+            )
             conv.out_channels = len(preserve_idx)
 
             if conv.bias is not None:
@@ -751,7 +798,7 @@ class LinearChannelModifier(ChannelModifier):
         self.input_modify_ = input_modify
         self.output_modify_ = output_modify
 
-        assert (((input_modify and output_modify) is False) and ((input_modify or output_modify) is True))
+        assert ((input_modify and output_modify) is False) and ((input_modify or output_modify) is True)
 
         if output_modify:
             for n in self.node.next_nodes:
@@ -771,11 +818,9 @@ class LinearChannelModifier(ChannelModifier):
 
             for n in self.node.next_nodes:
                 if n.unique_name in sub_graph_dict.keys():
-                    sub_graph_dict[n.unique_name].idx_forward(self.unique_name(),
-                                                              center_name,
-                                                              idxes,
-                                                              sub_graph_dict,
-                                                              leaf_names)
+                    sub_graph_dict[n.unique_name].idx_forward(
+                        self.unique_name(), center_name, idxes, sub_graph_dict, leaf_names
+                    )
 
 
 class RNNChannelModifier(ChannelModifier):
@@ -849,7 +894,9 @@ class RNNChannelModifier(ChannelModifier):
             remove_idx_proj = self.masker().custom_remove_idx
             if remove_idx_proj is not None:
                 offset = rnn.proj_size
-                remove_idx_proj_fwd, remove_idx_proj_bwd = self.split_indices_with_directions(remove_idx_proj, offset, num_directions)
+                remove_idx_proj_fwd, remove_idx_proj_bwd = self.split_indices_with_directions(
+                    remove_idx_proj, offset, num_directions
+                )
 
         for i in range(rnn.num_layers):
             for j in range(num_directions):
@@ -888,37 +935,45 @@ class RNNChannelModifier(ChannelModifier):
                     remove_idx_pc = remove_idx_proj
 
                 preserve_idx_ih_r = complementary_list(
-                    [j for j in range(self.weight_mask[f'weight_ih_l{i}{suffix}'].shape[0])], remove_idx_r)
+                    [j for j in range(self.weight_mask[f'weight_ih_l{i}{suffix}'].shape[0])], remove_idx_r
+                )
                 preserve_idx_hh_r = complementary_list(
-                    [j for j in range(self.weight_mask[f'weight_hh_l{i}{suffix}'].shape[0])], remove_idx_r)
+                    [j for j in range(self.weight_mask[f'weight_hh_l{i}{suffix}'].shape[0])], remove_idx_r
+                )
 
                 if weight_hr is None:
                     preserve_idx_hh_c = complementary_list(
-                        [j for j in range(self.weight_mask[f'weight_hh_l{i}{suffix}'].shape[1])], remove_idx_c)
+                        [j for j in range(self.weight_mask[f'weight_hh_l{i}{suffix}'].shape[1])], remove_idx_c
+                    )
                 else:
                     preserve_idx_hh_c = complementary_list(
-                        [j for j in range(self.weight_mask[f'weight_hh_l{i}{suffix}'].shape[1])], remove_idx_pc)
+                        [j for j in range(self.weight_mask[f'weight_hh_l{i}{suffix}'].shape[1])], remove_idx_pc
+                    )
                     preserve_idx_hr_c = complementary_list(
-                        [j for j in range(self.weight_mask[f'weight_hr_l{i}{suffix}'].shape[1])], remove_idx_c)
+                        [j for j in range(self.weight_mask[f'weight_hr_l{i}{suffix}'].shape[1])], remove_idx_c
+                    )
 
                 preserve_idx_ih_c = None
                 if i != 0 and preserve_idx_ih_c is None:
                     if weight_hr is not None:
                         preserve_idx_ih_c = complementary_list(
-                            [j for j in range(self.weight_mask[f'weight_ih_l{i}{suffix}'].shape[1])], remove_idx_proj)
+                            [j for j in range(self.weight_mask[f'weight_ih_l{i}{suffix}'].shape[1])], remove_idx_proj
+                        )
                     else:
                         preserve_idx_ih_c = preserve_idx_ih_r
                         if num_directions > 1 or gs > 1:
                             preserve_idx_ih_c = complementary_list(
-                                [j for j in range(self.weight_mask[f'weight_ih_l{i}{suffix}'].shape[1])], remove_idx)
+                                [j for j in range(self.weight_mask[f'weight_ih_l{i}{suffix}'].shape[1])], remove_idx
+                            )
 
                 if weight_ih.shape[0] != len(preserve_idx_ih_r):
                     if i != 0 and weight_ih.shape[1] != len(preserve_idx_ih_c):
                         desc_i = f'layer{suffix} input #{i}'
-                        log.info(f'[RNN] {self.unique_name()}: {desc_i} {weight_ih.shape[1]} -> {len(preserve_idx_ih_c)}')
+                        log.info(
+                            f'[RNN] {self.unique_name()}: {desc_i} {weight_ih.shape[1]} -> {len(preserve_idx_ih_c)}'
+                        )
 
-                    log.info(
-                        f'[RNN] {self.unique_name()}: {desc} {rnn.hidden_size * gs} -> {len(preserve_idx_ih_r)}')
+                    log.info(f'[RNN] {self.unique_name()}: {desc} {rnn.hidden_size * gs} -> {len(preserve_idx_ih_r)}')
 
                     if i != 0:
                         new_w = weight_ih[preserve_idx_ih_r, :][:, preserve_idx_ih_c]
@@ -931,17 +986,25 @@ class RNNChannelModifier(ChannelModifier):
 
                 desc = f'layer{suffix} output #{i}'
                 if weight_hh.shape[0] != len(preserve_idx_hh_r) or weight_hh.shape[1] != len(preserve_idx_hh_c):
-                    log.info(
-                        f'[RNN] {self.unique_name()}: {desc} {rnn.hidden_size * gs} -> {len(preserve_idx_hh_r)}')
+                    log.info(f'[RNN] {self.unique_name()}: {desc} {rnn.hidden_size * gs} -> {len(preserve_idx_hh_r)}')
 
                     if weight_hr is None:
-                        setattr(rnn, f'weight_hh_l{i}{suffix}', torch.nn.Parameter(
-                            weight_hh[preserve_idx_hh_r, :][:, preserve_idx_hh_c]))
+                        setattr(
+                            rnn,
+                            f'weight_hh_l{i}{suffix}',
+                            torch.nn.Parameter(weight_hh[preserve_idx_hh_r, :][:, preserve_idx_hh_c]),
+                        )
                     else:
-                        setattr(rnn, f'weight_hh_l{i}{suffix}', torch.nn.Parameter(
-                            weight_hh[preserve_idx_hh_r, :][:, preserve_idx_hh_c]))
-                        setattr(rnn, f'weight_hr_l{i}{suffix}', torch.nn.Parameter(
-                            weight_hr[preserve_idx_hh_c, :][:, preserve_idx_hr_c]))
+                        setattr(
+                            rnn,
+                            f'weight_hh_l{i}{suffix}',
+                            torch.nn.Parameter(weight_hh[preserve_idx_hh_r, :][:, preserve_idx_hh_c]),
+                        )
+                        setattr(
+                            rnn,
+                            f'weight_hr_l{i}{suffix}',
+                            torch.nn.Parameter(weight_hr[preserve_idx_hh_c, :][:, preserve_idx_hr_c]),
+                        )
 
                     if bias_hh is not None:
                         setattr(rnn, f'bias_hh_l{i}{suffix}', torch.nn.Parameter(bias_hh[preserve_idx_hh_r]))
@@ -987,7 +1050,9 @@ class RNNChannelModifier(ChannelModifier):
                 remove_idx_fwd, remove_idx_bwd = self.split_indices_with_directions(remove_idx, offset, num_directions)
                 if remove_idx_proj is not None:
                     offset = self.module().proj_size
-                    remove_idx_proj_fwd, remove_idx_proj_bwd = self.split_indices_with_directions(remove_idx_proj, offset, num_directions)
+                    remove_idx_proj_fwd, remove_idx_proj_bwd = self.split_indices_with_directions(
+                        remove_idx_proj, offset, num_directions
+                    )
                     assert len(remove_idx_proj_fwd) == len(remove_idx_proj_bwd)
 
             if gs > 1:
@@ -1090,7 +1155,7 @@ class RNNChannelModifier(ChannelModifier):
         self.input_modify_ = input_modify
         self.output_modify_ = output_modify
 
-        assert (((input_modify and output_modify) is False) and ((input_modify or output_modify) is True))
+        assert ((input_modify and output_modify) is False) and ((input_modify or output_modify) is True)
 
         if output_modify:
             for n in self.node.next_nodes:
@@ -1110,11 +1175,9 @@ class RNNChannelModifier(ChannelModifier):
 
             for n in self.node.next_nodes:
                 if n.unique_name in sub_graph_dict.keys():
-                    sub_graph_dict[n.unique_name].idx_forward(self.unique_name(),
-                                                              center_name,
-                                                              idxes,
-                                                              sub_graph_dict,
-                                                              leaf_names)
+                    sub_graph_dict[n.unique_name].idx_forward(
+                        self.unique_name(), center_name, idxes, sub_graph_dict, leaf_names
+                    )
 
 
 class PReLUChannelModifier(ChannelModifier):
@@ -1185,7 +1248,7 @@ class ElementWiseChannelModifier(ChannelModifier):
             sub_graph.append(self)
         else:
             return self
-        assert (((input_modify and output_modify) is False) and ((input_modify or output_modify) is True))
+        assert ((input_modify and output_modify) is False) and ((input_modify or output_modify) is True)
 
         input_modifiers = []
 
@@ -1229,11 +1292,9 @@ class ElementWiseChannelModifier(ChannelModifier):
         for n in self.node.next_nodes:
             if n.unique_name in sub_graph_dict.keys():
                 for center in center_changed:
-                    sub_graph_dict[n.unique_name].idx_forward(self.unique_name(),
-                                                              center,
-                                                              self.ot_idx_map.map_dict[center],
-                                                              sub_graph_dict,
-                                                              leaf_names)
+                    sub_graph_dict[n.unique_name].idx_forward(
+                        self.unique_name(), center, self.ot_idx_map.map_dict[center], sub_graph_dict, leaf_names
+                    )
 
 
 class CatChannelModifier(ChannelModifier):
@@ -1254,7 +1315,7 @@ class CatChannelModifier(ChannelModifier):
             return self
         self.input_modify_ = True
         self.output_modify_ = True
-        assert (((input_modify and output_modify) is False) and ((input_modify or output_modify) is True))
+        assert ((input_modify and output_modify) is False) and ((input_modify or output_modify) is True)
 
         # Channel changes of different inputs are isolated
         if output_modify:
@@ -1275,8 +1336,10 @@ class CatChannelModifier(ChannelModifier):
         cnt = 0
 
         for n in self.node.prev_nodes:
-            if n.unique_name in sub_graph_dict.keys() \
-                    and center_name in sub_graph_dict[n.unique_name].ot_idx_map.map_dict.keys():
+            if (
+                n.unique_name in sub_graph_dict.keys()
+                and center_name in sub_graph_dict[n.unique_name].ot_idx_map.map_dict.keys()
+            ):
                 ot_ch = sub_graph_dict[n.unique_name].ot_channel()
                 if isinstance(ot_ch, list):
                     ot_ch = ot_ch[self.node.prev_indices[cnt]]
@@ -1299,8 +1362,9 @@ class CatChannelModifier(ChannelModifier):
 
         for n in self.node.next_nodes:
             if n.unique_name in sub_graph_dict.keys():
-                sub_graph_dict[n.unique_name].idx_forward(self.unique_name(), center_name, idxes_, sub_graph_dict,
-                                                          leaf_names)
+                sub_graph_dict[n.unique_name].idx_forward(
+                    self.unique_name(), center_name, idxes_, sub_graph_dict, leaf_names
+                )
 
     def idx_back(self, pre_name, leaf_names, center_names, leaf_map_dict, sub_graph_dict):
         justify_group(leaf_map_dict, self.ot_idx_map)
@@ -1318,11 +1382,9 @@ class CatChannelModifier(ChannelModifier):
                 for k, v in leaf_map_dict.items():
                     sub_leaf_map_dict[k] = split_idx(v, start_idx, end_idx)
 
-                sub_graph_dict[n.unique_name].idx_back(self.node.unique_name,
-                                                       leaf_names,
-                                                       center_names,
-                                                       sub_leaf_map_dict,
-                                                       sub_graph_dict)
+                sub_graph_dict[n.unique_name].idx_back(
+                    self.node.unique_name, leaf_names, center_names, sub_leaf_map_dict, sub_graph_dict
+                )
             else:
                 ot_ch = create_modifier(n).ot_channel()
                 if isinstance(ot_ch, list):
@@ -1366,7 +1428,8 @@ class CatChannelModifier(ChannelModifier):
         for n in self.node.next_nodes:
             if n.unique_name in sub_graph_dict.keys() and sub_graph_dict[n.unique_name].input_modify_:
                 sub_graph_dict[n.unique_name].idx_back_forward(
-                    leaf_names, self.ot_idx_map.map_dict, sub_graph_dict, self.unique_name())
+                    leaf_names, self.ot_idx_map.map_dict, sub_graph_dict, self.unique_name()
+                )
 
 
 class SplitChannelModifier(ChannelModifier):
@@ -1404,9 +1467,9 @@ class SplitChannelModifier(ChannelModifier):
         cnt = 0
         for n in self.node.next_nodes:
             if n.unique_name in sub_graph_dict.keys():
-                sub_graph_dict[n.unique_name].idx_forward(self.unique_name(), center_name, [idxes_[cnt]],
-                                                          sub_graph_dict,
-                                                          leaf_names)
+                sub_graph_dict[n.unique_name].idx_forward(
+                    self.unique_name(), center_name, [idxes_[cnt]], sub_graph_dict, leaf_names
+                )
             cnt += 1
 
     def idx_back(self, pre_name, leaf_names, center_names, leaf_map_dict, sub_graph_dict):
@@ -1433,21 +1496,18 @@ class SplitChannelModifier(ChannelModifier):
 
         for n in self.node.next_nodes:
             if n.unique_name in sub_graph_dict.keys() and self.split_dict[n.unique_name] == self.split_dict[pre_name]:
-                sub_graph_dict[n.unique_name].idx_back_forward(leaf_names,
-                                                               leaf_map_dict,
-                                                               sub_graph_dict,
-                                                               self.unique_name())
+                sub_graph_dict[n.unique_name].idx_back_forward(
+                    leaf_names, leaf_map_dict, sub_graph_dict, self.unique_name()
+                )
 
         if self.unique_name() in center_names:
             return
 
         for n in self.node.prev_nodes:
             if n.unique_name in sub_graph_dict.keys():
-                sub_graph_dict[n.unique_name].idx_back(pre_name,
-                                                       leaf_names,
-                                                       center_names,
-                                                       self.ot_idx_map.map_dict,
-                                                       sub_graph_dict)
+                sub_graph_dict[n.unique_name].idx_back(
+                    pre_name, leaf_names, center_names, self.ot_idx_map.map_dict, sub_graph_dict
+                )
 
     def idx_back_forward(self, leaf_names, leaf_map_dict, sub_graph_dict, pre_name):
         justify_group(leaf_map_dict, self.in_idx_map)
@@ -1457,8 +1517,9 @@ class SplitChannelModifier(ChannelModifier):
                 start, end = self.split_dict[n.unique_name]
                 for k, v in leaf_map_dict.items():
                     tmp_sub_leaf_map[k] = split_idx(v, start, end)
-            sub_graph_dict[n.unique_name].idx_back_forward(leaf_names, tmp_sub_leaf_map, sub_graph_dict,
-                                                           self.unique_name())
+            sub_graph_dict[n.unique_name].idx_back_forward(
+                leaf_names, tmp_sub_leaf_map, sub_graph_dict, self.unique_name()
+            )
 
     def register_mask(self, importance, graph_sparsity):
         # arg case：torch.split(a, 2)，torch.split(a, b), torch.split(a, [2,4])
@@ -1497,7 +1558,10 @@ class ReshapeChannelModifier(ChannelModifier):
         tmp = tmp.reshape(after_tensor.shape)
         after_idx = []
         for i in range(tmp.shape[1]):
-            z = tmp[:, i, ]
+            z = tmp[
+                :,
+                i,
+            ]
             unique_z = z.unique()
             if len(unique_z) == 1:
                 after_idx.append(int(unique_z[0]))
@@ -1518,8 +1582,9 @@ class ReshapeChannelModifier(ChannelModifier):
             return
         for n in self.node.next_nodes:
             if n.unique_name in sub_graph_dict.keys():
-                sub_graph_dict[n.unique_name].idx_forward(self.unique_name(), center_name, after_idxes, sub_graph_dict,
-                                                          leaf_names)
+                sub_graph_dict[n.unique_name].idx_forward(
+                    self.unique_name(), center_name, after_idxes, sub_graph_dict, leaf_names
+                )
 
     def idx_back(self, pre_name, leaf_names, center_names, leaf_map_dict, sub_graph_dict):
         justify_group(leaf_map_dict, self.ot_idx_map)
@@ -1543,8 +1608,9 @@ class ReshapeChannelModifier(ChannelModifier):
             return
         for n in self.node.prev_nodes:
             if n.unique_name in sub_graph_dict.keys():
-                sub_graph_dict[n.unique_name].idx_back(pre_name, leaf_names, center_names, leaf_map_dict,
-                                                       sub_graph_dict)
+                sub_graph_dict[n.unique_name].idx_back(
+                    pre_name, leaf_names, center_names, leaf_map_dict, sub_graph_dict
+                )
 
     def idx_back_forward(self, leaf_names, leaf_map_dict, sub_graph_dict, pre_name):
         justify_group(leaf_map_dict, self.in_idx_map)
@@ -1564,10 +1630,9 @@ class ReshapeChannelModifier(ChannelModifier):
 
         for n in self.node.next_nodes:
             if n.unique_name in sub_graph_dict.keys() and sub_graph_dict[n.unique_name].input_modify_:
-                sub_graph_dict[n.unique_name].idx_back_forward(leaf_names,
-                                                               tmp_map_dict,
-                                                               sub_graph_dict,
-                                                               self.unique_name())
+                sub_graph_dict[n.unique_name].idx_back_forward(
+                    leaf_names, tmp_map_dict, sub_graph_dict, self.unique_name()
+                )
 
 
 MODIFIERS = {
@@ -1676,9 +1741,11 @@ def register_sub_masker(sub_graph, importance, sparsity):
             graph_sparsity.append(sparsity[m.unique_name()])
             center_names.append(m.unique_name())
 
-        if not is_dw_conv(m.node.module) and m.node.type() in [nn.Conv2d, nn.ConvTranspose2d, nn.Linear,
-                                                               nn.Conv1d, nn.ConvTranspose1d, 'output'] \
-                and m.input_modify_:
+        if (
+            not is_dw_conv(m.node.module)
+            and m.node.type() in [nn.Conv2d, nn.ConvTranspose2d, nn.Linear, nn.Conv1d, nn.ConvTranspose1d, 'output']
+            and m.input_modify_
+        ):
             leaf_names.append(m.unique_name())
 
     if len(set(graph_sparsity)) > 1:
@@ -1772,7 +1839,7 @@ class ChannelModifierGraph(object):
     sub_graphs: typing.List[typing.List[ChannelModifier]]
 
     def __init__(self, graph: TraceGraph, center_nodes):
-        """ Initialize a channel modifier for a calculation graph
+        """Initialize a channel modifier for a calculation graph
 
         Args:
             graph: Compute graph generated by tracer

@@ -18,7 +18,6 @@ BLACKLIST = ()
 
 
 class TestModelMeta(type):
-
     @classmethod
     def __prepare__(mcls, name, bases):
         d = dict()
@@ -29,8 +28,7 @@ class TestModelMeta(type):
                 simple_test_name = test_name + '_simple'
                 if eliminate_dead_graph:
                     simple_test_name += '_edg'
-                d[simple_test_name] = mcls.build_model_test(
-                    test_class, eliminate_dead_graph)
+                d[simple_test_name] = mcls.build_model_test(test_class, eliminate_dead_graph)
 
         test_classes = collect_custom_models()
         for test_class in test_classes:
@@ -39,8 +37,7 @@ class TestModelMeta(type):
                 simple_test_name = test_name + '_simple'
                 if eliminate_dead_graph:
                     simple_test_name += '_edg'
-                d[simple_test_name] = mcls.build_model_test(
-                    test_class, eliminate_dead_graph)
+                d[simple_test_name] = mcls.build_model_test(test_class, eliminate_dead_graph)
         return d
 
     @classmethod
@@ -64,9 +61,9 @@ class TestModelMeta(type):
 
                 inputs = prepare_inputs(m)
                 graph = trace(m, inputs, eliminate_dead_graph=eliminate_dead_graph)
-                self.assertTrue(graph.generate_code(f'out/{model_file}.py',
-                                                    f'out/{model_file}.pth',
-                                                    model_name, check=True))
+                self.assertTrue(
+                    graph.generate_code(f'out/{model_file}.py', f'out/{model_file}.pth', model_name, check=True)
+                )
 
                 # Remove the weights file to save space
                 os.unlink(f'out/{model_file}.pth')
