@@ -17,6 +17,10 @@ python setup.py install
 pip install git+https://github.com/alibaba/TinyNeuralNetwork.git
 ```
 
+## 贡献
+
+我们的项目欢迎你的贡献，关于更多的细节，可参见[此处](CONTRIBUTING_zh-CN.md)。
+
 ## 基本模块
 
 + 计算图捕获：通过Graph Tracer捕获PyTorch算子连接关系，并基于此实现自动的剪枝、模型量化， 并支持将PyTorch模型逆向codegen为等价的model.py.
@@ -48,5 +52,3 @@ pip install git+https://github.com/alibaba/TinyNeuralNetwork.git
 可以查看[《常见问题解答》](docs/FAQ_zh-CN.md) ， 或者加入钉钉答疑群
 
 ![img.png](docs/qa.png)
-
-
