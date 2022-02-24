@@ -2275,6 +2275,7 @@ class TraceGraph(object):
         prev_node = node.prev_nodes[0]
         next_nodes = node.next_nodes
         tensor_dict = dict(zip(node.next_tensors, node.prev_tensors))
+        index_dict = dict(zip(node.next_tensors, node.prev_indices))
         is_constant_node = type(node.module) == ConstantNode
 
         # Deal with previous nodes
@@ -2296,6 +2297,7 @@ class TraceGraph(object):
             for i, pt in enumerate(n.prev_tensors):
                 if pt in tensor_dict:
                     n.prev_tensors[i] = tensor_dict[pt]
+                    n.prev_indices[i] = index_dict[pt]
             # Rewrite func calls in next nodes
             if type(n.module) == TraceFunction:
                 if n.module.args_string is not None:

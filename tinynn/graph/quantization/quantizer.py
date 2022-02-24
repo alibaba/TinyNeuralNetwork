@@ -995,7 +995,7 @@ class QATQuantizer(object):
                     graph.insert_between(node, next_node, fake_quant, move_idx=True)
                     node_map[prev_idx] = graph.nodes_map[fake_quant_name]
 
-        # Finally, we insert the DeQuantStub nodes before every input node of the unsupported ops
+        # Insert the DeQuantStub nodes before every input node of the unsupported ops
         for idx, node in enumerate(unsupported_nodes):
             fake_dequant_cls = torch_q.DeQuantStub
             assert node.rev_index is False
@@ -1008,6 +1008,28 @@ class QATQuantizer(object):
                 module_constructor_lines[id(fake_dequant)] = f'{qualified_name(fake_dequant_cls)}()'
 
                 graph.insert_between(prev_node, node, fake_dequant, move_idx=True)
+
+        # Remove consecutive dequant quant nodes
+        def _is_consecutive_dequant_quant_nodes(node, custom_data):
+            cur_type = node.type()
+            if cur_type in (torch_q.QuantStub, torch_q.DeQuantStub):
+                for next_node in node.next_nodes:
+                    next_type = next_node.type()
+                    if next_type in (torch_q.QuantStub, torch_q.DeQuantStub):
+                        if cur_type != next_type:
+                            custom_data.append((node, next_node))
+                            return True
+            return False
+
+        consecutive_dequant_quant_nodes = []
+        graph.filter_forward_nodes(_is_consecutive_dequant_quant_nodes, consecutive_dequant_quant_nodes)
+        for node, next_node in consecutive_dequant_quant_nodes:
+            if len(node.next_nodes) == 1:
+                graph.remove_node(next_node)
+                graph.remove_node(node)
+            else:
+                # TODO: Support connect tensors between branch nodes
+                continue
 
         graph.quantized = True
 
