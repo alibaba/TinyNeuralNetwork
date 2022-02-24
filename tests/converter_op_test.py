@@ -3298,7 +3298,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
-    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Hardswish'), 'Quantized hardswish is not supported')
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'ELU'), 'Quantized hardswish is not supported')
     def test_quantized_elu_int8(self):
         class Model(nn.Module):
             def __init__(self) -> None:
@@ -3322,12 +3322,12 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
-    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Hardswish'), 'Quantized hardswish is not supported')
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'ReLU6'), 'Quantized hardswish is not supported')
     def test_quantized_relu6(self):
         class Model(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
-                self.q_func = torch.nn.quantized.Hardswish(0.5, 128)
+                self.q_func = torch.nn.quantized.ReLU6()
 
             def forward(self, x):
                 return self.q_func(x)
@@ -3346,12 +3346,12 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
-    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Hardswish'), 'Quantized hardswish is not supported')
-    def test_quantized_hardswish_int8(self):
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'ReLU6'), 'Quantized hardswish is not supported')
+    def test_quantized_relu6_int8(self):
         class Model(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
-                self.q_func = torch.nn.quantized.Hardswish(0.5, 128)
+                self.q_func = torch.nn.quantized.ReLU6()
 
             def forward(self, x):
                 return self.q_func(x)
