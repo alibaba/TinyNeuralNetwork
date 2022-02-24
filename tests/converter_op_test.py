@@ -1,4 +1,5 @@
 import unittest
+import sys
 
 import torch
 import torch.nn as nn
@@ -43,6 +44,14 @@ def get_model_path():
     model_path = f'out/converter_op_{size}.tflite'
     setattr(get_model_path, 'size', size + 1)
     return model_path
+
+
+def u8_to_s8(t):
+    if t.dtype == torch.quint8:
+        t = torch.int_repr(t)
+    t_i32 = t.to(dtype=torch.int32)
+    t_i32 -= 128
+    return t_i32.to(dtype=torch.int8)
 
 
 class ConverterOPTester(unittest.TestCase):
@@ -2900,6 +2909,466 @@ class ConverterOPTester(unittest.TestCase):
             return f'testing failed: {args}'
 
         torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+
+
+@unittest.skipIf(sys.platform == 'win32', 'Quantization cannot be performed on Windows')
+class ConverterQuantizedOPTester(unittest.TestCase):
+    def test_quantize(self):
+        def model(x):
+            return torch.quantize_per_tensor(x, 0.5, 128, torch.quint8)
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1.0, rtol=1.0)
+
+    def test_quantize_int8(self):
+        def model(x):
+            return torch.quantize_per_tensor(x, 0.5, 128, torch.quint8)
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(torch.int_repr(model(dummy_input)))
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1.0, rtol=1.0)
+
+    def test_dequantize(self):
+        def model(x):
+            return torch.dequantize(x)
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=0.5, rtol=0.5)
+
+    def test_dequantize_int8(self):
+        def model(x):
+            return torch.dequantize(x)
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=0.5, rtol=0.5)
+
+    def test_quantized_add(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+
+            def forward(self, x):
+                return self.q_func.add(x, x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    def test_quantized_add_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+
+            def forward(self, x):
+                return self.q_func.add(x, x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    def test_quantized_add_relu(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+
+            def forward(self, x):
+                return self.q_func.add_relu(x, x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    def test_quantized_add_relu_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+
+            def forward(self, x):
+                return self.q_func.add_relu(x, x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    def test_quantized_add_scalar(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+
+            def forward(self, x):
+                return self.q_func.add_scalar(x, 0.5)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    def test_quantized_add_scalar_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+
+            def forward(self, x):
+                return self.q_func.add_scalar(x, 0.5)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    def test_quantized_mul(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+
+            def forward(self, x):
+                return self.q_func.mul(x, x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    def test_quantized_mul_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+
+            def forward(self, x):
+                return self.q_func.mul(x, x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    def test_quantized_mul_scalar(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+
+            def forward(self, x):
+                return self.q_func.mul_scalar(x, 0.5)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    def test_quantized_mul_scalar_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+
+            def forward(self, x):
+                return self.q_func.mul_scalar(x, 0.5)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    def test_quantized_cat(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+
+            def forward(self, x):
+                return self.q_func.cat([x, x], 1)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    def test_quantized_cat_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.QFunctional()
+                # TFLite requires same qparams for all inputs and outputs
+                self.q_func.scale = 0.5
+                self.q_func.zero_point = 128
+
+            def forward(self, x):
+                return self.q_func.cat([x, x], 1)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Hardswish'), 'Quantized hardswish is not supported')
+    def test_quantized_hardswish(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.Hardswish(0.5, 128)
+
+            def forward(self, x):
+                return self.q_func(x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Hardswish'), 'Quantized hardswish is not supported')
+    def test_quantized_hardswish_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.Hardswish(0.5, 128)
+
+            def forward(self, x):
+                return self.q_func(x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Hardswish'), 'Quantized hardswish is not supported')
+    def test_quantized_elu_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.ELU(0.5, 128)
+
+            def forward(self, x):
+                return self.q_func(x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Hardswish'), 'Quantized hardswish is not supported')
+    def test_quantized_relu6(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.Hardswish(0.5, 128)
+
+            def forward(self, x):
+                return self.q_func(x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Hardswish'), 'Quantized hardswish is not supported')
+    def test_quantized_hardswish_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.Hardswish(0.5, 128)
+
+            def forward(self, x):
+                return self.q_func(x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
 
 if __name__ == '__main__':
