@@ -1,6 +1,7 @@
 import copy
 import logging
 import os
+import sys
 import queue
 import typing
 
@@ -93,8 +94,17 @@ class QATQuantizer(object):
 
         self.parse_config(config)
 
-        if self.backend != 'qnnpack':
+        if sys.platform == 'win32' and self.backend == 'qnnpack':
+            log.error('Quantization backend qnnpack is likely unsupported on Windows. Please use fbgemm instead.')
+
+        if self.backend not in ('fbgemm', 'qnnpack'):
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
+
+        if self.backend == 'fbgemm':
+            assert self.asymmetric, "Symmetric quantizaton for FBGEMM not supported"
+            assert (
+                not self.per_tensor
+            ), "Per-tensor quantizaton for FBGEMM not supported, please use per-channel quantization instead"
 
     def parse_config(self, config: typing.Optional[dict]):
         default_values = {
@@ -341,22 +351,46 @@ class QATQuantizer(object):
                     ch_axis=0,
                 )
                 qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
+        elif self.backend == 'fbgemm':
+            fq_type = qconfig.weight.p.func
+            sym_fq = fq_type.with_args(
+                observer=torch_q.MovingAverageMinMaxObserver,
+                quant_min=-128,
+                quant_max=127,
+                dtype=torch.qint8,
+                qscheme=torch.per_tensor_symmetric,
+                reduce_range=False,
+            )
+            qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
         else:
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
 
         torch.backends.quantized.engine = backend
         graph.module.qconfig = qconfig
-        if qconfig_c is not None:
-            q = queue.Queue()
-            q.put(graph.module)
+        if self.backend == 'qnnpack':
+            if qconfig_c is not None:
+                q = queue.Queue()
+                q.put(graph.module)
 
-            while not q.empty():
-                m = q.get()
-                if type(m).__name__ in ('Conv2d', 'ConvBnReLU2d', 'ConvBn2d', 'ConvReLU2d'):
-                    m.qconfig = qconfig_c
-                else:
-                    for c in m.children():
-                        q.put(c)
+                while not q.empty():
+                    m = q.get()
+                    if type(m).__name__ in ('Conv2d', 'ConvBnReLU2d', 'ConvBn2d', 'ConvReLU2d'):
+                        m.qconfig = qconfig_c
+                    else:
+                        for c in m.children():
+                            q.put(c)
+        elif self.backend == 'fbgemm':
+            if qconfig_c is not None:
+                q = queue.Queue()
+                q.put(graph.module)
+
+                while not q.empty():
+                    m = q.get()
+                    if type(m).__name__ in ('Linear', 'LinearReLU'):
+                        m.qconfig = qconfig_c
+                    else:
+                        for c in m.children():
+                            q.put(c)
 
     def prepare_qat(
         self,
@@ -423,14 +457,15 @@ class QATQuantizer(object):
                         delattr(n.module, "activation_post_process")
 
         if not self.per_tensor:
-            for n, m in graph.module.named_modules():
-                if n.endswith('.weight_fake_quant'):
-                    observer = getattr(m, 'activation_post_process', None)
-                    if observer is not None:
-                        m.quant_min = -127
-                        m.quant_max = 127
-                        observer.quant_min = -127
-                        observer.quant_max = 127
+            if self.backend == 'qnnpack':
+                for n, m in graph.module.named_modules():
+                    if n.endswith('.weight_fake_quant'):
+                        observer = getattr(m, 'activation_post_process', None)
+                        if observer is not None:
+                            m.quant_min = -127
+                            m.quant_max = 127
+                            observer.quant_min = -127
+                            observer.quant_max = 127
 
             self.per_channel_qconfig_post_process(graph)
 
@@ -1171,22 +1206,38 @@ class PostQuantizer(QATQuantizer):
                     dtype=torch.qint8, qscheme=torch.per_channel_symmetric, reduce_range=False, ch_axis=0
                 )
                 qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
+        elif self.backend == 'fbgemm':
+            sym_fq = torch_q.MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric)
+            qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
         else:
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
 
         torch.backends.quantized.engine = backend
         graph.module.qconfig = qconfig
-        if qconfig_c is not None:
-            q = queue.Queue()
-            q.put(graph.module)
+        if self.backend == 'qnnpack':
+            if qconfig_c is not None:
+                q = queue.Queue()
+                q.put(graph.module)
 
-            while not q.empty():
-                m = q.get()
-                if type(m).__name__ in ('Conv2d', 'ConvBnReLU2d', 'ConvBn2d', 'ConvReLU2d'):
-                    m.qconfig = qconfig_c
-                else:
-                    for c in m.children():
-                        q.put(c)
+                while not q.empty():
+                    m = q.get()
+                    if type(m).__name__ in ('Conv2d', 'ConvBnReLU2d', 'ConvBn2d', 'ConvReLU2d'):
+                        m.qconfig = qconfig_c
+                    else:
+                        for c in m.children():
+                            q.put(c)
+        elif self.backend == 'fbgemm':
+            if qconfig_c is not None:
+                q = queue.Queue()
+                q.put(graph.module)
+
+                while not q.empty():
+                    m = q.get()
+                    if type(m).__name__ in ('Linear', 'LinearReLU'):
+                        m.qconfig = qconfig_c
+                    else:
+                        for c in m.children():
+                            q.put(c)
 
     def prepare_qat(
         self,
