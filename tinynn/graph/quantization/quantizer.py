@@ -772,6 +772,23 @@ class QATQuantizer(object):
                 # It is simply too complex for us.
                 op_type = op_kind
             node.module.full_name = f'self.{module_name}.{op_type}'
+            # Inplace operations
+            if node.module.func_type in ['__iadd__', '__imul__', 'add_', 'mul_']:
+                node.module.add_alias(node.module.tensor_names[0])
+                q = queue.Queue()
+                q.put(node.prev_nodes[0])
+                while not q.empty():
+                    n = q.get()
+                    if type(n.module) == TraceFunction:
+                        prev_aliases = n.module.get_aliases()
+                        if prev_aliases is not None:
+                            for pa in reversed(prev_aliases):
+                                node.module.add_alias(pa, head=True)
+                    else:
+                        if getattr(n.module, 'inplace', False):
+                            q.put(n.prev_nodes[0])
+                            node.module.add_alias(n.prev_node_unique_name(0), head=True)
+
             # We need to convert radd to normal add here
             if node.module.func_type in ['__radd__', '__rmul__']:
                 if '=' in node.module.args_string_no_self or ', ' in node.module.args_string_no_self:
@@ -814,9 +831,38 @@ class QATQuantizer(object):
                 next_module = next_node.module
                 next_class = type(next_module)
                 if next_class == TraceFunction:
-                    return next_module.kind == 'relu'
+                    fuse = next_module.kind == 'relu'
                 else:
-                    return next_class.__name__ == 'ReLU'
+                    fuse = next_class.__name__ == 'ReLU'
+
+                if not fuse:
+                    return False
+
+                if type(next_node.module) == TraceFunction:
+                    inplace = next_node.module.func_type == 'relu_' or 'True' in next_node.module.args_string
+                else:
+                    inplace = getattr(next_node.module, 'inplace', False)
+
+                # Inplace check
+                # If add is inplace and relu is not inplace, we need to ensure that all the aliases of
+                # the first operand of add are not used when relu is called.
+                if not inplace:
+                    aliases = cur_module.get_aliases()
+                    if aliases:
+                        q = queue.Queue()
+                        q.put(node.prev_nodes[0])
+                        while not q.empty():
+                            n = q.get()
+                            last_order = max((x.forward_order for x in n.next_nodes))
+                            if last_order > node.forward_order:
+                                fuse = False
+                                break
+                            if type(n.module) == TraceFunction and n.module.get_aliases():
+                                q.put(n.prev_nodes[0])
+                            elif getattr(n.module, 'inplace', False):
+                                q.put(n.prev_nodes[0])
+
+                return fuse
 
         add_relu_fusable_nodes = graph.filter_forward_nodes(_is_add_relu_fusable_node)
         for node in add_relu_fusable_nodes:
@@ -825,7 +871,18 @@ class QATQuantizer(object):
             kind = 'add_relu'
             func_type = kind
             is_class = False
+            if type(next_node.module) == TraceFunction:
+                inplace = next_node.module.func_type == 'relu_' or 'True' in next_node.module.args_string
+            else:
+                inplace = next_node.module.inplace
             graph.fuse_nodes_to_func([node, node.next_nodes[0]], full_name, kind, func_type, is_class)
+            # Propagate aliases for inplace nodes
+            if inplace:
+                aliases = node.module.get_aliases()
+                if aliases:
+                    node.module.add_alias(node.module.tensor_names[0])
+            else:
+                node.module.aliases = None
 
         # Rewrite relu, relu6 as nn.ReLU() and nn.ReLU6() for Module fusable rules
         def _is_relu_functional_node(node: TraceNode, custom_data):

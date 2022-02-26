@@ -372,6 +372,9 @@ class TraceFunction(object):
         # Whether it is a property
         self.is_property = is_property
 
+        # Alias
+        self.aliases = None
+
         # Arguments
         self.args = None
         self.kargs = None
@@ -604,6 +607,19 @@ class TraceFunction(object):
     def get_tensor_name(self, index):
         """Retrieves the tensor name at the given index"""
         return self.tensor_names[index]
+
+    def add_alias(self, name, head=False):
+        """Adds an aliases of the tensor"""
+        if self.aliases is None:
+            self.aliases = []
+        if head:
+            self.aliases.insert(0, name)
+        else:
+            self.aliases.append(name)
+
+    def get_aliases(self):
+        """Retrieves the aliases of the tensor"""
+        return self.aliases
 
 
 @contextlib.contextmanager
@@ -1742,7 +1758,11 @@ class TraceGraph(object):
                 first_arg = None
                 if node.is_class():
                     first_arg = node.prev_node_unique_name(0)
-                line = f"        {output} = {node.module.extra_expr(first=first_arg)}"
+                aliases = node.module.get_aliases()
+                prefix = ''
+                if aliases is not None:
+                    prefix = ''.join([f'{x} = ' for x in aliases])
+                line = f"        {prefix}{output} = {node.module.extra_expr(first=first_arg)}"
             else:
                 line = f"        {output} = self.{node.unique_name}({param})"
             lines.append(line)
