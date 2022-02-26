@@ -4,7 +4,7 @@ on: [pull_request]
 
 jobs:
   unit-test:
-    name: Full tests for ${{ matrix.os }}
+    name: Full tests for ${{ matrix.os }}, PyTorch ${{ matrix.vers.pt_ver }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -43,7 +43,7 @@ jobs:
       - name: Install TinyNeuralNetwork
         run: python setup.py install
       - name: Install test dependencies
-        run: pip install flake8 tensorflow pytest interval
+        run: pip install flake8 tensorflow pytest interval scipy
       - name: Lint checks
         run: python -m flake8
       - name: Run tests
