@@ -112,7 +112,11 @@ class TestModelMeta(type):
 
                 inputs = prepare_inputs(m)
 
-                quantizer = QATQuantizer(m, inputs, work_dir='out', config={'remove_weights_after_load': True})
+                config = {'remove_weights_after_load': True}
+                if sys.platform == 'win32':
+                    config.update({'backend': 'fbgemm', 'per_tensor': False})
+
+                quantizer = QATQuantizer(m, inputs, work_dir='out', config=config)
                 qat_model = quantizer.quantize()
 
             return qat_model, inputs
@@ -138,9 +142,12 @@ class TestModelMeta(type):
 
                 out_path = f'out/{model_file}.tflite'
                 out_pt = f'out/{model_file}.pt'
-                converter = TFLiteConverter(
-                    qat_model, inputs, out_path, dump_jit_model_path=out_pt, gc_when_reload=True
-                )
+
+                extra_kwargs = {'gc_when_reload': True}
+                if sys.platform == 'win32':
+                    extra_kwargs.update({'quantize_target_type': 'int8'})
+
+                converter = TFLiteConverter(qat_model, inputs, out_path, dump_jit_model_path=out_pt, **extra_kwargs)
                 converter.convert()
 
                 os.remove(out_pt)
@@ -155,7 +162,6 @@ class TestModelMeta(type):
         return f
 
 
-@unittest.skipIf(sys.platform == 'win32', 'Quantization cannot be performed on Windows')
 class TestModel(unittest.TestCase, metaclass=TestModelMeta):
     pass
 

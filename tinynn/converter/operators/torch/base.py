@@ -405,12 +405,14 @@ class OperatorConverter(ABC):
             pad_input = ops[fill_nan_index - 1].outputs[0]
             if pad_input.quantization is not None:
                 if self.q_type == np.uint8:
+                    nan = 0
                     constant_arr = tfl.FakeQuantTensor(
                         np.zeros(1, dtype=pad_input.dtype),
                         pad_input.quantization.scale,
                         pad_input.quantization.zero_point,
                     )
                 else:
+                    nan = -128
                     constant_arr = tfl.FakeQuantTensor(
                         np.array([-128], dtype=pad_input.dtype),
                         pad_input.quantization.scale,
