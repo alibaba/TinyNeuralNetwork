@@ -11,6 +11,18 @@ import numpy as np
 from tinynn.converter import TFLiteConverter
 
 
+def assert_close(actual, expected, *args, **kwargs):
+    if hasattr(torch.testing, 'assert_close'):
+        torch.testing.assert_close(actual, expected, *args, **kwargs)
+    else:
+        filtered_kwargs = {k: v for k, v in kwargs.items() if not k.startswith('check_')}
+        if 'msg' in filtered_kwargs:
+            msg = filtered_kwargs['msg']
+            if not isinstance(msg, str):
+                filtered_kwargs['msg'] = msg()
+        torch.testing.assert_allclose(actual, expected, *args, **filtered_kwargs)
+
+
 def tfl_run_model(path, inputs, outputs):
     interpreter = tf.lite.Interpreter(model_path=path)
 
@@ -72,7 +84,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_masked_fill_tensor(self):
         class TestModel(nn.Module):
@@ -91,7 +103,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_masked_fill_tensor_with_cast(self):
         class TestModel(nn.Module):
@@ -110,7 +122,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_masked_fill_tensor_with_tensor(self):
         class TestModel(nn.Module):
@@ -129,7 +141,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_binary_elementwise_same_dtype(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -162,7 +174,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(*inputs)
             tfl_output = tfl_run_model(model_path, inputs, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_binary_elementwise_constant_same_dtype(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -194,7 +206,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_binary_elementwise_different_dtype(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -227,7 +239,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(*inputs)
             tfl_output = tfl_run_model(model_path, inputs, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_binary_elementwise_constant_different_dtype(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -259,7 +271,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_binary_elementwise_scalar_int(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -290,7 +302,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_binary_elementwise_scalar_float(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -321,7 +333,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_where_int_scalars(self):
         class TestModel(nn.Module):
@@ -340,7 +352,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_dtype=False)
+        assert_close(dummy_output, tfl_output, check_dtype=False)
 
     def test_where_float_scalars(self):
         class TestModel(nn.Module):
@@ -359,7 +371,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_dtype=False)
+        assert_close(dummy_output, tfl_output, check_dtype=False)
 
     def test_where_tensor_scalar(self):
         class TestModel(nn.Module):
@@ -378,7 +390,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_dtype=False)
+        assert_close(dummy_output, tfl_output, check_dtype=False)
 
     def test_where_scalar_tensor(self):
         class TestModel(nn.Module):
@@ -397,7 +409,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_dtype=False)
+        assert_close(dummy_output, tfl_output, check_dtype=False)
 
     def test_where_tensors(self):
         class TestModel(nn.Module):
@@ -416,7 +428,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_reduce_ops_no_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -439,7 +451,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
     def test_reduce_ops_single_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -463,7 +475,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg)
+            assert_close(dummy_output, tfl_output, msg=msg)
 
     def test_reduce_ops_single_dim_keepdim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -487,7 +499,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg)
+            assert_close(dummy_output, tfl_output, msg=msg)
 
     def test_reduce_ops_multi_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -510,7 +522,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
     def test_reduce_ops_multi_dim_keepdim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -533,7 +545,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
     def test_unary_bitwise_ops(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32) > 0
@@ -555,7 +567,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_binary_bitwise_ops_scalar(self):
         raise unittest.SkipTest('Cannot go through torch.jit.trace')
@@ -582,7 +594,7 @@ class ConverterOPTester(unittest.TestCase):
 
                 dummy_output = model(dummy_input)
                 tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-                torch.testing.assert_close(dummy_output, tfl_output)
+                assert_close(dummy_output, tfl_output)
 
     def test_binary_bitwise_ops_tensor(self):
         dummy_input_1 = torch.randn(1, 3, 224, 224, dtype=torch.float32) > 0
@@ -609,7 +621,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(*dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_activation_ops_no_args(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -641,7 +653,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_activation_ops_approx_no_args(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -662,7 +674,7 @@ class ConverterOPTester(unittest.TestCase):
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
 
             with self.assertRaisesRegex(AssertionError, r'.* are not close!.*'):
-                torch.testing.assert_close(dummy_output, tfl_output)
+                assert_close(dummy_output, tfl_output)
 
     def test_prelu(self):
         class Model(nn.Module):
@@ -684,7 +696,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_prelu_multi_channel(self):
         class Model(nn.Module):
@@ -706,7 +718,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_prelu_multi_channel_with_transposes(self):
         class Model(nn.Module):
@@ -731,7 +743,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_prelu_with_reshapes(self):
         class Model(nn.Module):
@@ -756,7 +768,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_prelu_multi_channel_with_reshapes(self):
         class Model(nn.Module):
@@ -781,7 +793,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_softmax_like_funcs(self):
         dummy_input = torch.randn(1, 1000, dtype=torch.float32)
@@ -800,7 +812,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_argminmax(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -819,7 +831,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output, check_dtype=False)
+            assert_close(dummy_output, tfl_output, check_dtype=False)
 
     def test_argminmax_keepdim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -838,7 +850,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output, check_dtype=False)
+            assert_close(dummy_output, tfl_output, check_dtype=False)
 
     def test_noops(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -858,7 +870,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_float_unary_ops(self):
         random_val = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -880,7 +892,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_pow_scalar(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -894,7 +906,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_pow_tensor(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -911,7 +923,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_reshape_ops_no_args(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -931,7 +943,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_flatten_with_args(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -945,7 +957,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_reshape_ops_with_shapes(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -965,7 +977,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_squeeze_with_args(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -979,7 +991,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_unsqueeze_with_args(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -993,7 +1005,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_transpose(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1007,7 +1019,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_t_1d(self):
         dummy_input = torch.randn(4, dtype=torch.float32)
@@ -1021,7 +1033,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_t_2d(self):
         dummy_input = torch.randn(4, 3, dtype=torch.float32)
@@ -1035,7 +1047,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_permute(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1049,7 +1061,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_clamp_hardtanh(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1073,7 +1085,7 @@ class ConverterOPTester(unittest.TestCase):
 
                 dummy_output = model(dummy_input)
                 tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-                torch.testing.assert_close(dummy_output, tfl_output)
+                assert_close(dummy_output, tfl_output)
 
     def test_flip_single_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1087,7 +1099,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_flip_multi_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1101,7 +1113,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_cat_no_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1115,7 +1127,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_cat_self_no_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1129,7 +1141,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_cat_self_negative_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1143,7 +1155,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_cat_constant_negative_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1158,7 +1170,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_cat_tensors_negative_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1174,7 +1186,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(*dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_stack_no_arg(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1188,7 +1200,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_stack_self(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1202,7 +1214,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_stack_self_negative_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1216,7 +1228,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_floor_div_scalar(self):
         dummy_input = torch.randint(0, 100, size=(1, 3, 224, 224)).int()
@@ -1230,7 +1242,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_floor_div_tensor(self):
         dummy_input = torch.randint(0, 100, size=(1, 3, 224, 224)).int()
@@ -1245,7 +1257,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_floor_div_tensor_different_dtype(self):
         dummy_input = torch.randint(0, 100, size=(1, 3, 224, 224)).int()
@@ -1261,7 +1273,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(*dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_pixel_shuffle_no_reorder(self):
         dummy_input = torch.randn(1, 9, 1, 1, dtype=torch.float32)
@@ -1275,7 +1287,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_pixel_unshuffle_no_reorder(self):
         dummy_input = torch.randn(1, 1, 3, 3, dtype=torch.float32)
@@ -1289,7 +1301,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_pixel_shuffle_with_reorder(self):
         dummy_input = torch.randn(1, 36, 7, 7, dtype=torch.float32)
@@ -1303,7 +1315,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_pixel_unshuffle_with_reorder(self):
         dummy_input = torch.randn(1, 12, 21, 21, dtype=torch.float32)
@@ -1317,7 +1329,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_embedding_1d(self):
         dummy_input = torch.randint(0, 100, size=(100,))
@@ -1338,7 +1350,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_embedding_2d(self):
         dummy_input = torch.randint(0, 100, size=(10, 10))
@@ -1359,7 +1371,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_embedding_3d(self):
         dummy_input = torch.randint(0, 1000, size=(10, 10, 10))
@@ -1381,7 +1393,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_embedding_3d_with_padding_idx(self):
         dummy_input = torch.randint(0, 1000, size=(10, 10, 10))
@@ -1402,7 +1414,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_split_chunk_divisible(self):
         dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
@@ -1422,7 +1434,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+            assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_split_chunk_non_divisible(self):
         dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
@@ -1442,7 +1454,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+            assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_split_chunk_negative_dim(self):
         dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
@@ -1462,7 +1474,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+            assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_split_with_sizes(self):
         dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
@@ -1476,7 +1488,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_chunk_divisible(self):
         dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
@@ -1490,7 +1502,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_chunk_indivisible(self):
         dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
@@ -1504,7 +1516,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_chunk_indivisible_negative_dim(self):
         dummy_input = torch.randn(1, 9, 224, 224, dtype=torch.float32)
@@ -1518,7 +1530,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_repeat_single_dim(self):
         dummy_input = torch.randn(10, dtype=torch.float32)
@@ -1532,7 +1544,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_repeat_multi_dim(self):
         dummy_input = torch.randn(10, dtype=torch.float32)
@@ -1546,7 +1558,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_expand_simple(self):
         dummy_input = torch.randn(3, 1, dtype=torch.float32)
@@ -1560,7 +1572,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_expand_negative_dim(self):
         dummy_input = torch.randn(3, 1, dtype=torch.float32)
@@ -1574,7 +1586,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_expand_more_dims(self):
         dummy_input = torch.randn(3, 1, dtype=torch.float32)
@@ -1588,7 +1600,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_expand_noop(self):
         dummy_input = torch.randn(3, 1, dtype=torch.float32)
@@ -1602,7 +1614,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_copy_constant(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1617,7 +1629,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_copy_constant_broadcast(self):
         dummy_input = torch.randn(224, dtype=torch.float32)
@@ -1632,7 +1644,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_copy_constant_broadcast_with_cast(self):
         dummy_input = torch.randint(0, 100, size=(224,), dtype=torch.int32)
@@ -1647,7 +1659,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_2d_matmuls_constant(self):
         dummy_input = torch.randn(9, 17, dtype=torch.float32)
@@ -1668,7 +1680,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_2d_matmuls_tensor(self):
         mat1 = torch.randn(9, 17, dtype=torch.float32)
@@ -1690,7 +1702,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(*dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_3d_matmuls_constant(self):
         dummy_input = torch.randn(1, 9, 17, dtype=torch.float32)
@@ -1711,7 +1723,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_3d_matmuls_tensor(self):
         mat1 = torch.randn(1, 9, 17, dtype=torch.float32)
@@ -1733,7 +1745,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(*dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_3d_2d_matmul_constant(self):
         dummy_input = torch.randn(1, 9, 17, dtype=torch.float32)
@@ -1748,7 +1760,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_3d_2d_matmul_tensor(self):
         mat1 = torch.randn(1, 9, 17, dtype=torch.float32)
@@ -1764,7 +1776,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(*dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_2d_linear(self):
         dummy_input = torch.randn(9, 17, dtype=torch.float32)
@@ -1786,7 +1798,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_3d_linear(self):
         dummy_input = torch.randn(1, 9, 17, dtype=torch.float32)
@@ -1808,7 +1820,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_2d_linear_no_bias(self):
         dummy_input = torch.randn(9, 17, dtype=torch.float32)
@@ -1830,7 +1842,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_3d_linear_no_bias(self):
         dummy_input = torch.randn(1, 9, 17, dtype=torch.float32)
@@ -1852,7 +1864,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_addmm(self):
         dummy_input = torch.randn(9, 17, dtype=torch.float32)
@@ -1868,7 +1880,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_pooling(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1888,7 +1900,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_pooling_with_pad(self):
         dummy_input = torch.randn(1, 3, 220, 222, dtype=torch.float32)
@@ -1908,7 +1920,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_pooling_with_stride(self):
         dummy_input = torch.randn(1, 3, 220, 222, dtype=torch.float32)
@@ -1928,7 +1940,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            torch.testing.assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_max_pool_with_ceil_mode(self):
         dummy_input = torch.randn(1, 3, 112, 112, dtype=torch.float32)
@@ -1942,7 +1954,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_adaptive_pool(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1956,7 +1968,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_adaptive_pool_2(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1970,7 +1982,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_adaptive_pool_3(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1984,7 +1996,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_adaptive_pool_4(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -1998,7 +2010,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_constant_pad_1d(self):
         dummy_input = torch.randn(1, 3, 224, dtype=torch.float32)
@@ -2012,7 +2024,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_constant_pad_2d(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2026,7 +2038,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_constant_pad_2d_with_fill_value(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2040,7 +2052,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_reflection_pad_1d(self):
         dummy_input = torch.randn(1, 3, 224, dtype=torch.float32)
@@ -2054,7 +2066,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_reflection_pad_2d(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2068,7 +2080,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_upsample_bilinear(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2082,7 +2094,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_upsample_bilinear_align_corners(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2096,7 +2108,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_upsample_nearest(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2110,7 +2122,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_upsample_bilinear_output_size(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2124,7 +2136,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_upsample_nearest_output_size(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2138,7 +2150,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_lstm(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
@@ -2160,7 +2172,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_lstm_no_bias(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
@@ -2182,7 +2194,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_lstm_batch_first(self):
         dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
@@ -2204,7 +2216,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_lstm_multi_layer(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
@@ -2226,7 +2238,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_lstm_multi_layer_no_bias(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
@@ -2248,7 +2260,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_bilstm(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
@@ -2270,7 +2282,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_bilstm_no_bias(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
@@ -2292,7 +2304,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_bilstm_batch_first(self):
         dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
@@ -2314,7 +2326,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_bilstm_multi_layer(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
@@ -2336,7 +2348,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_bilstm_multi_layer_no_bias(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
@@ -2358,7 +2370,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_sigmoid_(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2373,7 +2385,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input.clone())
         tfl_output = tfl_run_model(model_path, dummy_input.clone(), dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_type_as(self):
         dummy_input_1 = torch.randint(1, 100, (1, 3, 224, 224), dtype=torch.int32)
@@ -2389,7 +2401,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(*dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_to(self):
         dummy_input_1 = torch.randint(1, 100, size=(1, 3, 224, 224), dtype=torch.int32)
@@ -2405,7 +2417,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(*dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_slice(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2420,7 +2432,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_slice_no_end(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2435,7 +2447,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_slice_no_start(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2450,7 +2462,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_slice_negative_start(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2465,7 +2477,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_slice_negative_end(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2480,7 +2492,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_slice_with_step(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2495,7 +2507,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, check_stride=False)
+        assert_close(dummy_output, tfl_output, check_stride=False)
 
     def test_select(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2510,7 +2522,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_select_negative_index(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2525,7 +2537,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_index(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2540,7 +2552,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_index_negative_index(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2555,7 +2567,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_index_tensor_indices(self):
         dummy_input_1 = torch.randn(10, 10, dtype=torch.float32)
@@ -2572,7 +2584,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(*dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_index_multi_dim(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2587,7 +2599,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_gather(self):
         dummy_input = torch.randn(10, dtype=torch.float32)
@@ -2602,7 +2614,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_gather_negative_dim(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
@@ -2617,7 +2629,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_gather_tensor_indices(self):
         dummy_input_1 = torch.randn(10, 10, dtype=torch.float32)
@@ -2634,7 +2646,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(*dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_var_std_no_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2659,7 +2671,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
     def test_var_std_ops_single_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2682,7 +2694,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg)
+            assert_close(dummy_output, tfl_output, msg=msg)
 
     def test_var_std_ops_single_dim_unbiased(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2705,7 +2717,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg)
+            assert_close(dummy_output, tfl_output, msg=msg)
 
     def test_var_std_single_dim_keepdim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2728,7 +2740,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg)
+            assert_close(dummy_output, tfl_output, msg=msg)
 
     def test_var_std_multi_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2751,7 +2763,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
     def test_var_std_multi_dim_keepdim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2774,7 +2786,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
     def test_norms(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2804,7 +2816,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
     def test_conv(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2830,7 +2842,7 @@ class ConverterOPTester(unittest.TestCase):
         def msg(*args, **kwargs):
             return f'testing failed: {args}'
 
-        torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+        assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
     def test_conv_no_bias(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2856,7 +2868,7 @@ class ConverterOPTester(unittest.TestCase):
         def msg(*args, **kwargs):
             return f'testing failed: {args}'
 
-        torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+        assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
     def test_conv_transpose(self):
         dummy_input = torch.randn(1, 16, 50, 100, dtype=torch.float32)
@@ -2882,7 +2894,7 @@ class ConverterOPTester(unittest.TestCase):
         def msg(*args, **kwargs):
             return f'testing failed: {args}'
 
-        torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+        assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
     def test_conv_transpose_no_bias(self):
         dummy_input = torch.randn(1, 16, 50, 100, dtype=torch.float32)
@@ -2908,7 +2920,7 @@ class ConverterOPTester(unittest.TestCase):
         def msg(*args, **kwargs):
             return f'testing failed: {args}'
 
-        torch.testing.assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+        assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
 
 @unittest.skipIf(sys.platform == 'win32', 'Quantization cannot be performed on Windows')
@@ -2925,7 +2937,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
 
         dummy_output = torch.int_repr(model(dummy_input))
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1.0, rtol=1.0)
+        assert_close(dummy_output, tfl_output, atol=1.0, rtol=1.0)
 
     def test_quantize_int8(self):
         def model(x):
@@ -2939,7 +2951,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
 
         dummy_output = u8_to_s8(torch.int_repr(model(dummy_input)))
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1.0, rtol=1.0)
+        assert_close(dummy_output, tfl_output, atol=1.0, rtol=1.0)
 
     def test_dequantize(self):
         def model(x):
@@ -2954,7 +2966,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=0.5, rtol=0.5)
+        assert_close(dummy_output, tfl_output, atol=0.5, rtol=0.5)
 
     def test_dequantize_int8(self):
         def model(x):
@@ -2969,7 +2981,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=0.5, rtol=0.5)
+        assert_close(dummy_output, tfl_output, atol=0.5, rtol=0.5)
 
     def test_quantized_add(self):
         class Model(nn.Module):
@@ -2992,7 +3004,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     def test_quantized_add_int8(self):
         class Model(nn.Module):
@@ -3015,7 +3027,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     def test_quantized_add_relu(self):
         class Model(nn.Module):
@@ -3038,7 +3050,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     def test_quantized_add_relu_int8(self):
         class Model(nn.Module):
@@ -3061,7 +3073,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     def test_quantized_add_scalar(self):
         class Model(nn.Module):
@@ -3084,7 +3096,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     def test_quantized_add_scalar_int8(self):
         class Model(nn.Module):
@@ -3107,7 +3119,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     def test_quantized_mul(self):
         class Model(nn.Module):
@@ -3130,7 +3142,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     def test_quantized_mul_int8(self):
         class Model(nn.Module):
@@ -3153,7 +3165,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     def test_quantized_mul_scalar(self):
         class Model(nn.Module):
@@ -3176,7 +3188,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     def test_quantized_mul_scalar_int8(self):
         class Model(nn.Module):
@@ -3199,7 +3211,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     def test_quantized_cat(self):
         class Model(nn.Module):
@@ -3222,7 +3234,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     def test_quantized_cat_int8(self):
         class Model(nn.Module):
@@ -3248,7 +3260,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Hardswish'), 'Quantized hardswish is not supported')
     def test_quantized_hardswish(self):
@@ -3272,7 +3284,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Hardswish'), 'Quantized hardswish is not supported')
     def test_quantized_hardswish_int8(self):
@@ -3296,7 +3308,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ELU'), 'Quantized hardswish is not supported')
     def test_quantized_elu_int8(self):
@@ -3320,7 +3332,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ReLU6'), 'Quantized hardswish is not supported')
     def test_quantized_relu6(self):
@@ -3344,7 +3356,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ReLU6'), 'Quantized hardswish is not supported')
     def test_quantized_relu6_int8(self):
@@ -3368,7 +3380,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        torch.testing.assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
 
 if __name__ == '__main__':
