@@ -15,7 +15,7 @@ import numpy as np
 from tinynn.converter import TFLiteConverter
 from tinynn.graph.tracer import model_tracer, trace
 from tinynn.graph.quantization.quantizer import QATQuantizer
-from common_utils import collect_custom_models, collect_torchvision_models, prepare_inputs
+from common_utils import IS_CI, collect_custom_models, collect_torchvision_models, prepare_inputs
 
 
 HAS_TF = False
@@ -141,16 +141,19 @@ class TestModelMeta(type):
                 qat_model = torch.quantization.convert(qat_model)
 
                 out_path = f'out/{model_file}.tflite'
-                out_pt = f'out/{model_file}.pt'
 
-                extra_kwargs = {'gc_when_reload': True}
+                extra_kwargs = {}
+                if IS_CI:
+                    out_pt = f'out/{model_file}.pt'
+                    extra_kwargs.update({'dump_jit_model_path': out_pt, 'gc_when_reload': True})
                 if sys.platform == 'win32':
                     extra_kwargs.update({'quantize_target_type': 'int8'})
 
-                converter = TFLiteConverter(qat_model, inputs, out_path, dump_jit_model_path=out_pt, **extra_kwargs)
+                converter = TFLiteConverter(qat_model, inputs, out_path, **extra_kwargs)
                 converter.convert()
 
-                os.remove(out_pt)
+                if IS_CI:
+                    os.remove(out_pt)
 
                 if HAS_TF:
                     outputs = converter.get_outputs()
@@ -159,7 +162,8 @@ class TestModelMeta(type):
                     tf_outputs = get_tflite_out(out_path, input_tf)
                     self.assertTrue(len(outputs) == len(tf_outputs))
 
-                os.remove(out_path)
+                if IS_CI and os.path.exists(out_path):
+                    os.remove(out_path)
 
         return f
 

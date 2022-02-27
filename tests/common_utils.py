@@ -1,9 +1,13 @@
 import torch
 import torchvision
 
+import os
 import inspect
 
 import models
+
+
+IS_CI = os.getenv('CI', '') == 'true'
 
 
 def collect_torchvision_models():
