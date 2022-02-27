@@ -159,6 +159,8 @@ class TestModelMeta(type):
                     tf_outputs = get_tflite_out(out_path, input_tf)
                     self.assertTrue(len(outputs) == len(tf_outputs))
 
+                os.remove(out_path)
+
         return f
 
 

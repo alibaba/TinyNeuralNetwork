@@ -148,6 +148,8 @@ class TestModelMeta(type):
                             os.remove(out_path)
                             warnings.warn('The results don\'t match exactly')
 
+                os.remove(out_path)
+
         return f
 
 
