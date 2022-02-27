@@ -3003,7 +3003,6 @@ class ConverterOPTester(unittest.TestCase):
         assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
 
-@unittest.skipIf(sys.platform == 'win32', 'Quantization cannot be performed on Windows')
 class ConverterQuantizedOPTester(unittest.TestCase):
     def test_quantize(self):
         def model(x):
