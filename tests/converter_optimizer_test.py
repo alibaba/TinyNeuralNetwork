@@ -163,8 +163,8 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_simple_transpose(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                y = torch.permute(x, [0, 2, 3, 1])
-                y = torch.permute(y, [0, 3, 1, 2])
+                y = x.permute(0, 2, 3, 1)
+                y = y.permute(0, 3, 1, 2)
                 y = F.relu(y)
                 return y
 
@@ -189,9 +189,9 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_unary_elementwise_transpose(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                y = torch.permute(x, [0, 2, 3, 1])
+                y = x.permute(0, 2, 3, 1)
                 y = F.relu(y)
-                y = torch.permute(y, [0, 3, 1, 2])
+                y = y.permute(0, 3, 1, 2)
                 return y
 
         model = TestModel()
@@ -215,9 +215,9 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_binary_elementwise_transpose(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                y = torch.permute(x, [0, 2, 3, 1])
+                y = x.permute(0, 2, 3, 1)
                 y = torch.add(y, y)
-                y = torch.permute(y, [0, 3, 1, 2])
+                y = y.permute(0, 3, 1, 2)
                 return y
 
         model = TestModel()
@@ -241,9 +241,9 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_multiple_elementwise_transpose(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                y = torch.permute(x, [0, 2, 3, 1])
+                y = x.permute(0, 2, 3, 1)
                 y = torch.cat([y, y, y], -1)
-                y = torch.permute(y, [0, 3, 1, 2])
+                y = y.permute(0, 3, 1, 2)
                 return y
 
         model = TestModel()
@@ -267,9 +267,9 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_unary_elementwise_transpose_with_output(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                y = torch.permute(x, [0, 2, 3, 1])
+                y = x.permute(0, 2, 3, 1)
                 y = F.relu(y)
-                z = torch.permute(y, [0, 3, 1, 2])
+                z = y.permute(0, 3, 1, 2)
                 z = F.relu(z)
                 return y, z
 
@@ -433,11 +433,11 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_pad_with_paired_reshape_and_transpose(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                y = torch.permute(x, [0, 2, 3, 1])
+                y = x.permute(0, 2, 3, 1)
                 y = torch.reshape(y, (224, 224, 3))
                 y = F.pad(y, (1, 1), "constant", 0)
                 y = torch.reshape(y, (1, 224, 224, 5))
-                y = torch.permute(y, [0, 3, 1, 2])
+                y = y.permute(0, 3, 1, 2)
                 return y
 
         model = TestModel()
@@ -626,11 +626,11 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_transpose_across_channel_shuffle(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                x = torch.permute(x, [0, 2, 3, 1])
+                x = x.permute(0, 2, 3, 1)
                 x = torch.reshape(x, [1, 2, 112, 224, 3])
                 x = torch.transpose(x, 1, 2)
                 x = torch.reshape(x, [1, 224, 224, 3])
-                x = torch.permute(x, [0, 3, 1, 2])
+                x = x.permute(0, 3, 1, 2)
                 return x
 
         model = TestModel()
@@ -670,11 +670,11 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_transpose_across_channel_shuffle_with_output(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                x = torch.permute(x, [0, 2, 3, 1])
+                x = x.permute(0, 2, 3, 1)
                 x = torch.reshape(x, [1, 2, 112, 224, 3])
                 x = torch.transpose(x, 1, 2)
                 y = torch.reshape(x, [1, 224, 224, 3])
-                y = torch.permute(y, [0, 3, 1, 2])
+                y = y.permute(0, 3, 1, 2)
                 return x, y
 
         model = TestModel()
@@ -720,9 +720,9 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_transpose_across_squeeze(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                x = torch.permute(x, [0, 2, 3, 1])
+                x = x.permute(0, 2, 3, 1)
                 x = torch.reshape(x, [224, 224, 3])
-                x = torch.permute(x, [2, 0, 1])
+                x = x.permute(2, 0, 1)
                 return x
 
         model = TestModel()
@@ -747,9 +747,9 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_transpose_across_unsqueeze(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                x = torch.permute(x, [1, 2, 0])
+                x = x.permute(1, 2, 0)
                 x = torch.reshape(x, [1, 224, 224, 3])
-                x = torch.permute(x, [0, 3, 1, 2])
+                x = x.permute(0, 3, 1, 2)
                 return x
 
         model = TestModel()
@@ -801,9 +801,9 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_branch_expand_transpose(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                y = torch.permute(x, [0, 2, 3, 1])
-                y1 = torch.permute(y, [0, 3, 1, 2])
-                y2 = torch.permute(y, [0, 3, 1, 2])
+                y = x.permute(0, 2, 3, 1)
+                y1 = y.permute(0, 3, 1, 2)
+                y2 = y.permute(0, 3, 1, 2)
                 y = y1 + y2
                 return y
 
@@ -833,9 +833,9 @@ class ConverterOptimizerTester(unittest.TestCase):
                 self.register_buffer('buf1', nn.Parameter(torch.randn(1, 3, 224, 224)))
 
             def forward(self, x):
-                y = torch.permute(self.buf1, [0, 2, 3, 1])
-                y1 = torch.permute(y, [0, 3, 1, 2])
-                y2 = torch.permute(y, [0, 3, 1, 2])
+                y = self.buf1.permute(0, 2, 3, 1)
+                y1 = y.permute(0, 3, 1, 2)
+                y2 = y.permute(0, 3, 1, 2)
                 y = x + y1 + y2
                 return y
 
@@ -877,7 +877,7 @@ class ConverterOptimizerTester(unittest.TestCase):
     def test_unused_tensors_branch_transpose(self):
         class TestModel(nn.Module):
             def forward(self, x):
-                x = torch.permute(x, [0, 2, 3, 1])
+                x = x.permute(0, 2, 3, 1)
                 x = torch.split(x, 1, -1)
                 return [t.permute([0, 3, 1, 2]) for t in x[1:]]
 
