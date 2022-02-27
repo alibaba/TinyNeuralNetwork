@@ -20,7 +20,20 @@ def assert_close(actual, expected, *args, **kwargs):
             msg = filtered_kwargs['msg']
             if not isinstance(msg, str):
                 filtered_kwargs['msg'] = msg()
-        torch.testing.assert_allclose(actual, expected, *args, **filtered_kwargs)
+
+        if not isinstance(actual, (tuple, list)):
+            actual_v = [actual]
+            expected_v = [expected]
+        else:
+            actual_v = actual
+            expected_v = expected
+
+        for a, e in zip(actual_v, expected_v):
+            if not kwargs.get('check_dtype', True):
+                t = torch.promote_types(a.dtype, e.dtype)
+                a = a.to(dtype=t)
+                e = e.to(dtype=t)
+            torch.testing.assert_allclose(a, e, *args, **filtered_kwargs)
 
 
 def tfl_run_model(path, inputs, outputs):
@@ -673,7 +686,7 @@ class ConverterOPTester(unittest.TestCase):
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
 
-            with self.assertRaisesRegex(AssertionError, r'.* are not close!.*'):
+            with self.assertRaisesRegex(AssertionError, r'.* (are not close!|exceeded the margin of error).*'):
                 assert_close(dummy_output, tfl_output)
 
     def test_prelu(self):
@@ -2814,7 +2827,7 @@ class ConverterOPTester(unittest.TestCase):
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
 
             def msg(*args, **kwargs):
-                return f'testing {func.__name__} failed: {args}'
+                return f'testing {type(func).__name__} failed: {args}'
 
             assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
 
