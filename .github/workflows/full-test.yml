@@ -36,7 +36,11 @@ jobs:
           TORCHVISION_VER: ${{ matrix.vers.tv_ver }}
         run: |
          if [ "$RUNNER_OS" == "macOS" ]; then
+            if [ "$TORCHVISION_VER" == "0.9."* ] || [ "$TORCHVISION_VER" == "0.10."* ]; then
+              conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER pillow=6 -c pytorch
+            else
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER -c pytorch
+            fi
          else
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER cpuonly -c pytorch
          fi
