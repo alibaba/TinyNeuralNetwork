@@ -1,12 +1,13 @@
-import unittest
 import sys
+import unittest
 
+from distutils.version import LooseVersion
+
+import numpy as np
+import tensorflow as tf
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import tensorflow as tf
-import numpy as np
 
 from tinynn.converter import TFLiteConverter
 
@@ -160,19 +161,21 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
         dummy_input_1 = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [
-            torch.add,
-            torch.mul,
-            torch.sub,
-            torch.div,
-            torch.greater,
-            torch.remainder,
-            torch.less,
-            torch.greater_equal,
-            torch.less_equal,
-            torch.eq,
-            torch.ne,
+        func_names = [
+            (torch, 'add'),
+            (torch, 'mul'),
+            (torch, 'sub'),
+            (torch, 'div'),
+            (torch, 'greater'),
+            (torch, 'remainder'),
+            (torch, 'less'),
+            (torch, 'greater_equal'),
+            (torch, 'less_equal'),
+            (torch, 'eq'),
+            (torch, 'ne'),
         ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -193,19 +196,21 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
         dummy_input_1 = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [
-            torch.add,
-            torch.mul,
-            torch.sub,
-            torch.div,
-            torch.greater,
-            torch.remainder,
-            torch.less,
-            torch.greater_equal,
-            torch.less_equal,
-            torch.eq,
-            torch.ne,
+        func_names = [
+            (torch, 'add'),
+            (torch, 'mul'),
+            (torch, 'sub'),
+            (torch, 'div'),
+            (torch, 'greater'),
+            (torch, 'remainder'),
+            (torch, 'less'),
+            (torch, 'greater_equal'),
+            (torch, 'less_equal'),
+            (torch, 'eq'),
+            (torch, 'ne'),
         ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -225,19 +230,21 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
         dummy_input_1 = torch.randint(1, 10, size=dummy_input.shape)
 
-        funcs = [
-            torch.add,
-            torch.mul,
-            torch.sub,
-            torch.div,
-            torch.greater,
-            torch.remainder,
-            torch.less,
-            torch.greater_equal,
-            torch.less_equal,
-            torch.eq,
-            torch.ne,
+        func_names = [
+            (torch, 'add'),
+            (torch, 'mul'),
+            (torch, 'sub'),
+            (torch, 'div'),
+            (torch, 'greater'),
+            (torch, 'remainder'),
+            (torch, 'less'),
+            (torch, 'greater_equal'),
+            (torch, 'less_equal'),
+            (torch, 'eq'),
+            (torch, 'ne'),
         ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -258,19 +265,21 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
         dummy_input_1 = torch.randint(1, 10, size=dummy_input.shape)
 
-        funcs = [
-            torch.add,
-            torch.mul,
-            torch.sub,
-            torch.div,
-            torch.greater,
-            torch.remainder,
-            torch.less,
-            torch.greater_equal,
-            torch.less_equal,
-            torch.eq,
-            torch.ne,
+        func_names = [
+            (torch, 'add'),
+            (torch, 'mul'),
+            (torch, 'sub'),
+            (torch, 'div'),
+            (torch, 'greater'),
+            (torch, 'remainder'),
+            (torch, 'less'),
+            (torch, 'greater_equal'),
+            (torch, 'less_equal'),
+            (torch, 'eq'),
+            (torch, 'ne'),
         ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -289,19 +298,21 @@ class ConverterOPTester(unittest.TestCase):
     def test_binary_elementwise_scalar_int(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [
-            torch.add,
-            torch.mul,
-            torch.sub,
-            torch.div,
-            torch.greater,
-            torch.remainder,
-            torch.less,
-            torch.greater_equal,
-            torch.less_equal,
-            torch.eq,
-            torch.ne,
+        func_names = [
+            (torch, 'add'),
+            (torch, 'mul'),
+            (torch, 'sub'),
+            (torch, 'div'),
+            (torch, 'greater'),
+            (torch, 'remainder'),
+            (torch, 'less'),
+            (torch, 'greater_equal'),
+            (torch, 'less_equal'),
+            (torch, 'eq'),
+            (torch, 'ne'),
         ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -320,19 +331,21 @@ class ConverterOPTester(unittest.TestCase):
     def test_binary_elementwise_scalar_float(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [
-            torch.add,
-            torch.mul,
-            torch.sub,
-            torch.div,
-            torch.greater,
-            torch.remainder,
-            torch.less,
-            torch.greater_equal,
-            torch.less_equal,
-            torch.eq,
-            torch.ne,
+        func_names = [
+            (torch, 'add'),
+            (torch, 'mul'),
+            (torch, 'sub'),
+            (torch, 'div'),
+            (torch, 'greater'),
+            (torch, 'remainder'),
+            (torch, 'less'),
+            (torch, 'greater_equal'),
+            (torch, 'less_equal'),
+            (torch, 'eq'),
+            (torch, 'ne'),
         ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -348,6 +361,7 @@ class ConverterOPTester(unittest.TestCase):
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
             assert_close(dummy_output, tfl_output)
 
+    @unittest.skipIf(LooseVersion(torch.__version__) < LooseVersion('1.7.0'), "torch.where cannot take scalar inputs")
     def test_where_int_scalars(self):
         class TestModel(nn.Module):
             def forward(self, x):
@@ -367,6 +381,7 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output, check_dtype=False)
 
+    @unittest.skipIf(LooseVersion(torch.__version__) < LooseVersion('1.7.0'), "torch.where cannot take scalar inputs")
     def test_where_float_scalars(self):
         class TestModel(nn.Module):
             def forward(self, x):
@@ -446,7 +461,17 @@ class ConverterOPTester(unittest.TestCase):
     def test_reduce_ops_no_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [torch.mean, torch.sum, torch.min, torch.max, torch.prod, torch.amin, torch.amax]
+        func_names = [
+            (torch, 'mean'),
+            (torch, 'sum'),
+            (torch, 'min'),
+            (torch, 'max'),
+            (torch, 'prod'),
+            (torch, 'amin'),
+            (torch, 'amax'),
+        ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -469,7 +494,17 @@ class ConverterOPTester(unittest.TestCase):
     def test_reduce_ops_single_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [torch.mean, torch.sum, torch.min, torch.max, torch.prod, torch.amin, torch.amax]
+        func_names = [
+            (torch, 'mean'),
+            (torch, 'sum'),
+            (torch, 'min'),
+            (torch, 'max'),
+            (torch, 'prod'),
+            (torch, 'amin'),
+            (torch, 'amax'),
+        ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -493,7 +528,17 @@ class ConverterOPTester(unittest.TestCase):
     def test_reduce_ops_single_dim_keepdim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [torch.mean, torch.sum, torch.min, torch.max, torch.prod, torch.amin, torch.amax]
+        func_names = [
+            (torch, 'mean'),
+            (torch, 'sum'),
+            (torch, 'min'),
+            (torch, 'max'),
+            (torch, 'prod'),
+            (torch, 'amin'),
+            (torch, 'amax'),
+        ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -517,7 +562,14 @@ class ConverterOPTester(unittest.TestCase):
     def test_reduce_ops_multi_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [torch.mean, torch.sum, torch.amin, torch.amax]
+        func_names = [
+            (torch, 'mean'),
+            (torch, 'sum'),
+            (torch, 'amin'),
+            (torch, 'amax'),
+        ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -540,7 +592,14 @@ class ConverterOPTester(unittest.TestCase):
     def test_reduce_ops_multi_dim_keepdim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [torch.mean, torch.sum, torch.amin, torch.amax]
+        func_names = [
+            (torch, 'mean'),
+            (torch, 'sum'),
+            (torch, 'amin'),
+            (torch, 'amax'),
+        ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -639,20 +698,22 @@ class ConverterOPTester(unittest.TestCase):
     def test_activation_ops_no_args(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [
-            F.relu,
-            F.relu6,
-            F.hardsigmoid,
-            F.hardswish,
-            F.hardtanh,
-            F.glu,
-            F.silu,
-            F.tanh,
-            F.sigmoid,
-            F.softplus,
-            F.elu,
-            F.leaky_relu,
+        func_names = [
+            (F, 'relu'),
+            (F, 'relu6'),
+            (F, 'hardsigmoid'),
+            (F, 'hardswish'),
+            (F, 'hardtanh'),
+            (F, 'glu'),
+            (F, 'silu'),
+            (F, 'tanh'),
+            (F, 'sigmoid'),
+            (F, 'softplus'),
+            (F, 'elu'),
+            (F, 'leaky_relu'),
         ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
 
         for func in funcs:
             print(f'testing {func.__name__}')
@@ -888,7 +949,7 @@ class ConverterOPTester(unittest.TestCase):
     def test_float_unary_ops(self):
         random_val = torch.randn(1, 3, 224, 224, dtype=torch.float32)
         min_val = torch.tensor(0.1, dtype=torch.float32)
-        dummy_input = torch.maximum(random_val, min_val)
+        dummy_input = torch.clamp(random_val, min=min_val)
 
         funcs = [torch.reciprocal, torch.exp, torch.log, torch.sqrt, torch.rsqrt, torch.sin, torch.cos, torch.floor]
 
@@ -1066,7 +1127,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
         def model(x):
-            return torch.permute(x, [0, 2, 3, 1])
+            return x.permute(0, 2, 3, 1)
 
         model_path = get_model_path()
         converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
@@ -1288,6 +1349,7 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    @unittest.skipIf(not hasattr(torch, 'pixel_shuffle'), "Pixel shuffle is not supported")
     def test_pixel_shuffle_no_reorder(self):
         dummy_input = torch.randn(1, 9, 1, 1, dtype=torch.float32)
 
@@ -1302,6 +1364,7 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    @unittest.skipIf(not hasattr(torch, 'pixel_unshuffle'), "Pixel unshuffle is not supported")
     def test_pixel_unshuffle_no_reorder(self):
         dummy_input = torch.randn(1, 1, 3, 3, dtype=torch.float32)
 
@@ -1316,6 +1379,7 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output, check_stride=False)
 
+    @unittest.skipIf(not hasattr(torch, 'pixel_shuffle'), "Pixel shuffle is not supported")
     def test_pixel_shuffle_with_reorder(self):
         dummy_input = torch.randn(1, 36, 7, 7, dtype=torch.float32)
 
@@ -1330,6 +1394,7 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    @unittest.skipIf(not hasattr(torch, 'pixel_unshuffle'), "Pixel unshuffle is not supported")
     def test_pixel_unshuffle_with_reorder(self):
         dummy_input = torch.randn(1, 12, 21, 21, dtype=torch.float32)
 

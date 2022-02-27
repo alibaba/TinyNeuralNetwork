@@ -2260,7 +2260,10 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
                     other_t = new_other
                     # TODO: +/- inf check for variable tensors
                 else:
-                    casted = torch.functional.atleast_1d(casted)
+                    if hasattr(torch.functional, 'atleast_1d'):
+                        casted = torch.functional.atleast_1d(casted)
+                    elif len(casted.shape) == 0:
+                        casted = casted.reshape(1)
                     if torch.isinf(casted).any():
                         log.warning(
                             'aten::masked_fill(input, mask, value) where value=[+/-]inf is not supported, '
