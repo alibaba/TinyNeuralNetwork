@@ -94,7 +94,7 @@ A: There are generally two ways to tackle this problem.
 There are a large number of operators in PyTorch. We cannot cover all operators, but only most of the commonly used ones. Therefore, if you have unsupported operators in your model, you have the following options:
 1. [Submit](https://github.com/alibaba/TinyNeuralNetwork/issues/new/choose) a new issue
 2. You can also try to implement it yourself. The process of operator translation in model conversion is actually the process of mapping between corresponding TorchScript OP and TFLite OP.
-    
+
     The locations of the relevant code
     - TFLite
         - OP schema (without I/O tensors): [generated_ops.py](../tinynn/converter/operators/tflite/generated_ops.py)
