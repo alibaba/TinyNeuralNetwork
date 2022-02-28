@@ -38,13 +38,19 @@ jobs:
           TORCHVISION_VER: ${{ matrix.vers.tv_ver }}
         run: |
          if [ "$RUNNER_OS" == "macOS" ]; then
-            if [[ "$TORCHVISION_VER" == "0.9."* || "$TORCHVISION_VER" == "0.10."* ]]; then
+            if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
+              conda install pytorch torchvision -c pytorch
+            elif [[ "$TORCHVISION_VER" == "0.9."* || "$TORCHVISION_VER" == "0.10."* ]]; then
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER pillow=6 -c pytorch
             else
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER -c pytorch
             fi
          else
+            if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
+              conda install pytorch torchvision cpuonly -c pytorch
+            else
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER cpuonly -c pytorch
+            fi
          fi
       - name: Install TinyNeuralNetwork
         run: python setup.py install
