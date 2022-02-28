@@ -1,6 +1,8 @@
 name: Full tests
 
-on: [pull_request]
+on:
+  schedule:
+    - cron:  '00 19 * * *'
 
 jobs:
   unit-test:
