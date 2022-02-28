@@ -144,7 +144,7 @@ class OneShotChannelPruner(BasePruner):
         self.graph_modifier.unregister_masker()
 
         # Sync parameters after the size of the tensors has been shrunk
-        if dist.is_initialized():
+        if dist.is_available() and dist.is_initialized():
             for ps in self.model.parameters():
                 dist.broadcast(ps, 0)
 

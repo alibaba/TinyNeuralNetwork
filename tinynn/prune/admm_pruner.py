@@ -52,11 +52,11 @@ class ADMMPruner(OneShotChannelPruner):
                 self.context.epoch = epoch + (iteration - 1) * self.admm_epoch
                 self.adjust_learning_rate()
                 self.context.criterion = self.construct_admm_criterion(old_criterion)
-                if dist.is_initialized():
+                if dist.is_available() and dist.is_initialized():
                     self.context.train_loader.sampler.set_epoch(self.context.epoch)
                 self.context.train_func(self.model, self.context)
 
-                if not dist.is_initialized() or dist.get_rank() == 0:
+                if not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0:
                     if self.context.epoch % self.admm_save_freq == 0:
                         save_path = os.path.join(self.admm_dir, f'epoch_{self.context.epoch}.pth')
                         os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -66,7 +66,7 @@ class ADMMPruner(OneShotChannelPruner):
                     if self.context.validate_func is not None and self.context.epoch % self.admm_valid_freq == 0:
                         # According to https://github.com/pytorch/pytorch/issues/54059, when validating via DDP,
                         # it needs to be done on the original module.
-                        if dist.is_initialized():
+                        if dist.is_available() and dist.is_initialized():
                             self.context.validate_func(self.model.module, self.context)
                         else:
                             self.context.validate_func(self.model, self.context)
@@ -142,7 +142,7 @@ class ADMMPruner(OneShotChannelPruner):
                     self.U[m.unique_name()] = weight - self.Z[m.unique_name()] + self.U[m.unique_name()]
 
         # Sync ADMM parameters
-        if dist.is_initialized():
+        if dist.is_available() and dist.is_initialized():
             for state in (self.U, self.Z):
                 for param in state.values():
                     dist.broadcast(param, 0)

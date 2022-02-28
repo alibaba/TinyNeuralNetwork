@@ -139,7 +139,7 @@ class BasePruner(ABC):
             config = yaml.load(f, Loader=yaml.RoundTripLoader)
         return config
 
-    @conditional(lambda: not dist.is_initialized() or dist.get_rank() == 0)
+    @conditional(lambda: not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0)
     def generate_config(self, path: str, config: dict = None) -> None:
         """Generates a new copy the updated configuration with the given path"""
 

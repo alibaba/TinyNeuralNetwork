@@ -10,12 +10,13 @@ on:
 
 jobs:
   unit-test:
-    name: Unit tests for ${{ matrix.os }}
+    name: Unit tests for ${{ matrix.os }}, PyTorch ${{ matrix.vers.pt_ver }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        vers: [ {pt_ver: "1.6.0", tv_ver: "0.7.0"}, {pt_ver: "latest", tv_ver: "latest"} ]
     defaults:
       run:
         shell: bash -l {0}
@@ -26,16 +27,29 @@ jobs:
           auto-update-conda: true
           python-version: 3.8
       - name: Install PyTorch
+        env:
+          PYTORCH_VER: ${{ matrix.vers.pt_ver }}
+          TORCHVISION_VER: ${{ matrix.vers.tv_ver }}
         run: |
          if [ "$RUNNER_OS" == "macOS" ]; then
+            if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
               conda install pytorch torchvision -c pytorch
+            elif [[ "$TORCHVISION_VER" == "0.9."* || "$TORCHVISION_VER" == "0.10."* ]]; then
+              conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER pillow=6 -c pytorch
+            else
+              conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER -c pytorch
+            fi
          else
+            if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
               conda install pytorch torchvision cpuonly -c pytorch
+            else
+              conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER cpuonly -c pytorch
+            fi
          fi
       - name: Install TinyNeuralNetwork
         run: python setup.py install
       - name: Install test dependencies
-        run: pip install black flake8 tensorflow
+        run: pip install black flake8 tensorflow scipy
       - name: Lint checks
         run: python -m flake8
       - name: Style checks
