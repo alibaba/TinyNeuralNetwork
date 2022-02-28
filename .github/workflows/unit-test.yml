@@ -49,7 +49,7 @@ jobs:
       - name: Install TinyNeuralNetwork
         run: python setup.py install
       - name: Install test dependencies
-        run: pip install black flake8 tensorflow
+        run: pip install black flake8 tensorflow scipy
       - name: Lint checks
         run: python -m flake8
       - name: Style checks
