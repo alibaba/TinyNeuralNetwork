@@ -13,7 +13,7 @@ import warnings
 import numpy as np
 
 from tinynn.converter import TFLiteConverter
-from common_utils import collect_custom_models, collect_torchvision_models, prepare_inputs
+from common_utils import IS_CI, collect_custom_models, collect_torchvision_models, prepare_inputs
 
 
 HAS_TF = False
@@ -117,15 +117,22 @@ class TestModelMeta(type):
 
             with torch.no_grad():
                 out_path = f'out/{model_file}.tflite'
-                out_pt = f'out/{model_file}.pt'
-                converter = TFLiteConverter(m, inputs, out_path, dump_jit_model_path=out_pt, gc_when_reload=True)
 
-                # Remove original model to lower memory usage
-                del m
+                extra_kwargs = {}
+                if IS_CI:
+                    out_pt = f'out/{model_file}.pt'
+                    extra_kwargs.update({'dump_jit_model_path': out_pt, 'gc_when_reload': True})
+
+                converter = TFLiteConverter(m, inputs, out_path, **extra_kwargs)
+
+                if IS_CI:
+                    # Remove original model to lower memory usage
+                    del m
 
                 converter.convert()
 
-                os.remove(out_pt)
+                if IS_CI:
+                    os.remove(out_pt)
 
                 if HAS_TF:
                     outputs = converter.get_outputs()
@@ -147,6 +154,9 @@ class TestModelMeta(type):
                             print(tt[(pt - tt).abs() > 1e-4])
                             os.remove(out_path)
                             warnings.warn('The results don\'t match exactly')
+
+                if IS_CI and os.path.exists(out_path):
+                    os.remove(out_path)
 
         return f
 

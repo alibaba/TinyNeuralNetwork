@@ -81,7 +81,7 @@ def main_worker(args):
         qat_model = torch.quantization.convert(qat_model)
 
         # When converting quantized models, please ensure the quantization backend is set.
-        torch.backends.quantized.engine = 'qnnpack'
+        torch.backends.quantized.engine = quantizer.backend
 
         # The code section below is used to convert the model to the TFLite format
         # If you need a quantized model with a specific data type (e.g. int8)

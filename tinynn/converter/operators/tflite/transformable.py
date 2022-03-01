@@ -315,10 +315,25 @@ class GenericConvOperator(TransformableOperator):
         if len(conv_op.inputs) == 2 or conv_op.inputs[2] is None:
             if conv_op.inputs[0].dtype == np.float32:
                 bias = np.zeros((kernel_num,), dtype='float32')
+                q_args = None
             else:
                 bias = np.zeros((kernel_num,), dtype='int32')
 
-            conv_op.inputs.append(self.create_attr_tensor(bias))
+                per_tensor = weight_tensor.quantization.dim is None
+
+                # Bias handling
+                if per_tensor:
+                    bias_scale = input_tensor.quantization.scale * weight_tensor.quantization.scale
+                    bias_zero_point = 0
+                    bias_dim = None
+                else:
+                    bias_scale = [input_tensor.quantization.scale * s for s in weight_tensor.quantization.scale]
+                    bias_zero_point = [0] * len(bias_scale)
+                    bias_dim = 0
+
+                q_args = QuantizationParameters(bias_scale, bias_zero_point, bias_dim)
+
+            conv_op.inputs.append(self.create_attr_tensor(bias, quantization=q_args))
         elif conv_op.inputs[2].shape[0] != kernel_num and conv_op.inputs[2].shape[0] == 1:
             if conv_op.inputs[0].dtype == np.float32:
                 bias = torch.tensor([conv_op.inputs[2][0]] * kernel_num, dtype='float32')

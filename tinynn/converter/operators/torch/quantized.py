@@ -89,17 +89,18 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
             bias_zero_point = [0] * len(bias_scale)
             bias_dim = weight_tensor.quantization.dim
 
-        if transpose:
-            if self.q_type == np.uint8:
-                bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.uint8)
-            elif self.q_type == np.int8:
-                bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int8)
-        else:
-            bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int32, dim=bias_dim)
+        inputs = [input_tensor, weight_tensor]
+        if bias is not None:
+            if transpose:
+                if self.q_type == np.uint8:
+                    bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.uint8)
+                elif self.q_type == np.int8:
+                    bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int8)
+            else:
+                bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int32, dim=bias_dim)
 
-        bias_tensor = self.create_attr_tensor(bias)
-
-        inputs = [input_tensor, weight_tensor, bias_tensor]
+            bias_tensor = self.create_attr_tensor(bias)
+            inputs.append(bias_tensor)
 
         if transpose:
             assert fusedActivation == tfl_schema.ActivationFunctionType.NONE
