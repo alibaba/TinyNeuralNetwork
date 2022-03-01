@@ -1,7 +1,7 @@
 # Introduction
 [简体中文](README_zh-CN.md)
 
-Graph tracer for PyTorch. 
+Graph tracer for PyTorch.
 
 ## Background
 
@@ -21,8 +21,8 @@ with model_tracer():
 
     # Provide a viable input for the model
     dummy_input = torch.rand((1, 3, 224, 224))
-    
-    # After tracing the model, we will get a TraceGraph object 
+
+    # After tracing the model, we will get a TraceGraph object
     graph = trace(model, dummy_input)
 
     # We can use it to generate the code for the original model
@@ -38,7 +38,7 @@ According to the official PyTorch tutorial, you'll have to do the following thin
 5. JIT Tracing and seralize it to a TorchScript model file
 6. Running the inference through PyTorch Mobile
 
-Step 1-3 require a lot of manual work, which are pretty cumbersome and error-prone. Therefore, we have come up with the idea to write an automatic quantization preparation tool. 
+Step 1-3 require a lot of manual work, which are pretty cumbersome and error-prone. Therefore, we have come up with the idea to write an automatic quantization preparation tool.
 
 ## What's more
 1. The model to be traced could either be instantiated inside or outside the with-block.

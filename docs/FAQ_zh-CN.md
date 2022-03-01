@@ -94,9 +94,9 @@ A：一般有两种解法
 由于PyTorch的算子数量相当多，我们无法覆盖所有的算子，只能覆盖大部分常用的算子。因此，如果遇到不支持的算子，你可以有以下选择：
 1. [提交](https://github.com/alibaba/TinyNeuralNetwork/issues/new/choose)一个新issue
 2. 你也可以选择自己实现，模型转换中算子翻译的过程其实就是将TorchScript OP与TFLite OP对应的过程
-    
+
     相关代码的位置
-    - TFLite 
+    - TFLite
         - OP schema (without I/O tensors): [generated_ops.py](../tinynn/converter/operators/tflite/generated_ops.py)
         - Full schema: https://www.tensorflow.org/mlir/tfl_ops
     - TorchScript

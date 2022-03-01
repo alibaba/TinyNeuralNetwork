@@ -19,7 +19,7 @@ with model_tracer():
 
     # 提供一个可用的输入
     dummy_input = torch.rand((1, 3, 224, 224))
-    
+
     # 通过trace，我们可以拿到计算图
     graph = trace(model, dummy_input)
 

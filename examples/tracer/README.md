@@ -1,4 +1,4 @@
-## Sample code for using tracer and code generator in TinyNeuralNetwork 
+## Sample code for using tracer and code generator in TinyNeuralNetwork
 
 [简体中文](README_zh-CN.md)
 

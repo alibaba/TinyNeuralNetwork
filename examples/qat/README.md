@@ -7,7 +7,7 @@ as the backend for quantization-aware training and focuses on optimizing its usa
 ## The quantization process in PyTorch
 1. Modify the forward function of the model to insert `QuantStub`s and `DeQuantStub`s for the inputs and outputs.
 2. Manually replace all `add`, `mul` and `cat` operations in the model with the alternatives in `torch.nn.quantized.FloatFunctional`. For example, the line of code `x = a + b` in the forward function requires the creation of a corresponding module `self.add0 = torch.nn.quantized.FloatFunctional()` and the line is written as `x = self.add0.add(a, b)` instead in the `forward` function.
-3. Write the `fuse_model` function to manually fuse the operators. For example, the adjacent `Conv2D` and `BatchNorm2D` modules need to be fused to a `ConvBN2D` module. 
+3. Write the `fuse_model` function to manually fuse the operators. For example, the adjacent `Conv2D` and `BatchNorm2D` modules need to be fused to a `ConvBN2D` module.
 (More complex model means more time-consuming operation. Usually, this causes a huge workload)
 4. Call `torch.quantization.prepare_qat` to convert the computational graph into a quantized computational graph (using this function, it tries to perform quantization on the whole computation graph. If you need mixed precision quantization, some dirty hacks or splitting the model may help.)
 5. Create the quantized model via `torch.quantization.convert`. However, it can only be converted to TorchScript, not ONNX, TFLite or other mobile-friendly formats, making deployments difficult.
