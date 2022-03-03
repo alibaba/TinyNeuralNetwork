@@ -4,8 +4,10 @@ import torchvision
 import os
 import inspect
 
-import models
-
+try:
+    import models
+except ImportError:
+    models = None
 
 IS_CI = os.getenv('CI', '') == 'true'
 
@@ -30,23 +32,24 @@ def collect_torchvision_models():
 
 def collect_custom_models():
     custom_model_classes = []
-    for key in models.__dict__:
-        item = getattr(models, key)
+    if models is not None:
+        for key in models.__dict__:
+            item = getattr(models, key)
 
-        if inspect.isclass(item) and issubclass(item, torch.nn.Module):
-            if hasattr(item, '__module__'):
-                if item.__module__.startswith('torch.'):
-                    continue
+            if inspect.isclass(item) and issubclass(item, torch.nn.Module):
+                if hasattr(item, '__module__'):
+                    if item.__module__.startswith('torch.'):
+                        continue
 
-            if hasattr(item, '__init__') and hasattr(item, 'forward'):
-                constructor = getattr(item, '__init__')
-                no_arg = True
-                for p in inspect.signature(constructor).parameters.values():
-                    if p.name not in ('self', 'kwargs') and p.default is p.empty:
-                        no_arg = False
-                        break
-                if no_arg:
-                    custom_model_classes.append(item)
+                if hasattr(item, '__init__') and hasattr(item, 'forward'):
+                    constructor = getattr(item, '__init__')
+                    no_arg = True
+                    for p in inspect.signature(constructor).parameters.values():
+                        if p.name not in ('self', 'kwargs') and p.default is p.empty:
+                            no_arg = False
+                            break
+                    if no_arg:
+                        custom_model_classes.append(item)
     return custom_model_classes
 
 
