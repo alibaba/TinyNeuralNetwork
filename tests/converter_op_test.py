@@ -191,7 +191,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(*inputs)
             tfl_output = tfl_run_model(model_path, inputs, dummy_output)
-            assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output, equal_nan=True)
 
     def test_binary_elementwise_constant_same_dtype(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -225,7 +225,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output, equal_nan=True)
 
     def test_binary_elementwise_different_dtype(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -260,7 +260,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(*inputs)
             tfl_output = tfl_run_model(model_path, inputs, dummy_output)
-            assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output, equal_nan=True)
 
     def test_binary_elementwise_constant_different_dtype(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -294,7 +294,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output, equal_nan=True)
 
     def test_binary_elementwise_scalar_int(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -327,7 +327,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output, equal_nan=True)
 
     def test_binary_elementwise_scalar_float(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -360,7 +360,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_output = model(dummy_input)
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-            assert_close(dummy_output, tfl_output)
+            assert_close(dummy_output, tfl_output, equal_nan=True)
 
     @unittest.skipIf(LooseVersion(torch.__version__) < LooseVersion('1.7.0'), "torch.where cannot take scalar inputs")
     def test_where_int_scalars(self):
@@ -492,7 +492,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
     def test_reduce_ops_single_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -590,7 +590,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
     def test_reduce_ops_multi_dim_keepdim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -620,7 +620,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
     def test_unary_bitwise_ops(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32) > 0
@@ -2752,7 +2752,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
     def test_var_std_ops_single_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2844,7 +2844,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
     def test_var_std_multi_dim_keepdim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2867,7 +2867,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {func.__name__} failed: {args}'
 
-            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
     def test_norms(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2897,7 +2897,7 @@ class ConverterOPTester(unittest.TestCase):
             def msg(*args, **kwargs):
                 return f'testing {type(func).__name__} failed: {args}'
 
-            assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+            assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
     def test_conv(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2923,7 +2923,7 @@ class ConverterOPTester(unittest.TestCase):
         def msg(*args, **kwargs):
             return f'testing failed: {args}'
 
-        assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
     def test_conv_no_bias(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
@@ -2949,7 +2949,7 @@ class ConverterOPTester(unittest.TestCase):
         def msg(*args, **kwargs):
             return f'testing failed: {args}'
 
-        assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
     def test_conv_transpose(self):
         dummy_input = torch.randn(1, 16, 50, 100, dtype=torch.float32)
@@ -2975,7 +2975,7 @@ class ConverterOPTester(unittest.TestCase):
         def msg(*args, **kwargs):
             return f'testing failed: {args}'
 
-        assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
     def test_conv_transpose_no_bias(self):
         dummy_input = torch.randn(1, 16, 50, 100, dtype=torch.float32)
@@ -3001,7 +3001,7 @@ class ConverterOPTester(unittest.TestCase):
         def msg(*args, **kwargs):
             return f'testing failed: {args}'
 
-        assert_close(dummy_output, tfl_output, msg=msg, atol=1e-3, rtol=1e-3)
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
 
 class ConverterQuantizedOPTester(unittest.TestCase):
@@ -3568,7 +3568,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
     def test_quantized_depthwise_conv2d_no_bias_int8(self):
@@ -3592,7 +3592,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv1d'), 'Quantized conv1d is not supported')
     def test_quantized_depthwise_conv1d_no_bias(self):
@@ -3616,7 +3616,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv1d'), 'Quantized conv1d is not supported')
     def test_quantized_depthwise_conv1d_no_bias_int8(self):
@@ -3640,7 +3640,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
     def test_quantized_depthwise_conv2d(self):
@@ -3664,7 +3664,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
     def test_quantized_depthwise_conv2d_int8(self):
@@ -3688,7 +3688,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv1d'), 'Quantized conv1d is not supported')
     def test_quantized_depthwise_conv1d(self):
@@ -3712,7 +3712,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv1d'), 'Quantized conv1d is not supported')
     def test_quantized_depthwise_conv1d_int8(self):
@@ -3736,7 +3736,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'ConvReLU2d'), 'Quantized conv2d_relu is not supported')
     def test_quantized_depthwise_conv2d_relu(self):
@@ -3760,7 +3760,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'ConvReLU2d'), 'Quantized conv2d_relu is not supported')
     def test_quantized_depthwise_conv2d_relu_int8(self):
@@ -3784,7 +3784,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'ConvReLU1d'), 'Quantized conv1d_relu is not supported')
     def test_quantized_depthwise_conv1d_relu(self):
@@ -3808,7 +3808,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'ConvReLU1d'), 'Quantized conv1d_relu is not supported')
     def test_quantized_depthwise_conv1d_relu_int8(self):
@@ -3832,7 +3832,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
     def test_quantized_conv2d_per_channel_int8(self):
@@ -3863,7 +3863,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
     def test_quantized_depthwise_conv2d_per_channel_int8(self):
@@ -3894,7 +3894,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
     def test_quantized_conv2d_no_bias(self):
@@ -3918,7 +3918,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
     def test_quantized_conv2d_no_bias_int8(self):
@@ -3942,7 +3942,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv1d'), 'Quantized conv1d is not supported')
     def test_quantized_conv1d_no_bias(self):
@@ -3966,7 +3966,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv1d'), 'Quantized conv1d is not supported')
     def test_quantized_conv1d_no_bias_int8(self):
@@ -3990,7 +3990,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
     def test_quantized_conv2d(self):
@@ -4014,7 +4014,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
     def test_quantized_conv2d_int8(self):
@@ -4038,7 +4038,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv1d'), 'Quantized conv1d is not supported')
     def test_quantized_conv1d(self):
@@ -4062,7 +4062,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv1d'), 'Quantized conv1d is not supported')
     def test_quantized_conv1d_int8(self):
@@ -4086,7 +4086,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'ConvReLU2d'), 'Quantized conv2d_relu is not supported')
     def test_quantized_conv2d_relu(self):
@@ -4110,7 +4110,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'ConvReLU2d'), 'Quantized conv2d_relu is not supported')
     def test_quantized_conv2d_relu_int8(self):
@@ -4134,7 +4134,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'ConvReLU1d'), 'Quantized conv1d_relu is not supported')
     def test_quantized_conv1d_relu(self):
@@ -4158,7 +4158,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'ConvReLU1d'), 'Quantized conv1d_relu is not supported')
     def test_quantized_conv1d_relu_int8(self):
@@ -4182,7 +4182,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Linear'), 'Quantized linear is not supported')
     def test_quantized_linear(self):
@@ -4206,7 +4206,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Linear'), 'Quantized linear is not supported')
     def test_quantized_linear_int8(self):
@@ -4231,7 +4231,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Linear'), 'Quantized linear is not supported')
     def test_quantized_linear_no_bias(self):
@@ -4255,7 +4255,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'Linear'), 'Quantized linear is not supported')
     def test_quantized_linear_no_bias_int8(self):
@@ -4280,7 +4280,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'LinearReLU'), 'Quantized linear_relu is not supported')
     def test_quantized_linear_relu(self):
@@ -4304,7 +4304,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'LinearReLU'), 'Quantized linear_relu is not supported')
     def test_quantized_linear_relu_int8(self):
@@ -4329,7 +4329,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'LinearReLU'), 'Quantized linear_relu is not supported')
     def test_quantized_linear_relu_no_bias(self):
@@ -4353,7 +4353,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'LinearReLU'), 'Quantized linear_relu is not supported')
     def test_quantized_linear_relu_no_bias_int8(self):
@@ -4378,7 +4378,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ConvTranspose2d'), 'Quantized conv_transpose2d is not supported')
     def test_quantized_conv_transpose2d_no_bias(self):
@@ -4405,7 +4405,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ConvTranspose2d'), 'Quantized conv_transpose2d is not supported')
     def test_quantized_conv_transpose2d_no_bias_int8(self):
@@ -4432,7 +4432,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ConvTranspose1d'), 'Quantized conv_transpose1d is not supported')
     def test_quantized_conv_transpose1d_no_bias(self):
@@ -4459,7 +4459,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ConvTranspose1d'), 'Quantized conv_transpose1d is not supported')
     def test_quantized_conv_transpose1d_no_bias_int8(self):
@@ -4486,7 +4486,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ConvTranspose2d'), 'Quantized conv_transpose2d is not supported')
     def test_quantized_conv_transpose2d(self):
@@ -4513,7 +4513,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ConvTranspose2d'), 'Quantized conv_transpose2d is not supported')
     def test_quantized_conv_transpose2d_int8(self):
@@ -4540,7 +4540,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ConvTranspose1d'), 'Quantized conv_transpose1d is not supported')
     def test_quantized_conv_transpose1d(self):
@@ -4567,7 +4567,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ConvTranspose1d'), 'Quantized conv_transpose1d is not supported')
     def test_quantized_conv_transpose1d_int8(self):
@@ -4594,7 +4594,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'BatchNorm2d'), 'Quantized batch_norm2d is not supported')
     def test_quantized_batch_norm2d(self):
@@ -4618,7 +4618,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'BatchNorm2d'), 'Quantized batch_norm2d is not supported')
     def test_quantized_batch_norm2d_int8(self):
@@ -4642,7 +4642,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'BNReLU2d'), 'Quantized bn_relu2d is not supported')
     def test_quantized_batch_norm2d_relu(self):
@@ -4666,7 +4666,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = torch.int_repr(model(dummy_input))
         dummy_input = torch.int_repr(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'BNReLU2d'), 'Quantized bn_relu2d is not supported')
     def test_quantized_batch_norm2d_relu_int8(self):
@@ -4690,7 +4690,193 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=1, rtol=1)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'Linear'), 'Quantized linear_dynamic is not supported')
+    def test_quantized_linear_dynamic_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.dynamic.Linear(10, 10)
+
+            def forward(self, x):
+                return self.q_func(x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.randn(1, 10)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'Linear'), 'Quantized linear_dynamic is not supported')
+    def test_quantized_linear_dynamic_no_bias_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.dynamic.Linear(10, 10, bias_=False)
+
+            def forward(self, x):
+                return self.q_func(x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.randn(1, 10)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    def test_lstm_dynamic(self):
+        dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lstm = nn.LSTM(10, 20)
+
+            def forward(self, x):
+                return self.lstm(x)[0]
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    def test_lstm_dynamic_batch_first(self):
+        raise unittest.SkipTest('TFLite hybrid LSTM kernel with batch_first=True is broken')
+        dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lstm = torch.nn.quantized.dynamic.LSTM(10, 20, batch_first=True)
+
+            def forward(self, x):
+                return self.lstm(x)[0]
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, check_stride=False, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    def test_lstm_dynamic_multi_layer(self):
+        dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lstm = torch.nn.quantized.dynamic.LSTM(10, 20, 2)
+
+            def forward(self, x):
+                return self.lstm(x)[0]
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    def test_bilstm_dynamic(self):
+        dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lstm = torch.nn.quantized.dynamic.LSTM(10, 20, bidirectional=True)
+
+            def forward(self, x):
+                return self.lstm(x)[0]
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    def test_bilstm_dynamic_batch_first(self):
+        raise unittest.SkipTest('TFLite hybrid LSTM kernel with batch_first=True is broken')
+        dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lstm = torch.nn.quantized.dynamic.LSTM(10, 20, batch_first=True, bidirectional=True)
+
+            def forward(self, x):
+                return self.lstm(x)[0]
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, check_stride=False, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    def test_bilstm_dynamic_multi_layer(self):
+        dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lstm = torch.nn.quantized.dynamic.LSTM(10, 20, 2, bidirectional=True)
+
+            def forward(self, x):
+                return self.lstm(x)[0]
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
 
 
 if __name__ == '__main__':

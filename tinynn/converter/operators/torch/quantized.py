@@ -341,6 +341,10 @@ class QuantizedLinearDynamicOperator(QuantizedLinearDynamicSchema):
         output_tensor = outputs[0]
 
         # Bias handling
+        if bias is None:
+            out_features = weight.shape[0]
+            bias = torch.zeros(out_features, dtype=torch.float32)
+
         bias_tensor = self.create_attr_tensor(bias)
 
         inputs = [input_tensor, weight_tensor, bias_tensor]
