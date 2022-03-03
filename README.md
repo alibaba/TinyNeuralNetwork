@@ -17,6 +17,12 @@ python setup.py install
 pip install git+https://github.com/alibaba/TinyNeuralNetwork.git
 ```
 
+Or you could build with docker
+
+```shell
+sudo docker build -t tinynn:pytorch1.9.0-cuda11.1 .
+```
+
 ## Contributing
 
 We appreciate your help for improving our framework. More details are listed [here](CONTRIBUTING.md).
