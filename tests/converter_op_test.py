@@ -1,6 +1,5 @@
 import sys
 import unittest
-
 from distutils.version import LooseVersion
 
 import numpy as np
@@ -8,6 +7,8 @@ import tensorflow as tf
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from common_utils import IS_CI
 
 from tinynn.converter import TFLiteConverter
 
@@ -3009,6 +3010,8 @@ class ConverterQuantizedOPTester(unittest.TestCase):
     def setUp(self):
         backends = ['qnnpack', 'fbgemm']
         for backend in backends:
+            if IS_CI and backend == 'qnnpack':
+                continue
             if backend in torch.backends.quantized.supported_engines:
                 self.backend = backend
                 return
