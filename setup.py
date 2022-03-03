@@ -2,6 +2,8 @@ import os
 import setuptools
 import subprocess
 
+from datetime import datetime
+
 try:
     from pip._internal.req import parse_requirements
 except ImportError:
@@ -15,14 +17,22 @@ def get_sha():
         return None
 
 
+def get_datetime():
+    now = datetime.now()
+    return now.strftime("%Y%m%d%H%M%S")
+
+
 predefined_version = os.getenv('TINYML_BUILD_VERSION')
 if predefined_version:
     version = predefined_version
 else:
     version = '0.1.0'
     sha = get_sha()
+    dt = get_datetime()
     if sha:
-        version += f'+{sha}'
+        version += f'{dt}_{sha}'
+    else:
+        version += dt
 
 reqs = parse_requirements('requirements.txt', session=False)
 
