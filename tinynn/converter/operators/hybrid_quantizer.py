@@ -46,7 +46,11 @@ class HybridQuantizer(object):
                     continue
                 if self.asymmetric and hasattr(node['op'], 'asymmetricQuantizeInputs'):
                     node['op'].asymmetricQuantizeInputs = True
-                new_weight = quantize(name, weight, torch.qint8, torch.per_tensor_symmetric, q_type=self.q_type)
+                if self.q_type == np.uint8:
+                    new_weight = quantize(name, weight, torch.qint8, torch.per_tensor_symmetric, q_type=np.int8)
+                    new_weight.reinterpret_as(self.q_type)
+                else:
+                    new_weight = quantize(name, weight, torch.qint8, torch.per_tensor_symmetric, q_type=self.q_type)
             elif node['node_type'] == ExtendedOperator.CONV_2D:
                 new_weight = quantize(name, weight, torch.qint8, torch.per_channel_symmetric, 0, q_type=self.q_type)
             elif node['node_type'] == ExtendedOperator.DEPTHWISE_CONV_2D:

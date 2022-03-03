@@ -257,6 +257,10 @@ class Tensor(object):
     def __repr__(self) -> str:
         return f'{self.name}: {self.dtype}{self.shape}'
 
+    def reinterpret_as(self, new_type: typing.Union[type, np.dtype]):
+        self.tensor = self.tensor.view(new_type)
+        self.dtype = self.tensor.dtype
+
     def build(self, builder: flatbuffers.Builder) -> Offset:
         name = create_string(builder, tflite.Tensor.Name, self.name)
         shape = create_numpy_array(builder, tflite.Tensor.Shape, self.shape)

@@ -94,7 +94,9 @@ class TFLiteConverter(object):
             if self.hybrid:
                 if self.hybrid_per_channel:
                     raise AttributeError('Per-channel kernels supports int8 only')
-                raise AttributeError('Hybrid kernels supports int8 only')
+                log.warning(
+                    'Unless you are using legacy TFLite (<1.14), please set quantize_target_type to int8 instead'
+                )
         elif quantize_target_type == 'int8':
             self.q_type = np.int8
         else:
