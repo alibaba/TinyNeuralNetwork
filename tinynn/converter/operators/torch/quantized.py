@@ -222,6 +222,10 @@ class QuantizedLinearOperator(QuantizedLinearSchema):
         self.rescale_weight_scale_for_qnnpack(input_tensor, weight_tensor, output_tensor)
 
         # Bias handling
+        if bias is None:
+            out_features = weight.shape[0]
+            bias = torch.zeros(out_features, dtype=torch.float)
+
         bias_scale = input_tensor.quantization.scale * weight_tensor.quantization.scale
         bias = self.quantize(bias, bias_scale, 0, dtype=torch.int32)
         bias_tensor = self.create_attr_tensor(bias)
@@ -363,7 +367,7 @@ class QuantizedEluOperator(QuantizedEluSchema):
         self.run(node)
 
         # Only int8 kernel is supported
-        if self.q_type == 'int8':
+        if self.q_type == np.int8:
             self.elementwise_unary(tfl.EluOperator, graph_converter)
         else:
             ops = []
