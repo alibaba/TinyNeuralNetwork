@@ -1016,6 +1016,55 @@ class QATQuantizer(object):
         for idx, node in enumerate(non_leaf_data_nodes):
             graph.remove_node(node)
 
+        # Handle PoolNd with kernel_size=1
+        def _is_pool_nd_with_one_kernel_size(node, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            kernel_size, stride = None, None
+            if cur_class == TraceFunction:
+                if cur_module.kind in ('avg_pool1d', 'avg_pool2d', 'max_pool1d', 'max_pool2d'):
+
+                    def _avgpool_kernel_size_and_stride(kernel_size, stride=None, *args, **kwargs):
+                        return kernel_size, stride
+
+                    kernel_size, stride = eval(f'_avgpool_kernel_size_and_stride({cur_module.args_string_no_self})')
+            else:
+                if cur_class in (nn.AvgPool1d, nn.AvgPool2d, nn.MaxPool1d, nn.MaxPool2d):
+                    kernel_size = cur_module.kernel_size
+                    stride = cur_module.stride
+
+            if kernel_size is not None:
+                if isinstance(kernel_size, (tuple, list)):
+                    is_match = all((ks == 1 for ks in kernel_size))
+                else:
+                    is_match = kernel_size == 1
+            else:
+                is_match = False
+
+            if is_match:
+                custom_data.append((node, kernel_size, stride))
+                return True
+            else:
+                return False
+
+        pool_one_kernel_size_nodes = []
+        graph.filter_forward_nodes(_is_pool_nd_with_one_kernel_size, pool_one_kernel_size_nodes)
+        for node, kernel_size, stride in pool_one_kernel_size_nodes:
+            slices = [slice(None)] * 2
+            t = node.prev_tensors[0]
+            dim = len(t.shape)
+            if not isinstance(stride, (list, tuple)):
+                stride = [stride] * (dim - 2)
+            for s in stride:
+                if s == 1 or s is None:
+                    slices.append(slice(None))
+                else:
+                    slices.append(slice(None, None, s))
+
+            with override_current_trace_graph(graph):
+                new_func = TraceFunction('torch.Tensor.__getitem__', True).parse_args(t, slices)
+                node.module = new_func
+
         # Add quant/dequant nodes for non-quantizable OPs
         def _is_not_quantizable(node, custom_data):
             cur_module = node.module
