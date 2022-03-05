@@ -4642,7 +4642,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_output = u8_to_s8(model(dummy_input))
         dummy_input = u8_to_s8(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output, atol=256, rtol=256)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256, check_stride=False)
 
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'BNReLU2d'), 'Quantized bn_relu2d is not supported')
     def test_quantized_batch_norm2d_relu(self):
