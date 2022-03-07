@@ -945,6 +945,126 @@ class ConverterOptimizerTester(unittest.TestCase):
         for i in range(3):
             self.assertEqual(tfl_model.Subgraphs(0).Tensors(tfl_model.Subgraphs(0).Operators(0).Outputs(i)).Buffer(), 0)
 
+    def test_fuse_simple_slice(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                return x[:, :, 1:-1, 1:-1]
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.SLICE)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 3)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_fuse_strided_slice(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                return x[:, :, 1:-1:2, 1:-1:2]
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 4)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_fuse_multiple_strided_slice(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                return x[:, :, 1:-1:3, ::4][:, :, ::4, 1:-1:3]
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 4)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_fuse_mixed_slice_and_strided_slice(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                return x[:, :, 1:-1, :][:, :, ::4, 1:-1:3]
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 4)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_fuse_mixed_slice_and_strided_slice_reverse(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                return x[:, :, ::4, 1:-1:3][:, :, 1:-1, :]
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 4)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

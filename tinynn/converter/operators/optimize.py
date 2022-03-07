@@ -275,13 +275,48 @@ class GraphOptimizer(object):
 
         def _remove_first_action(first_node, last_node, custom_data):
             # Set final shape to the first reshape node
-            start, size = custom_data
-            start_tensor = self.create_attr_tensor(np.array(start, dtype='int32'))
-            size_tensor = self.create_attr_tensor(np.array(size, dtype='int32'))
-            actions = [
-                (self.graph.replace_operator_input, (first_node, 1, start_tensor)),
-                (self.graph.replace_operator_input, (first_node, 2, size_tensor)),
-            ]
+            start, end, stride = custom_data
+            if all((x == 1 for x in stride)):
+                target_class = tfl.SliceOperator
+                target_type = ExtendedOperator.SLICE
+            else:
+                target_class = tfl.StridedSliceOperator
+                target_type = ExtendedOperator.STRIDED_SLICE
+
+            if target_type == ExtendedOperator.SLICE:
+                size = end - start
+                start_tensor = self.create_attr_tensor(np.array(start, dtype='int32'))
+                size_tensor = self.create_attr_tensor(np.array(size, dtype='int32'))
+                actions = [
+                    (self.graph.replace_operator_input, (first_node, 1, start_tensor)),
+                    (self.graph.replace_operator_input, (first_node, 2, size_tensor)),
+                ]
+                if first_node['node_type'] != ExtendedOperator.SLICE:
+                    old_slice_op = first_node['op']
+                    first_node['node_type'] = ExtendedOperator.SLICE
+                    first_node['op'] = target_class(old_slice_op.inputs, old_slice_op.outputs)
+                    actions.append((self.graph.remove_operator_input, (first_node, 3)))
+            else:
+                size = end - start
+                start_tensor = self.create_attr_tensor(np.array(start, dtype='int32'))
+                end_tensor = self.create_attr_tensor(np.array(end, dtype='int32'))
+                stride_tensor = self.create_attr_tensor(np.array(stride, dtype='int32'))
+                if first_node['node_type'] == ExtendedOperator.STRIDED_SLICE:
+                    actions = [
+                        (self.graph.replace_operator_input, (first_node, 1, start_tensor)),
+                        (self.graph.replace_operator_input, (first_node, 2, end_tensor)),
+                        (self.graph.replace_operator_input, (first_node, 3, stride_tensor)),
+                    ]
+                else:
+                    old_slice_op = first_node['op']
+                    first_node['node_type'] = ExtendedOperator.STRIDED_SLICE
+                    first_node['op'] = target_class(old_slice_op.inputs, old_slice_op.outputs)
+                    actions = [
+                        (self.graph.replace_operator_input, (first_node, 1, start_tensor)),
+                        (self.graph.replace_operator_input, (first_node, 2, end_tensor)),
+                        (self.graph.append_operator_input, (first_node, stride_tensor)),
+                    ]
+
             return actions
 
         elinimate_sequences(self.graph, filtered_pairs, _remove_first_pred, _remove_first_action)
@@ -1597,7 +1632,7 @@ def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph, branch: b
                 and target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape
             )
             or (
-                target_vertex['node_type'] == ExtendedOperator.SLICE
+                target_vertex['node_type'] in (ExtendedOperator.SLICE, ExtendedOperator.STRIDED_SLICE)
                 and target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape
             )
             or (
@@ -1660,9 +1695,9 @@ def is_slice_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
     return (
-        source_vertex['node_type'] == ExtendedOperator.SLICE
+        source_vertex['node_type'] in (ExtendedOperator.SLICE, ExtendedOperator.STRIDED_SLICE)
         and source_vertex.outdegree() == 1
-        and target_vertex['node_type'] == ExtendedOperator.SLICE
+        and target_vertex['node_type'] in (ExtendedOperator.SLICE, ExtendedOperator.STRIDED_SLICE)
         and target_vertex.outdegree() >= 1
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
     )
@@ -1824,18 +1859,32 @@ def fuse_bn_bias(eps, scale, var, mean, bn_b, activ_b):
 
 def fuse_slices(seq: typing.Iterable[ig.Vertex]):
     cur_start = None
-    cur_size = None
+    cur_end = None
+    cur_strides = None
     for node in seq:
-        assert node['node_type'] == ExtendedOperator.SLICE
+        assert node['node_type'] in (ExtendedOperator.SLICE, ExtendedOperator.STRIDED_SLICE)
         next_start = node['op'].inputs[1].tensor
-        next_size = node['op'].inputs[2].tensor
-        if cur_start is None and cur_size is None:
-            cur_start = next_start
-            cur_size = next_size
+        if cur_strides is None:
+            cur_strides = np.ones_like(next_start, dtype='int32')
+        if cur_start is None:
+            cur_start = np.zeros_like(next_start, dtype='int32')
+        if node['node_type'] == ExtendedOperator.SLICE:
+            next_size = node['op'].inputs[2].tensor
+            next_end = cur_start + (next_start + next_size) * cur_strides
+            next_strides = np.ones_like(next_start, dtype='int32')
         else:
-            cur_start += next_start
-            cur_size = np.min((cur_size, next_size), axis=0)
-    return cur_start, cur_size
+            next_end = node['op'].inputs[2].tensor
+            next_end = cur_start + next_end * cur_strides
+            next_strides = node['op'].inputs[3].tensor
+        if cur_end is None:
+            cur_start = next_start
+            cur_end = next_end
+            cur_strides = next_strides
+        else:
+            cur_start += next_start * cur_strides
+            cur_end = np.min((cur_end, next_end), axis=0)
+            cur_strides = cur_strides * next_strides
+    return cur_start, cur_end, cur_strides
 
 
 def fuse_transpose_perms(seq: typing.Iterable[ig.Vertex]):

@@ -243,15 +243,14 @@ class CommonGraph(object):
                 edge = self.graph.add_edge(prev_node, next_node, name=edge_name, label=edge_name)
                 log.debug(f'NEW EDGE: {prev_node["label"]} -> {next_node["label"]} {self.tensor_map[edge["name"]]}')
 
-    def replace_operator_input(
-        self, node: ig.Vertex, input_idx: int, new_tensor: tfl.Tensor, return_ids: bool = False, skip: int = 0
+    def remove_operator_input(
+        self, node: ig.Vertex, input_idx: int, return_ids: bool = False, skip: int = 0
     ) -> typing.Optional[typing.List[int]]:
-        """Use a new input tensor in a op node
+        """Remove an input tensor in a op node
 
         Args:
             node (ig.Vertex): An op node
             input_idx (int): the index of the input tensor
-            new_tensor (tfl.Tensor): The tensor to be be used
             return_ids (bool): Return the ids instead of removing the edges. Defaults to False.
             skip (int): Number of items to skip
 
@@ -274,6 +273,29 @@ class CommonGraph(object):
                     break
             if len(remove_edges) > 0:
                 break
+
+        if return_ids:
+            return remove_edges
+        else:
+            self.graph.delete_edges(remove_edges)
+
+    def replace_operator_input(
+        self, node: ig.Vertex, input_idx: int, new_tensor: tfl.Tensor, return_ids: bool = False, skip: int = 0
+    ) -> typing.Optional[typing.List[int]]:
+        """Use a new input tensor in a op node
+
+        Args:
+            node (ig.Vertex): An op node
+            input_idx (int): the index of the input tensor
+            new_tensor (tfl.Tensor): The tensor to be be used
+            return_ids (bool): Return the ids instead of removing the edges. Defaults to False.
+            skip (int): Number of items to skip
+
+        Returns:
+            typing.Optional[typing.List[int]]: The edges to be removed if return_ids is True, otherwise None
+        """
+
+        remove_edges = self.remove_operator_input(node, input_idx, return_ids=True, skip=skip)
 
         node['op'].inputs[input_idx] = new_tensor
         new_node = self.add_nodes([new_tensor])[0]
