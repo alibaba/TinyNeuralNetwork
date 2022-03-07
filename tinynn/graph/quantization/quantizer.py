@@ -1069,6 +1069,50 @@ class QATQuantizer(object):
 
                 graph.replace_node_module(node, new_func)
 
+        # Rewrite BatchNorm1d to BatchNorm2d
+        def _is_batch_norm_1d(node, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if len(node.prev_nodes) != 1:
+                return False
+
+            if node.prev_nodes[0].kind() in ('conv1d', nn.Conv1d):
+                return False
+
+            if cur_class == TraceFunction:
+                return cur_module.kind == 'batch_norm' and node.prev_tensors[0].ndim == 3
+            else:
+                return cur_class == nn.BatchNorm1d
+
+        batch_norm_1d_nodes = graph.filter_forward_nodes(_is_batch_norm_1d)
+        for idx, node in enumerate(batch_norm_1d_nodes):
+            mod = node.module
+            if type(mod) == nn.BatchNorm1d:
+                new_bn = torch.nn.BatchNorm2d(
+                    mod.num_features,
+                    mod.eps,
+                    mod.momentum,
+                    affine=mod.affine,
+                    track_running_stats=mod.track_running_stats,
+                )
+                new_bn.load_state_dict(mod.state_dict())
+
+                graph.module_unique_name_dict[id(new_bn)] = graph.module_unique_name_dict[id(mod)]
+                graph.module_original_name_dict[id(new_bn)] = graph.module_unique_name_dict[id(mod)]
+
+                with override_current_trace_graph(graph):
+                    graph.replace_node_module(node, new_bn)
+
+                    prev_func = TraceFunction('torch.unsqueeze').parse_args(node.prev_tensors[0], 2)
+                    next_func = TraceFunction('torch.squeeze').parse_args(node.next_tensors[0], 2)
+
+                node.next_tensors[0].unsqueeze_(2)
+
+                prev_out = torch.unsqueeze(node.prev_tensors[0], 2)
+                graph.insert_between(node.prev_nodes[0], node, prev_func, [prev_out])
+                next_out = torch.squeeze(node.next_tensors[0], 2)
+                graph.insert_after(node, next_func, [next_out])
+
         # Add quant/dequant nodes for non-quantizable OPs
         def _is_not_quantizable(node, custom_data):
             cur_module = node.module
