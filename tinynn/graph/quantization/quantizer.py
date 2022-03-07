@@ -1063,7 +1063,11 @@ class QATQuantizer(object):
 
             with override_current_trace_graph(graph):
                 new_func = TraceFunction('torch.Tensor.__getitem__', True).parse_args(t, slices)
-                node.module = new_func
+
+                graph.module_unique_name_dict[id(new_func)] = graph.module_unique_name_dict[id(node.module)]
+                graph.module_original_name_dict[id(new_func)] = graph.module_unique_name_dict[id(node.module)]
+
+                graph.replace_node_module(node, new_func)
 
         # Add quant/dequant nodes for non-quantizable OPs
         def _is_not_quantizable(node, custom_data):
