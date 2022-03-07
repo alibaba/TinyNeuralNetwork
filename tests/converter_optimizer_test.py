@@ -874,6 +874,19 @@ class ConverterOptimizerTester(unittest.TestCase):
         converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.SPLIT_V)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 3)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 3)
+        self.assertEqual(tfl_model.Subgraphs(0).Tensors(tfl_model.Subgraphs(0).Operators(0).Inputs(0)).Buffer(), 0)
+        for i in range(3):
+            self.assertEqual(tfl_model.Subgraphs(0).Tensors(tfl_model.Subgraphs(0).Operators(0).Outputs(i)).Buffer(), 0)
+
     def test_unused_tensors_branch_transpose(self):
         class TestModel(nn.Module):
             def forward(self, x):
@@ -890,6 +903,19 @@ class ConverterOptimizerTester(unittest.TestCase):
         converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.SPLIT_V)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 3)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 3)
+        self.assertEqual(tfl_model.Subgraphs(0).Tensors(tfl_model.Subgraphs(0).Operators(0).Inputs(0)).Buffer(), 0)
+        for i in range(3):
+            self.assertEqual(tfl_model.Subgraphs(0).Tensors(tfl_model.Subgraphs(0).Operators(0).Outputs(i)).Buffer(), 0)
+
     def test_unused_tensors_branch_reshape(self):
         class TestModel(nn.Module):
             def forward(self, x):
@@ -905,6 +931,19 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.SPLIT_V)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 3)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 3)
+        self.assertEqual(tfl_model.Subgraphs(0).Tensors(tfl_model.Subgraphs(0).Operators(0).Inputs(0)).Buffer(), 0)
+        for i in range(3):
+            self.assertEqual(tfl_model.Subgraphs(0).Tensors(tfl_model.Subgraphs(0).Operators(0).Outputs(i)).Buffer(), 0)
 
 
 if __name__ == '__main__':
