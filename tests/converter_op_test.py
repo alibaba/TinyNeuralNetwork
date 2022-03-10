@@ -3003,6 +3003,19 @@ class ConverterOPTester(unittest.TestCase):
 
         assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
+    def test_topk(self):
+        def model(x):
+            return x.topk(5)
+
+        model_path = get_model_path()
+        dummy_input = torch.randn((2, 10), dtype=torch.float32)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(tfl_output, dummy_output, check_dtype=False)
+
 
 class ConverterQuantizedOPTester(unittest.TestCase):
     backend: str

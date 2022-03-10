@@ -143,6 +143,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::remainder": ATenRemainderOperator,
     "aten::where": ATenWhereOperator,
     "aten::type_as": ATenTypeAsOperator,
+    "aten::topk": ATenTopkOperator,
     # quantized
     "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,
     "aten::fake_quantize_per_tensor_affine": ATenFakeQuantizePerTensorAffineOperator,
