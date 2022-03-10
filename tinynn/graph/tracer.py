@@ -2172,23 +2172,6 @@ class TraceGraph(object):
                 prev_indices = node.prev_indices[idx : idx + 1]
                 if move_idx:
                     node.prev_indices[idx] = None
-                # prev_tensors = []
-                # prev_indices = []
-                # for i, (t, ind) in enumerate(zip(node.prev_tensors, node.prev_indices)):
-                #     for nt in new_node.prev_nodes[0].next_tensors:
-                #         if isinstance(nt, (list, tuple)):
-                #             for ntt in nt:
-                #                 if id(ntt) == id(t):
-                #                     prev_tensors.append(t)
-                #                     prev_indices.append(ind)
-                #                     if move_idx:
-                #                         node.prev_indices[i] = None
-                #                     break
-                #         elif id(t) == id(nt):
-                #             prev_tensors.append(t)
-                #             prev_indices.append(ind)
-                #             if move_idx:
-                #                 node.prev_indices[i] = None
 
             if next_tensors is None:
                 next_tensors = [None] * len(prev_tensors)
