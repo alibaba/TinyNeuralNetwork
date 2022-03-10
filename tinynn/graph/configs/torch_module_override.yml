@@ -150,7 +150,6 @@ torch.quantization:
 torchvision.ops:
 - DeformConv2d
 - FrozenBatchNorm2d
-- SqueezeExcitation
 - MultiScaleRoIAlign
 - PSRoIAlign
 - PSRoIPool

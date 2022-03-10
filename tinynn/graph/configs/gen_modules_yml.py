@@ -49,7 +49,7 @@ for k in torchvision.ops.__dict__:
         print(k, c, issubclass(c, torch.nn.Module))
         print(c.__module__)
         # Skip container modules
-        if c.__name__ in ('FeaturePyramidNetwork',):
+        if c.__name__ in ('FeaturePyramidNetwork', 'SqueezeExcitation'):
             continue
         final_dict.setdefault('torchvision.ops', [])
         final_dict['torchvision.ops'].append(k)
