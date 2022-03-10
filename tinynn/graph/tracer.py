@@ -1967,6 +1967,8 @@ class TraceGraph(object):
         else:
             new_node = module
 
+        is_constant_node = type(node.module) == ConstantNode
+
         new_node.prev_nodes.append(node)
         new_node.next_nodes.extend(node.next_nodes)
         if next_tensors is None:
@@ -1986,6 +1988,7 @@ class TraceGraph(object):
         # Connect the next nodes to the new node
         tensor_replace_dict = dict(zip(new_node.prev_tensors, new_node.next_tensors))
         for next_node in new_node.next_nodes:
+            is_next_constant_node = type(next_node) == ConstantNode
             for i, n in enumerate(next_node.prev_nodes):
                 if n == node:
                     next_node.prev_nodes[i] = new_node
@@ -1995,20 +1998,21 @@ class TraceGraph(object):
             if isinstance(next_node.prev_tensors, tuple):
                 next_node.prev_tensors = list(next_node.prev_tensors)
 
+            updated_indices = []
             for i, t in enumerate(next_node.prev_tensors):
                 if t in tensor_replace_dict:
                     next_node.prev_tensors[i] = tensor_replace_dict[t]
+                    updated_indices.append(next_node.prev_indices[i])
 
             # Since the function calls are rendered beforehand,
             # we need to change them as well.
             if type(next_node.module) == TraceFunction:
                 if next_node.module.args_string is not None:
-                    ns = ''
-                    if type(node.module) == ConstantNode:
-                        ns = 'self.'
-                    node_unique_name = f'{ns}{node.unique_name}'
-                    next_node.module.replace_tensor_name(node_unique_name, new_node.unique_name)
-                    next_node.module.update_args_string()
+                    for idx in updated_indices:
+                        old_unique_name = tensor_name_from_parts(node.unique_name, idx, is_constant_node)
+                        new_unique_name = tensor_name_from_parts(new_node.unique_name, idx, is_next_constant_node)
+                        next_node.module.replace_tensor_name(old_unique_name, new_unique_name)
+                        next_node.module.update_args_string()
 
     def insert_between(
         self,
@@ -2039,12 +2043,20 @@ class TraceGraph(object):
         else:
             new_node = module
 
+        is_new_constant_node = type(new_node.module) == ConstantNode
+
         # Gather tensors from previous nodes
         prev_tensors = []
         prev_indices = []
         for pt, pidx in zip(next_node.prev_tensors, next_node.prev_indices):
             for nt in prev_node.next_tensors:
-                if id(pt) == id(nt):
+                if isinstance(nt, (list, tuple)):
+                    for i, ntt in enumerate(nt):
+                        if id(ntt) == id(pt):
+                            prev_tensors.append(pt)
+                            prev_indices.append(pidx)
+                            break
+                elif id(pt) == id(nt):
                     prev_tensors.append(pt)
                     prev_indices.append(pidx)
                     break
@@ -2069,12 +2081,16 @@ class TraceGraph(object):
                 break
 
         # Update tensors in output nodes
+        index_mapping = []
         for idx, t in enumerate(next_node.prev_tensors):
             for pt, nt in zip(prev_tensors, next_tensors):
                 if id(t) == id(pt):
                     next_node.prev_tensors[idx] = nt
+                    old_index = next_node.prev_indices[idx]
                     if move_idx:
                         next_node.prev_indices[idx] = None
+                    new_index = next_node.prev_indices[idx]
+                    index_mapping.append((old_index, new_index))
                     break
 
         # Connect the previous nodes to the new node
@@ -2086,20 +2102,26 @@ class TraceGraph(object):
 
         # Update previous node name for next nodes (TraceFunction)
         if type(next_node.module) == TraceFunction:
-            ns = ''
-            if is_constant_node:
-                ns = 'self.'
-            prev_unique_name = f'{ns}{old_unique_name}'
-            log.debug('node rename: ', old_unique_name, '->', new_node.unique_name)
-            n.module.replace_tensor_name(prev_unique_name, new_node.unique_name)
-            n.module.update_args_string()
+            for old_idx, new_idx in index_mapping:
+                prev_unique_name = tensor_name_from_parts(old_unique_name, old_idx, is_constant_node)
+                next_unique_name = tensor_name_from_parts(new_node.unique_name, new_idx, is_new_constant_node)
+                log.debug('tensor rename: ', prev_unique_name, '->', next_unique_name)
+                n.module.replace_tensor_name(prev_unique_name, next_unique_name)
+                n.module.update_args_string()
 
-    def insert_before(self, node: TraceNode, module, next_tensors: typing.Optional[typing.List[torch.Tensor]] = None):
+    def insert_before(
+        self,
+        node: TraceNode,
+        module,
+        next_tensors: typing.Optional[typing.List[torch.Tensor]] = None,
+        move_idx: bool = False,
+    ):
         """Insert a module or an existing node before a node in the computation graph"""
         # Create a new node and connects it to the previous node/tensors
         if type(module) != TraceNode:
             if not isinstance(module, (tuple, list)):
                 modules = [module]
+                rev_mode = False
             else:
                 if not node.rev_index:
                     log.error('You can only insert nodes with a list modules when node.rev_index=True')
@@ -2110,6 +2132,7 @@ class TraceGraph(object):
                     assert False
 
                 modules = module
+                rev_mode = True
 
             new_nodes: typing.List[TraceNode] = []
             for module in modules:
@@ -2131,31 +2154,51 @@ class TraceGraph(object):
 
         for idx, new_node in enumerate(new_nodes):
             self.nodes_map[new_node.unique_name] = new_node
-            if len(new_nodes) == 1:
+            if not rev_mode:
                 new_node.prev_nodes.extend(node.prev_nodes)
             else:
+                print(new_node.unique_name, node.prev_nodes[idx].unique_name)
                 new_node.prev_nodes.append(node.prev_nodes[idx])
             new_node.next_nodes.append(node)
 
         for idx, new_node in enumerate(new_nodes):
-            if len(new_nodes) == 1:
+            if not rev_mode:
                 prev_tensors = node.prev_tensors
+                prev_indices = node.prev_indices
+                if move_idx:
+                    node.prev_indices = [None] * len(node.prev_indices)
             else:
-                prev_tensors = []
-                for t in node.prev_tensors:
-                    for nt in new_node.prev_nodes[0].next_tensors:
-                        if id(t) == id(nt):
-                            prev_tensors.append(t)
+                prev_tensors = node.prev_tensors[idx : idx + 1]
+                prev_indices = node.prev_indices[idx : idx + 1]
+                if move_idx:
+                    node.prev_indices[idx] = None
+                # prev_tensors = []
+                # prev_indices = []
+                # for i, (t, ind) in enumerate(zip(node.prev_tensors, node.prev_indices)):
+                #     for nt in new_node.prev_nodes[0].next_tensors:
+                #         if isinstance(nt, (list, tuple)):
+                #             for ntt in nt:
+                #                 if id(ntt) == id(t):
+                #                     prev_tensors.append(t)
+                #                     prev_indices.append(ind)
+                #                     if move_idx:
+                #                         node.prev_indices[i] = None
+                #                     break
+                #         elif id(t) == id(nt):
+                #             prev_tensors.append(t)
+                #             prev_indices.append(ind)
+                #             if move_idx:
+                #                 node.prev_indices[i] = None
 
             if next_tensors is None:
                 next_tensors = [None] * len(prev_tensors)
-            for t, new_t in zip(node.prev_tensors, next_tensors):
+            for t, new_t, ind in zip(prev_tensors, next_tensors, prev_indices):
                 if new_t is None:
                     new_t = t.clone()
                 self.tensor_pre_node_dict[id(new_t)] = new_node.unique_name
                 new_node.prev_tensors.append(t)
                 new_node.next_tensors.append(new_t)
-                new_node.prev_indices.append(None)
+                new_node.prev_indices.append(ind if move_idx else None)
 
         # Make output nodes connects to the new node
         node.prev_nodes.clear()
@@ -2165,24 +2208,35 @@ class TraceGraph(object):
             node.prev_tensors.extend(new_node.next_tensors)
 
         # Connect the previous nodes to the new node
-        for new_node in new_nodes:
+        if rev_mode:
             for prev_node in new_node.prev_nodes:
+                idx = None
                 for i, n in enumerate(prev_node.next_nodes):
                     if n == node:
-                        prev_node.next_nodes[i] = new_node
+                        idx = i
                         break
+                if idx is not None:
+                    for i, new_node in enumerate(new_nodes):
+                        prev_node.next_nodes.insert(idx + 1 + i, new_node)
+                    prev_node.next_nodes.pop(idx)
+        else:
+            for new_node in new_nodes:
+                for prev_node in new_node.prev_nodes:
+                    for i, n in enumerate(prev_node.next_nodes):
+                        if n == node:
+                            prev_node.next_nodes[i] = new_node
+                            break
 
         # Update previous node name for next nodes (TraceFunction)
         if type(node.module) == TraceFunction and node not in self.output_nodes:
             new_node = new_nodes[0]
             old_unique_name = new_node.prev_nodes[0].unique_name
             is_constant_node = type(new_node.prev_nodes[0].module) == ConstantNode
-            ns = ''
-            if is_constant_node:
-                ns = 'self.'
-            prev_unique_name = f'{ns}{old_unique_name}'
-            log.debug('node rename: ', old_unique_name, '->', new_node.unique_name)
-            n.module.replace_tensor_name(prev_unique_name, new_node.unique_name)
+            is_next_constant_node = type(new_node.module) == ConstantNode
+            prev_unique_name = tensor_name_from_parts(old_unique_name, is_constant_node=is_constant_node)
+            next_unique_name = tensor_name_from_parts(new_node.unique_name, is_constant_node=is_next_constant_node)
+            log.debug('node rename: ', prev_unique_name, '->', next_unique_name)
+            n.module.replace_tensor_name(prev_unique_name, next_unique_name)
             n.module.update_args_string()
 
     def replace_node_module(self, node: TraceNode, module: torch.nn.Module) -> None:
@@ -2190,6 +2244,7 @@ class TraceGraph(object):
         # Update unique name for node
         old_unique_name = node.unique_name
         is_constant_node = type(node.module) == ConstantNode
+        is_new_constant_node = type(module) == ConstantNode
         node.unique_name = self.module_unique_name_dict[id(module)]
 
         # Update module for node
@@ -2205,14 +2260,15 @@ class TraceGraph(object):
 
         # Update previous node name for next nodes (TraceFunction)
         for n in node.next_nodes:
-            if type(n.module) == TraceFunction:
-                ns = ''
-                if is_constant_node:
-                    ns = 'self.'
-                prev_unique_name = f'{ns}{old_unique_name}'
-                log.debug('node rename: ', old_unique_name, '->', node.unique_name)
-                n.module.replace_tensor_name(prev_unique_name, node.unique_name)
-                n.module.update_args_string()
+            for i, pt in enumerate(n.prev_tensors):
+                if pt in node.next_tensors:
+                    idx = n.prev_indices[i]
+                    if type(n.module) == TraceFunction:
+                        prev_unique_name = tensor_name_from_parts(old_unique_name, idx, is_constant_node)
+                        next_unique_name = tensor_name_from_parts(node.unique_name, idx, is_new_constant_node)
+                        log.debug('node rename: ', prev_unique_name, '->', next_unique_name)
+                        n.module.replace_tensor_name(prev_unique_name, next_unique_name)
+                        n.module.update_args_string()
 
     def fuse_nodes_to_func(
         self, nodes: typing.List[TraceNode], full_name: str, kind: str, func_type: str, is_class: bool
@@ -2259,10 +2315,15 @@ class TraceGraph(object):
                     for i, pn in enumerate(n.prev_nodes):
                         if pn.unique_name == last_node_unique_name:
                             n.prev_nodes[i] = node
-                    # Rewrite func calls in next nodes
-                    if type(n.module) == TraceFunction:
-                        n.module.replace_tensor_name(last_node_unique_name, first_node_unique_name)
-                        n.module.update_args_string()
+                    for i, pt in enumerate(n.prev_tensors):
+                        if pt in node.next_tensors:
+                            idx = n.prev_indices[i]
+                            # Rewrite func calls in next nodes
+                            if type(n.module) == TraceFunction:
+                                old_unique_name = tensor_name_from_parts(last_node_unique_name, idx, False)
+                                new_unique_name = tensor_name_from_parts(last_node_unique_name, idx, False)
+                                n.module.replace_tensor_name(old_unique_name, new_unique_name)
+                                n.module.update_args_string()
 
             else:
                 # TODO: Implement this codepath
@@ -2297,6 +2358,8 @@ class TraceGraph(object):
         tensor_dict = dict(zip(node.next_tensors, node.prev_tensors))
         index_dict = dict(zip(node.next_tensors, node.prev_indices))
         is_constant_node = type(node.module) == ConstantNode
+        is_prev_constant_node = type(prev_node.module) == ConstantNode
+        old_unique_name = node.unique_name
 
         # Deal with previous nodes
         if node in prev_node.next_nodes:
@@ -2317,16 +2380,19 @@ class TraceGraph(object):
             for i, pt in enumerate(n.prev_tensors):
                 if pt in tensor_dict:
                     n.prev_tensors[i] = tensor_dict[pt]
+                    old_idx = n.prev_indices[i]
                     n.prev_indices[i] = index_dict[pt]
-            # Rewrite func calls in next nodes
-            if type(n.module) == TraceFunction:
-                if n.module.args_string is not None:
-                    ns = ''
-                    if is_constant_node:
-                        ns = 'self.'
-                    prev_unique_name = f'{ns}{node}'
-                    n.module.replace_tensor_name(prev_unique_name, prev_node.unique_name)
-                    n.module.update_args_string()
+                    new_idx = n.prev_indices[i]
+                    # Rewrite func calls in next nodes
+                    if type(n.module) == TraceFunction:
+                        if n.module.args_string is not None:
+                            prev_unique_name = tensor_name_from_parts(old_unique_name, old_idx, is_constant_node)
+                            new_unique_name = tensor_name_from_parts(
+                                prev_node.unique_name, new_idx, is_prev_constant_node
+                            )
+
+                            n.module.replace_tensor_name(prev_unique_name, new_unique_name)
+                            n.module.update_args_string()
 
         # Remove this node
         self.forward_nodes.remove(node)
@@ -2459,6 +2525,18 @@ def check_creation_args(args: typing.Iterable) -> typing.Tuple:
         else:
             new_args.append(arg)
     return tuple(new_args)
+
+
+def tensor_name_from_parts(node_name, node_idx=None, is_constant_node=False):
+    ns = 'self.' if is_constant_node else ''
+    if node_idx is None:
+        return f'{ns}{node_name}'
+    else:
+        if isinstance(node_idx, (list, tuple)):
+            indices_str = ''.join([f'[{i}]' for i in node_idx])
+            return f'{ns}{node_name}{indices_str}'
+        else:
+            return f'{ns}{node_name}[{node_idx}]'
 
 
 def trace(module: torch.nn.Module, dummy_input: torch.Tensor, eliminate_dead_graph: bool = False) -> TraceGraph:

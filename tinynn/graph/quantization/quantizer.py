@@ -576,7 +576,7 @@ class QATQuantizer(object):
                     module_constructor_lines[id(fake_dequant)] = f'{qualified_name(fake_dequant_cls)}()'
                     modules.append(fake_dequant)
 
-                graph.insert_before(node, modules)
+                graph.insert_before(node, modules, move_idx=True)
             else:
                 fake_dequant = fake_dequant_cls()
 
@@ -585,7 +585,7 @@ class QATQuantizer(object):
 
                 module_constructor_lines[id(fake_dequant)] = f'{qualified_name(fake_dequant_cls)}()'
 
-                graph.insert_before(node, fake_dequant)
+                graph.insert_before(node, fake_dequant, move_idx=True)
 
         # Third, we rewrite neg/sub/div using supported functions(e.g add, mul)
         def _is_neg_node(node: TraceNode, custom_data):
@@ -603,10 +603,8 @@ class QATQuantizer(object):
             full_name_parts = node.module.full_name.split('.')
             full_name_parts[-1] = node.module.func_type
 
-            node.module.full_name = '.'.join(full_name_parts)
-
             with override_current_trace_graph(graph):
-                node.module.parse_args(node.module.prev_tensors[0], -1.0)
+                node.module.parse_args(node.prev_tensors[0], -1.0)
 
         def _is_div_node(node: TraceNode, custom_data):
             cur_module = node.module
@@ -642,7 +640,7 @@ class QATQuantizer(object):
                 other_arg = int(node.module.args_string_no_self)
 
             with override_current_trace_graph(graph):
-                node.module.parse_args(node.prev_tensors[0], 1.0 / other_arg)
+                node.module.parse_args(node.prev_tensors[0], -1.0 / other_arg)
 
         def _is_sub_node(node: TraceNode, custom_data):
             cur_module = node.module
@@ -732,7 +730,7 @@ class QATQuantizer(object):
         stack_nodes = graph.filter_forward_nodes(_is_stack_node)
 
         for idx, node in enumerate(stack_nodes):
-            args = node.module.args_string_no_self
+            args = getattr(node.module, 'args_string_no_self', '')
             if ',' in args:
                 log.error('rewrite doesn\'t support multiple args for torch.stack')
                 assert False
@@ -923,32 +921,50 @@ class QATQuantizer(object):
                 node.module.aliases = None
 
         # Rewrite relu, relu6 as nn.ReLU() and nn.ReLU6() for Module fusable rules
-        def _is_relu_functional_node(node: TraceNode, custom_data):
+        def _is_functional_rewrite_node(node: TraceNode, custom_data):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind in ('relu', 'relu6')
+                return cur_module.kind in ('relu', 'relu6', 'elu')
 
-        relu_nodes_to_rewrite = graph.filter_forward_nodes(_is_relu_functional_node)
-        log.info(f'rewriting relu for {[node.unique_name for node in relu_nodes_to_rewrite]}')
-        for idx, node in enumerate(relu_nodes_to_rewrite):
+        func_nodes_to_rewrite = graph.filter_forward_nodes(_is_functional_rewrite_node)
+        log.info(f'rewriting functional to module for {[node.unique_name for node in func_nodes_to_rewrite]}')
+        for idx, node in enumerate(func_nodes_to_rewrite):
             kind = node.module.kind
             inplace = node.module.func_type == f'{kind}_' or 'True' in node.module.args_string
             if node.module.kind == 'relu':
-                new_relu = nn.ReLU(inplace=inplace)
+                new_func = nn.ReLU(inplace=inplace)
             elif node.module.kind == 'relu6':
-                new_relu = nn.ReLU6(inplace=inplace)
+                new_func = nn.ReLU6(inplace=inplace)
+            elif node.module.kind == 'elu':
+                if hasattr(node.module, 'args_string_no_self'):
 
-            graph.module_unique_name_dict[id(new_relu)] = f'rewritten_{kind}_{idx}'
-            graph.module_original_name_dict[id(new_relu)] = f'rewritten_{kind}_{idx}'
+                    def _parse_args(alpha=1.0, *args, **kwargs):
+                        return alpha
 
-            relu_cls = type(new_relu)
+                    alpha = eval(f'_parse_args({node.module.args_string_no_self})')
+                    new_func = nn.ELU(alpha, inplace=inplace)
+                else:
+                    alpha = None
+                    new_func = nn.ELU()
+
+            graph.module_unique_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
+            graph.module_original_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
+
+            relu_cls = type(new_func)
             if inplace:
                 arg_str = 'inplace=True'
             else:
                 arg_str = ''
-            module_constructor_lines[id(new_relu)] = f'{qualified_name(relu_cls)}({arg_str})'
-            graph.replace_node_module(node, new_relu)
+
+            if node.module.kind == 'elu' and alpha is not None:
+                if arg_str:
+                    arg_str = f'{alpha}, {arg_str}'
+                else:
+                    arg_str = f'{alpha}'
+
+            module_constructor_lines[id(new_func)] = f'{qualified_name(relu_cls)}({arg_str})'
+            graph.replace_node_module(node, new_func)
 
         # Rewrite dropout as nn.Dropout() for models in training mode
         def _is_dropout_functional_node(node: TraceNode, custom_data):
@@ -963,7 +979,8 @@ class QATQuantizer(object):
         dropout_nodes_to_rewrite = graph.filter_forward_nodes(_is_dropout_functional_node)
         log.info(f'rewriting dropout for {[node.unique_name for node in dropout_nodes_to_rewrite]}')
         for idx, node in enumerate(dropout_nodes_to_rewrite):
-            p, _, inplace = eval(f'_dropout_args({node.module.args_string_no_self})')
+            args = getattr(node.module, 'args_string_no_self', '')
+            p, _, inplace = eval(f'_dropout_args({args})')
             kind = node.module.kind
             inplace = node.module.func_type == f'{kind}_' or inplace
             dropout_cls = nn.Dropout
@@ -1052,7 +1069,7 @@ class QATQuantizer(object):
 
         pool_one_kernel_size_nodes = []
         graph.filter_forward_nodes(_is_pool_nd_with_one_kernel_size, pool_one_kernel_size_nodes)
-        for node, kernel_size, stride in pool_one_kernel_size_nodes:
+        for idx, (node, kernel_size, stride) in enumerate(pool_one_kernel_size_nodes):
             slices = [slice(None)] * 2
             t = node.prev_tensors[0]
             dim = len(t.shape)
@@ -1067,8 +1084,8 @@ class QATQuantizer(object):
             with override_current_trace_graph(graph):
                 new_func = TraceFunction('torch.Tensor.__getitem__', True).parse_args(t, slices)
 
-                graph.module_unique_name_dict[id(new_func)] = graph.module_unique_name_dict[id(node.module)]
-                graph.module_original_name_dict[id(new_func)] = graph.module_unique_name_dict[id(node.module)]
+                graph.module_unique_name_dict[id(new_func)] = f'rewritten_pool_{idx}'
+                graph.module_original_name_dict[id(new_func)] = f'rewritten_pool_{idx}'
 
                 graph.replace_node_module(node, new_func)
 
@@ -1100,8 +1117,8 @@ class QATQuantizer(object):
                 )
                 new_bn.load_state_dict(mod.state_dict())
 
-                graph.module_unique_name_dict[id(new_bn)] = graph.module_unique_name_dict[id(mod)]
-                graph.module_original_name_dict[id(new_bn)] = graph.module_unique_name_dict[id(mod)]
+                graph.module_unique_name_dict[id(new_bn)] = f'rewritten_bn2d_{idx}'
+                graph.module_original_name_dict[id(new_bn)] = f'rewritten_bn2d_{idx}'
 
                 with override_current_trace_graph(graph):
                     graph.replace_node_module(node, new_bn)
@@ -1166,8 +1183,14 @@ class QATQuantizer(object):
                 prev_indices = []
                 for pt in next_node.prev_tensors:
                     for j, nt in enumerate(node.next_tensors):
-                        if id(pt) == id(nt):
+                        if isinstance(nt, (list, tuple)):
+                            for k, ntt in enumerate(nt):
+                                if id(pt) == id(ntt):
+                                    prev_indices.append(f'{j},{k}')
+                                    break
+                        elif id(pt) == id(nt):
                             prev_indices.append(str(j))
+                            break
 
                 prev_idx = '_'.join(prev_indices)
 
