@@ -2395,11 +2395,8 @@ class ATenTopkOperator(ATenTopkSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        input_tensor, k, dim, largest, sorted = self.input_tensors
-        log.warning(
-            "ATenTopkOperator only return the top k largest element along each last dimensional slice of"
-            " input and the indices of values within the last dimension of the input tensor"
-        )
+        input_tensor, k, dim, largest, sorted = self.input_tensors[:5]
+        assert dim == -1 and largest is True and sorted is True, "tflite topk only dim=-1,largest=True and sorted=True"
         input_tensor = self.find_or_create_input(0, graph_converter)
         k = self.create_attr_tensor(np.array([k], dtype='int32'))
         inputs = [input_tensor, k]
