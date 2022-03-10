@@ -3014,7 +3014,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(tfl_output, dummy_output)
+        assert_close(tfl_output, dummy_output, check_dtype=False)
 
 
 class ConverterQuantizedOPTester(unittest.TestCase):

@@ -2396,10 +2396,12 @@ class ATenTopkOperator(ATenTopkSchema):
 
         self.run(node)
         input_tensor, k, dim, largest, sorted = self.input_tensors[:5]
-        assert dim == -1 and largest is True and sorted is True, "tflite topk only dim=-1,largest=True and sorted=True"
+        assert dim in (input_tensor.ndim - 1, -1), 'tflite topk only support last dim'
+        assert largest in (1, True) and sorted in (1, True), 'tflite topk only support largest=True and sorted=True'
         input_tensor = self.find_or_create_input(0, graph_converter)
         k = self.create_attr_tensor(np.array([k], dtype='int32'))
         inputs = [input_tensor, k]
+        self.output_tensors[1] = self.output_tensors[1].to(dtype=torch.int32)
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
         op = tfl.TopkV2Operator(inputs, outputs)
         graph_converter.add_operator(op)
