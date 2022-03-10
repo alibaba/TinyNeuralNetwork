@@ -2397,10 +2397,11 @@ class ATenTopkOperator(ATenTopkSchema):
         self.run(node)
         input_tensor, k, dim, largest, sorted = self.input_tensors
         log.warning(
-            "ATenTopkOperator only return the top k largest element along '            'each last dimensional slice of"
-            " input and the indices of values within '            'the last dimension of the input tensor"
+            "ATenTopkOperator only return the top k largest element along each last dimensional slice of"
+            " input and the indices of values within the last dimension of the input tensor"
         )
-        input_tensor, k = [self.find_or_create_input(i, graph_converter) for i in range(2)]
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        k = self.create_attr_tensor(np.array([k], dtype='int32'))
         inputs = [input_tensor, k]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
         op = tfl.TopkV2Operator(inputs, outputs)
