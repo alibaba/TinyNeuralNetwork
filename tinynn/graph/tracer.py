@@ -963,8 +963,8 @@ def fetch_funcs(config: typing.Optional[str] = None):
         version_parts = torch.__version__.split('.')
         if int(version_parts[1]) < 6:
             version_parts[1] = '6'
-        if int(version_parts[1]) > 10:
-            version_parts[1] = '10'
+        if int(version_parts[1]) > 11:
+            version_parts[1] = '11'
         version_str = '_'.join(version_parts[:2])
         config = os.path.join(current_dir, f'configs/torch_func_override_{version_str}.yml')
     modules = []

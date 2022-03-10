@@ -12,6 +12,7 @@ torch:
 - arange
 - as_strided
 - as_tensor
+- asarray
 - bartlett_window
 - blackman_window
 - empty
