@@ -247,9 +247,14 @@ class QATQuantizer(object):
 
         while not qat_analysis_queue.empty():
             node, quantized = qat_analysis_queue.get()
+            if not graph.quantized:
+                graph.quantized = graph.quantized or quantized
             _qat_analysis(node, quantized)
 
         log.debug("qat analysis over")
+
+        if not graph.quantized:
+            return
 
         processed_qat_rules = load_processed_qat_rules()
 
@@ -416,6 +421,10 @@ class QATQuantizer(object):
         graph.module.train()
 
         self.prepare_qat_prep(graph, is_input_quantized, backend)
+
+        if not graph.quantized:
+            log.warning('Graph is not quantized, skip preparation')
+            return graph.module
 
         # Unfornately, the suggested way below will try to fuse all the modules
         # even if some of the nodes are not in a quantized computation graph.
@@ -1009,20 +1018,21 @@ class QATQuantizer(object):
             else:
                 return cur_class in (nn.ConstantPad1d, nn.ConstantPad2d, nn.ConstantPad3d, nn.ZeroPad2d)
 
-        partially_supported_nodes = graph.filter_forward_nodes(_is_partially_quantizable)
-        for idx, node in enumerate(partially_supported_nodes):
-            assert len(node.prev_nodes) == 1
-            for n in node.prev_nodes:
-                shared_tensors = list(set(node.prev_tensors).intersection(set(n.next_tensors)))
-                if len(shared_tensors) > 1:
-                    log.error('rewrite for partially-supported ops supports with nodes with exact one input')
-                    assert False
-                with override_current_trace_graph(graph):
-                    trace_func = TraceFunction('torch.Tensor.contiguous', True, prefix='fuse_').parse_args(
-                        shared_tensors[0]
-                    )
-                next_tensors = [x.contiguous() for x in shared_tensors]
-                graph.insert_between(n, node, trace_func, next_tensors)
+        if LooseVersion(torch.__version__) >= LooseVersion('1.7.0'):
+            partially_supported_nodes = graph.filter_forward_nodes(_is_partially_quantizable)
+            for idx, node in enumerate(partially_supported_nodes):
+                assert len(node.prev_nodes) == 1
+                for n in node.prev_nodes:
+                    shared_tensors = list(set(node.prev_tensors).intersection(set(n.next_tensors)))
+                    if len(shared_tensors) > 1:
+                        log.error('rewrite for partially-supported ops supports with nodes with exact one input')
+                        assert False
+                    with override_current_trace_graph(graph):
+                        trace_func = TraceFunction('torch.Tensor.contiguous', True, prefix='fuse_').parse_args(
+                            shared_tensors[0]
+                        )
+                    next_tensors = [x.contiguous() for x in shared_tensors]
+                    graph.insert_between(n, node, trace_func, next_tensors)
 
         # Remove non-leaf `.data` nodes
         def _is_non_leaf_data_nodes(node, custom_data):
@@ -1140,6 +1150,9 @@ class QATQuantizer(object):
             if cur_class == ConstantNode:
                 return False
             elif cur_class == TraceFunction:
+                if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
+                    if cur_module.kind in ('pad',):
+                        return True
                 return cur_module.kind in (
                     'pow',
                     'truediv',
@@ -1159,7 +1172,13 @@ class QATQuantizer(object):
                 )
             else:
                 if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
-                    if cur_class == nn.ConvTranspose2d:
+                    if cur_class in (
+                        nn.ConvTranspose2d,
+                        nn.ConstantPad1d,
+                        nn.ConstantPad2d,
+                        nn.ConstantPad3d,
+                        nn.ZeroPad2d,
+                    ):
                         return True
                 else:
                     if cur_class == nn.SiLU:

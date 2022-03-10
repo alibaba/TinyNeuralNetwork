@@ -1,6 +1,7 @@
 import importlib.util
 import logging
 import os
+import sys
 import types
 import typing
 from functools import wraps
@@ -240,6 +241,7 @@ def import_from_path(module: str, path: str, name: str):
     spec = importlib.util.spec_from_file_location(module, path)
     foo = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(foo)
+    sys.modules[module] = foo
     return getattr(foo, name)
 
 
