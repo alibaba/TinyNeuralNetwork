@@ -2388,3 +2388,20 @@ class ATenTypeAsOperator(ATenTypeAsSchema):
 
         self.run(node)
         ATenToOperator.parse_common(self, node, attrs, args, graph_converter)
+
+
+class ATenTopkOperator(ATenTopkSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        input_tensor, k, dim, largest, sorted = self.input_tensors
+        log.warning(
+            "ATenTopkOperator only return the top k largest element along '            'each last dimensional slice of"
+            " input and the indices of values within '            'the last dimension of the input tensor"
+        )
+        input_tensor, k = [self.find_or_create_input(i, graph_converter) for i in range(2)]
+        inputs = [input_tensor, k]
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        op = tfl.TopkV2Operator(inputs, outputs)
+        graph_converter.add_operator(op)
