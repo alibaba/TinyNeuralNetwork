@@ -2244,14 +2244,16 @@ class TraceGraph(object):
         # Update previous node name for next nodes (TraceFunction)
         for n in node.next_nodes:
             for i, pt in enumerate(n.prev_tensors):
-                if pt in node.next_tensors:
-                    idx = n.prev_indices[i]
-                    if type(n.module) == TraceFunction:
-                        prev_unique_name = tensor_name_from_parts(old_unique_name, idx, is_constant_node)
-                        next_unique_name = tensor_name_from_parts(node.unique_name, idx, is_new_constant_node)
-                        log.debug('node rename: ', prev_unique_name, '->', next_unique_name)
-                        n.module.replace_tensor_name(prev_unique_name, next_unique_name)
-                        n.module.update_args_string()
+                for nt in node.next_tensors:
+                    if id(nt) == id(pt):
+                        idx = n.prev_indices[i]
+                        if type(n.module) == TraceFunction:
+                            prev_unique_name = tensor_name_from_parts(old_unique_name, idx, is_constant_node)
+                            next_unique_name = tensor_name_from_parts(node.unique_name, idx, is_new_constant_node)
+                            log.debug('node rename: ', prev_unique_name, '->', next_unique_name)
+                            n.module.replace_tensor_name(prev_unique_name, next_unique_name)
+                            n.module.update_args_string()
+                        break
 
     def fuse_nodes_to_func(
         self, nodes: typing.List[TraceNode], full_name: str, kind: str, func_type: str, is_class: bool
@@ -2299,14 +2301,16 @@ class TraceGraph(object):
                         if pn.unique_name == last_node_unique_name:
                             n.prev_nodes[i] = node
                     for i, pt in enumerate(n.prev_tensors):
-                        if pt in node.next_tensors:
-                            idx = n.prev_indices[i]
-                            # Rewrite func calls in next nodes
-                            if type(n.module) == TraceFunction:
-                                old_unique_name = tensor_name_from_parts(last_node_unique_name, idx, False)
-                                new_unique_name = tensor_name_from_parts(last_node_unique_name, idx, False)
-                                n.module.replace_tensor_name(old_unique_name, new_unique_name)
-                                n.module.update_args_string()
+                        for nt in node.next_tensors:
+                            if id(pt) == id(nt):
+                                idx = n.prev_indices[i]
+                                # Rewrite func calls in next nodes
+                                if type(n.module) == TraceFunction:
+                                    old_unique_name = tensor_name_from_parts(last_node_unique_name, idx, False)
+                                    new_unique_name = tensor_name_from_parts(first_node_unique_name, idx, False)
+                                    n.module.replace_tensor_name(old_unique_name, new_unique_name)
+                                    n.module.update_args_string()
+                                break
 
             else:
                 # TODO: Implement this codepath
