@@ -6,7 +6,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-sys.path.append('../../../')
+CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../../'))
 
 from examples.models.cifar10 import mobilenet
 from tinynn.prune import ADMMPruner

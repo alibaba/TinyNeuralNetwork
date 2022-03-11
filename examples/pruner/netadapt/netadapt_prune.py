@@ -6,14 +6,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-sys.path.append('../../../')
+CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../../'))
 
 from examples.models.cifar10 import mobilenet
 from tinynn.prune import NetAdaptPruner
 from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate
 from tinynn.util.train_util import DLContext, get_device, train
-
-CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 
 
 def load_model():

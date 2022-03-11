@@ -4,12 +4,12 @@ import sys
 
 import torch
 
-sys.path.append('../../')
+CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../'))
 
 from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
 from tinynn.converter import TFLiteConverter
-
-CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 
 
 def main_worker():

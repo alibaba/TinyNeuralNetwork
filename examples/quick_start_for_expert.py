@@ -4,7 +4,9 @@ import argparse
 
 import sys
 
-sys.path.append('../')
+CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../'))
 
 import torch
 import torch.nn as nn
