@@ -30,9 +30,9 @@ else:
     sha = get_sha()
     dt = get_datetime()
     if sha:
-        version += f'{dt}_{sha}'
+        version += f'.{dt}+{sha}'
     else:
-        version += dt
+        version += f'.{dt}'
 
 reqs = parse_requirements('requirements.txt', session=False)
 
