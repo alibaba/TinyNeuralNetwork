@@ -1,15 +1,19 @@
-import os
-import torch
 import argparse
-import torch.nn as nn
-import torch.optim as optim
-from tinynn.graph.tracer import model_tracer, trace
-from tinynn.graph.quantization.quantizer import DynamicQuantizer
-from models.cifar10.mobilenet import Mobilenet, DEFAULT_STATE_DICT
-from tinynn.converter import TFLiteConverter
-
+import os
+import sys
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../'))
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
+from tinynn.converter import TFLiteConverter
+from tinynn.graph.quantization.quantizer import DynamicQuantizer
+from tinynn.graph.tracer import model_tracer, trace
 
 
 class SimpleLSTM(nn.Module):

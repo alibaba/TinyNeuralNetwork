@@ -1,8 +1,14 @@
 import argparse
 import os
+import sys
+
+CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../'))
 
 import torch
 import torch.nn as nn
+
 from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
 from tinynn.converter import TFLiteConverter
 from tinynn.graph.quantization.quantizer import PostQuantizer

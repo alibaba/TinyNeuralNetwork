@@ -1,18 +1,22 @@
-import os
-import torch
 import argparse
-import torch.nn as nn
-import torch.optim as optim
-from tinynn.graph.tracer import model_tracer, trace
-from tinynn.graph.quantization.quantizer import BF16Quantizer
-from tinynn.graph.quantization import disable_fake_quant
-from models.cifar10.mobilenet import Mobilenet, DEFAULT_STATE_DICT
-from tinynn.util.cifar10 import train_one_epoch, validate, get_dataloader
-from tinynn.util.train_util import DLContext, get_device, train
-from tinynn.converter import TFLiteConverter
-
+import os
+import sys
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../'))
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
+from tinynn.converter import TFLiteConverter
+from tinynn.graph.quantization import disable_fake_quant
+from tinynn.graph.quantization.quantizer import BF16Quantizer
+from tinynn.graph.tracer import model_tracer, trace
+from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate
+from tinynn.util.train_util import DLContext, get_device, train
 
 
 def main_worker(args):
