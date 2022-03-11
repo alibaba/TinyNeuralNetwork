@@ -1067,6 +1067,8 @@ def qualified_name(module, item: typing.Optional[str] = None, short: bool = Fals
                     if hasattr(cur_mod, name) and getattr(cur_mod, name) == module:
                         obj_key = f'{ns}.{name}'
                         break
+    elif isinstance(module, str):
+        obj_key = module
     else:
         obj_key = module.__name__
     if item is not None:
