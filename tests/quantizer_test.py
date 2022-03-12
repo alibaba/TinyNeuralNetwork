@@ -35,7 +35,7 @@ def show_source(model, title, reload_cache=True):
     print(source)
 
 
-def test_quantize_rewrite(model, inputs, show_rewritten=True):
+def check_quantize_rewrite(model, inputs, show_rewritten=True):
     with model_tracer():
         config = {'remove_weights_after_load': True}
         if sys.platform == 'win32':
@@ -70,7 +70,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_pow(self):
         class Model(nn.Module):
@@ -80,7 +80,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_sqrt(self):
         class Model(nn.Module):
@@ -90,7 +90,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_sin(self):
         class Model(nn.Module):
@@ -100,7 +100,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_cos(self):
         class Model(nn.Module):
@@ -110,7 +110,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     @unittest.skipIf(not hasattr(F, 'hardsigmoid'), 'F.hardsigmoid not supported')
     def test_not_quantizable_hardsigmoid(self):
@@ -121,7 +121,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     @unittest.skipIf(not hasattr(nn, 'hardsigmoid'), 'nn.Hardsigmoid not supported')
     def test_not_quantizable_hardsigmoid_module(self):
@@ -137,7 +137,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     @unittest.skipIf(not hasattr(F, 'silu'), 'F.silu not supported')
     def test_not_quantizable_silu(self):
@@ -148,7 +148,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     @unittest.skipIf(not hasattr(nn, 'SiLU'), 'nn.SiLU not supported')
     def test_not_quantizable_silu_module(self):
@@ -164,7 +164,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_reciprocal(self):
         class Model(nn.Module):
@@ -174,7 +174,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_exp(self):
         class Model(nn.Module):
@@ -184,7 +184,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_softmax(self):
         class Model(nn.Module):
@@ -194,7 +194,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_softmax_module(self):
         class Model(nn.Module):
@@ -209,7 +209,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_log_softmax(self):
         class Model(nn.Module):
@@ -219,7 +219,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_log_softmax_module(self):
         class Model(nn.Module):
@@ -234,7 +234,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_atan(self):
         class Model(nn.Module):
@@ -244,7 +244,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_atan2(self):
         class Model(nn.Module):
@@ -254,7 +254,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = [torch.randn(1, 3, 224, 224), torch.ones(1, 3, 224, 224)]
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_truediv(self):
         class Model(nn.Module):
@@ -264,7 +264,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = [torch.randn(1, 3, 224, 224), torch.ones(1, 3, 224, 224)]
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_layer_norm(self):
         class Model(nn.Module):
@@ -279,7 +279,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_layer_norm_module(self):
         class Model(nn.Module):
@@ -294,7 +294,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_instance_norm_module(self):
         class Model(nn.Module):
@@ -304,7 +304,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_instance_norm_1d_module(self):
         class Model(nn.Module):
@@ -319,7 +319,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_instance_norm_2d_module(self):
         class Model(nn.Module):
@@ -334,7 +334,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_rnn_module(self):
         class Model(nn.Module):
@@ -349,7 +349,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_lstm_module(self):
         class Model(nn.Module):
@@ -364,7 +364,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_not_quantizable_gru_module(self):
         class Model(nn.Module):
@@ -379,7 +379,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_avg_pool1d_with_one_kernel_size(self):
         class Model(nn.Module):
@@ -393,7 +393,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_max_pool1d_with_one_kernel_size_and_stride(self):
         class Model(nn.Module):
@@ -407,7 +407,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_avg_pool2d_with_one_kernel_size_with_stride(self):
         class Model(nn.Module):
@@ -417,7 +417,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_max_pool2d_with_one_kernel_size(self):
         class Model(nn.Module):
@@ -427,7 +427,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_functional_to_module_relu(self):
         class Model(nn.Module):
@@ -437,7 +437,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_functional_to_module_relu6(self):
         class Model(nn.Module):
@@ -447,7 +447,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_functional_to_module_elu(self):
         class Model(nn.Module):
@@ -457,7 +457,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_functional_to_module_dropout(self):
         class Model(nn.Module):
@@ -467,7 +467,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_functional_to_module_dropout_with_p(self):
         class Model(nn.Module):
@@ -477,7 +477,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_functional_to_module_elu_with_alpha(self):
         class Model(nn.Module):
@@ -487,7 +487,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_neg(self):
         class Model(nn.Module):
@@ -497,7 +497,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_div(self):
         class Model(nn.Module):
@@ -507,7 +507,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_sub(self):
         class Model(nn.Module):
@@ -517,7 +517,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_rsub(self):
         class Model(nn.Module):
@@ -527,7 +527,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_sub_tensors(self):
         class Model(nn.Module):
@@ -537,7 +537,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = [torch.randn(1, 3, 224, 224), torch.randn(1, 3, 224, 224)]
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_stack(self):
         class Model(nn.Module):
@@ -547,7 +547,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = [torch.randn(1, 3, 224, 224), torch.randn(1, 3, 224, 224)]
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_stack_with_dim(self):
         class Model(nn.Module):
@@ -557,7 +557,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = [torch.randn(1, 3, 224, 224), torch.randn(1, 3, 224, 224)]
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_stack_with_dim_keyword(self):
         class Model(nn.Module):
@@ -567,7 +567,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = [torch.randn(1, 3, 224, 224), torch.randn(1, 3, 224, 224)]
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_add(self):
         class Model(nn.Module):
@@ -577,7 +577,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_radd(self):
         class Model(nn.Module):
@@ -587,7 +587,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_add_tensors(self):
         class Model(nn.Module):
@@ -597,7 +597,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = [torch.randn(1, 3, 224, 224), torch.randn(1, 3, 224, 224)]
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_mul(self):
         class Model(nn.Module):
@@ -607,7 +607,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_rmul(self):
         class Model(nn.Module):
@@ -617,7 +617,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_mul_tensors(self):
         class Model(nn.Module):
@@ -627,7 +627,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = [torch.randn(1, 3, 224, 224), torch.randn(1, 3, 224, 224)]
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_add_relu(self):
         class Model(nn.Module):
@@ -637,7 +637,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = [torch.randn(1, 3, 224, 224), torch.randn(1, 3, 224, 224)]
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_constant_pad_1d(self):
         class Model(nn.Module):
@@ -647,7 +647,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_constant_pad_2d(self):
         class Model(nn.Module):
@@ -657,7 +657,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_constant_pad_1d_module(self):
         class Model(nn.Module):
@@ -671,7 +671,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_constant_pad_2d_module(self):
         class Model(nn.Module):
@@ -685,7 +685,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_zero_pad_2d(self):
         class Model(nn.Module):
@@ -699,7 +699,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
     def test_non_leaf_data(self):
         class Model(nn.Module):
@@ -711,7 +711,7 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
 
-        test_quantize_rewrite(model, inputs)
+        check_quantize_rewrite(model, inputs)
 
 
 if __name__ == '__main__':
