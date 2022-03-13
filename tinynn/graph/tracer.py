@@ -836,12 +836,14 @@ def new_init_gen(orig_init, key: str):
                         )
                         log.warning(f'  Args: {args}')
                         log.warning(f'  Keyword args: {kwargs}')
+                        module_constructor_traced.remove(id(obj))
                     else:
                         log.info(f'Constructor of {class_fullname} registered')
                         full_args_content = args_as_string(args, kwargs)
                         orig_constructor_line = f'{class_fullname}({full_args_content})'
-                    module_constructor_lines[id(obj)] = orig_constructor_line
+                        module_constructor_lines[id(obj)] = orig_constructor_line
                 else:
+                    module_constructor_traced.remove(id(obj))
                     log.warning(f'Constructor of class {actual_class_name} is not captured')
             orig_init(obj, *args, **kwargs)
         log.debug(f'{key} after with block, lock: {lock}')
