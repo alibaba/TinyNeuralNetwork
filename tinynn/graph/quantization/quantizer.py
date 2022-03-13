@@ -442,31 +442,65 @@ class QATQuantizer(object):
             model = torch_q.prepare(graph.module, inplace=True)
             for n in graph.forward_nodes:
                 if not n.quantized:
-                    if hasattr(n.module, "_forward_hooks"):
-                        if len(n.module._forward_hooks) > 0:
-                            n.module._forward_hooks.popitem()
-                    if hasattr(n.module, "qconfig"):
-                        delattr(n.module, "qconfig")
-                    if hasattr(n.module, "activation_post_process"):
-                        delattr(n.module, "activation_post_process")
+                    modules = queue.Queue()
+                    modules.put(n.module)
+                    check_child = False
+                    first_iter = True
+                    while not modules.empty():
+                        mod = modules.get()
+                        if hasattr(mod, "_forward_hooks"):
+                            if len(mod._forward_hooks) > 0:
+                                mod._forward_hooks.popitem()
+                                check_child = True
+                        if hasattr(mod, "qconfig"):
+                            delattr(mod, "qconfig")
+                            check_child = True
+                        if hasattr(mod, "activation_post_process"):
+                            delattr(mod, "activation_post_process")
+                            check_child = True
+                        if check_child and first_iter:
+                            for mod in mod.children():
+                                modules.put(mod)
             torch_q.convert(model, mapping, inplace=True)
         else:
             torch_q.propagate_qconfig_(graph.module, qconfig_dict=None)
             for n in graph.forward_nodes:
                 if not n.quantized:
-                    if hasattr(n.module, "qconfig"):
-                        delattr(n.module, "qconfig")
+                    modules = queue.Queue()
+                    modules.put(n.module)
+                    check_child = False
+                    first_iter = True
+                    while not modules.empty():
+                        mod = modules.get()
+                        if hasattr(mod, "qconfig"):
+                            delattr(mod, "qconfig")
+                            check_child = True
+                        if check_child and first_iter:
+                            for mod in mod.children():
+                                modules.put(mod)
             model = torch_q.convert(graph.module, mapping=mapping, inplace=True, remove_qconfig=False)
             torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
             for n in graph.forward_nodes:
                 if not n.quantized:
-                    if hasattr(n.module, "qconfig"):
-                        delattr(n.module, "qconfig")
-                    if hasattr(n.module, "_forward_hooks"):
-                        if len(n.module._forward_hooks) > 0:
-                            n.module._forward_hooks.popitem()
-                    if hasattr(n.module, "activation_post_process"):
-                        delattr(n.module, "activation_post_process")
+                    modules = queue.Queue()
+                    modules.put(n.module)
+                    check_child = False
+                    first_iter = True
+                    while not modules.empty():
+                        mod = modules.get()
+                        if hasattr(mod, "qconfig"):
+                            delattr(mod, "qconfig")
+                            check_child = True
+                        if hasattr(mod, "_forward_hooks"):
+                            if len(mod._forward_hooks) > 0:
+                                mod._forward_hooks.popitem()
+                                check_child = True
+                        if hasattr(mod, "activation_post_process"):
+                            delattr(mod, "activation_post_process")
+                            check_child = True
+                        if check_child and first_iter:
+                            for mod in mod.children():
+                                modules.put(mod)
 
         if not self.per_tensor:
             if self.backend == 'qnnpack':
@@ -1188,36 +1222,45 @@ class QATQuantizer(object):
                     'instance_norm',
                     'softmax',
                     'log_softmax',
+                    'multi_head_attention_forward',
                 )
             else:
                 if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
-                    if cur_class in (
-                        nn.ConvTranspose2d,
-                        nn.ConstantPad1d,
-                        nn.ConstantPad2d,
-                        nn.ConstantPad3d,
-                        nn.ZeroPad2d,
+                    if isinstance(
+                        cur_module,
+                        (
+                            nn.ConvTranspose2d,
+                            nn.ConstantPad1d,
+                            nn.ConstantPad2d,
+                            nn.ConstantPad3d,
+                            nn.ZeroPad2d,
+                        ),
                     ):
                         return True
                 else:
-                    if cur_class == nn.SiLU:
+                    if isinstance(cur_module, nn.SiLU):
                         return True
-                return cur_class in (
-                    nn.LSTM,
-                    nn.RNN,
-                    nn.GRU,
-                    nn.LayerNorm,
-                    nn.InstanceNorm1d,
-                    nn.InstanceNorm2d,
-                    nn.Hardsigmoid,
-                    nn.Softmax,
-                    nn.LogSoftmax,
+                return isinstance(
+                    cur_module,
+                    (
+                        nn.LSTM,
+                        nn.RNN,
+                        nn.GRU,
+                        nn.LayerNorm,
+                        nn.InstanceNorm1d,
+                        nn.InstanceNorm2d,
+                        nn.Hardsigmoid,
+                        nn.Softmax,
+                        nn.LogSoftmax,
+                        nn.MultiheadAttention,
+                    ),
                 )
 
         unsupported_nodes = graph.filter_forward_nodes(_is_not_quantizable)
         for idx, node in enumerate(reversed(unsupported_nodes)):
             node_map = dict()
-            for inner_idx, next_node in enumerate(node.next_nodes):
+            next_nodes = {n.unique_name: n for n in node.next_nodes}.values()
+            for inner_idx, next_node in enumerate(next_nodes):
                 prev_indices = []
                 for pt in next_node.prev_tensors:
                     for j, nt in enumerate(node.next_tensors):
@@ -1254,7 +1297,8 @@ class QATQuantizer(object):
         for idx, node in enumerate(unsupported_nodes):
             fake_dequant_cls = torch_q.DeQuantStub
             assert node.rev_index is False
-            for inner_idx, prev_node in enumerate(node.prev_nodes):
+            prev_nodes = {n.unique_name: n for n in node.prev_nodes}.values()
+            for inner_idx, prev_node in enumerate(prev_nodes):
                 fake_dequant = fake_dequant_cls()
 
                 graph.module_unique_name_dict[id(fake_dequant)] = f'fake_dequant_inner_{idx}_{inner_idx}'

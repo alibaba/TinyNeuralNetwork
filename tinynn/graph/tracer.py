@@ -2131,7 +2131,6 @@ class TraceGraph(object):
         for idx in range(len(next_node.prev_nodes)):
             if next_node.prev_nodes[idx] == prev_node:
                 next_node.prev_nodes[idx] = new_node
-                break
 
         # Update tensors in output nodes
         index_mapping = []
@@ -2159,8 +2158,8 @@ class TraceGraph(object):
                 prev_unique_name = tensor_name_from_parts(old_unique_name, old_idx, is_constant_node)
                 next_unique_name = tensor_name_from_parts(new_node.unique_name, new_idx, is_new_constant_node)
                 log.debug('tensor rename: ', prev_unique_name, '->', next_unique_name)
-                n.module.replace_tensor_name(prev_unique_name, next_unique_name)
-                n.module.update_args_string()
+                next_node.module.replace_tensor_name(prev_unique_name, next_unique_name)
+                next_node.module.update_args_string()
 
     def insert_before(
         self,
@@ -2414,7 +2413,6 @@ class TraceGraph(object):
             for i, pn in enumerate(n.prev_nodes):
                 if pn == node:
                     n.prev_nodes[i] = prev_node
-                    break
             # Handle previous tensors
             for i, pt in enumerate(n.prev_tensors):
                 if pt in tensor_dict:
