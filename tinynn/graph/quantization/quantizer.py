@@ -461,6 +461,7 @@ class QATQuantizer(object):
                         if check_child and first_iter:
                             for mod in mod.children():
                                 modules.put(mod)
+                            first_iter = False
             torch_q.convert(model, mapping, inplace=True)
         else:
             torch_q.propagate_qconfig_(graph.module, qconfig_dict=None)
@@ -478,6 +479,7 @@ class QATQuantizer(object):
                         if check_child and first_iter:
                             for mod in mod.children():
                                 modules.put(mod)
+                            first_iter = False
             model = torch_q.convert(graph.module, mapping=mapping, inplace=True, remove_qconfig=False)
             torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
             for n in graph.forward_nodes:
@@ -501,6 +503,7 @@ class QATQuantizer(object):
                         if check_child and first_iter:
                             for mod in mod.children():
                                 modules.put(mod)
+                            first_iter = False
 
         if not self.per_tensor:
             if self.backend == 'qnnpack':

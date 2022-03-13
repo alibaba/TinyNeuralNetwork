@@ -1414,9 +1414,6 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
             if need_idx:
                 log.debug(f'set pre_index tensor {i}')
                 current_graph().tensor_pre_index_dict[id(t)] = i
-        else:
-            if len(input_tensors) == 0:
-                raise Exception("")
 
     current_graph().forward_nodes.append(node)
     current_graph().nodes_map[node.unique_name] = node
@@ -2281,6 +2278,12 @@ class TraceGraph(object):
         is_new_constant_node = type(module) == ConstantNode
         node.unique_name = self.module_unique_name_dict[id(module)]
 
+        # Drop original module constructor line
+        if id(node.module) in module_constructor_lines:
+            if id(node.module) in module_constructor_traced:
+                module_constructor_traced.remove(id(node.module))
+            del module_constructor_lines[id(node.module)]
+
         # Update module for node
         node.module = module
 
@@ -2326,6 +2329,11 @@ class TraceGraph(object):
                     name = node.unique_name
                     del self.nodes_map[name]
                     self.forward_nodes.remove(node)
+
+                    if id(node.module) in module_constructor_lines:
+                        if id(node.module) in module_constructor_traced:
+                            module_constructor_traced.remove(id(node.module))
+                        del module_constructor_lines[id(node.module)]
 
                 node = nodes[0]
 
@@ -2434,6 +2442,11 @@ class TraceGraph(object):
         # Remove this node
         self.forward_nodes.remove(node)
         del self.nodes_map[node.unique_name]
+
+        if id(node.module) in module_constructor_lines:
+            if id(node.module) in module_constructor_traced:
+                module_constructor_traced.remove(id(node.module))
+            del module_constructor_lines[id(node.module)]
 
 
 def load_overridable_modules():
