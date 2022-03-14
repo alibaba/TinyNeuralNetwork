@@ -30,7 +30,7 @@ def transform_output(output):
     return new_output
 
 
-BLACKLIST = ()
+BLACKLIST = ('vit_b_16', 'vit_b_32', 'vit_l_16', 'vit_l_32')
 
 
 class TestModelMeta(type):
