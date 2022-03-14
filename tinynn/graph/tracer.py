@@ -844,7 +844,8 @@ def new_init_gen(orig_init, key: str):
                         module_constructor_lines[id(obj)] = orig_constructor_line
                 else:
                     module_constructor_traced.remove(id(obj))
-                    log.warning(f'Constructor of class {actual_class_name} is not captured')
+                    if not actual_class_name.startswith('torch.'):
+                        log.warning(f'Constructor of class {actual_class_name} is not captured')
             orig_init(obj, *args, **kwargs)
         log.debug(f'{key} after with block, lock: {lock}')
 
