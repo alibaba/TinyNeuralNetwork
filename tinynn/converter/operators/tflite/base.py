@@ -198,8 +198,12 @@ class Tensor(object):
                         )
                     else:
                         sym_u8_offset = tensor.q_zero_point()
+                    scale = tensor.q_scale()
                     self.tensor = (self.tensor.astype(np.int32) - 128).astype(np.int8)
-                    self.quantization = QuantizationParameters(tensor.q_scale(), sym_u8_offset - 128)
+                    if q_type == np.int16:
+                        scale = scale * 255 / 65535
+                        self.tensor = np.round(self.tensor.astype(np.float32) / 255 * 65535).astype(np.int16)
+                    self.quantization = QuantizationParameters(scale, sym_u8_offset - 128)
             elif tensor.dtype == torch.qint8:
                 self.tensor = torch.int_repr(tensor.detach()).numpy()
                 if q_type == np.uint8:
@@ -434,6 +438,7 @@ def create_byte_array(builder: flatbuffers.Builder, prop: typing.Callable, val: 
 
 numpy_tflite_dtype_mappings = {
     'bool': tflite.TensorType.BOOL,
+    'int16': tflite.TensorType.INT16,
     'int32': tflite.TensorType.INT32,
     'int64': tflite.TensorType.INT64,
     'int8': tflite.TensorType.INT8,
@@ -444,6 +449,7 @@ numpy_tflite_dtype_mappings = {
 
 torch_tflite_dtype_mappings = {
     torch.bool: tflite.TensorType.BOOL,
+    torch.int16: tflite.TensorType.INT16,
     torch.int32: tflite.TensorType.INT32,
     torch.int64: tflite.TensorType.INT64,
     torch.qint8: tflite.TensorType.INT8,
