@@ -35,7 +35,7 @@ def data_to_tf(inputs, input_transpose):
     return tf_inputs
 
 
-def get_tflite_out(model_path, inputs):
+def get_tflite_out(model_path, inputs, skip_run=False):
     interpreter = tf.lite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
 
@@ -46,7 +46,8 @@ def get_tflite_out(model_path, inputs):
     for i in range(len(inputs)):
         interpreter.set_tensor(input_details[i]['index'], inputs[i])
 
-    interpreter.invoke()
+    if not skip_run:
+        interpreter.invoke()
 
     outputs = []
     for i in range(len(output_details)):
@@ -79,6 +80,14 @@ BLACKLIST = (
     'regnet_y_800mf',
     'regnet_y_8gf',
     'regnet_y_128gf',
+)
+
+# Those extremely-large models will be skipped to save memory and time
+RUN_BLACKLIST = (
+    'vit_b_16',
+    'vit_b_32',
+    'vit_l_16',
+    'vit_l_32',
 )
 
 
@@ -130,6 +139,10 @@ class TestModelMeta(type):
             if model_name in BLACKLIST:
                 raise unittest.SkipTest('IN BLACKLIST')
 
+            skip_run = False
+            if model_name in RUN_BLACKLIST or IS_CI:
+                skip_run = True
+
             if os.path.exists(f'out/{model_file}.tflite'):
                 raise unittest.SkipTest('TESTED')
 
@@ -160,7 +173,7 @@ class TestModelMeta(type):
                     outputs = converter.get_outputs()
                     input_transpose = converter.input_transpose
                     input_tf = data_to_tf(inputs, input_transpose)
-                    tf_outputs = get_tflite_out(out_path, input_tf)
+                    tf_outputs = get_tflite_out(out_path, input_tf, skip_run)
                     self.assertTrue(len(outputs) == len(tf_outputs))
 
                 if IS_CI and os.path.exists(out_path):
