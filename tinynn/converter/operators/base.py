@@ -1,10 +1,8 @@
 import inspect
 import sys
-
 from enum import IntEnum
 
-from tflite.ActivationFunctionType import ActivationFunctionType
-from tflite.BuiltinOperator import BuiltinOperator
+from ..schemas.tflite.schema_generated import ActivationFunctionType, BuiltinOperator
 
 # In Python 3.6, we cannot make ExtendedOperator derive from IntEnum
 if sys.version_info >= (3, 7):

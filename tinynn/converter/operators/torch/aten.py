@@ -1,14 +1,14 @@
-import torch
-import numpy as np
-
-from .aten_schema import *
-from .. import CommonGraph
-from .. import tflite as tfl
-
-import tflite as tfl_schema
 import warnings
 
+import numpy as np
+import torch
+
 from tinynn.util.util import get_logger
+
+from ...schemas.tflite import schema_generated as tfl_schema
+from ...schemas.torch.aten_schema import *
+from .. import CommonGraph
+from .. import tflite as tfl
 
 log = get_logger(__name__, 'INFO')
 

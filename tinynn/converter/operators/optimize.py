@@ -7,10 +7,10 @@ import warnings
 
 import igraph as ig
 import numpy as np
+
 from tinynn.util.util import class_conditional, get_logger
 
-from tflite.ActivationFunctionType import ActivationFunctionType
-
+from ..schemas.tflite.schema_generated import ActivationFunctionType
 from . import tflite as tfl
 from .base import FUSE_ACTIVATION_MAP, ExtendedOperator
 from .graph import CommonGraph

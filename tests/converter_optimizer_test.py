@@ -1,11 +1,11 @@
 import unittest
 
-import tflite
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from tinynn.converter import TFLiteConverter
+from tinynn.converter.schemas.tflite import schema_generated as tflite
 
 
 def parse_model(path):
@@ -42,7 +42,8 @@ class ConverterOptimizerTester(unittest.TestCase):
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
         self.assertIn(
-            tfl_model.OperatorCodes(0).BuiltinCode(), (tflite.BuiltinOperator.SPLIT_V, tflite.BuiltinOperator.SPLIT)
+            tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(),
+            (tflite.BuiltinOperator.SPLIT_V, tflite.BuiltinOperator.SPLIT),
         )
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
@@ -68,7 +69,8 @@ class ConverterOptimizerTester(unittest.TestCase):
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
         self.assertIn(
-            tfl_model.OperatorCodes(0).BuiltinCode(), (tflite.BuiltinOperator.SPLIT_V, tflite.BuiltinOperator.SPLIT)
+            tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(),
+            (tflite.BuiltinOperator.SPLIT_V, tflite.BuiltinOperator.SPLIT),
         )
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
@@ -93,7 +95,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RESHAPE)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -118,7 +120,8 @@ class ConverterOptimizerTester(unittest.TestCase):
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
         self.assertIn(
-            tfl_model.OperatorCodes(0).BuiltinCode(), (tflite.BuiltinOperator.SPLIT_V, tflite.BuiltinOperator.SPLIT)
+            tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(),
+            (tflite.BuiltinOperator.SPLIT_V, tflite.BuiltinOperator.SPLIT),
         )
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
@@ -179,7 +182,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -205,7 +208,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -231,7 +234,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.ADD)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.ADD)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -257,7 +260,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.CONCATENATION)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.CONCATENATION)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -284,9 +287,9 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 3)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RELU)
-        self.assertEqual(tfl_model.OperatorCodes(1).BuiltinCode(), tflite.BuiltinOperator.RELU)
-        self.assertEqual(tfl_model.OperatorCodes(2).BuiltinCode(), tflite.BuiltinOperator.TRANSPOSE)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(1).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(2).DeprecatedBuiltinCode(), tflite.BuiltinOperator.TRANSPOSE)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
@@ -314,7 +317,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -340,7 +343,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -366,7 +369,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.ADD)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.ADD)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -392,7 +395,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.CONCATENATION)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.CONCATENATION)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -419,9 +422,9 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 3)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RELU)
-        self.assertEqual(tfl_model.OperatorCodes(1).BuiltinCode(), tflite.BuiltinOperator.RELU)
-        self.assertEqual(tfl_model.OperatorCodes(2).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(1).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(2).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RESHAPE)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
@@ -451,7 +454,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.PAD)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.PAD)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -481,7 +484,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.FULLY_CONNECTED)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.FULLY_CONNECTED)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -518,12 +521,12 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         for i in range(5):
             self.assertEqual(
-                tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(i).OpcodeIndex()).BuiltinCode(),
+                tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(i).OpcodeIndex()).DeprecatedBuiltinCode(),
                 tflite.BuiltinOperator.FULLY_CONNECTED,
             )
             self.assertEqual(tfl_model.Subgraphs(0).Operators(i).OutputsLength(), 1)
         self.assertEqual(
-            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(5).OpcodeIndex()).BuiltinCode(),
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(5).OpcodeIndex()).DeprecatedBuiltinCode(),
             tflite.BuiltinOperator.CONCATENATION,
         )
         self.assertEqual(tfl_model.Subgraphs(0).Operators(5).OutputsLength(), 1)
@@ -545,7 +548,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.ADD)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.ADD)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -583,7 +586,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.FULLY_CONNECTED)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.FULLY_CONNECTED)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -615,7 +618,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.FULLY_CONNECTED)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.FULLY_CONNECTED)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -651,19 +654,19 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 2)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
         self.assertEqual(
-            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(0).OpcodeIndex()).BuiltinCode(),
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(0).OpcodeIndex()).DeprecatedBuiltinCode(),
             tflite.BuiltinOperator.RESHAPE,
         )
         self.assertEqual(tfl_model.Subgraphs(0).Operators(1).InputsLength(), 2)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(1).OutputsLength(), 1)
         self.assertEqual(
-            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(1).OpcodeIndex()).BuiltinCode(),
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(1).OpcodeIndex()).DeprecatedBuiltinCode(),
             tflite.BuiltinOperator.TRANSPOSE,
         )
         self.assertEqual(tfl_model.Subgraphs(0).Operators(2).InputsLength(), 2)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(2).OutputsLength(), 1)
         self.assertEqual(
-            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(2).OpcodeIndex()).BuiltinCode(),
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(2).OpcodeIndex()).DeprecatedBuiltinCode(),
             tflite.BuiltinOperator.RESHAPE,
         )
 
@@ -695,25 +698,25 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 2)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
         self.assertEqual(
-            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(0).OpcodeIndex()).BuiltinCode(),
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(0).OpcodeIndex()).DeprecatedBuiltinCode(),
             tflite.BuiltinOperator.RESHAPE,
         )
         self.assertEqual(tfl_model.Subgraphs(0).Operators(1).InputsLength(), 2)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(1).OutputsLength(), 1)
         self.assertEqual(
-            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(1).OpcodeIndex()).BuiltinCode(),
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(1).OpcodeIndex()).DeprecatedBuiltinCode(),
             tflite.BuiltinOperator.TRANSPOSE,
         )
         self.assertEqual(tfl_model.Subgraphs(0).Operators(2).InputsLength(), 2)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(2).OutputsLength(), 1)
         self.assertEqual(
-            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(2).OpcodeIndex()).BuiltinCode(),
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(2).OpcodeIndex()).DeprecatedBuiltinCode(),
             tflite.BuiltinOperator.TRANSPOSE,
         )
         self.assertEqual(tfl_model.Subgraphs(0).Operators(3).InputsLength(), 2)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(3).OutputsLength(), 1)
         self.assertEqual(
-            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(3).OpcodeIndex()).BuiltinCode(),
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(3).OpcodeIndex()).DeprecatedBuiltinCode(),
             tflite.BuiltinOperator.RESHAPE,
         )
 
@@ -736,7 +739,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RESHAPE)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -763,7 +766,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RESHAPE)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RESHAPE)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -790,7 +793,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -818,7 +821,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.ADD)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.ADD)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -855,7 +858,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 2)
         for i in range(2):
-            self.assertEqual(tfl_model.OperatorCodes(i).BuiltinCode(), tflite.BuiltinOperator.ADD)
+            self.assertEqual(tfl_model.OperatorCodes(i).DeprecatedBuiltinCode(), tflite.BuiltinOperator.ADD)
             self.assertEqual(tfl_model.Subgraphs(0).Operators(i).InputsLength(), 2)
             self.assertEqual(tfl_model.Subgraphs(0).Operators(i).OutputsLength(), 1)
 
@@ -876,7 +879,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.SPLIT_V)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.SPLIT_V)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
@@ -905,7 +908,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.SPLIT_V)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.SPLIT_V)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
@@ -934,7 +937,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.SPLIT_V)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.SPLIT_V)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
@@ -961,7 +964,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.SLICE)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.SLICE)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -985,7 +988,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -1009,7 +1012,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -1033,7 +1036,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
@@ -1057,7 +1060,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
-        self.assertEqual(tfl_model.OperatorCodes(0).BuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.STRIDED_SLICE)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)

@@ -31,7 +31,8 @@ extend-exclude = '''
 | ^/build/
 | ^/debugging/
 | ^/tinynn/converter/operators/tflite/generated_ops\.py
-| ^/tinynn/converter/operators/torch/aten_schema\.py
-| ^/tinynn/converter/operators/torch/quantized_schema\.py
-| ^/tinynn/converter/operators/torch/torchvision_schema\.py
+| ^/tinynn/converter/schemas/tflite//schema_generated\.py
+| ^/tinynn/converter/schemas/torch/aten_schema\.py
+| ^/tinynn/converter/schemas/torch/quantized_schema\.py
+| ^/tinynn/converter/schemas/torch/torchvision_schema\.py
 '''

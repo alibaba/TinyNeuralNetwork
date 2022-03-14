@@ -1,11 +1,10 @@
-import torch
 import numpy as np
+import torch
 
-from .quantized_schema import *
+from ...schemas.tflite import schema_generated as tfl_schema
+from ...schemas.torch.quantized_schema import *
 from .. import CommonGraph
 from .. import tflite as tfl
-
-import tflite as tfl_schema
 
 
 class QuantizedRelu6Operator(QuantizedRelu6Schema):

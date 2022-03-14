@@ -1,13 +1,11 @@
 import copy
-import tflite
 import typing
+
+import flatbuffers
 import numpy as np
 import torch
-import flatbuffers
-import pkg_resources
 
-if pkg_resources.get_distribution('tflite').version != '2.3.0':
-    raise AssertionError('tflite==2.3.0 is required. Please run `python3 -m pip install tflite==2.3.0`.')
+from ...schemas.tflite import schema_generated as tflite
 
 Offset = int
 
@@ -31,7 +29,10 @@ class OpCode(object):
             custom_code = create_string(builder, tflite.OperatorCode.CustomCode, self.custom_code)
 
         tflite.OperatorCodeStart(builder)
-        tflite.OperatorCodeAddBuiltinCode(builder, self.code)
+        if self.code < tflite.BuiltinOperator.PLACEHOLDER_FOR_GREATER_OP_CODES:
+            tflite.OperatorCodeAddDeprecatedBuiltinCode(builder, self.code)
+        else:
+            tflite.OperatorCodeAddBuiltinCode(builder, self.code)
         tflite.OperatorCodeAddVersion(builder, self.version)
 
         if custom_code is not None:
@@ -375,10 +376,10 @@ def create_offset_vector(builder: flatbuffers.Builder, prop: typing.Callable, ve
         vec = list(vec)
 
     prop_name = prop.__name__
-    cls_name = prop.__module__.split('.')[-1]
+    cls_name = prop.__qualname__.split('.')[0]
     func_name = f'{cls_name}Start{prop_name}Vector'
     if not hasattr(tflite, func_name):
-        assert False, "invalid prop is given"
+        assert False, f"invalid prop is given, {prop.__qualname__}"
 
     start_vec_func = getattr(tflite, func_name)
     start_vec_func(builder, len(vec))
@@ -397,10 +398,10 @@ def create_numpy_array(builder: flatbuffers.Builder, prop: typing.Callable, vec:
         assert False, "type of vec unexpected, expected: list or tuple or ndarray"
 
     prop_name = prop.__name__
-    cls_name = prop.__module__.split('.')[-1]
+    cls_name = prop.__qualname__.split('.')[0]
     func_name = f'{cls_name}Start{prop_name}Vector'
     if not hasattr(tflite, func_name):
-        assert False, "invalid prop is given"
+        assert False, f"invalid prop is given, {prop.__qualname__}"
 
     arr = np.asarray(vec, dtype=dtype)
     return builder.CreateNumpyVector(arr)
@@ -411,10 +412,10 @@ def create_string(builder: flatbuffers.Builder, prop: typing.Callable, val: str)
         assert False, "type of val unexpected, expected: str"
 
     prop_name = prop.__name__
-    cls_name = prop.__module__.split('.')[-1]
+    cls_name = prop.__qualname__.split('.')[0]
     func_name = f'{cls_name}Add{prop_name}'
     if not hasattr(tflite, func_name):
-        assert False, "invalid prop is given"
+        assert False, f"invalid prop is given, {prop.__qualname__}"
 
     return builder.CreateString(val)
 
@@ -424,10 +425,10 @@ def create_byte_array(builder: flatbuffers.Builder, prop: typing.Callable, val: 
         assert False, "type of val unexpected, expected: bytes or bytearray"
 
     prop_name = prop.__name__
-    cls_name = prop.__module__.split('.')[-1]
+    cls_name = prop.__qualname__.split('.')[0]
     func_name = f'{cls_name}Start{prop_name}Vector'
     if not hasattr(tflite, func_name):
-        assert False, "invalid prop is given"
+        assert False, f"invalid prop is given, {prop.__qualname__}"
 
     return builder.CreateByteVector(val)
 

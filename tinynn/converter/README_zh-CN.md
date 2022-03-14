@@ -33,12 +33,17 @@
         + [transformable.py](operators/tflite/transformable.py) : 可转换算子，如BatchNorm、Conv2d等由多个TFLite算子组成的复合算子
     + [torch](operators/torch) : PyTorch相关的类
         + [base.py](operators/torch/base.py) : TorchScript解析所需的基础数据结构
-        + [aten_schema.py](operators/torch/aten_schema.py) : 从ATen schema生成的Wrapper类
-        + [quantized_schema.py](operators/torch/quantized_schema.py) : 从Quantized schema生成的Wrapper类
         + [aten.py](operators/torch/aten.py) : ATen相关算子的翻译
         + [quantized.py](operators/torch/quantized.py) : Quantized相关算子的翻译
     + [base.py](operators/base.py) : 通用算子的定义
     + [graph.py](operators/graph.py) : 计算图相关的基础设施
     + [op_version.py](operators/op_version.py) : 设置算子版本
     + [optimize.py](operators/optimize.py) : 计算图优化
++ [schemas](schemas): schemas相关
+    + [tflite](schemas/tflite) : TFLite相关的schema
+        + [schema_generated.py](schemas/tflite/schema_generated.py) : TFLite schema 解析器
+    + [torch](schemas/torch) : PyTorch相关的schema
+        + [aten_schema.py](schemas/torch/aten_schema.py) : 从ATen schema生成的Wrapper类
+        + [quantized_schema.py](schemas/torch/quantized_schema.py) : 从Quantized schema生成的Wrapper类
+        + [torchvision_schema.py](schemas/torch/torchvision_schema.py) : 从Torchvision schema生成的Wrapper类
 + [base](base.py): 入口类TFLiteConverter

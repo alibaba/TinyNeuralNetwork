@@ -1,17 +1,21 @@
 import flatbuffers
-import tflite
 
+from ...schemas.tflite import schema_generated as tflite
 from . import BaseOperator, Offset, create_numpy_array
 
 
 class AddOperator(BaseOperator):
-    def __init__(self, inputs, outputs, fusedActivationFunction=tflite.ActivationFunctionType.NONE) -> None:
+    def __init__(
+        self, inputs, outputs, fusedActivationFunction=tflite.ActivationFunctionType.NONE, potScaleInt16=False
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.ADD, inputs, outputs)
         self.fusedActivationFunction = fusedActivationFunction
+        self.potScaleInt16 = potScaleInt16
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
         tflite.AddOptionsStart(builder)
         tflite.AddOptionsAddFusedActivationFunction(builder, self.fusedActivationFunction)
+        tflite.AddOptionsAddPotScaleInt16(builder, self.potScaleInt16)
         options = tflite.AddOptionsEnd(builder)
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
@@ -29,7 +33,17 @@ class AddOperator(BaseOperator):
 
 
 class AveragePool2dOperator(BaseOperator):
-    def __init__(self, inputs, outputs, padding=tflite.Padding.SAME, strideW=0, strideH=0, filterWidth=0, filterHeight=0, fusedActivationFunction=tflite.ActivationFunctionType.NONE) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        padding=tflite.Padding.SAME,
+        strideW=0,
+        strideH=0,
+        filterWidth=0,
+        filterHeight=0,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.AVERAGE_POOL_2D, inputs, outputs)
         self.padding = padding
         self.strideW = strideW
@@ -89,7 +103,17 @@ class ConcatenationOperator(BaseOperator):
 
 
 class Conv2dOperator(BaseOperator):
-    def __init__(self, inputs, outputs, padding=tflite.Padding.SAME, strideW=0, strideH=0, fusedActivationFunction=tflite.ActivationFunctionType.NONE, dilationWFactor=0, dilationHFactor=0) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        padding=tflite.Padding.SAME,
+        strideW=0,
+        strideH=0,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        dilationWFactor=0,
+        dilationHFactor=0,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.CONV_2D, inputs, outputs)
         self.padding = padding
         self.strideW = strideW
@@ -123,7 +147,18 @@ class Conv2dOperator(BaseOperator):
 
 
 class DepthwiseConv2dOperator(BaseOperator):
-    def __init__(self, inputs, outputs, padding=tflite.Padding.SAME, strideW=0, strideH=0, depthMultiplier=0, fusedActivationFunction=tflite.ActivationFunctionType.NONE, dilationWFactor=0, dilationHFactor=0) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        padding=tflite.Padding.SAME,
+        strideW=0,
+        strideH=0,
+        depthMultiplier=0,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        dilationWFactor=0,
+        dilationHFactor=0,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.DEPTHWISE_CONV_2D, inputs, outputs)
         self.padding = padding
         self.strideW = strideW
@@ -183,7 +218,11 @@ class DepthToSpaceOperator(BaseOperator):
 
 
 class DequantizeOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.DEQUANTIZE, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -215,7 +254,15 @@ class FloorOperator(BaseOperator):
 
 
 class FullyConnectedOperator(BaseOperator):
-    def __init__(self, inputs, outputs, fusedActivationFunction=tflite.ActivationFunctionType.NONE, weightsFormat=tflite.FullyConnectedOptionsWeightsFormat.DEFAULT, keepNumDims=False, asymmetricQuantizeInputs=False) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        weightsFormat=tflite.FullyConnectedOptionsWeightsFormat.DEFAULT,
+        keepNumDims=False,
+        asymmetricQuantizeInputs=False,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.FULLY_CONNECTED, inputs, outputs)
         self.fusedActivationFunction = fusedActivationFunction
         self.weightsFormat = weightsFormat
@@ -250,12 +297,41 @@ class HashtableLookupOperator(BaseOperator):
 
 
 class L2NormalizationOperator(BaseOperator):
-    def __init__(self, inputs, outputs) -> None:
+    def __init__(self, inputs, outputs, fusedActivationFunction=tflite.ActivationFunctionType.NONE) -> None:
         super().__init__(tflite.BuiltinOperator.L2_NORMALIZATION, inputs, outputs)
+        self.fusedActivationFunction = fusedActivationFunction
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.L2NormOptionsStart(builder)
+        tflite.L2NormOptionsAddFusedActivationFunction(builder, self.fusedActivationFunction)
+        options = tflite.L2NormOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.L2NormOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
 
 
 class L2Pool2dOperator(BaseOperator):
-    def __init__(self, inputs, outputs, padding=tflite.Padding.SAME, strideW=0, strideH=0, filterWidth=0, filterHeight=0, fusedActivationFunction=tflite.ActivationFunctionType.NONE) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        padding=tflite.Padding.SAME,
+        strideW=0,
+        strideH=0,
+        filterWidth=0,
+        filterHeight=0,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.L2_POOL_2D, inputs, outputs)
         self.padding = padding
         self.strideW = strideW
@@ -348,7 +424,16 @@ class LshProjectionOperator(BaseOperator):
 
 
 class LstmOperator(BaseOperator):
-    def __init__(self, inputs, outputs, fusedActivationFunction=tflite.ActivationFunctionType.NONE, cellClip=0.0, projClip=0.0, kernelType=tflite.LSTMKernelType.FULL, asymmetricQuantizeInputs=False) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        cellClip=0.0,
+        projClip=0.0,
+        kernelType=tflite.LSTMKernelType.FULL,
+        asymmetricQuantizeInputs=False,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.LSTM, inputs, outputs)
         self.fusedActivationFunction = fusedActivationFunction
         self.cellClip = cellClip
@@ -380,7 +465,17 @@ class LstmOperator(BaseOperator):
 
 
 class MaxPool2dOperator(BaseOperator):
-    def __init__(self, inputs, outputs, padding=tflite.Padding.SAME, strideW=0, strideH=0, filterWidth=0, filterHeight=0, fusedActivationFunction=tflite.ActivationFunctionType.NONE) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        padding=tflite.Padding.SAME,
+        strideW=0,
+        strideH=0,
+        filterWidth=0,
+        filterHeight=0,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.MAX_POOL_2D, inputs, outputs)
         self.padding = padding
         self.strideW = strideW
@@ -504,7 +599,13 @@ class ResizeBilinearOperator(BaseOperator):
 
 
 class RnnOperator(BaseOperator):
-    def __init__(self, inputs, outputs, fusedActivationFunction=tflite.ActivationFunctionType.NONE, asymmetricQuantizeInputs=False) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        asymmetricQuantizeInputs=False,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.RNN, inputs, outputs)
         self.fusedActivationFunction = fusedActivationFunction
         self.asymmetricQuantizeInputs = asymmetricQuantizeInputs
@@ -578,7 +679,14 @@ class SpaceToDepthOperator(BaseOperator):
 
 
 class SvdfOperator(BaseOperator):
-    def __init__(self, inputs, outputs, rank=0, fusedActivationFunction=tflite.ActivationFunctionType.NONE, asymmetricQuantizeInputs=False) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        rank=0,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        asymmetricQuantizeInputs=False,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.SVDF, inputs, outputs)
         self.rank = rank
         self.fusedActivationFunction = fusedActivationFunction
@@ -619,9 +727,11 @@ class ConcatEmbeddingsOperator(BaseOperator):
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
         numColumnsPerChannel = create_numpy_array(
-            builder, tflite.ConcatEmbeddingsOptions.NumColumnsPerChannel, self.numColumnsPerChannel)
+            builder, tflite.ConcatEmbeddingsOptions.NumColumnsPerChannel, self.numColumnsPerChannel
+        )
         embeddingDimPerChannel = create_numpy_array(
-            builder, tflite.ConcatEmbeddingsOptions.EmbeddingDimPerChannel, self.embeddingDimPerChannel)
+            builder, tflite.ConcatEmbeddingsOptions.EmbeddingDimPerChannel, self.embeddingDimPerChannel
+        )
         tflite.ConcatEmbeddingsOptionsStart(builder)
         tflite.ConcatEmbeddingsOptionsAddNumChannels(builder, self.numChannels)
         tflite.ConcatEmbeddingsOptionsAddNumColumnsPerChannel(builder, numColumnsPerChannel)
@@ -744,7 +854,11 @@ class EmbeddingLookupSparseOperator(BaseOperator):
 
 
 class PadOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.PAD, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -766,18 +880,50 @@ class PadOperator(BaseOperator):
 
 
 class UnidirectionalSequenceRnnOperator(BaseOperator):
-    def __init__(self, inputs, outputs) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        timeMajor=False,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        asymmetricQuantizeInputs=False,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.UNIDIRECTIONAL_SEQUENCE_RNN, inputs, outputs)
+        self.timeMajor = timeMajor
+        self.fusedActivationFunction = fusedActivationFunction
+        self.asymmetricQuantizeInputs = asymmetricQuantizeInputs
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.SequenceRNNOptionsStart(builder)
+        tflite.SequenceRNNOptionsAddTimeMajor(builder, self.timeMajor)
+        tflite.SequenceRNNOptionsAddFusedActivationFunction(builder, self.fusedActivationFunction)
+        tflite.SequenceRNNOptionsAddAsymmetricQuantizeInputs(builder, self.asymmetricQuantizeInputs)
+        options = tflite.SequenceRNNOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SequenceRNNOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
 
 
 class GatherOperator(BaseOperator):
-    def __init__(self, inputs, outputs, axis=0) -> None:
+    def __init__(self, inputs, outputs, axis=0, batchDims=0) -> None:
         super().__init__(tflite.BuiltinOperator.GATHER, inputs, outputs)
         self.axis = axis
+        self.batchDims = batchDims
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
         tflite.GatherOptionsStart(builder)
         tflite.GatherOptionsAddAxis(builder, self.axis)
+        tflite.GatherOptionsAddBatchDims(builder, self.batchDims)
         options = tflite.GatherOptionsEnd(builder)
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
@@ -795,7 +941,11 @@ class GatherOperator(BaseOperator):
 
 
 class BatchToSpaceNdOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.BATCH_TO_SPACE_ND, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -817,7 +967,11 @@ class BatchToSpaceNdOperator(BaseOperator):
 
 
 class SpaceToBatchNdOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.SPACE_TO_BATCH_ND, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -839,12 +993,40 @@ class SpaceToBatchNdOperator(BaseOperator):
 
 
 class TransposeOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        padding=tflite.Padding.SAME,
+        strideD=0,
+        strideW=0,
+        strideH=0,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        dilationDFactor=0,
+        dilationWFactor=0,
+        dilationHFactor=0,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.TRANSPOSE, inputs, outputs)
+        self.padding = padding
+        self.strideD = strideD
+        self.strideW = strideW
+        self.strideH = strideH
+        self.fusedActivationFunction = fusedActivationFunction
+        self.dilationDFactor = dilationDFactor
+        self.dilationWFactor = dilationWFactor
+        self.dilationHFactor = dilationHFactor
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
-        tflite.TransposeOptionsStart(builder)
-        options = tflite.TransposeOptionsEnd(builder)
+        tflite.Conv3DOptionsStart(builder)
+        tflite.Conv3DOptionsAddPadding(builder, self.padding)
+        tflite.Conv3DOptionsAddStrideD(builder, self.strideD)
+        tflite.Conv3DOptionsAddStrideW(builder, self.strideW)
+        tflite.Conv3DOptionsAddStrideH(builder, self.strideH)
+        tflite.Conv3DOptionsAddFusedActivationFunction(builder, self.fusedActivationFunction)
+        tflite.Conv3DOptionsAddDilationDFactor(builder, self.dilationDFactor)
+        tflite.Conv3DOptionsAddDilationWFactor(builder, self.dilationWFactor)
+        tflite.Conv3DOptionsAddDilationHFactor(builder, self.dilationHFactor)
+        options = tflite.Conv3DOptionsEnd(builder)
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
@@ -853,7 +1035,7 @@ class TransposeOperator(BaseOperator):
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
-        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.TransposeOptions)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Conv3DOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
 
@@ -885,13 +1067,17 @@ class MeanOperator(BaseOperator):
 
 
 class SubOperator(BaseOperator):
-    def __init__(self, inputs, outputs, fusedActivationFunction=tflite.ActivationFunctionType.NONE) -> None:
+    def __init__(
+        self, inputs, outputs, fusedActivationFunction=tflite.ActivationFunctionType.NONE, potScaleInt16=False
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.SUB, inputs, outputs)
         self.fusedActivationFunction = fusedActivationFunction
+        self.potScaleInt16 = potScaleInt16
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
         tflite.SubOptionsStart(builder)
         tflite.SubOptionsAddFusedActivationFunction(builder, self.fusedActivationFunction)
+        tflite.SubOptionsAddPotScaleInt16(builder, self.potScaleInt16)
         options = tflite.SubOptionsEnd(builder)
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
@@ -958,7 +1144,16 @@ class SqueezeOperator(BaseOperator):
 
 
 class UnidirectionalSequenceLstmOperator(BaseOperator):
-    def __init__(self, inputs, outputs, fusedActivationFunction=tflite.ActivationFunctionType.NONE, cellClip=0.0, projClip=0.0, timeMajor=False, asymmetricQuantizeInputs=False) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        cellClip=0.0,
+        projClip=0.0,
+        timeMajor=False,
+        asymmetricQuantizeInputs=False,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.UNIDIRECTIONAL_SEQUENCE_LSTM, inputs, outputs)
         self.fusedActivationFunction = fusedActivationFunction
         self.cellClip = cellClip
@@ -990,7 +1185,9 @@ class UnidirectionalSequenceLstmOperator(BaseOperator):
 
 
 class StridedSliceOperator(BaseOperator):
-    def __init__(self, inputs, outputs, beginMask=0, endMask=0, ellipsisMask=0, newAxisMask=0, shrinkAxisMask=0) -> None:
+    def __init__(
+        self, inputs, outputs, beginMask=0, endMask=0, ellipsisMask=0, newAxisMask=0, shrinkAxisMask=0
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.STRIDED_SLICE, inputs, outputs)
         self.beginMask = beginMask
         self.endMask = endMask
@@ -1022,7 +1219,15 @@ class StridedSliceOperator(BaseOperator):
 
 
 class BidirectionalSequenceRnnOperator(BaseOperator):
-    def __init__(self, inputs, outputs, timeMajor=False, fusedActivationFunction=tflite.ActivationFunctionType.NONE, mergeOutputs=False, asymmetricQuantizeInputs=False) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        timeMajor=False,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        mergeOutputs=False,
+        asymmetricQuantizeInputs=False,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.BIDIRECTIONAL_SEQUENCE_RNN, inputs, outputs)
         self.timeMajor = timeMajor
         self.fusedActivationFunction = fusedActivationFunction
@@ -1052,7 +1257,11 @@ class BidirectionalSequenceRnnOperator(BaseOperator):
 
 
 class ExpOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.EXP, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1074,7 +1283,11 @@ class ExpOperator(BaseOperator):
 
 
 class TopkV2Operator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.TOPK_V2, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1120,7 +1333,11 @@ class SplitOperator(BaseOperator):
 
 
 class LogSoftmaxOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.LOG_SOFTMAX, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1147,7 +1364,17 @@ class DelegateOperator(BaseOperator):
 
 
 class BidirectionalSequenceLstmOperator(BaseOperator):
-    def __init__(self, inputs, outputs, fusedActivationFunction=tflite.ActivationFunctionType.NONE, cellClip=0.0, projClip=0.0, mergeOutputs=False, timeMajor=False, asymmetricQuantizeInputs=False) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        cellClip=0.0,
+        projClip=0.0,
+        mergeOutputs=False,
+        timeMajor=False,
+        asymmetricQuantizeInputs=False,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.BIDIRECTIONAL_SEQUENCE_LSTM, inputs, outputs)
         self.fusedActivationFunction = fusedActivationFunction
         self.cellClip = cellClip
@@ -1181,7 +1408,9 @@ class BidirectionalSequenceLstmOperator(BaseOperator):
 
 
 class CastOperator(BaseOperator):
-    def __init__(self, inputs, outputs, inDataType=tflite.TensorType.FLOAT32, outDataType=tflite.TensorType.FLOAT32) -> None:
+    def __init__(
+        self, inputs, outputs, inDataType=tflite.TensorType.FLOAT32, outDataType=tflite.TensorType.FLOAT32
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.CAST, inputs, outputs)
         self.inDataType = inDataType
         self.outDataType = outDataType
@@ -1212,8 +1441,29 @@ class PreluOperator(BaseOperator):
 
 
 class MaximumOperator(BaseOperator):
-    def __init__(self, inputs, outputs) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.MAXIMUM, inputs, outputs)
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.MaximumMinimumOptionsStart(builder)
+        options = tflite.MaximumMinimumOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.MaximumMinimumOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
 
 
 class ArgMaxOperator(BaseOperator):
@@ -1241,12 +1491,37 @@ class ArgMaxOperator(BaseOperator):
 
 
 class MinimumOperator(BaseOperator):
-    def __init__(self, inputs, outputs) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.MINIMUM, inputs, outputs)
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.MaximumMinimumOptionsStart(builder)
+        options = tflite.MaximumMinimumOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.MaximumMinimumOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
 
 
 class LessOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.LESS, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1268,7 +1543,11 @@ class LessOperator(BaseOperator):
 
 
 class NegOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.NEG, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1290,7 +1569,11 @@ class NegOperator(BaseOperator):
 
 
 class Padv2Operator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.PADV2, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1312,7 +1595,11 @@ class Padv2Operator(BaseOperator):
 
 
 class GreaterOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.GREATER, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1334,7 +1621,11 @@ class GreaterOperator(BaseOperator):
 
 
 class GreaterEqualOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.GREATER_EQUAL, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1356,7 +1647,11 @@ class GreaterEqualOperator(BaseOperator):
 
 
 class LessEqualOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.LESS_EQUAL, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1378,7 +1673,11 @@ class LessEqualOperator(BaseOperator):
 
 
 class SelectOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.SELECT, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1400,7 +1699,11 @@ class SelectOperator(BaseOperator):
 
 
 class SliceOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.SLICE, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1479,7 +1782,11 @@ class SparseToDenseOperator(BaseOperator):
 
 
 class TileOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.TILE, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1501,7 +1808,11 @@ class TileOperator(BaseOperator):
 
 
 class ExpandDimsOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.EXPAND_DIMS, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1523,7 +1834,11 @@ class ExpandDimsOperator(BaseOperator):
 
 
 class EqualOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.EQUAL, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1545,7 +1860,11 @@ class EqualOperator(BaseOperator):
 
 
 class NotEqualOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.NOT_EQUAL, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1630,7 +1949,11 @@ class ShapeOperator(BaseOperator):
 
 
 class PowOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.POW, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1780,7 +2103,11 @@ class PackOperator(BaseOperator):
 
 
 class LogicalOrOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.LOGICAL_OR, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1826,7 +2153,11 @@ class OneHotOperator(BaseOperator):
 
 
 class LogicalAndOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.LOGICAL_AND, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1848,7 +2179,11 @@ class LogicalAndOperator(BaseOperator):
 
 
 class LogicalNotOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.LOGICAL_NOT, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1920,7 +2255,11 @@ class ReduceMinOperator(BaseOperator):
 
 
 class FloorDivOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.FLOOR_DIV, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1966,7 +2305,11 @@ class ReduceAnyOperator(BaseOperator):
 
 
 class SquareOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.SQUARE, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -1988,7 +2331,11 @@ class SquareOperator(BaseOperator):
 
 
 class ZerosLikeOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.ZEROS_LIKE, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2010,7 +2357,11 @@ class ZerosLikeOperator(BaseOperator):
 
 
 class FillOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.FILL, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2032,7 +2383,11 @@ class FillOperator(BaseOperator):
 
 
 class FloorModOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.FLOOR_MOD, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2054,7 +2409,11 @@ class FloorModOperator(BaseOperator):
 
 
 class RangeOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.RANGE, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2126,7 +2485,11 @@ class LeakyReluOperator(BaseOperator):
 
 
 class SquaredDifferenceOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.SQUARED_DIFFERENCE, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2172,7 +2535,11 @@ class MirrorPadOperator(BaseOperator):
 
 
 class AbsOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.ABS, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2247,7 +2614,11 @@ class CeilOperator(BaseOperator):
 
 
 class ReverseV2Operator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.REVERSE_V2, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2269,7 +2640,11 @@ class ReverseV2Operator(BaseOperator):
 
 
 class AddNOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.ADD_N, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2291,7 +2666,11 @@ class AddNOperator(BaseOperator):
 
 
 class GatherNdOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.GATHER_ND, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2313,7 +2692,11 @@ class GatherNdOperator(BaseOperator):
 
 
 class CosOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.COS, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2335,7 +2718,11 @@ class CosOperator(BaseOperator):
 
 
 class WhereOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.WHERE, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2357,7 +2744,11 @@ class WhereOperator(BaseOperator):
 
 
 class RankOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.RANK, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2410,7 +2801,11 @@ class ReverseSequenceOperator(BaseOperator):
 
 
 class MatrixDiagOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.MATRIX_DIAG, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2432,7 +2827,11 @@ class MatrixDiagOperator(BaseOperator):
 
 
 class QuantizeOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.QUANTIZE, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2454,7 +2853,11 @@ class QuantizeOperator(BaseOperator):
 
 
 class MatrixSetDiagOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.MATRIX_SET_DIAG, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2481,7 +2884,11 @@ class RoundOperator(BaseOperator):
 
 
 class HardSwishOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.HARD_SWISH, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2555,7 +2962,11 @@ class WhileOperator(BaseOperator):
 
 
 class NonMaxSuppressionV4Operator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.NON_MAX_SUPPRESSION_V4, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2577,7 +2988,11 @@ class NonMaxSuppressionV4Operator(BaseOperator):
 
 
 class NonMaxSuppressionV5Operator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.NON_MAX_SUPPRESSION_V5, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2599,7 +3014,11 @@ class NonMaxSuppressionV5Operator(BaseOperator):
 
 
 class ScatterNdOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.SCATTER_ND, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2621,7 +3040,11 @@ class ScatterNdOperator(BaseOperator):
 
 
 class SelectV2Operator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.SELECT_V2, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2643,7 +3066,11 @@ class SelectV2Operator(BaseOperator):
 
 
 class DensifyOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.DENSIFY, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2665,7 +3092,11 @@ class DensifyOperator(BaseOperator):
 
 
 class SegmentSumOperator(BaseOperator):
-    def __init__(self, inputs, outputs, ) -> None:
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
         super().__init__(tflite.BuiltinOperator.SEGMENT_SUM, inputs, outputs)
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
@@ -2687,15 +3118,17 @@ class SegmentSumOperator(BaseOperator):
 
 
 class BatchMatmulOperator(BaseOperator):
-    def __init__(self, inputs, outputs, adjX=False, adjY=False) -> None:
+    def __init__(self, inputs, outputs, adjX=False, adjY=False, asymmetricQuantizeInputs=False) -> None:
         super().__init__(tflite.BuiltinOperator.BATCH_MATMUL, inputs, outputs)
         self.adjX = adjX
         self.adjY = adjY
+        self.asymmetricQuantizeInputs = asymmetricQuantizeInputs
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
         tflite.BatchMatMulOptionsStart(builder)
         tflite.BatchMatMulOptionsAddAdjX(builder, self.adjX)
         tflite.BatchMatMulOptionsAddAdjY(builder, self.adjY)
+        tflite.BatchMatMulOptionsAddAsymmetricQuantizeInputs(builder, self.asymmetricQuantizeInputs)
         options = tflite.BatchMatMulOptionsEnd(builder)
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
@@ -2706,6 +3139,572 @@ class BatchMatmulOperator(BaseOperator):
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.BatchMatMulOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class PlaceholderForGreaterOpCodesOperator(BaseOperator):
+    def __init__(self, inputs, outputs) -> None:
+        super().__init__(tflite.BuiltinOperator.PLACEHOLDER_FOR_GREATER_OP_CODES, inputs, outputs)
+
+
+class CumsumOperator(BaseOperator):
+    def __init__(self, inputs, outputs, exclusive=False, reverse=False) -> None:
+        super().__init__(tflite.BuiltinOperator.CUMSUM, inputs, outputs)
+        self.exclusive = exclusive
+        self.reverse = reverse
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.CumsumOptionsStart(builder)
+        tflite.CumsumOptionsAddExclusive(builder, self.exclusive)
+        tflite.CumsumOptionsAddReverse(builder, self.reverse)
+        options = tflite.CumsumOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.CumsumOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class CallOnceOperator(BaseOperator):
+    def __init__(self, inputs, outputs, initSubgraphIndex=0) -> None:
+        super().__init__(tflite.BuiltinOperator.CALL_ONCE, inputs, outputs)
+        self.initSubgraphIndex = initSubgraphIndex
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.CallOnceOptionsStart(builder)
+        tflite.CallOnceOptionsAddInitSubgraphIndex(builder, self.initSubgraphIndex)
+        options = tflite.CallOnceOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.CallOnceOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class BroadcastToOperator(BaseOperator):
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
+        super().__init__(tflite.BuiltinOperator.BROADCAST_TO, inputs, outputs)
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.BroadcastToOptionsStart(builder)
+        options = tflite.BroadcastToOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.BroadcastToOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class Rfft2dOperator(BaseOperator):
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
+        super().__init__(tflite.BuiltinOperator.RFFT2D, inputs, outputs)
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.Rfft2dOptionsStart(builder)
+        options = tflite.Rfft2dOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Rfft2dOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class Conv3dOperator(BaseOperator):
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        padding=tflite.Padding.SAME,
+        strideD=0,
+        strideW=0,
+        strideH=0,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        dilationDFactor=0,
+        dilationWFactor=0,
+        dilationHFactor=0,
+    ) -> None:
+        super().__init__(tflite.BuiltinOperator.CONV_3D, inputs, outputs)
+        self.padding = padding
+        self.strideD = strideD
+        self.strideW = strideW
+        self.strideH = strideH
+        self.fusedActivationFunction = fusedActivationFunction
+        self.dilationDFactor = dilationDFactor
+        self.dilationWFactor = dilationWFactor
+        self.dilationHFactor = dilationHFactor
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.Conv3DOptionsStart(builder)
+        tflite.Conv3DOptionsAddPadding(builder, self.padding)
+        tflite.Conv3DOptionsAddStrideD(builder, self.strideD)
+        tflite.Conv3DOptionsAddStrideW(builder, self.strideW)
+        tflite.Conv3DOptionsAddStrideH(builder, self.strideH)
+        tflite.Conv3DOptionsAddFusedActivationFunction(builder, self.fusedActivationFunction)
+        tflite.Conv3DOptionsAddDilationDFactor(builder, self.dilationDFactor)
+        tflite.Conv3DOptionsAddDilationWFactor(builder, self.dilationWFactor)
+        tflite.Conv3DOptionsAddDilationHFactor(builder, self.dilationHFactor)
+        options = tflite.Conv3DOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Conv3DOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class ImagOperator(BaseOperator):
+    def __init__(self, inputs, outputs) -> None:
+        super().__init__(tflite.BuiltinOperator.IMAG, inputs, outputs)
+
+
+class RealOperator(BaseOperator):
+    def __init__(self, inputs, outputs) -> None:
+        super().__init__(tflite.BuiltinOperator.REAL, inputs, outputs)
+
+
+class ComplexAbsOperator(BaseOperator):
+    def __init__(self, inputs, outputs) -> None:
+        super().__init__(tflite.BuiltinOperator.COMPLEX_ABS, inputs, outputs)
+
+
+class HashtableOperator(BaseOperator):
+    def __init__(
+        self, inputs, outputs, tableId=0, keyDtype=tflite.TensorType.FLOAT32, valueDtype=tflite.TensorType.FLOAT32
+    ) -> None:
+        super().__init__(tflite.BuiltinOperator.HASHTABLE, inputs, outputs)
+        self.tableId = tableId
+        self.keyDtype = keyDtype
+        self.valueDtype = valueDtype
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.HashtableOptionsStart(builder)
+        tflite.HashtableOptionsAddTableId(builder, self.tableId)
+        tflite.HashtableOptionsAddKeyDtype(builder, self.keyDtype)
+        tflite.HashtableOptionsAddValueDtype(builder, self.valueDtype)
+        options = tflite.HashtableOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.HashtableOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class HashtableFindOperator(BaseOperator):
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
+        super().__init__(tflite.BuiltinOperator.HASHTABLE_FIND, inputs, outputs)
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.HashtableFindOptionsStart(builder)
+        options = tflite.HashtableFindOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.HashtableFindOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class HashtableImportOperator(BaseOperator):
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
+        super().__init__(tflite.BuiltinOperator.HASHTABLE_IMPORT, inputs, outputs)
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.HashtableImportOptionsStart(builder)
+        options = tflite.HashtableImportOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.HashtableImportOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class HashtableSizeOperator(BaseOperator):
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
+        super().__init__(tflite.BuiltinOperator.HASHTABLE_SIZE, inputs, outputs)
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.HashtableSizeOptionsStart(builder)
+        options = tflite.HashtableSizeOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.HashtableSizeOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class ReduceAllOperator(BaseOperator):
+    def __init__(self, inputs, outputs, keepDims=False) -> None:
+        super().__init__(tflite.BuiltinOperator.REDUCE_ALL, inputs, outputs)
+        self.keepDims = keepDims
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.ReducerOptionsStart(builder)
+        tflite.ReducerOptionsAddKeepDims(builder, self.keepDims)
+        options = tflite.ReducerOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReducerOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class Conv3dTransposeOperator(BaseOperator):
+    def __init__(
+        self,
+        inputs,
+        outputs,
+        padding=tflite.Padding.SAME,
+        strideD=0,
+        strideW=0,
+        strideH=0,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+        dilationDFactor=0,
+        dilationWFactor=0,
+        dilationHFactor=0,
+    ) -> None:
+        super().__init__(tflite.BuiltinOperator.CONV_3D_TRANSPOSE, inputs, outputs)
+        self.padding = padding
+        self.strideD = strideD
+        self.strideW = strideW
+        self.strideH = strideH
+        self.fusedActivationFunction = fusedActivationFunction
+        self.dilationDFactor = dilationDFactor
+        self.dilationWFactor = dilationWFactor
+        self.dilationHFactor = dilationHFactor
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.Conv3DOptionsStart(builder)
+        tflite.Conv3DOptionsAddPadding(builder, self.padding)
+        tflite.Conv3DOptionsAddStrideD(builder, self.strideD)
+        tflite.Conv3DOptionsAddStrideW(builder, self.strideW)
+        tflite.Conv3DOptionsAddStrideH(builder, self.strideH)
+        tflite.Conv3DOptionsAddFusedActivationFunction(builder, self.fusedActivationFunction)
+        tflite.Conv3DOptionsAddDilationDFactor(builder, self.dilationDFactor)
+        tflite.Conv3DOptionsAddDilationWFactor(builder, self.dilationWFactor)
+        tflite.Conv3DOptionsAddDilationHFactor(builder, self.dilationHFactor)
+        options = tflite.Conv3DOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Conv3DOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class VarHandleOperator(BaseOperator):
+    def __init__(self, inputs, outputs, container=(), sharedName=()) -> None:
+        super().__init__(tflite.BuiltinOperator.VAR_HANDLE, inputs, outputs)
+        self.container = container
+        self.sharedName = sharedName
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        container = create_numpy_array(builder, tflite.VarHandleOptions.Container, self.container)
+        sharedName = create_numpy_array(builder, tflite.VarHandleOptions.SharedName, self.sharedName)
+        tflite.VarHandleOptionsStart(builder)
+        tflite.VarHandleOptionsAddContainer(builder, container)
+        tflite.VarHandleOptionsAddSharedName(builder, sharedName)
+        options = tflite.VarHandleOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.VarHandleOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class ReadVariableOperator(BaseOperator):
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
+        super().__init__(tflite.BuiltinOperator.READ_VARIABLE, inputs, outputs)
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.ReadVariableOptionsStart(builder)
+        options = tflite.ReadVariableOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReadVariableOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class AssignVariableOperator(BaseOperator):
+    def __init__(
+        self,
+        inputs,
+        outputs,
+    ) -> None:
+        super().__init__(tflite.BuiltinOperator.ASSIGN_VARIABLE, inputs, outputs)
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.AssignVariableOptionsStart(builder)
+        options = tflite.AssignVariableOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.AssignVariableOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class BroadcastArgsOperator(BaseOperator):
+    def __init__(self, inputs, outputs) -> None:
+        super().__init__(tflite.BuiltinOperator.BROADCAST_ARGS, inputs, outputs)
+
+
+class RandomStandardNormalOperator(BaseOperator):
+    def __init__(self, inputs, outputs, seed=0, seed2=0) -> None:
+        super().__init__(tflite.BuiltinOperator.RANDOM_STANDARD_NORMAL, inputs, outputs)
+        self.seed = seed
+        self.seed2 = seed2
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.RandomOptionsStart(builder)
+        tflite.RandomOptionsAddSeed(builder, self.seed)
+        tflite.RandomOptionsAddSeed2(builder, self.seed2)
+        options = tflite.RandomOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.RandomOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class BucketizeOperator(BaseOperator):
+    def __init__(self, inputs, outputs, boundaries=()) -> None:
+        super().__init__(tflite.BuiltinOperator.BUCKETIZE, inputs, outputs)
+        self.boundaries = boundaries
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        boundaries = create_numpy_array(builder, tflite.BucketizeOptions.Boundaries, self.boundaries)
+        tflite.BucketizeOptionsStart(builder)
+        tflite.BucketizeOptionsAddBoundaries(builder, boundaries)
+        options = tflite.BucketizeOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.BucketizeOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class RandomUniformOperator(BaseOperator):
+    def __init__(self, inputs, outputs, seed=0, seed2=0) -> None:
+        super().__init__(tflite.BuiltinOperator.RANDOM_UNIFORM, inputs, outputs)
+        self.seed = seed
+        self.seed2 = seed2
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.RandomOptionsStart(builder)
+        tflite.RandomOptionsAddSeed(builder, self.seed)
+        tflite.RandomOptionsAddSeed2(builder, self.seed2)
+        options = tflite.RandomOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.RandomOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class MultinomialOperator(BaseOperator):
+    def __init__(self, inputs, outputs, seed=0, seed2=0) -> None:
+        super().__init__(tflite.BuiltinOperator.MULTINOMIAL, inputs, outputs)
+        self.seed = seed
+        self.seed2 = seed2
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.RandomOptionsStart(builder)
+        tflite.RandomOptionsAddSeed(builder, self.seed)
+        tflite.RandomOptionsAddSeed2(builder, self.seed2)
+        options = tflite.RandomOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.RandomOptions)
+        tflite.OperatorAddBuiltinOptions(builder, options)
+        self.tfl_op = tflite.OperatorEnd(builder)
+
+        return self.tfl_op
+
+
+class GeluOperator(BaseOperator):
+    def __init__(self, inputs, outputs, approximate=False) -> None:
+        super().__init__(tflite.BuiltinOperator.GELU, inputs, outputs)
+        self.approximate = approximate
+
+    def build(self, builder: flatbuffers.Builder) -> Offset:
+        tflite.GeluOptionsStart(builder)
+        tflite.GeluOptionsAddApproximate(builder, self.approximate)
+        options = tflite.GeluOptionsEnd(builder)
+
+        tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
+        tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+
+        tflite.OperatorStart(builder)
+        tflite.OperatorAddOpcodeIndex(builder, self.op.index)
+        tflite.OperatorAddInputs(builder, tfl_inputs_idx)
+        tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.GeluOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
 

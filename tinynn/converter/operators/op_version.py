@@ -1,8 +1,7 @@
-from .base import ExtendedOperator, FUSE_ACTIVATION_MAP
-from .graph import CommonGraph
+from ..schemas.tflite import schema_generated as tfl_schema
 from . import tflite as tfl
-
-import tflite as tfl_schema
+from .base import FUSE_ACTIVATION_MAP, ExtendedOperator
+from .graph import CommonGraph
 
 
 class OPVersioner(object):
