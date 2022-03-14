@@ -32,7 +32,7 @@ def transform_output(output):
 
 BLACKLIST = ('vit_b_16', 'vit_b_32', 'vit_l_16', 'vit_l_32')
 
-CI_BLACKLIST = ('convnext_large', 'regnet_y_128gf')
+CI_BLACKLIST = ('convnext_base', 'convnext_large', 'regnet_y_128gf')
 
 
 class TestModelMeta(type):
