@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from tkinter import E
 
 from .base import BaseOperator, QuantizationParameters, Tensor
 from . import generated_ops as tfl_ops
