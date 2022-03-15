@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from tkinter import E
 
 from .base import BaseOperator, QuantizationParameters, Tensor
 from . import generated_ops as tfl_ops
@@ -47,8 +48,14 @@ class TransformableOperator(BaseOperator):
         orig_input = ops[0].inputs[input_idx]
         orig_output = ops[-1].outputs[output_idx]
 
-        nhwc2nchw_perm = np.array([0, 3, 1, 2], dtype='int32')
-        nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
+        if orig_input.tensor.ndim == 4:
+            nhwc2nchw_perm = np.array([0, 3, 1, 2], dtype='int32')
+            nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
+        elif orig_input.tensor.ndim == 5:
+            nhwc2nchw_perm = np.array([0, 4, 1, 2, 3], dtype='int32')
+            nchw2nhwc_perm = np.array([0, 2, 3, 4, 1], dtype='int32')
+        else:
+            assert False, f'Don\'t know how to wrap tranposes for {orig_input.tensor.ndim}d tensors'
 
         nhwc2nchw_perm_tensor = self.create_attr_tensor(nhwc2nchw_perm)
         nchw2nhwc_perm_tensor = self.create_attr_tensor(nchw2nhwc_perm)
@@ -231,44 +238,69 @@ class GenericConvOperator(TransformableOperator):
             self.outputs = conv_outputs + self.outputs[reshape_output_size:]
 
             weight_tensor = self.inputs[1]
-        elif weight_dim != 4:
-            assert False, "Only Conv[Transpose]1d/2d is supported"
+        elif weight_dim not in (4, 5):
+            assert False, "Only Conv[Transpose]1d/2d/3d is supported"
 
         if weight_tensor.shape[1] == 1 and weight_tensor.shape[0] == self.groups:
-            conv_op = tfl_ops.DepthwiseConv2dOperator(
-                self.inputs,
-                self.outputs,
-                strideH=self.stride[0],
-                strideW=self.stride[1],
-                depthMultiplier=1,
-                dilationHFactor=self.dilation[0],
-                dilationWFactor=self.dilation[1],
-                fusedActivationFunction=self.fusedActivationFunction,
-                padding=tflite.Padding.VALID,
-            )
+            if weight_dim == 4:
+                conv_op = tfl_ops.DepthwiseConv2dOperator(
+                    self.inputs,
+                    self.outputs,
+                    strideH=self.stride[0],
+                    strideW=self.stride[1],
+                    depthMultiplier=1,
+                    dilationHFactor=self.dilation[0],
+                    dilationWFactor=self.dilation[1],
+                    fusedActivationFunction=self.fusedActivationFunction,
+                    padding=tflite.Padding.VALID,
+                )
+            else:
+                assert False, "Only DepthwiseConv1d/2d is supported"
         else:
             if input_tensor.shape[1] != weight_tensor.shape[1]:
                 warnings.warn('Group conv is not supported if official tflite interpreter is used')
-            conv_op = tfl_ops.Conv2dOperator(
-                self.inputs,
-                self.outputs,
-                strideH=self.stride[0],
-                strideW=self.stride[1],
-                dilationHFactor=self.dilation[0],
-                dilationWFactor=self.dilation[1],
-                fusedActivationFunction=self.fusedActivationFunction,
-                padding=tflite.Padding.VALID,
-            )
+            if weight_dim == 4:
+                conv_op = tfl_ops.Conv2dOperator(
+                    self.inputs,
+                    self.outputs,
+                    strideH=self.stride[0],
+                    strideW=self.stride[1],
+                    dilationHFactor=self.dilation[0],
+                    dilationWFactor=self.dilation[1],
+                    fusedActivationFunction=self.fusedActivationFunction,
+                    padding=tflite.Padding.VALID,
+                )
+            else:
+                conv_op = tfl_ops.Conv3dOperator(
+                    self.inputs,
+                    self.outputs,
+                    strideD=self.stride[0],
+                    strideH=self.stride[1],
+                    strideW=self.stride[2],
+                    dilationDFactor=self.dilation[0],
+                    dilationHFactor=self.dilation[1],
+                    dilationWFactor=self.dilation[2],
+                    fusedActivationFunction=self.fusedActivationFunction,
+                    padding=tflite.Padding.VALID,
+                )
 
         ops = self.wrap_ops_with_nhwc_nchw_transposes([conv_op])
         conv_op = ops[1]
 
         # Pad handling
         if sum(self.padding) > 0:
-            pad_h = self.padding[0]
-            pad_w = self.padding[1]
+            if weight_dim == 4:
+                pad_h = self.padding[0]
+                pad_w = self.padding[1]
 
-            pad = [[0, 0], [pad_h, pad_h], [pad_w, pad_w], [0, 0]]
+                pad = [[0, 0], [pad_h, pad_h], [pad_w, pad_w], [0, 0]]
+            else:
+                pad_d = self.padding[0]
+                pad_h = self.padding[1]
+                pad_w = self.padding[2]
+
+                pad = [[0, 0], [pad_d, pad_d], [pad_h, pad_h], [pad_w, pad_w], [0, 0]]
+
             pad_tensor = self.create_attr_tensor(np.array(pad, dtype='int32'))
 
             pad_input = ops[0].outputs[0]
@@ -294,8 +326,12 @@ class GenericConvOperator(TransformableOperator):
             conv_op.inputs[1] = reordered_weight
             reorder_op = tfl_ops.TransposeOperator([weight, nchw2chwn_perm_tensor], [reordered_weight])
         else:
-            nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
-            nchw2nhwc_perm_tensor = self.create_attr_tensor(nchw2nhwc_perm)
+            if weight_dim == 4:
+                nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
+                nchw2nhwc_perm_tensor = self.create_attr_tensor(nchw2nhwc_perm)
+            else:
+                nchw2nhwc_perm = np.array([2, 3, 4, 1, 0], dtype='int32')
+                nchw2nhwc_perm_tensor = self.create_attr_tensor(nchw2nhwc_perm)
             weight_q = weight.quantization
             if weight_q is not None and weight_q.dim is not None:
                 new_dim = np.nonzero(nchw2nhwc_perm == weight_q.dim)[0][0]
@@ -309,11 +345,11 @@ class GenericConvOperator(TransformableOperator):
 
         # Bias handling
         kernel_num = self.inputs[1].shape[0]
-        if conv_op.op.code == tflite.BuiltinOperator.DEPTHWISE_CONV_2D:
-            kernel_num = self.inputs[1].shape[3]
+        if conv_op.op.code in (tflite.BuiltinOperator.DEPTHWISE_CONV_2D, tflite.BuiltinOperator.CONV_3D):
+            kernel_num = self.inputs[1].shape[-1]
 
         if len(conv_op.inputs) == 2 or conv_op.inputs[2] is None:
-            if conv_op.inputs[0].dtype == np.float32:
+            if conv_op.inputs[0].dtype == np.dtype('float32'):
                 bias = np.zeros((kernel_num,), dtype='float32')
                 q_args = None
             else:
@@ -370,7 +406,7 @@ class GenericTransposeConvOperator(TransformableOperator):
 
     stride: typing.List[int]
     padding: typing.List[int]
-    dialation: typing.List[int]
+    dilation: typing.List[int]
     transpose: bool
     output_padding: typing.List[int]
     groups: int
@@ -453,33 +489,57 @@ class GenericTransposeConvOperator(TransformableOperator):
             self.outputs = conv_outputs + self.outputs[1:]
 
             weight_tensor = self.inputs[1]
-        elif weight_dim != 4:
-            assert False, "Only Conv[Transpose]1d/2d is supported"
+        elif weight_dim not in (4, 5):
+            assert False, "Only Conv[Transpose]1d/2d/3d is supported"
 
-        conv_op = tfl_ops.TransposeConvOperator(
-            self.inputs[:2][::-1],
-            self.outputs,
-            strideH=self.stride[0],
-            strideW=self.stride[1],
-            padding=tflite.Padding.VALID,
-        )
+        if weight_dim == 4:
+            conv_op = tfl_ops.TransposeConvOperator(
+                self.inputs[:2][::-1],
+                self.outputs,
+                strideH=self.stride[0],
+                strideW=self.stride[1],
+                padding=tflite.Padding.VALID,
+            )
+        else:
+            conv_op = tfl_ops.Conv3dTransposeOperator(
+                self.inputs[:2][::-1],
+                self.outputs,
+                strideD=self.stride[0],
+                strideH=self.stride[1],
+                strideW=self.stride[2],
+                dilationDFactor=self.dilation[0],
+                dilationHFactor=self.dilation[1],
+                dilationWFactor=self.dilation[2],
+                padding=tflite.Padding.VALID,
+            )
 
         ops = self.wrap_ops_with_nhwc_nchw_transposes([conv_op], input_idx=1)
 
         # Pad handling
         output_shape = conv_op.outputs[0].shape
         if sum(self.padding) > 0:
-            pad_h = self.padding[0]
-            pad_w = self.padding[1]
+            if weight_dim == 4:
+                pad_h = self.padding[0]
+                pad_w = self.padding[1]
 
-            start = np.array([0, pad_h, pad_w, 0], dtype='int32')
+                start = np.array([0, pad_h, pad_w, 0], dtype='int32')
+
+                pad_sizes = ((0, 0), (pad_h, pad_h), (pad_w, pad_w), (0, 0))
+            else:
+                pad_d = self.padding[0]
+                pad_h = self.padding[1]
+                pad_w = self.padding[2]
+
+                start = np.array([0, pad_d, pad_h, pad_w, 0], dtype='int32')
+
+                pad_sizes = ((0, 0), (pad_d, pad_d), (pad_h, pad_h), (pad_w, pad_w), (0, 0))
+
             size = np.array(ops[1].outputs[0].shape, dtype='int32')
 
             start_tensor = self.create_attr_tensor(start)
             size_tensor = self.create_attr_tensor(size)
 
             slice_out = ops[1].outputs[0]
-            pad_sizes = ((0, 0), (pad_h, pad_h), (pad_w, pad_w), (0, 0))
             pad_array = np.pad(self.outputs[0].tensor, pad_sizes)
             slice_input = self.create_transform_tensor(pad_array, quantization=self.outputs[0].quantization)
             ops[1].outputs[0] = slice_input
@@ -494,7 +554,10 @@ class GenericTransposeConvOperator(TransformableOperator):
 
         # Weight handling
         weight = conv_op.inputs[1]
-        nchw2chwn_perm = np.array([1, 2, 3, 0], dtype='int32')
+        if weight_dim == 4:
+            nchw2chwn_perm = np.array([1, 2, 3, 0], dtype='int32')
+        else:
+            nchw2chwn_perm = np.array([2, 3, 4, 1, 0], dtype='int32')
         nchw2chwn_perm_tensor = self.create_attr_tensor(nchw2chwn_perm)
         reordered_weight = self.create_transform_tensor(
             np.transpose(weight.tensor, nchw2chwn_perm), quantization=weight.quantization
