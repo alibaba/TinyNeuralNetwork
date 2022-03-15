@@ -3125,7 +3125,7 @@ class ConverterOPTester(unittest.TestCase):
 
         assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
-    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.5.0'), 'conv_transpose3d is not supported')
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.6.0'), 'conv_transpose3d is not supported')
     def test_conv_transpose3d_no_bias(self):
         dummy_input = torch.randn(1, 16, 10, 50, 100, dtype=torch.float32)
 
