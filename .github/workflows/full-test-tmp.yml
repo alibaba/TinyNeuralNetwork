@@ -23,12 +23,12 @@ jobs:
         if: runner.os == 'Windows'
         uses: al-cheb/configure-pagefile-action@v1.2
         with:
-          minimum-size: 8GB
+          minimum-size: 10GB
       - name: Set up swap space
         if: runner.os == 'Linux'
         uses: pierotofy/set-swap-space@v1.0
         with:
-          swap-size-gb: 8
+          swap-size-gb: 10
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
