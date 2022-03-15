@@ -1,8 +1,9 @@
 name: Full tests
 
 on:
-  schedule:
-    - cron:  '00 19 * * *'
+  pull_request:
+    branches:
+      - main
 
 jobs:
   unit-test:
