@@ -16,7 +16,7 @@ from common_utils import collect_custom_models, collect_torchvision_models, prep
 
 BLACKLIST = ()
 
-CI_BLACKLIST = ('regnet_y_128gf', 'vit_l_16', 'vit_l_32',)
+CI_BLACKLIST = ('regnet_y_128gf', 'vit_l_16', 'vit_l_32', 'vgg19', 'vgg19_bn')
 
 
 class TestModelMeta(type):
