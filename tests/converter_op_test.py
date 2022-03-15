@@ -3016,6 +3016,34 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(tfl_output, dummy_output, check_dtype=False)
 
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.4.0'), 'cumsum is not supported')
+    def test_cumsum(self):
+        def model(x):
+            return torch.cumsum(x, 1)
+
+        model_path = get_model_path()
+        dummy_input = torch.randn((2, 10), dtype=torch.float32)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(tfl_output, dummy_output, check_dtype=False)
+
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.4.0'), 'cumsum is not supported')
+    def test_cumsum_negative_dim(self):
+        def model(x):
+            return torch.cumsum(x, -1)
+
+        model_path = get_model_path()
+        dummy_input = torch.randn((2, 10), dtype=torch.float32)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(tfl_output, dummy_output, check_dtype=False)
+
 
 class ConverterQuantizedOPTester(unittest.TestCase):
     backend: str

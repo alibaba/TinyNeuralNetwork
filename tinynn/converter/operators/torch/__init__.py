@@ -144,6 +144,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::where": ATenWhereOperator,
     "aten::type_as": ATenTypeAsOperator,
     "aten::topk": ATenTopkOperator,
+    "aten::cumsum": ATenCumsumOperator,
     # quantized
     "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,
     "aten::fake_quantize_per_tensor_affine": ATenFakeQuantizePerTensorAffineOperator,

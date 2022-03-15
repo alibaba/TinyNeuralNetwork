@@ -2405,3 +2405,21 @@ class ATenTopkOperator(ATenTopkSchema):
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
         op = tfl.TopkV2Operator(inputs, outputs)
         graph_converter.add_operator(op)
+
+
+class ATenCumsumOperator(ATenCumsumSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        input_tensor, dim = self.input_tensors[:2]
+
+        if dim < 0:
+            dim += input_tensor.ndim
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
+
+        inputs = [input_tensor, dim_tensor]
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        graph_converter.add_operator(tfl.CumsumOperator(inputs, outputs))
