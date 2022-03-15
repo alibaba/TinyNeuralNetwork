@@ -100,8 +100,9 @@ There are a large number of operators in PyTorch. We cannot cover all operators,
         - OP schema (without I/O tensors): [generated_ops.py](../tinynn/converter/operators/tflite/generated_ops.py)
         - Full schema: https://www.tensorflow.org/mlir/tfl_ops
     - TorchScript
-        - ATen schema [aten_schema.py](../tinynn/converter/operators/torch/aten_schema.py)
-        - Quantized schema [quantized_schema.py](../tinynn/converter/operators/torch/quantized_schema.py)
+        - ATen schema [aten_schema.py](../tinynn/converter/schemas/torch/aten_schema.py)
+        - Quantized schema [quantized_schema.py](../tinynn/converter/schemas/torch/quantized_schema.py)
+        - Quantized schema [torchvision_schema.py](../tinynn/converter/schemas/torch/torchvision_schema.py)
     - Translation logic
         - ATen OPs [aten.py](../tinynn/converter/operators/torch/aten.py)
         - Quantized OPs [quantized.py](../tinynn/converter/operators/torch/quantized.py)

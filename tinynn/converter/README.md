@@ -32,12 +32,17 @@ To solve the above problems, we implement this converter that translates models 
         + [transformable.py](operators/tflite/transformable.py) : Transformable operators, such as BatchNorm, Conv2d, and other composite operators composed of multiple TFLite operators
     + [torch](operators/torch) : PyTorch related classes
         + [base.py](operators/torch/base.py) : The base data structure needed for TorchScript parsing
-        + [aten_schema.py](operators/torch/aten_schema.py) : Wrapper classes generated from ATen schema
-        + [quantized_schema.py](operators/torch/quantized_schema.py) : Wrapper class generated from quantized schema
         + [aten.py](operators/torch/aten.py) : Translation of ATen-related operators
         + [quantized.py](operators/torch/quantized.py) : Translation of quantized-related operators
     + [base.py](operators/base.py) : Definition of generic operators
     + [graph.py](operators/graph.py) : Computation of graph-related infrastructure
     + [op_version.py](operators/op_version.py) : Handler for operator version
     + [optimize.py](operators/optimize.py) : Computation graph optimization
++ [schemas](schemas): Most of the schemas of the converter
+    + [tflite](schemas/tflite) : TFLite related schemas
+        + [schema_generated.py](schemas/tflite/schema_generated.py) : TFLite schema parsers
+    + [torch](schemas/torch) : PyTorch related schemas
+        + [aten_schema.py](schemas/torch/aten_schema.py) : Wrapper classes generated from ATen schema
+        + [quantized_schema.py](schemas/torch/quantized_schema.py) : Wrapper class generated from quantized schema
+        + [torchvision_schema.py](schemas/torch/torchvision_schema.py) : Wrapper class torchvision_schema from Torchvision schema
 + [base.py](base.py): Entry class `TFLiteConverter`

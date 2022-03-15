@@ -6,9 +6,10 @@ ignore =
 extend-ignore = E203
 per-file-ignores =
         tinynn/converter/operators/tflite/generated_ops.py: E501
-        tinynn/converter/operators/torch/aten_schema.py: E501
-        tinynn/converter/operators/torch/quantized_schema.py: E501
-        tinynn/converter/operators/torch/torchvision_schema.py: E501
+        tinynn/converter/schemas/tflite/schema_generated.py: E301, E302, E501, E704
+        tinynn/converter/schemas/torch/aten_schema.py: E501
+        tinynn/converter/schemas/torch/quantized_schema.py: E501
+        tinynn/converter/schemas/torch/torchvision_schema.py: E501
         tests/converter_op_test.py: E704
         examples/*: E402
 exclude =

@@ -4,10 +4,10 @@ from .base import BaseOperator, QuantizationParameters, Tensor
 from . import generated_ops as tfl_ops
 
 from ..base import ExtendedOperator
+from ...schemas.tflite import schema_generated as tflite
 
 import typing
 import torch
-import tflite
 import warnings
 
 import numpy as np

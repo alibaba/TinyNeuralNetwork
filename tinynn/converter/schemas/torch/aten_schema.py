@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-from .base import OperatorConverter
+from ...operators.torch.base import OperatorConverter
 
 
 class ATenPackSequenceSchema(OperatorConverter):

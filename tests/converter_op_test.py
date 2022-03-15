@@ -3027,6 +3027,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
                 continue
             if backend in torch.backends.quantized.supported_engines:
                 self.backend = backend
+                torch.backends.quantized.engine = backend
                 return
         self.skipTest('No quantization backend is found')
 
@@ -3440,6 +3441,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         assert_close(dummy_output, tfl_output, atol=1, rtol=1)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized, 'ELU'), 'Quantized elu is not supported')
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.4.1'), 'Quantized elu is not supported')
     def test_quantized_elu_int8(self):
         class Model(nn.Module):
             def __init__(self) -> None:
