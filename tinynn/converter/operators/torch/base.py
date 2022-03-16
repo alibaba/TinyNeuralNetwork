@@ -512,7 +512,7 @@ class OperatorConverter(ABC):
         assert tensor.numel() == 1
         assert tensor.dtype == torch.float32
         if not tensor.is_nonzero():
-            if self.q_type == np.uint8:
+            if self.q_type in (np.uint8, np.int16):
                 return torch.quantize_per_tensor(tensor, 0.5, 128, torch.quint8)
             elif self.q_type == np.int8:
                 return torch.quantize_per_tensor(tensor, 0.5, 0, torch.qint8)
@@ -521,11 +521,15 @@ class OperatorConverter(ABC):
                 return torch.quantize_per_tensor(tensor, -tensor[0] / 127, 255, torch.quint8)
             elif self.q_type == np.int8:
                 return torch.quantize_per_tensor(tensor, -tensor[0] / 127, 0, torch.qint8)
+            elif self.q_type == np.int16:
+                return torch.quantize_per_tensor(tensor, -tensor[0] / 127, 128, torch.quint8)
         else:
             if self.q_type == np.uint8:
                 return torch.quantize_per_tensor(tensor, tensor[0] / 127, 0, torch.quint8)
             elif self.q_type == np.int8:
                 return torch.quantize_per_tensor(tensor, tensor[0] / 127, 0, torch.qint8)
+            elif self.q_type == np.int16:
+                return torch.quantize_per_tensor(tensor, tensor[0] / 127, 128, torch.quint8)
 
 
 def get_prop_from_node(node, prop, assert_type=None, return_type=False):

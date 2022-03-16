@@ -547,6 +547,25 @@ class QATQuantizer(object):
                 for parent, prop in zip(parents[1:], props[1:]):
                     setattr(parent, prop, unified)
 
+    def rescale_activations_with_quant_min_max(self, quant_min: int, quant_max: int) -> None:
+        """Rescales activations with provided quant_min and quant_max"""
+        for n, m in self.model.named_modules():
+            if '.weight_fake_quant' in n:
+                continue
+
+            if isinstance(m, torch.quantization.FakeQuantize):
+                observer = getattr(m, 'activation_post_process', None)
+                if observer is not None:
+                    old_quant_range = m.quant_max - m.quant_min
+                    m.quant_min = quant_min
+                    m.quant_max = quant_max
+                    new_quant_range = m.quant_max - m.quant_min
+                    m.scale = m.scale * new_quant_range / old_quant_range
+                    zero_point = (new_quant_range + 1) // 2
+                    m.zero_point = torch.zeros_like(m.zero_point) + zero_point
+                    observer.quant_min = quant_min
+                    observer.quant_max = quant_max
+
     def rewrite_quantize_graph(self, graph: TraceGraph) -> None:
         """Rewrites the computation graph for quantization"""
         if graph.quantized:

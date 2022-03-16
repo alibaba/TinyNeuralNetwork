@@ -99,8 +99,14 @@ class TFLiteConverter(object):
                 )
         elif quantize_target_type == 'int8':
             self.q_type = np.int8
+        elif quantize_target_type == 'int16':
+            if self.hybrid:
+                raise AttributeError('Hybrid kernels supports int8 only')
+            if not self.strict_symmetric_check:
+                raise AttributeError('Int16 quantization requires strict_symmetric_check=True')
+            self.q_type = np.int16
         else:
-            raise AttributeError(f'unknown quantize_target_type: {quantize_target_type}, expected: uint8, int8')
+            raise AttributeError(f'unknown quantize_target_type: {quantize_target_type}, expected: uint8, int8, int16')
 
         if dump_config_path and not dump_jit_model_path:
             raise AssertionError("when dump_config_path is set, dump_jit_model_path is required to be set")

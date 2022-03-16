@@ -95,8 +95,13 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
                     bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.uint8)
                 elif self.q_type == np.int8:
                     bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int8)
+                elif self.q_type == np.int16:
+                    bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int16)
             else:
-                bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int32, dim=bias_dim)
+                if self.q_type == np.int16:
+                    bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int64, dim=bias_dim)
+                else:
+                    bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.int32, dim=bias_dim)
 
             bias_tensor = self.create_attr_tensor(bias)
             inputs.append(bias_tensor)
@@ -226,7 +231,10 @@ class QuantizedLinearOperator(QuantizedLinearSchema):
             bias = torch.zeros(out_features, dtype=torch.float)
 
         bias_scale = input_tensor.quantization.scale * weight_tensor.quantization.scale
-        bias = self.quantize(bias, bias_scale, 0, dtype=torch.int32)
+        if self.q_type == np.int16:
+            bias = self.quantize(bias, bias_scale, 0, dtype=torch.int64)
+        else:
+            bias = self.quantize(bias, bias_scale, 0, dtype=torch.int32)
         bias_tensor = self.create_attr_tensor(bias)
 
         inputs = [input_tensor, weight_tensor, bias_tensor]
