@@ -62,4 +62,4 @@ jobs:
       - name: Run tests
         run: |
           source activate.sh
-          pytest tests -v
+          pytest tests -v --durations=50
