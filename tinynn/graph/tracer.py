@@ -8,6 +8,7 @@ import re
 import sys
 import traceback
 import typing
+import weakref
 
 import torch
 import torch.nn as nn
@@ -476,7 +477,8 @@ class TraceFunction(object):
                     if a.numel() > 50 and a.is_floating_point():
                         convert_to_parameter = True
                     raw_data = a.tolist()
-                    constant_node = ConstantNode(raw_data, a.dtype, a.shape).parse(convert_to_parameter)
+                    with no_catch():
+                        constant_node = ConstantNode(raw_data, a.dtype, a.shape).parse(convert_to_parameter)
                     trace_node = TraceNode(constant_node)
                     add_constant_node(trace_node, a)
                     ns = 'self.'
@@ -1289,6 +1291,7 @@ def add_constant_node(node: TraceNode, output_tensor):
     actual_tensor = output_tensor
     if isinstance(output_tensor, torch.nn.Parameter):
         actual_tensor = output_tensor.data
+        current_graph().tensor_parameter_dict[id(output_tensor)] = weakref.ref(actual_tensor)
 
     node.next_tensors = [actual_tensor]
 
@@ -1351,7 +1354,8 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
                 if t.numel() > 50 and t.is_floating_point():
                     convert_to_parameter = True
                 raw_data = t.tolist()
-                constant_node = ConstantNode(raw_data, t.dtype, t.shape).parse(convert_to_parameter)
+                with no_catch():
+                    constant_node = ConstantNode(raw_data, t.dtype, t.shape).parse(convert_to_parameter)
                 trace_node = TraceNode(constant_node)
                 add_constant_node(trace_node, t)
         pre_node_name = current_graph().tensor_pre_node_dict[id(t)]
@@ -1363,7 +1367,11 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
         else:
             node.prev_indices.append(None)
         if isinstance(t, torch.nn.Parameter):
-            node.prev_tensors[i] = node.prev_tensors[i].data
+            if id(t) in current_graph().tensor_parameter_dict:
+                node.prev_tensors[i] = current_graph().tensor_parameter_dict[id(t)]()
+            else:
+                node.prev_tensors[i] = node.prev_tensors[i].data
+                current_graph().tensor_parameter_dict[id(t)] = weakref.ref(node.prev_tensors[i])
 
     for i, t in enumerate(output_tensors):
         if isinstance(t, (list, tuple)):
@@ -1584,6 +1592,9 @@ class TraceGraph(object):
 
         # Recording the previous index of the tensors
         self.tensor_pre_index_dict = {}
+
+        # Recording the tensor object of the parameters
+        self.tensor_parameter_dict = {}
 
         # Input module
         if isinstance(module, DataParallel) or isinstance(module, DistributedDataParallel):

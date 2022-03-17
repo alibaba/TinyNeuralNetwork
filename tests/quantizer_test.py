@@ -579,6 +579,34 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_add_tensor(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.c0 = torch.ones(1, 3, 224, 224)
+
+            def forward(self, x):
+                return x + self.c0
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_add_param_tensor(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_parameter('c0', nn.Parameter(torch.ones(1, 3, 224, 224)))
+
+            def forward(self, x):
+                return x + self.c0
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
     def test_radd(self):
         class Model(nn.Module):
             def forward(self, x):
