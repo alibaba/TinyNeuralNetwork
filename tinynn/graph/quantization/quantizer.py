@@ -319,7 +319,7 @@ class QATQuantizer(object):
         log.info(f'found nodes to fuse: {quant_list}')
 
         for quant_nodes in quant_list:
-            if LooseVersion(torch.__version__) >= LooseVersion('1.11.0'):
+            if type(self) != PostQuantizer and LooseVersion(torch.__version__) >= LooseVersion('1.11.0'):
                 torch.ao.quantization.fuse_modules_qat(graph.module, quant_nodes, inplace=True)
             else:
                 torch_q.fuse_modules(graph.module, quant_nodes, inplace=True)
