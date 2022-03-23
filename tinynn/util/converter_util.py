@@ -38,7 +38,7 @@ def tensor_config(tensors: typing.List[torch.Tensor], transpose: typing.List[boo
                 type_str = type_str.replace('torch.', '')
             tensor_dict['type'] = type_str
         if trans is None:
-            trans = len(t.shape) == 4
+            trans = len(tensor_dict['shape']) == 4
         tensor_dict['transpose'] = trans
         tensor_list.append(tensor_dict)
     return tensor_list
@@ -78,14 +78,6 @@ def generate_converter_config(
     else:
         raise AssertionError('input transpose should either be boolean or list of booleans')
 
-    if type(output_transpose) in (tuple, list):
-        if len(output_transpose) != len(outputs) or not all((type(x) == bool for x in output_transpose)):
-            raise AssertionError('output transpose should either be boolean or list of booleans')
-    elif type(output_transpose) == bool or output_transpose is None:
-        output_transpose = [output_transpose] * len(inputs)
-    else:
-        raise AssertionError('output transpose should either be boolean or list of booleans')
-
     if tflite_path is None:
         tflite_path = export_file.replace('.pt', '.tflite')
 
@@ -111,7 +103,6 @@ def export_converter_files(
     export_dir: typing.Optional[str] = None,
     model_name: typing.Optional[str] = None,
     input_transpose: typing.Optional[typing.Union[bool, typing.Iterable[bool]]] = None,
-    output_transpose: typing.Optional[typing.Union[bool, typing.Iterable[bool]]] = None,
     dump_graph: bool = False,
 ):
     """ Automatically generate required files for the model converter
@@ -123,8 +114,6 @@ def export_converter_files(
         model_name (typing.Optional[str], optional): File name for exporting. Defaults to None("jit_model").
         input_transpose (typing.Optional[typing.Union[bool, typing.Iterable[bool]]], optional): Whether to transpose \
             the input(s). Defaults to None(True for 4d-input, False otherwise).
-        output_transpose (typing.Optional[typing.Union[bool, typing.Iterable[bool]]], optional): Whether to transpose \
-            the input(s). Defaults to None(True for 4d-output, False otherwise).
         dump_graph (bool, optional): Whether to print the traced graph. Defaults to False.
     """
 
@@ -162,6 +151,9 @@ def export_converter_files(
                 new_output.append(item)
         outputs = new_output
 
+    # Always pass in list filled with `False` since this flag is ignored in the converter.
+    output_transpose = [False] * len(output)
+
     generate_converter_config(inputs, outputs, input_transpose, output_transpose, export_file)
 
 
@@ -169,14 +161,12 @@ def get_tensor_details(config):
     input_shapes = []
     input_transpose = []
     input_dtypes = []
-    output_transpose = []
 
     input_shapes.extend((inp['shape'] for inp in config['inputs']))
     input_transpose.extend((inp['transpose'] for inp in config['inputs']))
     input_dtypes.extend((inp['type'] for inp in config['inputs']))
-    output_transpose.extend((outp['transpose'] for outp in config['outputs']))
 
-    return input_shapes, input_transpose, input_dtypes, output_transpose
+    return input_shapes, input_transpose, input_dtypes
 
 
 def prepare_input_arrays(input_shapes, input_transpose, input_dtypes):
@@ -202,7 +192,7 @@ def data_to_pytorch(inputs, input_transpose):
 
 def parse_config(
     json_file: str, prepare_inputs: bool = True
-) -> typing.Tuple[str, str, typing.List[bool], typing.List[torch.Tensor], typing.List[bool]]:
+) -> typing.Tuple[str, str, typing.List[bool], typing.List[torch.Tensor]]:
     """Parses the configuration file for converter
 
     Args:
@@ -214,7 +204,6 @@ def parse_config(
         torch_model_path (str): The path of the torchscript model
         input_transpose (typing.List[bool]): Flag variables whether the inputs will be transposed (nchw -> nhwc)
         torch_inputs (typing.List[torch.Tensor]): The prepared inputs if prepare_inputs is True, otherwise None
-        output_transpose (typing.List[bool]): Flag variables whether the outputs will be transposed (nchw -> nhwc)
     """
 
     with open(json_file, 'r') as f:
@@ -224,10 +213,10 @@ def parse_config(
     torch_model_path = config['src_model']
 
     if prepare_inputs:
-        input_shapes, input_transpose, input_dtypes, output_transpose = get_tensor_details(config)
+        input_shapes, input_transpose, input_dtypes = get_tensor_details(config)
         inputs = prepare_input_arrays(input_shapes, input_transpose, input_dtypes)
         torch_inputs = data_to_pytorch(inputs, input_transpose)
     else:
         torch_inputs = None
 
-    return torch_model_path, tflite_model_path, input_transpose, torch_inputs, output_transpose
+    return torch_model_path, tflite_model_path, input_transpose, torch_inputs

@@ -33,7 +33,7 @@ def data_to_tf(inputs, input_transpose):
     return tf_inputs
 
 
-def get_tflite_out(model_path, inputs, output_transpose):
+def get_tflite_out(model_path, inputs):
     interpreter = tf.lite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
 
@@ -51,8 +51,6 @@ def get_tflite_out(model_path, inputs, output_transpose):
         output_data = interpreter.get_tensor(output_details[i]['index'])
         if not isinstance(output_data, np.ndarray):
             output_data = np.asarray(output_data).reshape((1,))
-        if output_transpose[i]:
-            output_data = np.transpose(output_data, [0, 3, 1, 2])
         outputs.append(output_data)
 
     return outputs
@@ -139,9 +137,8 @@ class TestModelMeta(type):
                 if HAS_TF:
                     outputs = converter.get_outputs()
                     input_transpose = converter.input_transpose
-                    output_transpose = converter.output_transpose
                     input_tf = data_to_tf(inputs, input_transpose)
-                    tf_outputs = get_tflite_out(out_path, input_tf, output_transpose)
+                    tf_outputs = get_tflite_out(out_path, input_tf)
                     output_tensors = list(map(torch.from_numpy, tf_outputs))
                     for pt, tt in zip(outputs, output_tensors):
                         result = torch.allclose(pt, tt, rtol=1e-2, atol=1e-5)

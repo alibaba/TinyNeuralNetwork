@@ -94,7 +94,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -113,7 +113,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -132,7 +132,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -151,7 +151,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -186,7 +186,7 @@ class ConverterOPTester(unittest.TestCase):
 
             model_path = get_model_path()
             inputs = [dummy_input, dummy_input_1]
-            converter = TFLiteConverter(model, inputs, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, inputs, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(*inputs)
@@ -220,7 +220,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dummy_input_1)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -255,7 +255,7 @@ class ConverterOPTester(unittest.TestCase):
 
             model_path = get_model_path()
             inputs = [dummy_input, dummy_input_1]
-            converter = TFLiteConverter(model, inputs, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, inputs, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(*inputs)
@@ -289,7 +289,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dummy_input_1)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -322,7 +322,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, 1)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -355,7 +355,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, 1.0)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -375,7 +375,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -395,7 +395,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -415,7 +415,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -435,7 +435,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -454,7 +454,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -483,7 +483,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -517,7 +517,7 @@ class ConverterOPTester(unittest.TestCase):
                 return res if type(res) == torch.Tensor else res[0]
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -551,7 +551,7 @@ class ConverterOPTester(unittest.TestCase):
                 return res if type(res) == torch.Tensor else res[0]
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -581,7 +581,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dim=[1, 2])
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -611,7 +611,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dim=[1, 2], keepdim=True)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -637,7 +637,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -664,7 +664,7 @@ class ConverterOPTester(unittest.TestCase):
                     return func(x, val)
 
                 model_path = get_model_path()
-                converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+                converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
                 converter.convert()
 
                 dummy_output = model(dummy_input)
@@ -691,7 +691,7 @@ class ConverterOPTester(unittest.TestCase):
 
             model_path = get_model_path()
             dummy_input = (dummy_input_1, dummy_input_2)
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(*dummy_input)
@@ -725,7 +725,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -744,7 +744,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -768,7 +768,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -790,7 +790,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -815,7 +815,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 16, 128, 1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -840,7 +840,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 16, 128, 1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -865,7 +865,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 16, 128, 1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -884,7 +884,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dim=-1)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -903,7 +903,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dim=1)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -922,7 +922,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dim=1, keepdim=True)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -942,7 +942,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -964,7 +964,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -978,7 +978,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.pow(x, 2)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -995,7 +995,7 @@ class ConverterOPTester(unittest.TestCase):
                 return torch.pow(x, exponent)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -1015,7 +1015,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -1029,7 +1029,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.flatten(x, 1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1049,7 +1049,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, (1, -1, 1))
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -1063,7 +1063,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.squeeze(x, 0)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1077,7 +1077,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.unsqueeze(x, -1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1091,7 +1091,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.transpose(x, 0, -1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1105,7 +1105,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.t(x)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1119,7 +1119,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.t(x)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1133,7 +1133,7 @@ class ConverterOPTester(unittest.TestCase):
             return x.permute(0, 2, 3, 1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1157,7 +1157,7 @@ class ConverterOPTester(unittest.TestCase):
                     return func(x, min_val, max_val)
 
                 model_path = get_model_path()
-                converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+                converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
                 converter.convert()
 
                 dummy_output = model(dummy_input)
@@ -1171,7 +1171,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.flip(x, [1])
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1185,7 +1185,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.flip(x, [1, 2])
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1199,7 +1199,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.cat([x])
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1213,7 +1213,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.cat([x, x])
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1227,7 +1227,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.cat([x, x], -1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1242,7 +1242,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.cat([x, dummy_input_1], -1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1258,7 +1258,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
         dummy_input = (dummy_input, dummy_input_1)
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(*dummy_input)
@@ -1272,7 +1272,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.stack([x])
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1286,7 +1286,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.stack([x, x])
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1300,7 +1300,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.stack([x, x], -1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1314,7 +1314,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.floor_divide(x, 2)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1329,7 +1329,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.floor_divide(x, dummy_input_1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1345,7 +1345,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
         dummy_input = (dummy_input, dummy_input_1)
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(*dummy_input)
@@ -1360,7 +1360,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.pixel_shuffle(x, 3)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1375,7 +1375,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.pixel_unshuffle(x, 3)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1390,7 +1390,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.pixel_shuffle(x, 3)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1405,7 +1405,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.pixel_unshuffle(x, 3)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1426,7 +1426,7 @@ class ConverterOPTester(unittest.TestCase):
         model = Model()
         model.eval()
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1447,7 +1447,7 @@ class ConverterOPTester(unittest.TestCase):
         model = Model()
         model.eval()
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1469,7 +1469,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1490,7 +1490,7 @@ class ConverterOPTester(unittest.TestCase):
         model = Model()
         model.eval()
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1510,7 +1510,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, 3, dim=1)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -1530,7 +1530,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, 5, dim=1)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -1550,7 +1550,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, 7, dim=-1)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -1564,7 +1564,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.split(x, [200, 24], dim=-1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1578,7 +1578,7 @@ class ConverterOPTester(unittest.TestCase):
             return list(torch.chunk(x, 3, 1))
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1592,7 +1592,7 @@ class ConverterOPTester(unittest.TestCase):
             return list(torch.chunk(x, 7, 1))
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1606,7 +1606,7 @@ class ConverterOPTester(unittest.TestCase):
             return list(torch.chunk(x, 11, -1))
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1620,7 +1620,7 @@ class ConverterOPTester(unittest.TestCase):
             return x.repeat(4)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1634,7 +1634,7 @@ class ConverterOPTester(unittest.TestCase):
             return x.repeat(4, 2)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1648,7 +1648,7 @@ class ConverterOPTester(unittest.TestCase):
             return x.expand(3, 4)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1662,7 +1662,7 @@ class ConverterOPTester(unittest.TestCase):
             return x.expand(-1, 4)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1676,7 +1676,7 @@ class ConverterOPTester(unittest.TestCase):
             return x.expand(2, -1, 4)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1690,7 +1690,7 @@ class ConverterOPTester(unittest.TestCase):
             return x.expand(-1, -1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1705,7 +1705,7 @@ class ConverterOPTester(unittest.TestCase):
             return buffer.copy_(x)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1720,7 +1720,7 @@ class ConverterOPTester(unittest.TestCase):
             return buffer.copy_(x)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1735,7 +1735,7 @@ class ConverterOPTester(unittest.TestCase):
             return buffer.copy_(x)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1756,7 +1756,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, mat)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -1778,7 +1778,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_input = (mat1, mat2)
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(*dummy_input)
@@ -1799,7 +1799,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, mat)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -1821,7 +1821,7 @@ class ConverterOPTester(unittest.TestCase):
 
             dummy_input = (mat1, mat2)
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(*dummy_input)
@@ -1836,7 +1836,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.matmul(x, mat)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1852,7 +1852,7 @@ class ConverterOPTester(unittest.TestCase):
 
         dummy_input = (mat1, mat2)
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(*dummy_input)
@@ -1874,7 +1874,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1896,7 +1896,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1918,7 +1918,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1940,7 +1940,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1956,7 +1956,7 @@ class ConverterOPTester(unittest.TestCase):
             return torch.addmm(bias, x, mat)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -1976,7 +1976,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, 7)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -1996,7 +1996,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, 7, padding=(2, 1))
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -2016,7 +2016,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, 7, 7)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -2030,7 +2030,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.max_pool2d(x, 3, 2, 0, ceil_mode=False)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2044,7 +2044,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.adaptive_avg_pool2d(x, 32)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2058,7 +2058,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.adaptive_avg_pool2d(x, (16, 32))
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2072,7 +2072,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.adaptive_avg_pool2d(x, (None, 32))
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2086,7 +2086,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.adaptive_avg_pool2d(x, 1)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2100,7 +2100,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.pad(x, (1, 1))
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2114,7 +2114,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.pad(x, (1, 1, 2, 2))
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2128,7 +2128,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.pad(x, (1, 1, 2, 2), 'constant', 0.5)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2142,7 +2142,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.pad(x, (2, 2), 'reflect')
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2156,7 +2156,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.pad(x, (1, 1, 2, 0), 'reflect')
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2170,7 +2170,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.interpolate(x, scale_factor=2.0, mode='bilinear')
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2184,7 +2184,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.interpolate(x, scale_factor=2.0, mode='bilinear', align_corners=True)
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2198,7 +2198,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.interpolate(x, scale_factor=2.0, mode='nearest')
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2212,7 +2212,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.interpolate(x, size=(448, 448), mode='bilinear')
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2226,7 +2226,7 @@ class ConverterOPTester(unittest.TestCase):
             return F.interpolate(x, size=(448, 448), mode='nearest')
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2248,7 +2248,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2270,7 +2270,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2292,7 +2292,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2314,7 +2314,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2336,7 +2336,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2358,7 +2358,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2380,7 +2380,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2402,7 +2402,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2424,7 +2424,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2446,7 +2446,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2461,7 +2461,7 @@ class ConverterOPTester(unittest.TestCase):
             return x
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input.clone())
@@ -2477,7 +2477,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
         dummy_input = (dummy_input_1, dummy_input_2)
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(*dummy_input)
@@ -2493,7 +2493,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
         dummy_input = (dummy_input_1, dummy_input_2)
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(*dummy_input)
@@ -2508,7 +2508,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2523,7 +2523,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2538,7 +2538,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2553,7 +2553,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2568,7 +2568,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2583,7 +2583,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2598,7 +2598,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2613,7 +2613,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2628,7 +2628,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2643,7 +2643,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2660,7 +2660,7 @@ class ConverterOPTester(unittest.TestCase):
         model_path = get_model_path()
 
         dummy_input = (dummy_input_1, dummy_input_2)
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(*dummy_input)
@@ -2675,7 +2675,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2690,7 +2690,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2705,7 +2705,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2722,7 +2722,7 @@ class ConverterOPTester(unittest.TestCase):
         model_path = get_model_path()
 
         dummy_input = (dummy_input_1, dummy_input_2)
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(*dummy_input)
@@ -2743,7 +2743,7 @@ class ConverterOPTester(unittest.TestCase):
 
             model_path = get_model_path()
 
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -2766,7 +2766,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dim=1)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -2789,7 +2789,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dim=-3, unbiased=False)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -2812,7 +2812,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dim=1, keepdim=True)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -2835,7 +2835,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dim=[1, 2])
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -2858,7 +2858,7 @@ class ConverterOPTester(unittest.TestCase):
                 return func(x, dim=[1, 2], keepdim=True)
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -2888,7 +2888,7 @@ class ConverterOPTester(unittest.TestCase):
             model.eval()
 
             model_path = get_model_path()
-            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
             converter.convert()
 
             dummy_output = model(dummy_input)
@@ -2914,7 +2914,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2940,7 +2940,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2966,7 +2966,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -2992,7 +2992,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -3009,7 +3009,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
         dummy_input = torch.randn((2, 10), dtype=torch.float32)
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -3023,7 +3023,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
         dummy_input = torch.randn((2, 10), dtype=torch.float32)
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -3037,7 +3037,7 @@ class ConverterOPTester(unittest.TestCase):
 
         model_path = get_model_path()
         dummy_input = torch.randn((2, 10), dtype=torch.float32)
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -3060,7 +3060,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -3087,7 +3087,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -3114,7 +3114,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -3141,7 +3141,7 @@ class ConverterOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -3174,7 +3174,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3188,7 +3188,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(torch.int_repr(model(dummy_input)))
@@ -3202,7 +3202,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -3217,7 +3217,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -3240,7 +3240,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3263,7 +3263,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3286,7 +3286,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3309,7 +3309,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3332,7 +3332,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3355,7 +3355,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3378,7 +3378,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3401,7 +3401,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3424,7 +3424,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3447,7 +3447,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3470,7 +3470,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3496,7 +3496,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3520,7 +3520,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3544,7 +3544,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3568,7 +3568,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3593,7 +3593,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3617,7 +3617,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3641,7 +3641,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3665,7 +3665,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3689,7 +3689,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3713,7 +3713,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3737,7 +3737,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3761,7 +3761,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3785,7 +3785,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3809,7 +3809,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3833,7 +3833,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3857,7 +3857,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3881,7 +3881,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3905,7 +3905,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3929,7 +3929,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -3953,7 +3953,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -3977,7 +3977,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4008,7 +4008,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4039,7 +4039,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4063,7 +4063,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4087,7 +4087,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4111,7 +4111,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4135,7 +4135,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4159,7 +4159,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4183,7 +4183,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4207,7 +4207,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4231,7 +4231,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4255,7 +4255,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4279,7 +4279,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4303,7 +4303,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4327,7 +4327,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4351,7 +4351,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 10), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4376,7 +4376,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 10), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4400,7 +4400,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 10), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4425,7 +4425,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 10), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4449,7 +4449,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 10), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4474,7 +4474,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 10), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4498,7 +4498,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 10), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4523,7 +4523,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 10), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4550,7 +4550,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4577,7 +4577,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4604,7 +4604,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4631,7 +4631,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4658,7 +4658,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4685,7 +4685,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4712,7 +4712,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4739,7 +4739,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4763,7 +4763,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4787,7 +4787,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4811,7 +4811,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
         converter.convert()
 
         dummy_output = torch.int_repr(model(dummy_input))
@@ -4835,7 +4835,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.quantize_per_tensor(torch.randn(1, 3, 224, 224), 0.5, 128, torch.quint8)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
@@ -4859,7 +4859,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 10)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -4882,7 +4882,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         dummy_input = torch.randn(1, 10)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -4905,7 +4905,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -4929,7 +4929,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -4952,7 +4952,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -4975,7 +4975,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -4999,7 +4999,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = model(dummy_input)
@@ -5022,7 +5022,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         model.eval()
 
         model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, quantize_target_type='int8')
         converter.convert()
 
         dummy_output = model(dummy_input)

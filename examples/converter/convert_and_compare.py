@@ -85,7 +85,7 @@ def main_worker():
 
         # Get outputs from the backends
         tfl_v = interpreter.get_tensor(tfl_tensor_idx_map[n])
-        torch_v = converter.get_value(n)
+        torch_v = converter.get_value(n).numpy()
 
         # Convert the PyTorch tensor to a NumPy array
         if torch_v.dtype in (torch.quint8, torch.qint8):
