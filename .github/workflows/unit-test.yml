@@ -60,11 +60,6 @@ jobs:
           python converter_op_test.py -v
           python converter_optimizer_test.py -v
           python quantizer_test.py -v
-      - name: Setup tmate session
-        if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3
-        with:
-          limit-access-to-actor: true
       - name: Run integration tests
         run: |
           source activate.sh

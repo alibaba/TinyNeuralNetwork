@@ -2354,11 +2354,12 @@ def elinimate_sequences(
                 if target_vertex['node_type'] in (ExtendedOperator.OUTPUT_NODE, ExtendedOperator.UNUSED_NODE):
                     if has_output_nodes and edge['label'] == output_name:
                         output_outdegree += 1
-                    break
+                        break
                 else:
                     names = [t.name for t in target_vertex['op'].inputs]
                     if output_name in names:
                         output_outdegree += 1
+                        break
 
             if not has_output_nodes:
                 use_forward_input = True

@@ -364,47 +364,8 @@ class TFLiteConverter(object):
             log.error(f'Unsupported ops: {", ".join(unsupported_ops)}')
             raise Exception("Cannot continue due to fatal error")
         else:
-            try:
-                optimizer = GraphOptimizer(self.common_graph, self.optimize, self.fuse_quant_dequant)
-                optimizer.optimize()
-            except Exception as err:
-                print()
-                print('All nodes:')
-                for v in self.common_graph.graph.vs:
-                    print('=' * 90)
-                    print(f'Node {v.index}:')
-                    print(v)
-
-                    print()
-                    print('In edges:')
-                    for e in v.in_edges():
-                        print('-' * 30)
-                        print(f'{e.source}:', e)
-
-                    print()
-                    print('Out edges:')
-                    for e in v.out_edges():
-                        print('-' * 30)
-                        print(f'{e.target}:', e)
-
-                    if v['op'] is not None:
-                        print()
-                        print('Input tensors:')
-                        for t in v['op'].inputs:
-                            print(t)
-
-                        print()
-                        print('Output tensors:')
-                        for t in v['op'].outputs:
-                            print(t)
-
-                print()
-                print('All edges:')
-                for e in self.common_graph.graph.es:
-                    print('=' * 90)
-                    print(e)
-
-                raise err
+            optimizer = GraphOptimizer(self.common_graph, self.optimize, self.fuse_quant_dequant)
+            optimizer.optimize()
 
             self.output_transpose = self.common_graph.output_transpose
 
