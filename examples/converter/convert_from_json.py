@@ -34,7 +34,7 @@ def main_worker(args):
 
     # We will try to parse the config and prepare the inputs for you.
     # If you want to use your own inputs, just assign it to `generated_inputs` here.
-    torch_model_path, tflite_model_path, input_transpose, generated_inputs = parse_config(json_file)
+    torch_model_path, tflite_model_path, input_transpose, generated_inputs, output_transpose = parse_config(json_file)
 
     # When converting quantized models, please ensure the quantization backend is set.
     torch.backends.quantized.engine = 'qnnpack'
@@ -44,10 +44,10 @@ def main_worker(args):
         model.cpu()
         model.eval()
 
-        # Pay attention to the argument `input_transpose` in the next line.
-        # By default, we will perform nchw -> nhwc transpose every 4D input.
-        # If you don't want to do this, please pass in False for it.
-        converter = TFLiteConverter(model, generated_inputs, tflite_model_path, input_transpose)
+        # Pay attention to the arguments `input_transpose` and `output_transpose` in the next line.
+        # By default, we will perform nchw -> nhwc transpose every 4D input and output tensor.
+        # If you don't want to do this, please pass in False for them.
+        converter = TFLiteConverter(model, generated_inputs, tflite_model_path, input_transpose, output_transpose)
         converter.convert()
 
 

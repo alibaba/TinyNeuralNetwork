@@ -21,6 +21,7 @@ class CommonGraph(object):
     inputs: typing.List[str]
     outputs: typing.List[str]
     input_transpose: typing.List[bool]
+    output_transpose: typing.Union[typing.List[typing.Optional[bool]], typing.Optional[bool]]
     node_op_counter: int
 
     def __init__(self) -> None:
@@ -31,6 +32,7 @@ class CommonGraph(object):
         self.inputs = []
         self.outputs = []
         self.input_transpose = []
+        self.output_transpose = None
         self.node_op_counter = 0
 
     def add_iterable_pair(
