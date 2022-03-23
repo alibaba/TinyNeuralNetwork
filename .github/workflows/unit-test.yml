@@ -60,6 +60,11 @@ jobs:
           python converter_op_test.py -v
           python converter_optimizer_test.py -v
           python quantizer_test.py -v
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        if: ${{ failure() }}
+        with:
+          limit-access-to-actor: true
       - name: Run integration tests
         run: |
           source activate.sh
