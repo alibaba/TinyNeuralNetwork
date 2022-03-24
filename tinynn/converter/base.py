@@ -24,6 +24,8 @@ class TFLiteConverter(object):
         dummy_input: typing.Union[torch.Tensor, typing.Iterable[torch.Tensor]],
         tflite_path: str,
         input_transpose: typing.Optional[typing.Union[bool, typing.Iterable[bool]]] = None,
+        output_transpose: typing.Optional[typing.Union[bool, typing.Iterable[bool]]] = None,
+        nchw_transpose: bool = True,
         dump_jit_model_path: typing.Optional[str] = None,
         dump_dummy_input_path: typing.Optional[str] = None,
         dump_config_path: typing.Optional[str] = None,
@@ -46,6 +48,10 @@ class TFLiteConverter(object):
             tflite_path (str): Path to use for exporting
             input_transpose (typing.Optional[typing.Union[bool, typing.Iterable[bool]]], optional): Whether to \
                 transpose the input(s). Defaults to None(True for 4d-input, False otherwise).
+            output_transpose (typing.Optional[typing.Union[bool, typing.Iterable[bool]]], optional): Whether to \
+                transpose the output(s). Defaults to None(True for 4d-input, False otherwise).
+            nchw_transpose (bool): Whether to perform nchw->nhwc transposes on input and output tensors. \
+                `False` is specified, the arguments `input_transpose` and `output_transpose` will be ignored.
             dump_jit_model_path (typing.Optional[str]): The path for dumping the jit model. Defaults to None
             dump_dummy_input_path (typing.Optional[str]): The path for dumping the dummy input. Defaults to None
             dump_config_path (typing.Optional[str]): The path for dumping the json config. Defaults to None
@@ -73,7 +79,15 @@ class TFLiteConverter(object):
             self.dummy_input = [dummy_input]
 
         self.tflite_path = tflite_path
-        self.input_transpose = input_transpose
+        self.nchw_transpose = nchw_transpose
+
+        if self.nchw_transpose:
+            self.input_transpose = input_transpose
+            self.output_transpose = output_transpose
+        else:
+            self.input_transpose = False
+            self.output_transpose = False
+
         self.strict_symmetric_check = strict_symmetric_check
 
         self.dump_jit_model_path = dump_jit_model_path
@@ -227,6 +241,7 @@ class TFLiteConverter(object):
         self.common_graph.inputs.extend(graph_inputs)
         self.common_graph.outputs.extend(graph_outputs)
         self.common_graph.input_transpose.extend(self.input_transpose)
+        self.common_graph.output_transpose = self.output_transpose
         tensors = []
         for i, node in enumerate(graph_inputs):
             tensors.append(
@@ -351,6 +366,8 @@ class TFLiteConverter(object):
         else:
             optimizer = GraphOptimizer(self.common_graph, self.optimize, self.fuse_quant_dequant)
             optimizer.optimize()
+
+            self.output_transpose = self.common_graph.output_transpose
 
             if self.hybrid:
                 quantizer = HybridQuantizer(

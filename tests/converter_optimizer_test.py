@@ -36,7 +36,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -51,6 +51,214 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 3)
 
+    def test_input_output_transpose(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = x.relu()
+                return x
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_input_output_transpose_quantize(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.quantize_per_tensor(x, 0.5, 128, torch.quint8)
+                x = x.relu()
+                x = x.dequantize()
+                return x
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 3)
+        self.assertIn(
+            tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(),
+            (tflite.BuiltinOperator.DEQUANTIZE, tflite.BuiltinOperator.QUANTIZE, tflite.BuiltinOperator.RELU),
+        )
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 3)
+        self.assertEqual(
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(0).OpcodeIndex()).DeprecatedBuiltinCode(),
+            tflite.BuiltinOperator.QUANTIZE,
+        )
+        self.assertEqual(
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(1).OpcodeIndex()).DeprecatedBuiltinCode(),
+            tflite.BuiltinOperator.RELU,
+        )
+        self.assertEqual(
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(2).OpcodeIndex()).DeprecatedBuiltinCode(),
+            tflite.BuiltinOperator.DEQUANTIZE,
+        )
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_input_output_transpose_branch(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.split(x, 1, 1)
+                return x
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertIn(
+            tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(),
+            (tflite.BuiltinOperator.SPLIT, tflite.BuiltinOperator.SPLIT_V),
+        )
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 3)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 3)
+
+    def test_input_output_transpose_branch_complex(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                y = torch.split(x, 1, 1)
+                z = torch.relu(y[0])
+                return list(y) + [z]
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path)
+        converter.convert()
+
+        # TODO: Optimize this case
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 4)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 4)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 4)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 3)
+
+        self.assertIn(
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(0).OpcodeIndex()).DeprecatedBuiltinCode(),
+            (tflite.BuiltinOperator.SPLIT, tflite.BuiltinOperator.SPLIT_V),
+        )
+
+    def test_input_output_transpose_branch_quantize(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.quantize_per_tensor(x, 0.5, 128, torch.quint8)
+                x = torch.split(x, 1, 1)
+                x = [t.dequantize() for t in x]
+                return x
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 5)
+        self.assertIn(
+            tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(),
+            (
+                tflite.BuiltinOperator.DEQUANTIZE,
+                tflite.BuiltinOperator.QUANTIZE,
+                tflite.BuiltinOperator.SPLIT_V,
+                tflite.BuiltinOperator.SPLIT,
+            ),
+        )
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 3)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 5)
+        self.assertEqual(
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(0).OpcodeIndex()).DeprecatedBuiltinCode(),
+            tflite.BuiltinOperator.QUANTIZE,
+        )
+        self.assertIn(
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(1).OpcodeIndex()).DeprecatedBuiltinCode(),
+            (tflite.BuiltinOperator.SPLIT_V, tflite.BuiltinOperator.SPLIT),
+        )
+        for i in range(2, 5):
+            self.assertEqual(
+                tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(i).OpcodeIndex()).DeprecatedBuiltinCode(),
+                tflite.BuiltinOperator.DEQUANTIZE,
+            )
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_input_output_transpose_branch_quantize_complex(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = torch.quantize_per_tensor(x, 0.5, 128, torch.quint8)
+                y = torch.split(x, 1, 1)
+                y = [t.dequantize() for t in y]
+                z = torch.relu(y[0])
+                return y + [z]
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 224, 224)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path)
+        converter.convert()
+
+        # TODO: Optimize this case
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 8)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 4)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 8)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+        split_output_indices = tfl_model.Subgraphs(0).Operators(1).OutputsAsNumpy().tolist()
+        split_output_names = [tfl_model.Subgraphs(0).Tensors(i).Name() for i in split_output_indices]
+
+        for i in range(2, 8):
+            op_index = tfl_model.Subgraphs(0).Operators(0).OpcodeIndex()
+            op_code = tfl_model.OperatorCodes(op_index)
+
+            if op_code == tflite.BuiltinOperator.DEQUANTIZE:
+                input_idx = tfl_model.Subgraphs(0).Operators(i).Inputs(0)
+                input_name = tfl_model.Subgraphs(0).Tensors(input_idx).Name()
+                self.assertIn(input_name, split_output_names)
+
     def test_repeated_list_output(self):
         class TestModel(nn.Module):
             def forward(self, x):
@@ -63,7 +271,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -90,7 +298,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -114,7 +322,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -143,7 +351,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         # TODO: Optimize this case
@@ -177,7 +385,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -203,7 +411,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -229,7 +437,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -255,7 +463,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -282,7 +490,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -312,7 +520,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -338,7 +546,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -364,7 +572,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -390,7 +598,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -417,7 +625,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -449,7 +657,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -479,7 +687,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(10, 50)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -509,7 +717,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(10, 50)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -543,7 +751,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(10, 50)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -581,7 +789,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(10, 50)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -613,7 +821,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(10, 50)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -642,7 +850,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -686,7 +894,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -734,7 +942,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -761,7 +969,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -788,7 +996,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False, fuse_quant_dequant=True)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, fuse_quant_dequant=True)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -816,7 +1024,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -848,7 +1056,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -874,7 +1082,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -903,7 +1111,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -932,7 +1140,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 6, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -959,7 +1167,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -983,7 +1191,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -1007,7 +1215,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -1031,7 +1239,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
@@ -1055,7 +1263,7 @@ class ConverterOptimizerTester(unittest.TestCase):
         dummy_input = torch.randn(1, 3, 224, 224)
         model_path = get_model_path()
 
-        converter = TFLiteConverter(model, dummy_input, model_path, input_transpose=False)
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         tfl_model = parse_model(model_path)
