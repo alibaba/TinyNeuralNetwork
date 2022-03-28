@@ -1781,6 +1781,16 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.LOG_SOFTMAX,
         ExtendedOperator.HARD_SWISH,
         ExtendedOperator.LEAKY_RELU,
+    ) or (
+        op_code
+        in (
+            ExtendedOperator.ADD,
+            ExtendedOperator.SUB,
+            ExtendedOperator.MUL,
+            ExtendedOperator.DIV,
+        )
+        and len(op.inputs) == 2
+        and op.inputs[1].tensor.ndim == 1
     )
 
 
@@ -2044,7 +2054,10 @@ def op_input_indices(op: tfl.BaseOperator):
     elif isinstance(op, tfl.SplitOperator):
         input_indices = (1,)
     elif isinstance(op, (tfl.AddOperator, tfl.SubOperator, tfl.MulOperator, tfl.DivOperator)):
-        input_indices = range(2)
+        if len(op.inputs[1].shape) != 1:
+            input_indices = range(2)
+        else:
+            input_indices = range(1)
     else:
         input_indices = range(1)
 
