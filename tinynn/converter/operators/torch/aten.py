@@ -432,6 +432,28 @@ class ATenSubOperator(ATenSubSchema):
         self.elementwise_binary(tfl.SubOperator, graph_converter, True)
 
 
+class ATenRsubOperator(ATenRsubSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        other = self.input_tensors[1]
+        alpha = self.input_tensors[-1]
+        assert alpha == 1
+
+        if type(other) in (int, float, bool):
+            self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
+        elif type(other) != torch.Tensor:
+            assert False, "other should have type int, float, tensor in aten::sub(input, other)"
+
+        # Swap the first two input tensors and their names
+        self.input_names[0], self.input_names[1] = self.input_names[1], self.input_names[0]
+        self.input_tensors[0], self.input_tensors[1] = self.input_tensors[1], self.input_tensors[0]
+
+        self.elementwise_binary(tfl.SubOperator, graph_converter, True)
+
+
 class ATenTransposeOperator(ATenTransposeSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)

@@ -174,6 +174,7 @@ class ConverterOPTester(unittest.TestCase):
             (torch, 'less_equal'),
             (torch, 'eq'),
             (torch, 'ne'),
+            (torch, 'rsub'),
         ]
 
         funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
@@ -209,6 +210,7 @@ class ConverterOPTester(unittest.TestCase):
             (torch, 'less_equal'),
             (torch, 'eq'),
             (torch, 'ne'),
+            (torch, 'rsub'),
         ]
 
         funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
@@ -243,6 +245,7 @@ class ConverterOPTester(unittest.TestCase):
             (torch, 'less_equal'),
             (torch, 'eq'),
             (torch, 'ne'),
+            (torch, 'rsub'),
         ]
 
         funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
@@ -278,6 +281,7 @@ class ConverterOPTester(unittest.TestCase):
             (torch, 'less_equal'),
             (torch, 'eq'),
             (torch, 'ne'),
+            (torch, 'rsub'),
         ]
 
         funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
@@ -311,6 +315,7 @@ class ConverterOPTester(unittest.TestCase):
             (torch, 'less_equal'),
             (torch, 'eq'),
             (torch, 'ne'),
+            (torch, 'rsub'),
         ]
 
         funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
@@ -344,6 +349,7 @@ class ConverterOPTester(unittest.TestCase):
             (torch, 'less_equal'),
             (torch, 'eq'),
             (torch, 'ne'),
+            (torch, 'rsub'),
         ]
 
         funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
