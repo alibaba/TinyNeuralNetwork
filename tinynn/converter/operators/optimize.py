@@ -1845,6 +1845,12 @@ def is_ending_with_noop_edge(edge: ig.Edge, graph_converter: ig.Graph, branch: b
                 and target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape
             )
             or (
+                target_vertex['node_type'] == ExtendedOperator.CONCATENATION
+                and len(target_vertex['op'].inputs) == 1
+                and len(target_vertex['op'].outputs) == 1
+                and target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape
+            )
+            or (
                 target_vertex['node_type'] == ExtendedOperator.GATHER
                 and target_vertex['op'].inputs[0].shape == target_vertex['op'].outputs[0].shape
                 and (np.diff(target_vertex['op'].inputs[1].tensor) == 1).all()
