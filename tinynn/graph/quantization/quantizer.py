@@ -1,4 +1,5 @@
 import copy
+import functools
 import logging
 import os
 import sys
@@ -53,8 +54,22 @@ FUSE_RULE_LIST = {
     (torch.nn.BatchNorm3d, torch.nn.ReLU),
 }
 
+FUSE_RULE_LIST_EXTRA = {
+    (torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.ReLU6),
+    (torch.nn.Conv2d, torch.nn.BatchNorm2d, torch.nn.ReLU6),
+    (torch.nn.Conv3d, torch.nn.BatchNorm3d, torch.nn.ReLU6),
+    (torch.nn.Conv1d, torch.nn.ReLU6),
+    (torch.nn.Conv2d, torch.nn.ReLU6),
+    (torch.nn.Conv3d, torch.nn.ReLU6),
+    (torch.nn.Linear, torch.nn.ReLU6),
+    (torch.nn.Linear, torch.nn.BatchNorm1d, torch.nn.ReLU6),
+    (torch.nn.BatchNorm2d, torch.nn.ReLU6),
+    (torch.nn.BatchNorm3d, torch.nn.ReLU6),
+}
+
 # Processed QAT fuse rules
 processed_qat_rules = {}
+processed_extra_qat_rules = {}
 
 # Constant func names
 creation_func_names = []
@@ -257,6 +272,7 @@ class QATQuantizer(object):
             return
 
         processed_qat_rules = load_processed_qat_rules()
+        is_fusable = functools.partial(self.is_fusable, current_rules=processed_qat_rules, graph=graph)
 
         def _find_quantized_prelu_nodes(node: TraceNode, custom_node):
             # Find quantized PReLU nodes
@@ -266,55 +282,8 @@ class QATQuantizer(object):
         quantized_prelu_nodes = graph.filter_forward_nodes(_find_quantized_prelu_nodes)
         graph.update_submodule_in_nodes_from_predicate(quantized_prelu_nodes, QPReLU)
 
-        def _is_fusable(node, custom_data):
-            # Tell whether a TraceNode is fusable with some nearby nodes
-
-            # Skip nodes that is not in a quantized computation graph
-            if not node.quantized:
-                return False
-
-            cur_node = node
-            names = []
-            final_names = []
-            current_rules = processed_qat_rules
-            current_state = False
-            while True:
-                cur_module = cur_node.module
-                cur_class = type(cur_module)
-                prev_nodes = cur_node.prev_nodes
-                log.debug('cur: ', cur_class)
-                if cur_class in current_rules:
-                    cur_name = graph.module_original_name_dict[id(cur_module)]
-                    if cur_name in custom_data[1]:
-                        log.debug('found existing nodes, skipping')
-                        break
-                    current_state, current_rules = current_rules[cur_class]
-                    log.debug('dict: ', current_rules, current_state)
-                    if len(prev_nodes) == 0:
-                        break
-                    if current_state and len(cur_node.prev_nodes) != 1:
-                        current_state = False
-                    names.append(cur_name)
-                    cur_node = cur_node.prev_nodes[0]
-                    if current_state is True:
-                        log.debug('update best: ', names)
-                        final_names.clear()
-                        final_names.extend(names)
-                else:
-                    break
-
-            if len(final_names) > 0:
-                final_names.reverse()
-                log.debug('final:', final_names)
-                custom_data[0].append(final_names)
-                for name in final_names:
-                    custom_data[1].add(name)
-                return True
-
-            return False
-
         custom_data = ([], set())
-        graph.filter_forward_nodes(_is_fusable, custom_data, reverse=True)
+        graph.filter_forward_nodes(is_fusable, custom_data, reverse=True)
         quant_list = custom_data[0]
         log.info(f'found nodes to fuse: {quant_list}')
 
@@ -1286,7 +1255,98 @@ class QATQuantizer(object):
                 # TODO: Support connect tensors between branch nodes
                 continue
 
+        # Process additional fusable nodes
+        processed_extra_qat_rules = load_processed_extra_qat_rules()
+        is_extra_fusable = functools.partial(
+            self.is_fusable,
+            current_rules=processed_extra_qat_rules,
+            check_node_quantized=False,
+            use_original_name=False,
+        )
+
+        custom_data = ([], set())
+        graph.filter_forward_nodes(is_extra_fusable, custom_data, reverse=True)
+        activ_names = custom_data[0]
+        log.debug(f'found nodes that cannot fuse: {activ_names}')
+
+        for idx, names in enumerate(reversed(activ_names)):
+            name = names[-1]
+            node = graph.nodes_map[name]
+            fake_quant = torch_q.QuantStub()
+
+            graph.module_unique_name_dict[id(fake_quant)] = f'fake_activ_quant_{idx}'
+            graph.module_original_name_dict[id(fake_quant)] = f'fake_activ_quant_{idx}'
+
+            fake_quant_cls = type(fake_quant)
+            module_constructor_lines[id(fake_quant)] = f'{qualified_name(fake_quant_cls)}()'
+
+            graph.insert_after(node, fake_quant)
+
+            fake_dequant = torch_q.DeQuantStub()
+
+            graph.module_unique_name_dict[id(fake_dequant)] = f'fake_activ_dequant_{idx}'
+            graph.module_original_name_dict[id(fake_dequant)] = f'fake_activ_dequant_{idx}'
+
+            fake_dequant_cls = type(fake_dequant)
+            module_constructor_lines[id(fake_dequant)] = f'{qualified_name(fake_dequant_cls)}()'
+
+            graph.insert_after(node, fake_dequant)
+
         graph.quantized = True
+
+    def is_fusable(
+        self, node, custom_data, current_rules=None, check_node_quantized=True, use_original_name=True, graph=None
+    ):
+        # Tell whether a TraceNode is fusable with some nearby nodes
+
+        if current_rules is None:
+            return False
+
+        if check_node_quantized:
+            if not node.quantized:
+                return False
+
+        cur_node = node
+        names = []
+        final_names = []
+        current_state = False
+        while True:
+            cur_module = cur_node.module
+            cur_class = type(cur_module)
+            prev_nodes = cur_node.prev_nodes
+            log.debug('cur: ', cur_class)
+            if cur_class in current_rules:
+                if use_original_name:
+                    cur_name = graph.module_original_name_dict[id(cur_module)]
+                else:
+                    cur_name = node.unique_name
+                if cur_name in custom_data[1]:
+                    log.debug('found existing nodes, skipping')
+                    break
+                current_state, current_rules = current_rules[cur_class]
+                log.debug('dict: ', current_rules, current_state)
+                if len(prev_nodes) == 0:
+                    break
+                if current_state and len(cur_node.prev_nodes) != 1:
+                    current_state = False
+                names.append(cur_name)
+                cur_node = cur_node.prev_nodes[0]
+                if current_state is True:
+                    log.debug('update best: ', names)
+                    final_names.clear()
+                    final_names.extend(names)
+            else:
+                break
+
+        if len(final_names) > 0:
+            final_names.reverse()
+            log.debug('final:', final_names)
+            custom_data[0].append(final_names)
+            for name in final_names:
+                custom_data[1].add(name)
+            return True
+
+        return False
 
 
 class BF16Quantizer(QATQuantizer):
@@ -1521,3 +1581,20 @@ def load_processed_qat_rules():
             base_rule_pair[0] = True
         processed_qat_rules.update(rule_dict)
     return processed_qat_rules
+
+
+def load_processed_extra_qat_rules():
+    if len(processed_extra_qat_rules) == 0:
+        # Constructor a prefix tree for the QAT rules
+        fuse_rules = sorted(FUSE_RULE_LIST_EXTRA, key=lambda x: len(x), reverse=True)
+        rule_dict = {}
+        for fuse_rule in fuse_rules:
+            base_rule_dict = rule_dict
+            for module_cls in reversed(fuse_rule):
+                # Node properties (has_key, child_nodes)
+                base_rule_dict.setdefault(module_cls, [False, {}])
+                base_rule_pair = base_rule_dict[module_cls]
+                base_rule_dict = base_rule_pair[1]
+            base_rule_pair[0] = True
+        processed_extra_qat_rules.update(rule_dict)
+    return processed_extra_qat_rules
