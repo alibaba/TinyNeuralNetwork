@@ -741,6 +741,22 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_conv_relu6(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.Conv2d(3, 3, 1)
+                self.activ = nn.ReLU6()
+
+            def forward(self, x):
+                s = self.conv(x)
+                return self.activ(s)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
 
 if __name__ == '__main__':
     unittest.main()

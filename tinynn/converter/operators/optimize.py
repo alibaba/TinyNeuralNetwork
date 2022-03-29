@@ -168,6 +168,36 @@ class GraphOptimizer(object):
         # Delete activation nodes
         self.graph.graph.delete_vertices(remove_ids)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
+    def fuse_requantize(self):
+        # Find fusable ops
+        edges = self.graph.graph.es.select(
+            functools.partial(is_requantize_fusable_edge, graph_converter=self.graph.graph)
+        )
+        filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target], x) for x in edges)
+
+        remove_ids = []
+        for pre_activ, activ, tensor in filtered_pairs:
+            # Find out the output of the batch-norm nodes
+            new_output = activ['outputs'][0]
+            assert new_output in self.graph.tensor_map
+
+            # For each node that is next of the activation node, we connect it with the previous node
+            self.graph.connect_next_tensors(activ, pre_activ, new_output)
+
+            # Update graph, prepare to drop the output tensor of the conv node and use the output tensor of the
+            # batch-norm instead
+            pre_activ['outputs'][0] = new_output
+            pre_activ['op'].outputs[0] = self.graph.tensor_map[new_output]
+            self.graph.tensor_node_map[new_output] = pre_activ['name']
+            tensor['name'] = activ['outputs'][0]
+            tensor['label'] = activ['outputs'][0]
+
+            remove_ids.append(activ.index)
+
+        # Delete activation nodes
+        self.graph.graph.delete_vertices(remove_ids)
+
     def transform_graph(self):
         # Find transformable ops
         filtered_nodes = self.graph.graph.vs.select(
@@ -231,6 +261,38 @@ class GraphOptimizer(object):
             new_perm_tensor = self.create_attr_tensor(new_perm)
             action = (self.graph.replace_operator_input, (first_node, 1, new_perm_tensor))
             return [action]
+
+        elinimate_sequences(self.graph, filtered_pairs, _remove_first_pred, _remove_first_action)
+
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
+    def fuse_dequant_quant_pass(self):
+        edges = self.graph.graph.es.select(
+            functools.partial(is_dequant_quant_fusable_edge, graph_converter=self.graph.graph)
+        )
+        filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
+
+        def _remove_first_pred(seq):
+            first_node, last_node = seq[0], seq[-1]
+            new_qparams = last_node['op'].outputs[0].quantization
+            orig_qparams = first_node['op'].inputs[0].quantization
+
+            assert new_qparams is not None
+            assert orig_qparams is not None
+
+            remove_first = (
+                new_qparams.scale == orig_qparams.scale
+                and new_qparams.zero_point == orig_qparams.zero_point
+                and new_qparams.dim == orig_qparams.dim
+            )
+
+            return remove_first, None
+
+        def _remove_first_action(first_node, last_node, custom_data):
+            # Set new node type to first node
+            first_node['node_type'] = ExtendedOperator.QUANTIZE
+            old_op = first_node['op']
+            first_node['op'] = tfl.QuantizeOperator(old_op.inputs, old_op.outputs)
+            return []
 
         elinimate_sequences(self.graph, filtered_pairs, _remove_first_pred, _remove_first_action)
 
@@ -1578,9 +1640,13 @@ class GraphOptimizer(object):
             self.fold_reshape_buffer()
             self.fold_transpose_buffer()
 
+        # Remove consecutive dequantize and quantize nodes
+        self.fuse_dequant_quant_pass()
+
         # OP fusion passes before transformation
         self.fuse_conv_fc_bn()
         self.fuse_activation()
+        self.fuse_requantize()
 
         # Convert TinyNeuralNetwork ops to TFLite ops
         self.transform_graph()
@@ -1652,6 +1718,26 @@ def is_bn_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
             or source_vertex['op'].fusedActivationFunction
             in (ActivationFunctionType.NONE, target_vertex['op'].fusedActivationFunction)
         )
+    )
+
+
+def is_requantize_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+    return (
+        source_vertex['node_type']
+        in (
+            ExtendedOperator.FULLY_CONNECTED,
+            ExtendedOperator.GENERIC_CONV,
+            ExtendedOperator.ADD,
+            ExtendedOperator.SUB,
+            ExtendedOperator.MUL,
+            ExtendedOperator.DIV,
+            ExtendedOperator.MAX_POOL_2D,
+            ExtendedOperator.AVERAGE_POOL_2D,
+        )
+        and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
+        and source_vertex.outdegree() == 1
     )
 
 
@@ -1958,6 +2044,18 @@ def is_transpose_branch_edge(edge: ig.Edge, graph_converter: ig.Graph):
         source_vertex['node_type'] == ExtendedOperator.TRANSPOSE
         and source_vertex.outdegree() > 1
         and target_vertex['node_type'] == ExtendedOperator.TRANSPOSE
+        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    )
+
+
+def is_dequant_quant_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+    return (
+        source_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
+        and source_vertex.outdegree() == 1
+        and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
+        and target_vertex.outdegree() >= 1
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
     )
 
