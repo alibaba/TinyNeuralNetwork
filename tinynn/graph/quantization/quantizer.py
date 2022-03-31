@@ -503,6 +503,9 @@ class QATQuantizer(object):
                     fq_count = 0
 
                 if fq_count < 2:
+                    if mode == 'up' and len(n.next_nodes) > 1:
+                        mode = 'both'
+
                     if mode in ('both', 'up'):
                         for node in n.prev_nodes:
                             q.put((node, 'up', fq_count))
