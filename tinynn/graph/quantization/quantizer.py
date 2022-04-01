@@ -85,6 +85,7 @@ class QATQuantizer(object):
     remove_weights_after_load: bool
     asymmetric: bool
     per_tensor: bool
+    disable_requantization_for_cat: bool
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new QATQuantizer object
@@ -121,6 +122,16 @@ class QATQuantizer(object):
                 not self.per_tensor
             ), "Per-tensor quantizaton for FBGEMM not supported, please use per-channel quantization instead"
 
+        if self.disable_requantization_for_cat is None:
+            if not self.per_tensor:
+                self.disable_requantization_for_cat = True
+            else:
+                self.disable_requantization_for_cat = False
+
+        assert (
+            self.per_tensor or self.disable_requantization_for_cat
+        ), "`disable_requantization_for_cat=True` is required for per-channel quantization"
+
     def parse_config(self, config: typing.Optional[dict]):
         default_values = {
             'rewrite_graph': True,
@@ -130,6 +141,7 @@ class QATQuantizer(object):
             'remove_weights_after_load': False,
             'asymmetric': True,
             'per_tensor': True,
+            'disable_requantization_for_cat': None,
         }
 
         if config is None:
@@ -448,11 +460,12 @@ class QATQuantizer(object):
                             observer.quant_min = -127
                             observer.quant_max = 127
 
-            self.per_channel_qconfig_post_process(graph)
+        if self.disable_requantization_for_cat:
+            self.disable_requantization_for_cat_pass(graph)
 
         return graph.module
 
-    def per_channel_qconfig_post_process(self, graph):
+    def disable_requantization_for_cat_pass(self, graph):
         connected_types = ['cat', 'chunk', 'split']
 
         def _find_quantized_cat_nodes(node: TraceNode, custom_node):
@@ -1516,8 +1529,8 @@ class PostQuantizer(QATQuantizer):
                 if hasattr(n.module, "activation_post_process"):
                     delattr(n.module, "activation_post_process")
 
-        if not self.per_tensor:
-            self.per_channel_qconfig_post_process(graph)
+        if self.disable_requantization_for_cat:
+            self.disable_requantization_for_cat_pass(graph)
 
         return graph.module
 
