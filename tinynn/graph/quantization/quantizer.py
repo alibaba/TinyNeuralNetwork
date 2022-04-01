@@ -81,6 +81,7 @@ class QATQuantizer(object):
     rewrite_graph: bool
     force_overwrite: bool
     is_input_quantized: typing.Optional[typing.Tuple[bool]]
+    quantized_input_stats: typing.Optional[typing.List[typing.Optional[typing.Tuple[float, float]]]]
     backend: str
     remove_weights_after_load: bool
     asymmetric: bool
@@ -142,6 +143,7 @@ class QATQuantizer(object):
             'asymmetric': True,
             'per_tensor': True,
             'disable_requantization_for_cat': None,
+            'quantized_input_stats': None,
         }
 
         if config is None:
@@ -463,6 +465,9 @@ class QATQuantizer(object):
         if self.disable_requantization_for_cat:
             self.disable_requantization_for_cat_pass(graph)
 
+        if self.quantized_input_stats is not None:
+            self.prepare_quantized_inputs_pass(graph)
+
         return graph.module
 
     def disable_requantization_for_cat_pass(self, graph):
@@ -531,6 +536,61 @@ class QATQuantizer(object):
                 unified = getattr(parents[0], props[0])
                 for parent, prop in zip(parents[1:], props[1:]):
                     setattr(parent, prop, unified)
+
+    def prepare_quantized_inputs_pass(self, graph):
+        if self.quantized_input_stats is not None:
+            assert len(self.quantized_input_stats) == len(graph.input_nodes), (
+                f"quantized_input_stats contains {len(self.quantized_input_stats)} elements, but"
+                f" {len(graph.input_nodes)} is expected"
+            )
+
+            for qstats, node in zip(self.quantized_input_stats, graph.input_nodes):
+                if qstats is not None:
+                    assert (
+                        isinstance(qstats, (list, tuple))
+                        and len(qstats) == 2
+                        and all((isinstance(q, (int, float)) for q in qstats))
+                    ), "quantized_input_stats format: [(mean_1, std_1), (mean_2, std_2), ..., (mean_n, std_n)]"
+
+                for next_node in node.next_nodes:
+                    if isinstance(next_node.module, torch_q.QuantStub):
+                        acp = getattr(next_node.module, 'activation_post_process', None)
+                        if acp is not None:
+                            if isinstance(acp, torch_q.FakeQuantizeBase):
+                                fake_quant = acp
+
+                                next_node.module.apply(torch_q.disable_observer)
+
+                                scale = torch.tensor(1.0 / qstats[1], dtype=fake_quant.scale.dtype)
+                                offset = torch.tensor(qstats[0], dtype=fake_quant.zero_point.dtype)
+
+                                fake_quant.scale.copy_(scale)
+                                fake_quant.zero_point.copy_(offset)
+
+                                quant_min = fake_quant.quant_min
+                                quant_max = fake_quant.quant_max
+
+                                observer = getattr(fake_quant, 'activation_post_process', None)
+                            elif isinstance(acp, torch_q.ObserverBase):
+                                observer = acp
+
+                                # We cannot use `disable_observer` which is designed for `FakeQuant` modules`.
+                                # Instead, we need to monkey-patch the forward function of the observer.
+                                identity = nn.Identity()
+                                observer.forward = identity.forward
+
+                                scale = torch.tensor(1.0 / qstats[1], dtype=torch.float32)
+                                offset = torch.tensor(qstats[0], dtype=torch.int32)
+
+                                quant_min = observer.quant_min
+                                quant_max = observer.quant_max
+
+                            else:
+                                continue
+
+                            if observer is not None:
+                                observer.min_val = scale * (quant_min - offset)
+                                observer.max_val = scale * (quant_max - offset)
 
     def rescale_activations_with_quant_min_max(self, quant_min: int, quant_max: int) -> None:
         """Rescales activations with provided quant_min and quant_max"""
@@ -1531,6 +1591,9 @@ class PostQuantizer(QATQuantizer):
 
         if self.disable_requantization_for_cat:
             self.disable_requantization_for_cat_pass(graph)
+
+        if self.quantized_input_stats is not None:
+            self.prepare_quantized_inputs_pass(graph)
 
         return graph.module
 
