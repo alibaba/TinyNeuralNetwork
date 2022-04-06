@@ -65,6 +65,12 @@ def main_worker(args):
     device = get_device()
     qat_model.to(device=device)
 
+    # When adapting our framework to the existing training code, please make sure that the optimizer and the
+    # lr_scheduler of the model is redefined using the weights of the new model.
+    # e.g. If you use `get_optimizer` and `get_lr_scheduler` for constructing those objects, then you may write
+    #   optimizer = get_optimizer(qat_model)
+    #   lr_scheduler = get_lr_scheduler(optimizer)
+
     context = DLContext()
     context.device = device
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)

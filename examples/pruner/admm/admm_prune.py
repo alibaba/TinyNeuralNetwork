@@ -75,6 +75,12 @@ def main_worker(args):
     )
     validate(model, context)
 
+    # When adapting our framework to the existing training code, please make sure that the optimizer and the
+    # lr_scheduler of the model is redefined using the weights of the new model.
+    # e.g. If you use `get_optimizer` and `get_lr_scheduler` for constructing those objects, then you may write
+    #   optimizer = get_optimizer(model)
+    #   lr_scheduler = get_lr_scheduler(optimizer)
+
     # fine tune
     context.max_epoch = 220
     context.criterion = nn.CrossEntropyLoss()

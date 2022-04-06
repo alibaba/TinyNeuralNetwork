@@ -79,6 +79,12 @@ def main_worker(args):
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
     validate(model, context)
 
+    # When adapting our framework to the existing training code, please make sure that the optimizer and the
+    # lr_scheduler of the model is redefined using the weights of the new model.
+    # e.g. If you use `get_optimizer` and `get_lr_scheduler` for constructing those objects, then you may write
+    #   optimizer = get_optimizer(model)
+    #   lr_scheduler = get_lr_scheduler(optimizer)
+
     # Fine tune
     context.max_epoch = 220
     context.criterion = nn.BCEWithLogitsLoss()
