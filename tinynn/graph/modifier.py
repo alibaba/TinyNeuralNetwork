@@ -1674,13 +1674,13 @@ def create_modifier(n):
 
 
 def get_subgraph(graph: TraceGraph, node: TraceNode):
-    for n in graph.forward_nodes + graph.output_nodes + graph.constant_nodes:
+    for n in graph.forward_nodes + graph.output_nodes + graph.input_nodes + graph.constant_nodes:
         setattr(n, "modifier", create_modifier(n))
 
     sub_graph = []
     node.modifier.traversal(False, True, sub_graph)
 
-    for n in graph.forward_nodes + graph.output_nodes + graph.constant_nodes:
+    for n in graph.forward_nodes + graph.output_nodes + graph.input_nodes + graph.constant_nodes:
         delattr(n, "modifier")
 
     sub_graph = sorted(sub_graph, key=lambda i: i.node.forward_order)
