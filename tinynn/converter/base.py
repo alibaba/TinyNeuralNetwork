@@ -188,7 +188,7 @@ class TFLiteConverter(object):
             isinstance(self.model, torch.jit.ScriptFunction)
             or self.model.training is False
             or str(next(self.model.graph.inputs()).type()) == '__torch__.PlaceholderModule'
-        ), 'Model is in training model'
+        ), 'Model is in training mode. Please run `model.eval()` before model conversion'
 
         graph = self.model.graph
 
