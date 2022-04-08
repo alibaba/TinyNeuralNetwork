@@ -2445,3 +2445,30 @@ class ATenCumsumOperator(ATenCumsumSchema):
         inputs = [input_tensor, dim_tensor]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
         graph_converter.add_operator(tfl.CumsumOperator(inputs, outputs))
+
+
+class ATenMeshgridOperator(ATenMeshgridSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        assert False, "aten::meshgrid for dynamic tensors is not supported"
+
+
+class ATenUnbindOperator(ATenUnbindSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        dim = self.input_tensors[1]
+        if dim < 0:
+            dim += len(self.input_tensors[0].shape)
+
+        chunks = self.input_tensors[0].shape[dim]
+        output_names = [f'{self.output_names[0]}:{i}' for i in range(chunks)]
+        graph_converter.add_iterable_pair(self.output_names, output_names, 'input')
+        outputs = self.to_tfl_tensors(output_names, self.output_tensors[0])
+
+        graph_converter.add_operator(tfl.UnpackOperator([input_tensor], outputs, chunks, dim))
