@@ -2252,7 +2252,9 @@ class TraceGraph(object):
 
         # Update previous node name for next tensors
         for t in node.next_tensors:
-            self.tensor_pre_node_dict[id(t)].replace(old_unique_name, node.unique_name)
+            self.tensor_pre_node_dict[id(t)] = self.tensor_pre_node_dict[id(t)].replace(
+                old_unique_name, node.unique_name
+            )
 
         # Update previous node name for next nodes (TraceFunction)
         for n in node.next_nodes:
