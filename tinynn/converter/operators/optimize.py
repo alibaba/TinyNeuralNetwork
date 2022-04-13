@@ -280,14 +280,23 @@ class GraphOptimizer(object):
             new_qparams = last_node['op'].outputs[0].quantization
             orig_qparams = first_node['op'].inputs[0].quantization
 
-            assert new_qparams is not None
-            assert orig_qparams is not None
+            if (
+                first_node['node_type'] == ExtendedOperator.DEQUANTIZE
+                and last_node['node_type'] == ExtendedOperator.QUANTIZE
+            ):
+                assert new_qparams is not None
+                assert orig_qparams is not None
 
-            remove_first = (
-                new_qparams.scale == orig_qparams.scale
-                and new_qparams.zero_point == orig_qparams.zero_point
-                and new_qparams.dim == orig_qparams.dim
-            )
+                remove_first = (
+                    new_qparams.scale == orig_qparams.scale
+                    and new_qparams.zero_point == orig_qparams.zero_point
+                    and new_qparams.dim == orig_qparams.dim
+                )
+            else:
+                assert new_qparams is None
+                assert orig_qparams is None
+
+                remove_first = True
 
             return remove_first, None
 
@@ -1865,6 +1874,9 @@ class GraphOptimizer(object):
             self.fuse_simple_reshape_pass()
             self.fuse_simple_transpose_pass()
 
+        # Remove consecutive dequantize and quantize nodes
+        self.fuse_dequant_quant_pass()
+
         # Fuse activation
         self.fuse_activation()
 
@@ -2244,9 +2256,17 @@ def is_dequant_quant_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
     return (
-        source_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
+        (
+            (
+                source_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
+                and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
+            )
+            or (
+                source_vertex['node_type'] == ExtendedOperator.QUANTIZE
+                and target_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
+            )
+        )
         and source_vertex.outdegree() == 1
-        and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
         and target_vertex.outdegree() >= 1
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
     )
