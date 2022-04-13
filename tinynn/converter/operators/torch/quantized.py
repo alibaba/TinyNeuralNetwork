@@ -146,7 +146,9 @@ class QuantizedCatOperator(QuantizedCatSchema):
             dim += self.input_tensors[0].ndim
 
         names = graph_converter.get_list_expanded_names(self.input_names[0])
-        inputs = self.to_tfl_tensors(names, self.input_tensors[0], graph_converter=graph_converter)
+        inputs = self.to_tfl_tensors(
+            names, self.input_tensors[0], graph_converter=graph_converter, non_existent_as_buffer=True
+        )
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
         graph_converter.add_operator(tfl.ConcatenationOperator(inputs, outputs, dim))
