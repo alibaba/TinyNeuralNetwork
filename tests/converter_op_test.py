@@ -2957,6 +2957,58 @@ class ConverterOPTester(unittest.TestCase):
 
         assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
+    def test_group_conv(self):
+        dummy_input = torch.randn(1, 4, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.Conv2d(4, 8, 3, groups=2)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, group_conv_rewrite=True)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
+    def test_group_conv_no_bias(self):
+        dummy_input = torch.randn(1, 4, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.Conv2d(4, 8, 3, groups=2, bias=False)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, group_conv_rewrite=True)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
     def test_conv_transpose(self):
         dummy_input = torch.randn(1, 16, 50, 100, dtype=torch.float32)
 
@@ -4190,6 +4242,56 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         model_path = get_model_path()
 
         converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256, check_stride=False)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
+    def test_quantized_conv2d_with_group(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.Conv2d(4, 4, 1, groups=2)
+
+            def forward(self, x):
+                return self.q_func(x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 4, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, group_conv_rewrite=True)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256, check_stride=False)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
+    def test_quantized_conv2d_with_group_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.Conv2d(4, 4, 1, groups=2)
+
+            def forward(self, x):
+                return self.q_func(x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 4, 224, 224), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(
+            model, dummy_input, model_path, nchw_transpose=False, group_conv_rewrite=True, quantize_target_type='int8'
+        )
         converter.convert()
 
         dummy_output = u8_to_s8(model(dummy_input))
