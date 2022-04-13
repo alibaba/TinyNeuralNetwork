@@ -269,9 +269,9 @@ class GraphOptimizer(object):
         elinimate_sequences(self.graph, filtered_pairs, _remove_first_pred, _remove_first_action)
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
-    def fuse_dequant_quant_pass(self):
+    def fuse_dequant_quant_pass(self, q_first):
         edges = self.graph.graph.es.select(
-            functools.partial(is_dequant_quant_fusable_edge, graph_converter=self.graph.graph)
+            functools.partial(is_dequant_quant_fusable_edge, graph_converter=self.graph.graph, q_first=q_first)
         )
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
 
@@ -1810,7 +1810,7 @@ class GraphOptimizer(object):
             self.fold_transpose_buffer()
 
         # Remove consecutive dequantize and quantize nodes
-        self.fuse_dequant_quant_pass()
+        self.fuse_dequant_quant_pass(q_first=False)
 
         # OP fusion passes before transformation
         self.fuse_conv_fc_bn()
@@ -1875,7 +1875,7 @@ class GraphOptimizer(object):
             self.fuse_simple_transpose_pass()
 
         # Remove consecutive dequantize and quantize nodes
-        self.fuse_dequant_quant_pass()
+        self.fuse_dequant_quant_pass(q_first=True)
 
         # Fuse activation
         self.fuse_activation()
@@ -2252,20 +2252,24 @@ def is_transpose_branch_edge(edge: ig.Edge, graph_converter: ig.Graph):
     )
 
 
-def is_dequant_quant_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
+def is_dequant_quant_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph, q_first: np.bool):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
-    return (
-        (
-            (
-                source_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
-                and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
-            )
-            or (
-                source_vertex['node_type'] == ExtendedOperator.QUANTIZE
-                and target_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
-            )
+
+    if q_first:
+        cond = (
+            source_vertex['node_type'] == ExtendedOperator.QUANTIZE
+            and target_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
         )
+
+    else:
+        cond = (
+            source_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
+            and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
+        )
+
+    return (
+        cond
         and source_vertex.outdegree() == 1
         and target_vertex.outdegree() >= 1
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
