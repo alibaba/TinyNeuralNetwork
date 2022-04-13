@@ -257,7 +257,10 @@ class GenericConvOperator(TransformableOperator):
                 assert False, "Only DepthwiseConv1d/2d is supported"
         else:
             if input_tensor.shape[1] != weight_tensor.shape[1]:
-                warnings.warn('Group conv is not supported if official tflite interpreter is used')
+                warnings.warn(
+                    'Group conv is not supported if official tflite interpreter is used. If that is the case for you,'
+                    ' plese pass in `group_conv_rewrite=True`.'
+                )
             if weight_dim == 4:
                 conv_op = tfl_ops.Conv2dOperator(
                     self.inputs,

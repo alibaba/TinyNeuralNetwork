@@ -38,6 +38,7 @@ class TFLiteConverter(object):
         hybrid_asymmetric_inputs: bool = True,
         fuse_quant_dequant: bool = False,
         gc_when_reload: bool = False,
+        group_conv_rewrite: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -64,6 +65,7 @@ class TFLiteConverter(object):
             hybrid_asymmetric_inputs (bool): Prefer asymmetric inputs while performing hybrid quantization
             fuse_quant_dequant (bool): Remove quant and dequant nodes directly connected to i/o nodes. Defaults to False
             gc_when_reload (bool): Apply GC when reloading the torchscript into memory
+            group_conv_rewrite (bool): Rewriting for group convolution. Defaults to False
         """
 
         self.model = model
@@ -100,6 +102,7 @@ class TFLiteConverter(object):
         self.hybrid_asymmetric_inputs = hybrid_asymmetric_inputs
         self.fuse_quant_dequant = fuse_quant_dequant
         self.gc_when_reload = gc_when_reload
+        self.group_conv_rewrite = group_conv_rewrite
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -368,7 +371,9 @@ class TFLiteConverter(object):
             log.error(f'Unsupported ops: {", ".join(unsupported_ops)}')
             raise Exception("Cannot continue due to fatal error")
         else:
-            optimizer = GraphOptimizer(self.common_graph, self.optimize, self.fuse_quant_dequant)
+            optimizer = GraphOptimizer(
+                self.common_graph, self.optimize, self.fuse_quant_dequant, self.group_conv_rewrite
+            )
             optimizer.optimize()
 
             self.output_transpose = self.common_graph.output_transpose
