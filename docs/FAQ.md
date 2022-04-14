@@ -134,8 +134,11 @@ export_converter_files(model, dummy_input, export_dir, export_name)
 ````
 Executing this code, you'll get two files in the specified directory, including the TorchScript model (.pt) and the input and output description files (.json). These two files can be shared with developers for debugging.
 
-#### Why is the input shape different from the original?
-Generally, for a vision model, the memory layout of the input data used by PyTorch is NCHW, and on the embedded device side, the layout of the supported image data is usually NHWC. Therefore, the 4-dimensional input is transformed by default. If you do not need this behaviour, you can add the parameter `input_transpose=False` when defining TFLiteConverter.
+#### Why is the input/output tensor shape different from the one in the original model?
+Generally, for a vision model, the memory layout of the input data used by PyTorch is NCHW, and on the embedded device side, the layout of the supported image data is usually NHWC. Therefore, the 4-dimensional input and output is transformed by default. If you do not need this behaviour, you can add the parameter `nchw_transpose=False` (or `input_transpose=False` and `output_transpose=False`) when defining TFLiteConverter.
+
+#### Why the converted model with grouped convolution does not work?
+Since TFLite does not officially support grouped convolution, we have extended the implementation of grouped convolution internally based on the `CONV_2D` operator. To generate a standard TFLite model, you can add the parameter `group_conv_rewrite=True` when defining TFLiteConverter.
 
 #### How to convert a model with LSTM?
 Since the target format of our conversion is TFLite, we need to understand how LSTM works in PyTorch and Tensorflow respectively.
