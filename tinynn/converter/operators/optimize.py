@@ -1033,6 +1033,10 @@ class GraphOptimizer(object):
                     new_weight = self.create_transform_tensor(np.transpose(old_weight, new_perm))
                     self.graph.add_operator(tfl.TransposeOperator([op.inputs[1], new_perm_t], [new_weight]))
                     actions.append((self.graph.replace_operator_input, (node, 1, new_weight, True)))
+            elif node['node_type'] in (ExtendedOperator.SLICE, ExtendedOperator.STRIDED_SLICE):
+                for i, t in enumerate(op.inputs[1:]):
+                    new_t = self.create_attr_tensor(t.tensor[inv_perm_arr])
+                    actions.append((self.graph.replace_operator_input, (node, i + 1, new_t, True)))
 
             for edge in next_edges:
                 source = tensor_node_dict[edge['name']]
@@ -1237,6 +1241,39 @@ class GraphOptimizer(object):
                     new_weight = self.create_transform_tensor(np.reshape(old_weight, new_shape))
                     self.graph.add_operator(tfl.ReshapeOperator([op.inputs[1], new_shape_t], [new_weight], new_shape))
                     actions.append((self.graph.replace_operator_input, (node, 1, new_weight, True)))
+            elif node['node_type'] == ExtendedOperator.SLICE:
+                new_dim = prev_shape.index(-1)
+                old_dim = next_shape.index(-1)
+
+                new_start = np.zeros(len(prev_shape), dtype='int32')
+                new_start[new_dim] = op.inputs[1][old_dim]
+                new_start_t = self.create_attr_tensor(new_start)
+
+                new_size = np.array(prev_shape, dtype='int32')
+                new_size[new_dim] = op.inputs[2][old_dim]
+                new_size_t = self.create_attr_tensor(new_size)
+
+                actions.append((self.graph.replace_operator_input, (node, 1, new_start_t, True)))
+                actions.append((self.graph.replace_operator_input, (node, 2, new_size_t, True)))
+            elif node['node_type'] == ExtendedOperator.STRIDED_SLICE:
+                new_dim = prev_shape.index(-1)
+                old_dim = next_shape.index(-1)
+
+                new_start = np.zeros(len(prev_shape), dtype='int32')
+                new_start[new_dim] = op.inputs[1][old_dim]
+                new_start_t = self.create_attr_tensor(new_start)
+
+                new_end = np.array(prev_shape, dtype='int32')
+                new_end[new_dim] = op.inputs[2][old_dim]
+                new_end_t = self.create_attr_tensor(new_end)
+
+                new_stride = np.ones(len(prev_shape), dtype='int32')
+                new_stride[new_dim] = op.inputs[3][old_dim]
+                new_stride_t = self.create_attr_tensor(new_stride)
+
+                actions.append((self.graph.replace_operator_input, (node, 1, new_start_t, True)))
+                actions.append((self.graph.replace_operator_input, (node, 2, new_end_t, True)))
+                actions.append((self.graph.replace_operator_input, (node, 3, new_stride_t, True)))
             elif dim_indice is not None:
                 raise NotImplementedError(f'{node["node_type"]} has the property `dims` but is not handled')
 
@@ -2062,6 +2099,13 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.LOG_SOFTMAX,
         ExtendedOperator.HARD_SWISH,
         ExtendedOperator.LEAKY_RELU,
+        ExtendedOperator.SPLIT,
+        ExtendedOperator.SPLIT_V,
+        ExtendedOperator.PAD,
+        ExtendedOperator.PADV2,
+        ExtendedOperator.MIRROR_PAD,
+        ExtendedOperator.SLICE,
+        ExtendedOperator.STRIDED_SLICE,
     ) or (
         op_code
         in (
@@ -2087,15 +2131,6 @@ def is_elementwise_binary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         )
         and len(op.inputs) >= 2
         and op.inputs[0].tensor.ndim == op.inputs[1].tensor.ndim
-    ) or (
-        op_code
-        in (
-            ExtendedOperator.SPLIT,
-            ExtendedOperator.SPLIT_V,
-            ExtendedOperator.PAD,
-            ExtendedOperator.PADV2,
-            ExtendedOperator.MIRROR_PAD,
-        )
     )
 
 
@@ -2359,6 +2394,14 @@ def op_input_dims(op: tfl.BaseOperator):
         nonzero_idx = np.nonzero(w_shape != 1)[0]
         if nonzero_idx.size == 1:
             dim_indices = nonzero_idx[0] + 1
+    elif isinstance(op, (tfl.SliceOperator, tfl.StridedSliceOperator)):
+        old_shape = np.array(op.inputs[0].shape)
+        new_shape = np.array(op.outputs[0].shape)
+        diff = new_shape - old_shape
+        nonzero_idx = np.nonzero(diff)[0]
+        # TODO: support multi indices
+        if nonzero_idx.size == 1:
+            dim_indices = nonzero_idx[0]
     return dim_indices
 
 
