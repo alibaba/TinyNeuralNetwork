@@ -10,9 +10,9 @@ import unittest
 import numpy as np
 
 from tinynn.graph.tracer import patch_helper, trace, tracer_context, model_tracer
-import models
 
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
+from common_utils import IS_CI
 
 
 def import_from(module, name):
@@ -30,7 +30,9 @@ def transform_output(output):
     return new_output
 
 
-BLACKLIST = ()
+BLACKLIST = ('vit_b_16', 'vit_b_32', 'vit_l_16', 'vit_l_32')
+
+CI_BLACKLIST = ('convnext_base', 'convnext_large', 'regnet_y_128gf')
 
 
 class TestModelMeta(type):
@@ -51,6 +53,9 @@ class TestModelMeta(type):
 
             if model_name in BLACKLIST:
                 raise unittest.SkipTest('IN BLACKLIST')
+
+            if IS_CI and model_name in CI_BLACKLIST:
+                raise unittest.SkipTest('IN CI BLACKLIST')
 
             with model_tracer():
                 m = model_class()

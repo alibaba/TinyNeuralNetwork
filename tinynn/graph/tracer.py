@@ -127,6 +127,7 @@ creation_funcs_overrided = GlobalData(False)
 
 # Lock for tracing
 lock = GlobalData(False)
+handle_func_lock = GlobalData(False)
 
 # Whether the constructors get traced
 module_constructor_traced = set()
@@ -635,6 +636,17 @@ def no_catch():
         lock(False)
 
 
+@contextlib.contextmanager
+def no_catch_handle_func():
+    """Context manager for tracing nodes. Use it to avoid hacking into handle_torch_function recursively."""
+    if handle_func_lock():
+        yield False
+    else:
+        handle_func_lock(True)
+        yield True
+        handle_func_lock(False)
+
+
 def args_as_string(args, kwargs):
     """String representation of the args and the keyword args"""
     cleaned_args = [f'"{arg}"' if type(arg) == str else str(arg) for arg in args]
@@ -813,20 +825,27 @@ def new_init_gen(orig_init, key: str):
                     )
                 log.debug(f'{key} in with block, lock: {lock}')
 
-                rckwa = check_types(kwargs.values())
-                rca = check_types(args)
-                err_type = rca or rckwa
-                if err_type:
-                    log.warning(
-                        f'Constructor of {class_fullname} has arguments of type {err_type} which is unsupported'
-                    )
-                    log.warning(f'  Args: {args}')
-                    log.warning(f'  Keyword args: {kwargs}')
+                actual_class_name = qualified_name(type(obj))
+                if actual_class_name == class_fullname:
+                    rckwa = check_types(kwargs.values())
+                    rca = check_types(args)
+                    err_type = rca or rckwa
+                    if err_type:
+                        log.warning(
+                            f'Constructor of {class_fullname} has arguments of type {err_type} which is unsupported'
+                        )
+                        log.warning(f'  Args: {args}')
+                        log.warning(f'  Keyword args: {kwargs}')
+                        module_constructor_traced.remove(id(obj))
+                    else:
+                        log.info(f'Constructor of {class_fullname} registered')
+                        full_args_content = args_as_string(args, kwargs)
+                        orig_constructor_line = f'{class_fullname}({full_args_content})'
+                        module_constructor_lines[id(obj)] = orig_constructor_line
                 else:
-                    log.info(f'Constructor of {class_fullname} registered')
-                    full_args_content = args_as_string(args, kwargs)
-                    orig_constructor_line = f'{class_fullname}({full_args_content})'
-                    module_constructor_lines[id(obj)] = orig_constructor_line
+                    module_constructor_traced.remove(id(obj))
+                    if not actual_class_name.startswith('torch.'):
+                        log.warning(f'Constructor of class {actual_class_name} is not captured')
             orig_init(obj, *args, **kwargs)
         log.debug(f'{key} after with block, lock: {lock}')
 
@@ -898,7 +917,8 @@ def new_has_torch_func_gen(orig_func, key: str, is_class: bool):
     log.debug(f'registered has torch func wrapper: {key}')
 
     def new_func(*args, **kwargs):
-        return (not lock()) or orig_func(*args, **kwargs)
+        with no_catch_handle_func() as res:
+            return (res and not lock()) or orig_func(*args, **kwargs)
 
     return new_func
 
@@ -911,7 +931,8 @@ def new_handle_func_gen(orig_func, key: str, is_class: bool):
         if lock():
             return orig_func(func, tracked_args, *args, **kwargs)
         else:
-            return func(*args, **kwargs)
+            with no_catch_handle_func():
+                return func(*args, **kwargs)
 
     return new_func
 
@@ -1376,15 +1397,16 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
     for i, t in enumerate(output_tensors):
         if isinstance(t, (list, tuple)):
             for j, rt in enumerate(t):
-                assert type(rt) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), (
-                    f'Output [{i}][{j}] of {node.unique_name}({node.type()}) should be one of the following type       '
-                    f'              [torch.dtype, torch.device, torch.Size, torch.Tensor], but got {type(rt)}'
-                )
-                current_graph().tensor_pre_node_dict[id(rt)] = node.unique_name
-                if need_idx:
-                    log.debug(f'set pre_index tensor {i}, {j}')
-                    current_graph().tensor_pre_index_dict[id(rt)] = [i, j]
-        else:
+                if t is not None:
+                    assert type(rt) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), (
+                        f'Output [{i}][{j}] of {node.unique_name}({node.type()}) should be one of the following type   '
+                        f'                  [torch.dtype, torch.device, torch.Size, torch.Tensor], but got {type(rt)}'
+                    )
+                    current_graph().tensor_pre_node_dict[id(rt)] = node.unique_name
+                    if need_idx:
+                        log.debug(f'set pre_index tensor {i}, {j}')
+                        current_graph().tensor_pre_index_dict[id(rt)] = [i, j]
+        elif t is not None:
             assert type(t) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), (
                 f'Output #{i} of {node.unique_name}({node.type()}) should be one of the following type                '
                 f' [torch.dtype, torch.device, torch.Size, torch.Tensor], but got {type(t)}'
@@ -1402,22 +1424,12 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
 def hook_modules(module):
     """Temporarily adds the hooks to a `nn.Module` for tracing"""
     hooks = []
+    module_forward_mapping = []
 
     def register_submodule_tracer(module):
         def _submodule_pre_tracer(module, input):
             log.debug(f'pre tracer in _submodule_pre_tracer in {type(module).__name__}')
             lock(True)
-
-        def _submodule_tracer(module, inputs, outputs):
-            log.debug(f'tracer in _submodule_tracer in {type(module).__name__}')
-            lock(False)
-            node = TraceNode(module)
-            modified_outputs = noop_handler(node, inputs, outputs)
-            if modified_outputs is None:
-                add_forward_node(node, inputs, outputs)
-            else:
-                add_forward_node(node, inputs, modified_outputs)
-            return modified_outputs
 
         module_unique_name = current_graph().module_unique_name_dict[id(module)]
         if module_unique_name in current_graph().traced_modules:
@@ -1439,7 +1451,30 @@ def hook_modules(module):
 
         if related:
             hooks.append(module.register_forward_pre_hook(_submodule_pre_tracer))
-            hooks.append(module.register_forward_hook(_submodule_tracer))
+
+            old_forward = module.forward
+            module_forward_mapping.append((module, old_forward))
+
+            def forward_tracer(*inputs, **kwargs):
+                log.debug(f'tracer in _submodule_tracer in {type(module).__name__}')
+                outputs = old_forward(*inputs, **kwargs)
+                lock(False)
+                node = TraceNode(module)
+                new_inputs = list(inputs)
+                for _, v in kwargs.items():
+                    if isinstance(v, torch.Tensor):
+                        new_inputs.append(v)
+                    elif isinstance(v, (list, tuple)):
+                        new_inputs.extend(v)
+                modified_outputs = noop_handler(node, new_inputs, outputs)
+                if modified_outputs is None:
+                    add_forward_node(node, new_inputs, outputs)
+                    return outputs
+                else:
+                    add_forward_node(node, new_inputs, modified_outputs)
+                    return modified_outputs
+
+            module.forward = forward_tracer
 
         current_graph().traced_modules.append(module_unique_name)
         return None
@@ -1495,6 +1530,9 @@ def hook_modules(module):
     hooks.append(module.register_forward_hook(_model_tracer))
 
     yield module
+
+    for mod, forward_func in module_forward_mapping:
+        mod.forward = forward_func
 
     for hook in hooks:
         hook.remove()
@@ -2091,7 +2129,6 @@ class TraceGraph(object):
         for idx in range(len(next_node.prev_nodes)):
             if next_node.prev_nodes[idx] == prev_node:
                 next_node.prev_nodes[idx] = new_node
-                break
 
         # Update tensors in output nodes
         index_mapping = []
@@ -2119,8 +2156,8 @@ class TraceGraph(object):
                 prev_unique_name = tensor_name_from_parts(old_unique_name, old_idx, is_constant_node)
                 next_unique_name = tensor_name_from_parts(new_node.unique_name, new_idx, is_new_constant_node)
                 log.debug('tensor rename: ', prev_unique_name, '->', next_unique_name)
-                n.module.replace_tensor_name(prev_unique_name, next_unique_name)
-                n.module.update_args_string()
+                next_node.module.replace_tensor_name(prev_unique_name, next_unique_name)
+                next_node.module.update_args_string()
 
     def insert_before(
         self,
@@ -2170,7 +2207,6 @@ class TraceGraph(object):
             if not rev_mode:
                 new_node.prev_nodes.extend(node.prev_nodes)
             else:
-                print(new_node.unique_name, node.prev_nodes[idx].unique_name)
                 new_node.prev_nodes.append(node.prev_nodes[idx])
             new_node.next_nodes.append(node)
 
@@ -2243,6 +2279,12 @@ class TraceGraph(object):
         is_new_constant_node = type(module) == ConstantNode
         node.unique_name = self.module_unique_name_dict[id(module)]
 
+        # Drop original module constructor line
+        if id(node.module) in module_constructor_lines:
+            if id(node.module) in module_constructor_traced:
+                module_constructor_traced.remove(id(node.module))
+            del module_constructor_lines[id(node.module)]
+
         # Update module for node
         node.module = module
 
@@ -2290,6 +2332,11 @@ class TraceGraph(object):
                     name = node.unique_name
                     del self.nodes_map[name]
                     self.forward_nodes.remove(node)
+
+                    if id(node.module) in module_constructor_lines:
+                        if id(node.module) in module_constructor_traced:
+                            module_constructor_traced.remove(id(node.module))
+                        del module_constructor_lines[id(node.module)]
 
                 node = nodes[0]
 
@@ -2377,7 +2424,6 @@ class TraceGraph(object):
             for i, pn in enumerate(n.prev_nodes):
                 if pn == node:
                     n.prev_nodes[i] = prev_node
-                    break
             # Handle previous tensors
             for i, pt in enumerate(n.prev_tensors):
                 if pt in tensor_dict:
@@ -2399,6 +2445,11 @@ class TraceGraph(object):
         # Remove this node
         self.forward_nodes.remove(node)
         del self.nodes_map[node.unique_name]
+
+        if id(node.module) in module_constructor_lines:
+            if id(node.module) in module_constructor_traced:
+                module_constructor_traced.remove(id(node.module))
+            del module_constructor_lines[id(node.module)]
 
 
 def load_overridable_modules():

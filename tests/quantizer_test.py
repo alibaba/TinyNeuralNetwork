@@ -44,21 +44,21 @@ def check_quantize_rewrite(model, inputs, show_rewritten=True):
         quantizer = QATQuantizer(model, inputs, work_dir='out', config=config)
         qat_model = quantizer.quantize()
 
-        if show_rewritten:
-            show_source(qat_model, 'Rewritten:')
+    if show_rewritten:
+        show_source(qat_model, 'Rewritten:')
 
-        for _ in range(3):
-            if isinstance(inputs, (list, tuple)):
-                qat_model(*inputs)
-            else:
-                qat_model(inputs)
+    for _ in range(3):
+        if isinstance(inputs, (list, tuple)):
+            qat_model(*inputs)
+        else:
+            qat_model(inputs)
 
-        with torch.no_grad():
-            qat_model.eval()
+    with torch.no_grad():
+        qat_model.eval()
 
-            qat_model = torch.quantization.convert(qat_model)
+        qat_model = torch.quantization.convert(qat_model)
 
-            torch.jit.trace(qat_model, inputs)
+        torch.jit.trace(qat_model, inputs)
 
 
 class QuantizerTester(unittest.TestCase):

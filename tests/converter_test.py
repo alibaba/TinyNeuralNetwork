@@ -80,6 +80,7 @@ BLACKLIST = (
     'regnet_y_400mf',
     'regnet_y_800mf',
     'regnet_y_8gf',
+    'regnet_y_128gf',
 )
 
 
