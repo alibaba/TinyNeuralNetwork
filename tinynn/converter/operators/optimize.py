@@ -34,13 +34,16 @@ class GraphOptimizer(object):
     BRANCH_OPTIMIZE_EXTENDED: int = 5
     ALL_OPTIMIZE: int = 5
 
-    def __init__(self, graph: CommonGraph, level: int, fuse_quant: bool, group_conv_rewrite: bool) -> None:
+    def __init__(
+        self, graph: CommonGraph, level: int, fuse_quant: bool, group_conv_rewrite: bool, rewrite_quantizable: bool
+    ) -> None:
         self.graph = graph
         self.fuse_tensor_count = 0
         self.fuse_attr_count = 0
         self.level = level
         self.fuse_quant = fuse_quant
         self.group_conv_rewrite = group_conv_rewrite
+        self.rewrite_quantizable = rewrite_quantizable
 
     def create_attr_tensor(
         self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
@@ -810,6 +813,150 @@ class GraphOptimizer(object):
             new_shape = self.create_attr_tensor(old_shape[inv_post_perm_arr])
             actions.append((self.graph.replace_operator_input, (node, 1, new_shape, True)))
             op.newShape = new_shape.tensor
+
+            for edge in next_edges:
+                source = tensor_node_dict[edge['name']]
+                self.graph.graph.add_edge(source, edge.target_vertex, name=edge['name'], label=edge['name'])
+
+        # Process actions
+        ids = []
+        for func, args in actions:
+            node = args[0]
+            res = func(*args)
+            if res is not None:
+                ids.extend(res)
+
+        remove_edges = list(set(remove_edges + ids))
+
+        self.graph.graph.delete_edges(remove_edges)
+        self.graph.graph.delete_vertices(remove_vertices)
+
+    @class_conditional(lambda self: self.rewrite_quantizable)
+    def elementwise_op_quantize_passthrough_pass(self):
+        edges = self.graph.graph.es.select(
+            functools.partial(is_quantize_elementwise_op_edge, graph_converter=self.graph.graph)
+        )
+        pairs = ((self.graph.graph.vs[edge.source], self.graph.graph.vs[edge.target]) for edge in edges)
+        filtered_nodes = (k[0] if k[0]['node_type'] != ExtendedOperator.DEQUANTIZE else k[1] for k in pairs)
+        unique_nodes = list(set(filtered_nodes))
+
+        actions = []
+        remove_edges = []
+        remove_vertices = []
+        for node in unique_nodes:
+            op = node['op']
+            input_indices = op_input_indices(op)
+
+            prev_nodes = []
+            q_tensors = dict()
+            prev_output_indices = []
+            for i in input_indices:
+                prev_node_name = op.inputs[i].name
+                prev_node = self.graph.graph.vs.find(name=self.graph.tensor_node_map[prev_node_name])
+                prev_nodes.append(prev_node)
+                prev_output_indices.append(prev_node['outputs'].index(prev_node_name))
+
+                if prev_node['node_type'] == ExtendedOperator.DEQUANTIZE:
+                    q_tensors[prev_node_name] = prev_node['op'].inputs[0]
+
+            next_nodes = []
+            next_edges = []
+            out_nodes = []
+            for edge in node.out_edges():
+                if edge.index in remove_edges:
+                    continue
+                next_node = self.graph.graph.vs[edge.target]
+
+                if next_node['node_type'] == ExtendedOperator.OUTPUT_NODE:
+                    out_nodes.append(next_node)
+                else:
+                    next_nodes.append(next_node)
+                    next_edges.append(edge)
+
+                if next_node['node_type'] == ExtendedOperator.QUANTIZE:
+                    skip = False
+                    name = next_node['op'].inputs[0].name
+                    q_tensor = next_node['op'].outputs[0]
+                    assert q_tensor.quantization is not None
+                    if node['node_type'] == ExtendedOperator.BATCH_MATMUL:
+                        if q_tensor.dtype not in (np.dtype('int8'), np.dtype('int16')):
+                            skip = True
+                    if node['node_type'] == ExtendedOperator.SOFTMAX:
+                        if q_tensor.dtype == np.dtype('int8'):
+                            if (
+                                abs(q_tensor.quantization.scale - 1.0 / 256) > 0.001 * 1.0 / 256
+                                or q_tensor.quantization.zero_point != -128
+                            ):
+                                skip = True
+                        elif q_tensor.dtype == np.dtype('int16'):
+                            if (
+                                abs(q_tensor.quantization.scale - 1.0 / 32768) > 0.001 * 1.0 / 32768
+                                or q_tensor.quantization.zero_point != 0
+                            ):
+                                skip = True
+                        else:
+                            skip = True
+                    elif node['node_type'] == ExtendedOperator.LOG_SOFTMAX:
+                        if q_tensor.dtype == np.dtype('int8'):
+                            if q_tensor.quantization.scale != 16.0 / 256 or q_tensor.quantization.zero_point != 127:
+                                skip = True
+                        elif q_tensor.dtype == np.dtype('uint8'):
+                            if q_tensor.quantization.scale != 16.0 / 256 or q_tensor.quantization.zero_point != 255:
+                                skip = True
+                        else:
+                            skip = True
+
+                    if not skip:
+                        q_tensors[name] = q_tensor
+
+            cur_transpose_size = len(q_tensors)
+            new_transpose_size = len(prev_nodes) + len(next_nodes)
+
+            # Skip if the number of [de]quantize nodes is not decreasing
+            if len(next_nodes) == 0 or new_transpose_size > cur_transpose_size:
+                continue
+
+            remove_edges.extend([x.index for x in next_edges])
+            remove_vertices.extend([x.index for x in out_nodes])
+
+            for n in out_nodes:
+                del self.graph.tensor_map[n['outputs'][0]]
+                del self.graph.tensor_node_map[n['outputs'][0]]
+
+            tensor_node_dict = {}
+            for prev_node, prev_idx, next_idx in zip(prev_nodes, input_indices, prev_output_indices):
+                prev_op = prev_node['op']
+                prev_out = prev_op.outputs[next_idx]
+                if prev_out.name in tensor_node_dict:
+                    prev_new_out, skip = tensor_node_dict[prev_out.name]
+                    actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True, skip)))
+                    skip += 1
+                    tensor_node_dict[prev_out.name] = (prev_new_out, skip)
+                else:
+                    prev_new_out = self.create_transform_tensor(
+                        q_tensors[prev_out.name].tensor, quantization=q_tensors[prev_out.name].quantization
+                    )
+                    tensor_node_dict[prev_out.name] = (prev_new_out, 1)
+                    self.graph.add_operator(tfl.QuantizeOperator([prev_out], [prev_new_out]))
+                    actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
+
+            tensor_node_dict = {}
+            for i, op_out in enumerate(op.outputs):
+                new_out = self.create_transform_tensor(
+                    q_tensors[op_out.name].tensor, quantization=q_tensors[op_out.name].quantization
+                )
+
+                # Update relations
+                if op_out.name in self.graph.tensor_node_map:
+                    del self.graph.tensor_node_map[op_out.name]
+                self.graph.tensor_node_map[new_out.name] = node['name']
+                self.graph.tensor_map[new_out.name] = new_out
+                node['outputs'][i] = new_out.name
+                op.outputs[i] = new_out
+
+                self.graph.add_operator(tfl.DequantizeOperator([new_out], [op_out]))
+
+                tensor_node_dict[op_out.name] = self.graph.graph.vs.find(name=self.graph.tensor_node_map[op_out.name])
 
             for edge in next_edges:
                 source = tensor_node_dict[edge['name']]
@@ -1846,6 +1993,9 @@ class GraphOptimizer(object):
             self.fold_reshape_buffer()
             self.fold_transpose_buffer()
 
+        # Map quantizable ops to quantized kernels
+        self.elementwise_op_quantize_passthrough_pass()
+
         # Remove consecutive dequantize and quantize nodes
         self.fuse_dequant_quant_pass(q_first=False)
 
@@ -2010,6 +2160,21 @@ def is_multi_output_op_node(vertex: ig.Vertex, graph_converter: ig.Graph):
     return vertex['node_type'] >= 0 and len(vertex['outputs']) > 1 and vertex.outdegree() > 0
 
 
+def is_quantize_elementwise_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+    return (
+        (
+            source_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
+            and is_quantizable_rewrite_op(target_vertex['node_type'], target_vertex['op'])
+        )
+        or (
+            target_vertex['node_type'] == ExtendedOperator.QUANTIZE
+            and is_quantizable_rewrite_op(source_vertex['node_type'], source_vertex['op'])
+        )
+    ) and target_vertex['op'].inputs[0].name in source_vertex['outputs']
+
+
 def is_transpose_reshape_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
@@ -2116,6 +2281,14 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         )
         and len(op.inputs) == 2
         and op.inputs[1].tensor.ndim == 1
+    )
+
+
+def is_quantizable_rewrite_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
+    return op_code in (
+        ExtendedOperator.BATCH_MATMUL,
+        ExtendedOperator.SOFTMAX,
+        ExtendedOperator.LOG_SOFTMAX,
     )
 
 
@@ -2410,6 +2583,8 @@ def op_input_indices(op: tfl.BaseOperator):
         input_indices = range(len(op.inputs))
     elif isinstance(op, tfl.SplitOperator):
         input_indices = (1,)
+    elif isinstance(op, tfl.BatchMatmulOperator):
+        input_indices = range(2)
     elif isinstance(op, (tfl.AddOperator, tfl.SubOperator, tfl.MulOperator, tfl.DivOperator)):
         if len(op.inputs[1].shape) != 1:
             input_indices = range(2)

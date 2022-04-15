@@ -1388,6 +1388,61 @@ class ConverterOptimizerQuantizedTester(unittest.TestCase):
         )
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
+    def test_quantizable_rewrite(self):
+        class TestModel(nn.Module):
+            def forward(self, x, y):
+                x = torch.quantize_per_tensor(x, 0.5, 128, torch.quint8)
+                y = torch.quantize_per_tensor(y, 0.5, 128, torch.quint8)
+                x = x.dequantize()
+                y = y.dequantize()
+                z = torch.matmul(x, y)
+                z = torch.quantize_per_tensor(z, 0.5, 128, torch.quint8)
+                z = z.dequantize()
+                return z
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = (torch.randn(1, 3, 10), torch.randn(1, 10, 3))
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(
+            model, dummy_input, model_path, quantize_target_type='int8', rewrite_quantizable=True
+        )
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 4)
+        self.assertIn(
+            tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(),
+            (
+                tflite.BuiltinOperator.DEQUANTIZE,
+                tflite.BuiltinOperator.QUANTIZE,
+                tflite.BuiltinOperator.BATCH_MATMUL,
+            ),
+        )
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 4)
+        self.assertEqual(
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(0).OpcodeIndex()).DeprecatedBuiltinCode(),
+            tflite.BuiltinOperator.QUANTIZE,
+        )
+        self.assertEqual(
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(1).OpcodeIndex()).DeprecatedBuiltinCode(),
+            tflite.BuiltinOperator.QUANTIZE,
+        )
+        self.assertEqual(
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(2).OpcodeIndex()).DeprecatedBuiltinCode(),
+            tflite.BuiltinOperator.BATCH_MATMUL,
+        )
+        self.assertEqual(
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(3).OpcodeIndex()).DeprecatedBuiltinCode(),
+            tflite.BuiltinOperator.DEQUANTIZE,
+        )
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

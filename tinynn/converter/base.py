@@ -39,6 +39,7 @@ class TFLiteConverter(object):
         fuse_quant_dequant: bool = False,
         gc_when_reload: bool = False,
         group_conv_rewrite: bool = False,
+        rewrite_quantizable: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -66,6 +67,8 @@ class TFLiteConverter(object):
             fuse_quant_dequant (bool): Remove quant and dequant nodes directly connected to i/o nodes. Defaults to False
             gc_when_reload (bool): Apply GC when reloading the torchscript into memory
             group_conv_rewrite (bool): Rewriting for group convolution. Defaults to False
+            rewrite_quantizable (bool): Rewriting quantizable ops (e.g. BATCH_MATMUL, SOFTMAX, LOG_SOFTMAX) \
+                to use quantized kernels. Defaults to False
         """
 
         self.model = model
@@ -103,6 +106,7 @@ class TFLiteConverter(object):
         self.fuse_quant_dequant = fuse_quant_dequant
         self.gc_when_reload = gc_when_reload
         self.group_conv_rewrite = group_conv_rewrite
+        self.rewrite_quantizable = rewrite_quantizable
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -372,7 +376,11 @@ class TFLiteConverter(object):
             raise Exception("Cannot continue due to fatal error")
         else:
             optimizer = GraphOptimizer(
-                self.common_graph, self.optimize, self.fuse_quant_dequant, self.group_conv_rewrite
+                self.common_graph,
+                self.optimize,
+                self.fuse_quant_dequant,
+                self.group_conv_rewrite,
+                self.rewrite_quantizable,
             )
             optimizer.optimize()
 
