@@ -1233,6 +1233,9 @@ class QATQuantizer(object):
                     'instance_norm',
                     'softmax',
                     'log_softmax',
+                    'mm',
+                    'matmul',
+                    'bmm',
                 )
             else:
                 if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
