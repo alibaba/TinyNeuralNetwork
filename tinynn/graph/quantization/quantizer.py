@@ -1436,11 +1436,15 @@ class QATQuantizer(object):
             threshold (float): The threshold of SQNR. Defaults to 20.0
         """
 
+        if isinstance(qat_model, DataParallel) or isinstance(qat_model, DistributedDataParallel):
+            model = qat_model.module
+        else:
+            model = qat_model
+
         modules_list = {}
         names_list = {}
 
         float_results = {}
-        quantized_results = {}
         hooks = []
 
         def forward_hook(module, input, output):
@@ -1449,7 +1453,7 @@ class QATQuantizer(object):
 
         fake_quant_enabled_dict = {}
         observer_enabled_dict = {}
-        for n, m in qat_model.named_modules():
+        for n, m in model.named_modules():
             if isinstance(m, torch.quantization.FakeQuantize):
                 names_list[m] = n
                 modules_list[n] = m
@@ -1463,10 +1467,11 @@ class QATQuantizer(object):
             log.warning('No FakeQuantize modules found. Are you sure you passed in a QAT model?')
             return
 
-        qat_model.apply(torch.quantization.disable_fake_quant)
-        qat_model.apply(torch.quantization.disable_observer)
+        model.apply(torch.quantization.disable_fake_quant)
+        model.apply(torch.quantization.disable_observer)
 
-        device = get_module_device(qat_model)
+        device = get_module_device(model)
+        print(device)
 
         if type(dummy_input) == torch.Tensor:
             actual_input = [dummy_input]
@@ -1480,10 +1485,12 @@ class QATQuantizer(object):
             dummy_input = actual_input[i]
             if type(dummy_input) == torch.Tensor:
                 if dummy_input.device != device:
-                    dummy_input = dummy_input.to(device)
+                    actual_input[i] = dummy_input.to(device)
 
-        qat_model.eval()
-        qat_model(*actual_input)
+        model.eval()
+
+        with torch.no_grad():
+            model(*actual_input)
 
         for h in hooks:
             h.remove()
@@ -1492,10 +1499,6 @@ class QATQuantizer(object):
         for m, v in fake_quant_enabled_dict.items():
             m.fake_quant_enabled = v
 
-        for n, f in float_results.items():
-            m = modules_list[n]
-            quantized_results[n] = m(*f)
-
         def sqnr(x, y):
             Ps = torch.norm(x)
             Pn = torch.norm(x - y)
@@ -1503,11 +1506,13 @@ class QATQuantizer(object):
 
         q_errors_weight = []
         q_errors_activ = []
-        for n, f in float_results.items():
-            q = quantized_results[n]
-            loss = sqnr(f[0], q)
-            actual_n = '.'.join(n.split('.')[:-1])
+        while len(float_results) > 0:
+            n, f = float_results.popitem()
             mod = modules_list[n]
+            with torch.no_grad():
+                q = mod(*f)
+                loss = sqnr(f[0], q)
+            actual_n = '.'.join(n.split('.')[:-1])
             if loss <= threshold:
                 if n.endswith('.weight_fake_quant'):
                     q_errors_weight.append((actual_n, mod, loss))
@@ -1544,7 +1549,7 @@ class QATQuantizer(object):
         for m, v in observer_enabled_dict.items():
             m.observer_enabled = v
 
-        qat_model.train()
+        model.train()
 
 
 class BF16Quantizer(QATQuantizer):
