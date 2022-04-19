@@ -1321,6 +1321,49 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 4)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
+    def test_cat_split_rewrite(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                v = torch.split(x, 1, -1)
+                return torch.cat(v, -1)
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 32)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, tflite_micro_rewrite=True)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 6)
+        self.assertIn(
+            tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(),
+            (
+                tflite.BuiltinOperator.SPLIT_V,
+                tflite.BuiltinOperator.SPLIT,
+            ),
+        )
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 6)
+        self.assertEqual(
+            tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(0).OpcodeIndex()).DeprecatedBuiltinCode(),
+            tflite.BuiltinOperator.SPLIT_V,
+        )
+        for i in range(1, 6):
+            self.assertEqual(
+                tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(i).OpcodeIndex()).DeprecatedBuiltinCode(),
+                tflite.BuiltinOperator.CONCATENATION,
+            )
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 32)
+        for i in range(1, 4):
+            self.assertEqual(tfl_model.Subgraphs(0).Operators(i).InputsLength(), 10)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(4).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(5).InputsLength(), 4)
+
 
 class ConverterOptimizerQuantizedTester(unittest.TestCase):
     backend: str

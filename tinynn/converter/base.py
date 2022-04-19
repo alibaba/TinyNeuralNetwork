@@ -40,6 +40,7 @@ class TFLiteConverter(object):
         gc_when_reload: bool = False,
         group_conv_rewrite: bool = False,
         rewrite_quantizable: bool = False,
+        tflite_micro_rewrite: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -69,6 +70,7 @@ class TFLiteConverter(object):
             group_conv_rewrite (bool): Rewriting for group convolution. Defaults to False
             rewrite_quantizable (bool): Rewriting quantizable ops (e.g. BATCH_MATMUL, SOFTMAX, LOG_SOFTMAX) \
                 to use quantized kernels. Defaults to False
+            tflite_micro_rewrite (bool): Rewriting for running on TFLite-micro. Defaults to False
         """
 
         self.model = model
@@ -107,6 +109,7 @@ class TFLiteConverter(object):
         self.gc_when_reload = gc_when_reload
         self.group_conv_rewrite = group_conv_rewrite
         self.rewrite_quantizable = rewrite_quantizable
+        self.tflite_micro_rewrite = tflite_micro_rewrite
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -381,6 +384,7 @@ class TFLiteConverter(object):
                 self.fuse_quant_dequant,
                 self.group_conv_rewrite,
                 self.rewrite_quantizable,
+                self.tflite_micro_rewrite,
             )
             optimizer.optimize()
 

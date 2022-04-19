@@ -259,7 +259,8 @@ class GenericConvOperator(TransformableOperator):
             if input_tensor.shape[1] != weight_tensor.shape[1]:
                 warnings.warn(
                     'Group conv is not supported if official tflite interpreter is used. If that is the case for you,'
-                    ' plese pass in `group_conv_rewrite=True`.'
+                    ' plese pass in `group_conv_rewrite=True`. If you want to run the model with TFLite micro, then you'
+                    ' may also need to pass in `tflite_micro_rewrite=True`'
                 )
             if weight_dim == 4:
                 conv_op = tfl_ops.Conv2dOperator(

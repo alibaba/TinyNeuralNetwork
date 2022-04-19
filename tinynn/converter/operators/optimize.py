@@ -24,6 +24,7 @@ class GraphOptimizer(object):
     fuse_attr_count: int
     fuse_quant: bool
     group_conv_rewrite: bool
+    tflite_micro_rewrite: bool
 
     # Optimization levels
     NO_OPTIMIZE: int = 0
@@ -35,7 +36,13 @@ class GraphOptimizer(object):
     ALL_OPTIMIZE: int = 5
 
     def __init__(
-        self, graph: CommonGraph, level: int, fuse_quant: bool, group_conv_rewrite: bool, rewrite_quantizable: bool
+        self,
+        graph: CommonGraph,
+        level: int,
+        fuse_quant: bool,
+        group_conv_rewrite: bool,
+        rewrite_quantizable: bool,
+        tflite_micro_rewrite: bool,
     ) -> None:
         self.graph = graph
         self.fuse_tensor_count = 0
@@ -44,6 +51,7 @@ class GraphOptimizer(object):
         self.fuse_quant = fuse_quant
         self.group_conv_rewrite = group_conv_rewrite
         self.rewrite_quantizable = rewrite_quantizable
+        self.tflite_micro_rewrite = tflite_micro_rewrite
 
     def create_attr_tensor(
         self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
@@ -1610,6 +1618,82 @@ class GraphOptimizer(object):
 
             self.graph.try_restore_edges(mapping)
 
+    @class_conditional(lambda self: self.tflite_micro_rewrite)
+    def cat_split_pass(self):
+        vertices = self.graph.graph.vs.select(functools.partial(is_large_cat_node, graph_converter=self.graph.graph))
+
+        remove_ids = []
+        ops = []
+        restore_mapping = []
+        for cat in vertices:
+            restore_nodes = []
+            # For each node that is next of a transformable node,
+            #  a. if it is an output node, remove it anyway since it will always be reconstructed
+            #  b. otherwise, record the info of the edge so that we may restore it after reconstruction
+            for out_edge in cat.out_edges():
+                next_node = self.graph.graph.vs[out_edge.target]
+                if next_node['node_type'] == ExtendedOperator.OUTPUT_NODE:
+                    remove_ids.append(next_node.index)
+                    del self.graph.tensor_map[next_node['outputs'][0]]
+                    del self.graph.tensor_node_map[next_node['outputs'][0]]
+                else:
+                    restore_nodes.append((out_edge['name'], next_node['name']))
+
+            # Remove the mapping since they are going to be removed
+            for output_name in cat['outputs']:
+                del self.graph.tensor_map[output_name]
+                del self.graph.tensor_node_map[output_name]
+
+            restore_mapping.append(restore_nodes)
+            remove_ids.append(cat.index)
+
+        # Make sure the nodes are topologically sorted
+        sorted_ops = [node['op'] for node in sorted(vertices, key=lambda x: int(re.search(r'\d+', x['name'])[0]))]
+
+        # Delete nodes before transformation in the graph
+        self.graph.graph.delete_vertices(remove_ids)
+
+        for cat, mapping in zip(sorted_ops, restore_mapping):
+            input_tensors = cat.inputs
+            layer_inputs = input_tensors
+            output_tensor = cat.outputs[0]
+
+            axis = cat.axis
+            last_layer = False
+
+            ops = []
+
+            while True:
+                layer_outputs = []
+
+                while len(layer_inputs) > 0:
+                    curr_inputs = layer_inputs[:10]
+
+                    input_arrs = [t.tensor for t in curr_inputs]
+                    output_arr = np.concatenate(input_arrs, axis)
+
+                    if last_layer:
+                        curr_output = output_tensor
+                    else:
+                        curr_output = self.create_transform_tensor(output_arr, quantization=output_tensor.quantization)
+                        layer_outputs.append(curr_output)
+
+                    ops.append(tfl.ConcatenationOperator(curr_inputs, [curr_output], axis))
+
+                    layer_inputs = layer_inputs[10:]
+
+                if len(layer_outputs) == 0:
+                    break
+                elif len(layer_outputs) <= 10:
+                    last_layer = True
+
+                layer_inputs = layer_outputs
+
+            for op in ops:
+                self.graph.add_operator(op, transform=True)
+
+            self.graph.try_restore_edges(mapping)
+
     def input_transpose_pass(self):
         nhwc2nchw_perm = np.array([0, 3, 1, 2], dtype='int32')
         nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
@@ -2073,6 +2157,9 @@ class GraphOptimizer(object):
         # Group conv
         self.group_conv_rewrite_pass()
 
+        # TFLite micro specific
+        self.cat_split_pass()
+
         # Final cleanup
         self.cleanup_dead_nodes()
 
@@ -2135,6 +2222,10 @@ def is_activ_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
         and source_vertex['op'].fusedActivationFunction == ActivationFunctionType.NONE
         and source_vertex.outdegree() == 1
     )
+
+
+def is_large_cat_node(vertex: ig.Vertex, graph_converter: ig.Graph):
+    return vertex['node_type'] == ExtendedOperator.CONCATENATION and len(vertex['op'].inputs) > 10
 
 
 def is_group_conv_node(vertex: ig.Vertex, graph_converter: ig.Graph):
