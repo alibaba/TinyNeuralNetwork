@@ -41,6 +41,8 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::addmm": ATenAddmmOperator,
     "aten::dropout": ATenDropoutOperator,
     "aten::dropout_": ATenDropoutOperator,
+    "aten::feature_dropout": ATenFeatureDropoutOperator,
+    "aten::feature_dropout_": ATenFeatureDropoutOperator,
     "aten::contiguous": ATenContiguousOperator,
     "aten::permute": ATenPermuteOperator,
     "aten::sin": ATenSinOperator,

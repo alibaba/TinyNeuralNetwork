@@ -646,6 +646,22 @@ class ATenDropoutOperator(ATenDropoutSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
 
+        train = self.input_tensors[args['train']]
+        if train not in (0, False):
+            log.warning('aten::dropout with train=True found. Please check your model.')
+
+        self.run(node)
+        self.passthrough(graph_converter)
+
+
+class ATenFeatureDropoutOperator(ATenFeatureDropoutSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        train = self.input_tensors[args['train']]
+        if train not in (0, False):
+            log.warning('aten::dropout with train=True found. Please check your model.')
+
         self.run(node)
         self.passthrough(graph_converter)
 
