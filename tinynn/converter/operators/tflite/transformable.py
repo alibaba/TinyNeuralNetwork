@@ -241,7 +241,7 @@ class GenericConvOperator(TransformableOperator):
             assert False, "Only Conv[Transpose]1d/2d/3d is supported"
 
         if weight_tensor.shape[1] == 1 and weight_tensor.shape[0] == self.groups:
-            if weight_dim == 4:
+            if weight_dim in (3, 4):
                 conv_op = tfl_ops.DepthwiseConv2dOperator(
                     self.inputs,
                     self.outputs,
@@ -262,7 +262,7 @@ class GenericConvOperator(TransformableOperator):
                     ' plese pass in `group_conv_rewrite=True`. If you want to run the model with TFLite micro, then you'
                     ' may also need to pass in `tflite_micro_rewrite=True`'
                 )
-            if weight_dim == 4:
+            if weight_dim in (3, 4):
                 conv_op = tfl_ops.Conv2dOperator(
                     self.inputs,
                     self.outputs,
@@ -292,7 +292,7 @@ class GenericConvOperator(TransformableOperator):
 
         # Pad handling
         if sum(self.padding) > 0:
-            if weight_dim == 4:
+            if weight_dim in (3, 4):
                 pad_h = self.padding[0]
                 pad_w = self.padding[1]
 
@@ -329,7 +329,7 @@ class GenericConvOperator(TransformableOperator):
             conv_op.inputs[1] = reordered_weight
             reorder_op = tfl_ops.TransposeOperator([weight, nchw2chwn_perm_tensor], [reordered_weight])
         else:
-            if weight_dim == 4:
+            if weight_dim in (3, 4):
                 nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
                 nchw2nhwc_perm_tensor = self.create_attr_tensor(nchw2nhwc_perm)
             else:
@@ -495,7 +495,7 @@ class GenericTransposeConvOperator(TransformableOperator):
         elif weight_dim not in (4, 5):
             assert False, "Only Conv[Transpose]1d/2d/3d is supported"
 
-        if weight_dim == 4:
+        if weight_dim in (3, 4):
             conv_op = tfl_ops.TransposeConvOperator(
                 self.inputs[:2][::-1],
                 self.outputs,
@@ -521,7 +521,7 @@ class GenericTransposeConvOperator(TransformableOperator):
         # Pad handling
         output_shape = conv_op.outputs[0].shape
         if sum(self.padding) > 0:
-            if weight_dim == 4:
+            if weight_dim in (3, 4):
                 pad_h = self.padding[0]
                 pad_w = self.padding[1]
 
@@ -557,7 +557,7 @@ class GenericTransposeConvOperator(TransformableOperator):
 
         # Weight handling
         weight = conv_op.inputs[1]
-        if weight_dim == 4:
+        if weight_dim in (3, 4):
             nchw2chwn_perm = np.array([1, 2, 3, 0], dtype='int32')
         else:
             nchw2chwn_perm = np.array([2, 3, 4, 1, 0], dtype='int32')
