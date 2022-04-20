@@ -1085,8 +1085,7 @@ class QATQuantizer(object):
         if LooseVersion(torch.__version__) >= LooseVersion('1.7.0'):
             partially_supported_nodes = graph.filter_forward_nodes(_is_partially_quantizable)
             for idx, node in enumerate(partially_supported_nodes):
-                assert len(node.prev_nodes) == 1
-                for n in node.prev_nodes:
+                for n in node.prev_nodes[:1]:
                     shared_tensors = list(set(node.prev_tensors).intersection(set(n.next_tensors)))
                     if len(shared_tensors) > 1:
                         log.error('rewrite for partially-supported ops supports with nodes with exact one input')
