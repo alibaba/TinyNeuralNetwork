@@ -65,6 +65,8 @@ FUSE_RULE_LIST_EXTRA = {
     (torch.nn.Linear, torch.nn.BatchNorm1d, torch.nn.ReLU6),
     (torch.nn.BatchNorm2d, torch.nn.ReLU6),
     (torch.nn.BatchNorm3d, torch.nn.ReLU6),
+    ('add', torch.nn.ReLU6),
+    ('add', 'relu6'),
 }
 
 # Processed QAT fuse rules
@@ -1391,13 +1393,15 @@ class QATQuantizer(object):
         while True:
             cur_module = cur_node.module
             cur_class = type(cur_module)
+            if isinstance(cur_module, TraceFunction):
+                cur_class = cur_module.kind
             prev_nodes = cur_node.prev_nodes
-            log.debug('cur: ', cur_class)
+            log.debug(f'cur: {cur_class}')
             if cur_class in current_rules:
                 if use_original_name:
                     cur_name = graph.module_original_name_dict[id(cur_module)]
                 else:
-                    cur_name = node.unique_name
+                    cur_name = cur_node.unique_name
                 if cur_name in custom_data[1]:
                     log.debug('found existing nodes, skipping')
                     break
@@ -1405,14 +1409,14 @@ class QATQuantizer(object):
                 log.debug('dict: ', current_rules, current_state)
                 if len(prev_nodes) == 0:
                     break
-                if current_state and len(cur_node.prev_nodes) != 1:
-                    current_state = False
                 names.append(cur_name)
-                cur_node = cur_node.prev_nodes[0]
                 if current_state is True:
-                    log.debug('update best: ', names)
+                    log.debug(f'update best: {names}')
                     final_names.clear()
                     final_names.extend(names)
+                if len(cur_node.prev_nodes) != 1:
+                    break
+                cur_node = cur_node.prev_nodes[0]
             else:
                 break
 
@@ -1470,7 +1474,6 @@ class QATQuantizer(object):
         model.apply(torch.quantization.disable_observer)
 
         device = get_module_device(model)
-        print(device)
 
         if type(dummy_input) == torch.Tensor:
             actual_input = [dummy_input]
