@@ -359,7 +359,7 @@ class TraceFunction(object):
             prefix = ""
 
         # Unique name
-        self.unique_name = prefix + "_".join([self.kind, str(current_graph().global_functions[self.kind])])
+        self.unique_name = prefix + "_".join([self.kind, str(current_graph().global_functions[self.kind])]) + "_f"
 
         # The input tensors of the function
         self.prev_tensors = []
