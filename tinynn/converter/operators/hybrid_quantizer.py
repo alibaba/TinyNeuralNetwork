@@ -38,7 +38,7 @@ class HybridQuantizer(object):
             if weight_t.buffer is None or str(weight_t.dtype) != 'float32':
                 continue
             name = weight_t.name
-            weight_a = np.frombuffer(weight_t.buffer.data).view(np.float32).reshape(weight_t.shape)
+            weight_a = np.frombuffer(weight_t.buffer.data, dtype='float32').reshape(weight_t.shape)
             weight = torch.from_numpy(weight_a.copy())
             if node['node_type'] == ExtendedOperator.FULLY_CONNECTED or not self.per_channel:
                 if node['node_type'] == ExtendedOperator.DEPTHWISE_CONV_2D:
