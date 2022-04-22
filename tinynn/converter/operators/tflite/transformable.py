@@ -496,6 +496,7 @@ class GenericTransposeConvOperator(TransformableOperator):
             assert False, "Only Conv[Transpose]1d/2d/3d is supported"
 
         if weight_dim in (3, 4):
+            assert all((x == 1 for x in self.dilation)), "Only dilation=1 is supported for conv_transpose2d"
             conv_op = tfl_ops.TransposeConvOperator(
                 self.inputs[:2][::-1],
                 self.outputs,

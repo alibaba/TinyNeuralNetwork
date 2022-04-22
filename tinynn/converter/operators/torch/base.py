@@ -402,7 +402,10 @@ class OperatorConverter(ABC):
             pad_out = self.create_transform_tensor(pad_array, quantization=pad_input.quantization)
             ops[pad_op_index].inputs[0] = pad_out
 
-            pad_op = tfl.PadOperator(inputs, [pad_out])
+            if len(inputs) > 2:
+                pad_op = tfl.Padv2Operator(inputs, [pad_out])
+            else:
+                pad_op = tfl.PadOperator(inputs, [pad_out])
             ops.insert(pad_op_index, pad_op)
 
         if fill_nan:

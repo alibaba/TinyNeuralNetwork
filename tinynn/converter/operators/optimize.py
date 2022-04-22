@@ -10,7 +10,7 @@ import numpy as np
 
 from tinynn.util.util import class_conditional, get_logger
 
-from ..schemas.tflite.schema_generated import ActivationFunctionType
+from ..schemas.tflite.schema_generated import ActivationFunctionType, Padding
 from . import tflite as tfl
 from .base import FUSE_ACTIVATION_MAP, ExtendedOperator
 from .graph import CommonGraph
@@ -179,6 +179,116 @@ class GraphOptimizer(object):
             pre_activ['op'].fusedActivationFunction = FUSE_ACTIVATION_MAP[activ['node_type']]
 
             remove_ids.append(activ.index)
+
+        # Delete activation nodes
+        self.graph.graph.delete_vertices(remove_ids)
+
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
+    def fuse_same_padding(self):
+        edges = self.graph.graph.es.select(functools.partial(is_padding_fusable_edge, graph_converter=self.graph.graph))
+        filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]) for x in edges)
+
+        def _remove_last_pred(seq):
+            op = seq[1]['op']
+            return False, op
+
+        def _remove_last_action(first_node, last_node, custom_data):
+            op = custom_data
+            op.padding = Padding.SAME
+            return []
+
+        def _skip_pred(seq):
+            pad_op = seq[0]['op']
+            next_op = seq[1]['op']
+
+            input_shape = pad_op.inputs[0].shape[1:-1]
+            if seq[1]['node_type'] == ExtendedOperator.MAX_POOL_2D:
+                kernel_shape = (next_op.filterHeight, next_op.filterWidth)
+                strides = (next_op.strideH, next_op.strideW)
+                dilation = (1, 1)
+            elif seq[1]['node_type'] in (
+                ExtendedOperator.CONV_2D,
+                ExtendedOperator.DEPTHWISE_CONV_2D,
+            ):
+                kernel_shape = next_op.inputs[1].shape[1:-1]
+                strides = (next_op.strideH, next_op.strideW)
+                dilation = (next_op.dilationHFactor, next_op.dilationWFactor)
+            elif seq[1]['node_type'] == ExtendedOperator.CONV_3D:
+                kernel_shape = next_op.inputs[1].shape[:3]
+                strides = (next_op.strideD, next_op.strideH, next_op.strideW)
+                dilation = (next_op.dilationDFactor, next_op.dilationHFactor, next_op.dilationWFactor)
+
+            pad_args = get_same_padding_args(input_shape, kernel_shape, strides, dilation)
+            pad_arr = np.array(pad_args, dtype='float32')
+
+            old_pad_arr = pad_op.inputs[1].tensor
+            skip = not np.array_equal(pad_arr, old_pad_arr)
+
+            return skip
+
+        elinimate_sequences(self.graph, filtered_pairs, True, None, _remove_last_pred, _remove_last_action, _skip_pred)
+
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
+    def fuse_same_padding_slicing(self):
+        edges = self.graph.graph.es.select(functools.partial(is_slicing_fusable_edge, graph_converter=self.graph.graph))
+        # filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]) for x in edges)
+
+        filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target], x) for x in edges)
+
+        remove_ids = []
+        actions = []
+        for prev_node, slice_node, tensor in filtered_pairs:
+            prev_op = prev_node['op']
+            slice_op = slice_node['op']
+
+            input_shape = slice_op.outputs[0].shape[1:-1]
+            if prev_node['node_type'] == ExtendedOperator.TRANSPOSE_CONV:
+                kernel_shape = prev_op.inputs[1].shape[1:-1]
+                strides = (prev_op.strideH, prev_op.strideW)
+                dilation = (1, 1)
+            elif prev_node['node_type'] == ExtendedOperator.CONV_3D_TRANSPOSE:
+                kernel_shape = prev_op.inputs[1].shape[:3]
+                strides = (prev_op.strideD, prev_op.strideH, prev_op.strideW)
+                dilation = (prev_op.dilationDFactor, prev_op.dilationHFactor, prev_op.dilationWFactor)
+
+            pad_args = get_same_padding_args(input_shape, kernel_shape, strides, dilation)
+            pad_arr = np.array(pad_args, dtype='float32')
+
+            start_arr = [x for x in slice_op.inputs[1].tensor]
+            end_arr = [slice_op.inputs[0].shape[i] - x - slice_op.outputs[0].shape[i] for i, x in enumerate(start_arr)]
+
+            old_pad_args = [[x, y] for x, y in zip(start_arr, end_arr)]
+            skip = not np.array_equal(pad_arr, old_pad_args)
+
+            if skip:
+                continue
+
+            # Find out the output of the slice nodes
+            new_output = slice_node['outputs'][0]
+            assert new_output in self.graph.tensor_map
+
+            # For each node that is next of the slice_nodeation node, we connect it with the previous node
+            self.graph.connect_next_tensors(slice_node, prev_node, new_output)
+
+            # Update graph, prepare to drop the output tensor of the conv node and use the output tensor of the
+            # slice op instead
+            prev_node['outputs'][0] = new_output
+            prev_node['op'].outputs[0] = self.graph.tensor_map[new_output]
+            self.graph.tensor_node_map[new_output] = prev_node['name']
+            tensor['name'] = slice_node['outputs'][0]
+            tensor['label'] = slice_node['outputs'][0]
+
+            # Fuse padding
+            prev_node['op'].padding = Padding.SAME
+
+            new_shape = np.array(prev_node['op'].outputs[0].shape, dtype='int32')
+            new_shape_tensor = self.create_attr_tensor(new_shape)
+            actions.append((self.graph.replace_operator_input, (prev_node, 0, new_shape_tensor)))
+
+            remove_ids.append(slice_node.index)
+
+        for func, args in actions:
+            func(*args)
 
         # Delete activation nodes
         self.graph.graph.delete_vertices(remove_ids)
@@ -2154,6 +2264,10 @@ class GraphOptimizer(object):
         # Fuse quant/dequant nodes
         self.fuse_quant_dequant_nodes()
 
+        # Fuse same padding
+        self.fuse_same_padding()
+        self.fuse_same_padding_slicing()
+
         # Group conv
         self.group_conv_rewrite_pass()
 
@@ -2180,6 +2294,61 @@ def is_bn_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
             or source_vertex['op'].fusedActivationFunction
             in (ActivationFunctionType.NONE, target_vertex['op'].fusedActivationFunction)
         )
+    )
+
+
+def is_padding_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+    return (
+        source_vertex['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2)
+        and (
+            len(source_vertex['op'].inputs) == 2
+            or (
+                len(source_vertex['op'].inputs) == 3
+                and source_vertex['op'].inputs[2].dtype == np.dtype('float32')
+                and (
+                    (
+                        source_vertex['op'].inputs[2].tensor[0] == 0.0
+                        and target_vertex['node_type'] != ExtendedOperator.MAX_POOL_2D
+                    )
+                    or (
+                        source_vertex['op'].inputs[2].tensor[0] == np.finfo(np.float32).min
+                        and target_vertex['node_type'] == ExtendedOperator.MAX_POOL_2D
+                    )
+                )
+            )
+        )
+        and target_vertex['node_type']
+        in (
+            ExtendedOperator.CONV_2D,
+            ExtendedOperator.CONV_3D,
+            ExtendedOperator.TRANSPOSE_CONV,
+            ExtendedOperator.CONV_3D_TRANSPOSE,
+            ExtendedOperator.DEPTHWISE_CONV_2D,
+            ExtendedOperator.MAX_POOL_2D,
+        )
+        and source_vertex.outdegree() == 1
+        and target_vertex['op'].padding == Padding.VALID
+    )
+
+
+def is_slicing_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+    return (
+        target_vertex['node_type'] in (ExtendedOperator.SLICE, ExtendedOperator.STRIDED_SLICE)
+        and (
+            len(target_vertex['op'].inputs) == 3
+            or (len(target_vertex['op'].inputs) == 4 and np.all(target_vertex['op'].inputs[3].tensor == 1))
+        )
+        and source_vertex['node_type']
+        in (
+            ExtendedOperator.TRANSPOSE_CONV,
+            ExtendedOperator.CONV_3D_TRANSPOSE,
+        )
+        and source_vertex.outdegree() == 1
+        and source_vertex['op'].padding == Padding.VALID
     )
 
 
@@ -3099,3 +3268,18 @@ def expand_op_outputs_in_branches(
     for func, args in actions:
         node = args[0]
         func(*args)
+
+
+def get_same_padding_args(input_shape, filter_shape, strides, dilation):
+    dim = len(input_shape)
+    padding = [0] * dim
+
+    for i in range(dim):
+        if input_shape[i] % strides[i] == 0:
+            padding[i] = max(1 - strides[i] + (filter_shape[i] - 1) * dilation[i], 0)
+        else:
+            padding[i] = max(1 + (filter_shape[i] - 1) * dilation[i] - (input_shape[i] % strides[i]), 0)
+
+    pad_args = [[0, 0]] + [[x // 2, x - x // 2] for x in padding] + [[0, 0]]
+
+    return pad_args

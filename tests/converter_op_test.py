@@ -2009,6 +2009,26 @@ class ConverterOPTester(unittest.TestCase):
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
             assert_close(dummy_output, tfl_output)
 
+    def test_pooling_same(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        funcs = [F.avg_pool2d, F.max_pool2d]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+
+            def model(x):
+                return func(x, 11, 7, 2)
+
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            assert_close(dummy_output, tfl_output)
+
     def test_pooling_with_pad(self):
         dummy_input = torch.randn(1, 3, 220, 222, dtype=torch.float32)
 
@@ -2951,6 +2971,58 @@ class ConverterOPTester(unittest.TestCase):
 
         assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
+    def test_conv_same_pad(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.Conv2d(3, 3, 11, 7, 2)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
+    def test_conv_same_pad_complex(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.Conv2d(3, 3, (8, 12), (3, 5), (3, 4))
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
     def test_conv_no_bias(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
@@ -3029,6 +3101,84 @@ class ConverterOPTester(unittest.TestCase):
 
         assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
+    def test_depthwise_conv(self):
+        dummy_input = torch.randn(1, 4, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.Conv2d(4, 4, 3, groups=4)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, group_conv_rewrite=True)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
+    def test_depthwise_conv_no_bias(self):
+        dummy_input = torch.randn(1, 4, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.Conv2d(4, 4, 3, groups=4, bias=False)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, group_conv_rewrite=True)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
+    def test_depthwise_conv_same_pad(self):
+        dummy_input = torch.randn(1, 4, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.Conv2d(4, 4, 11, 7, 2, groups=4)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
     def test_conv_transpose(self):
         dummy_input = torch.randn(1, 16, 50, 100, dtype=torch.float32)
 
@@ -3036,6 +3186,32 @@ class ConverterOPTester(unittest.TestCase):
             def __init__(self) -> None:
                 super().__init__()
                 self.norm = nn.ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2))
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
+    def test_conv_transpose_same_pad(self):
+        dummy_input = torch.randn(1, 16, 32, 32, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.ConvTranspose2d(16, 33, 11, stride=7, padding=2)
 
             def forward(self, x):
                 return self.norm(x)
@@ -3176,6 +3352,33 @@ class ConverterOPTester(unittest.TestCase):
 
         assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.5.0'), 'conv3d is not supported')
+    def test_conv3d_same_pad(self):
+        dummy_input = torch.randn(1, 3, 14, 14, 14, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.Conv3d(3, 3, 11, stride=7, padding=2)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
     @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.6.0'), 'conv_transpose3d is not supported')
     def test_conv_transpose3d(self):
         dummy_input = torch.randn(1, 16, 10, 50, 100, dtype=torch.float32)
@@ -3211,6 +3414,33 @@ class ConverterOPTester(unittest.TestCase):
             def __init__(self) -> None:
                 super().__init__()
                 self.norm = nn.ConvTranspose3d(16, 33, (3, 5, 2), stride=(2, 1, 1), padding=(0, 4, 2), bias=False)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.6.0'), 'conv_transpose3d is not supported')
+    def test_conv_transpose3d_same_pad(self):
+        dummy_input = torch.randn(1, 3, 2, 2, 2, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.ConvTranspose3d(3, 3, 11, stride=7, padding=2)
 
             def forward(self, x):
                 return self.norm(x)
