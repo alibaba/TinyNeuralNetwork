@@ -1989,6 +1989,26 @@ class ConverterOPTester(unittest.TestCase):
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
             assert_close(dummy_output, tfl_output)
 
+    def test_pooling_negative_values(self):
+        dummy_input = -torch.abs(torch.randn(1, 3, 224, 224, dtype=torch.float32))
+
+        funcs = [F.avg_pool2d, F.max_pool2d]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+
+            def model(x):
+                return func(x, 11, 7, 2)
+
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            assert_close(dummy_output, tfl_output)
+
     def test_pooling_with_pad(self):
         dummy_input = torch.randn(1, 3, 220, 222, dtype=torch.float32)
 

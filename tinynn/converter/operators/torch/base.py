@@ -390,44 +390,57 @@ class OperatorConverter(ABC):
             pad_tensor = self.create_attr_tensor(np.array(pad, dtype='int32'))
 
             pad_input = ops[pad_op_index - 1].outputs[0]
-            pad_array = np.pad(pad_input.tensor, pad)
+
+            inputs = [pad_input, pad_tensor]
+            if type(ops[1]) == tfl.MaxPool2dOperator:
+                constant_tensor = self.get_minimum_constant(pad_input)
+                inputs.append(constant_tensor)
+                pad_array = np.pad(pad_input.tensor, pad, constant_values=constant_tensor.tensor[0])
+            else:
+                pad_array = np.pad(pad_input.tensor, pad)
+
             pad_out = self.create_transform_tensor(pad_array, quantization=pad_input.quantization)
             ops[pad_op_index].inputs[0] = pad_out
 
-            pad_op = tfl.PadOperator([pad_input, pad_tensor], [pad_out])
+            pad_op = tfl.PadOperator(inputs, [pad_out])
             ops.insert(pad_op_index, pad_op)
 
         if fill_nan:
-            nan = np.finfo(np.float32).min
             fill_nan_index = pad_op_index + 1 if pad_h + pad_w > 0 else pad_op_index
             pad = [[0, 0], [0, ceil_pad[0]], [0, ceil_pad[1]], [0, 0]]
             pad_tensor = self.create_attr_tensor(np.array(pad, dtype='int32'))
             pad_input = ops[fill_nan_index - 1].outputs[0]
-            if pad_input.quantization is not None:
-                if self.q_type == np.uint8:
-                    nan = 0
-                    constant_arr = tfl.FakeQuantTensor(
-                        np.zeros(1, dtype=pad_input.dtype),
-                        pad_input.quantization.scale,
-                        pad_input.quantization.zero_point,
-                    )
-                else:
-                    nan = -128
-                    constant_arr = tfl.FakeQuantTensor(
-                        np.array([-128], dtype=pad_input.dtype),
-                        pad_input.quantization.scale,
-                        pad_input.quantization.zero_point,
-                    )
-            else:
-                constant_arr = np.array([nan], dtype='float32')
-            constant_tensor = self.create_attr_tensor(constant_arr)
+            constant_tensor = self.get_minimum_constant(pad_input)
 
-            pad_array = np.pad(pad_input.tensor, pad, constant_values=nan)
+            pad_array = np.pad(pad_input.tensor, pad, constant_values=constant_tensor.tensor[0])
             pad_out = self.create_transform_tensor(pad_array, quantization=pad_input.quantization)
             ops[fill_nan_index].inputs[0] = pad_out
 
             pad_op = tfl.Padv2Operator([pad_input, pad_tensor, constant_tensor], [pad_out])
             ops.insert(fill_nan_index, pad_op)
+
+    def get_minimum_constant(self, ref_tensor):
+        if ref_tensor.quantization is not None:
+            if self.q_type == np.uint8:
+                nan = 0
+                constant_arr = tfl.FakeQuantTensor(
+                    np.zeros(1, dtype=ref_tensor.dtype),
+                    ref_tensor.quantization.scale,
+                    ref_tensor.quantization.zero_point,
+                )
+            else:
+                nan = -128
+                constant_arr = tfl.FakeQuantTensor(
+                    np.array([-128], dtype=ref_tensor.dtype),
+                    ref_tensor.quantization.scale,
+                    ref_tensor.quantization.zero_point,
+                )
+        else:
+            nan = np.finfo(np.float32).min
+            constant_arr = np.array([nan], dtype='float32')
+
+        constant_tensor = self.create_attr_tensor(constant_arr)
+        return constant_tensor
 
     def handle_reduce(self, converter_class, input_args, graph_converter, transpose_opt, *args, **kwargs):
         input_tensor = self.find_or_create_input(0, graph_converter)
