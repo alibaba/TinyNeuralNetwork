@@ -2323,8 +2323,6 @@ def is_padding_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
         in (
             ExtendedOperator.CONV_2D,
             ExtendedOperator.CONV_3D,
-            ExtendedOperator.TRANSPOSE_CONV,
-            ExtendedOperator.CONV_3D_TRANSPOSE,
             ExtendedOperator.DEPTHWISE_CONV_2D,
             ExtendedOperator.MAX_POOL_2D,
         )
