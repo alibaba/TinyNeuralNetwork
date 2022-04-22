@@ -231,8 +231,6 @@ class GraphOptimizer(object):
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_same_padding_slicing(self):
         edges = self.graph.graph.es.select(functools.partial(is_slicing_fusable_edge, graph_converter=self.graph.graph))
-        # filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]) for x in edges)
-
         filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target], x) for x in edges)
 
         remove_ids = []
