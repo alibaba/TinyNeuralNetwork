@@ -321,6 +321,55 @@ class GraphOptimizer(object):
         # Delete activation nodes
         self.graph.graph.delete_vertices(remove_ids)
 
+    @class_conditional(lambda self: self.tflite_micro_rewrite)
+    def split_requantize(self):
+        vertices = self.graph.graph.vs.select(functools.partial(is_requantize_node, graph_converter=self.graph.graph))
+
+        remove_ids = []
+        ops = []
+        restore_mapping = []
+        for quantize in vertices:
+            restore_nodes = []
+            # For each node that is next of a transformable node,
+            #  a. if it is an output node, remove it anyway since it will always be reconstructed
+            #  b. otherwise, record the info of the edge so that we may restore it after reconstruction
+            for out_edge in quantize.out_edges():
+                next_node = self.graph.graph.vs[out_edge.target]
+                if next_node['node_type'] == ExtendedOperator.OUTPUT_NODE:
+                    remove_ids.append(next_node.index)
+                    del self.graph.tensor_map[next_node['outputs'][0]]
+                    del self.graph.tensor_node_map[next_node['outputs'][0]]
+                else:
+                    restore_nodes.append((out_edge['name'], next_node['name']))
+
+            # Remove the mapping since they are going to be removed
+            for output_name in quantize['outputs']:
+                del self.graph.tensor_map[output_name]
+                del self.graph.tensor_node_map[output_name]
+
+            restore_mapping.append(restore_nodes)
+            remove_ids.append(quantize.index)
+
+        # Make sure the nodes are topologically sorted
+        sorted_ops = [node['op'] for node in sorted(vertices, key=lambda x: int(re.search(r'\d+', x['name'])[0]))]
+
+        # Delete nodes before transformation in the graph
+        self.graph.graph.delete_vertices(remove_ids)
+
+        for quantize, mapping in zip(sorted_ops, restore_mapping):
+            input_tensor = quantize.inputs[0]
+            output_tensor = quantize.outputs[0]
+
+            intermediate = self.create_transform_tensor(input_tensor.tensor.astype('float32'))
+
+            ops.append(tfl.DequantizeOperator([input_tensor], [intermediate]))
+            ops.append(tfl.QuantizeOperator([intermediate], [output_tensor]))
+
+            for op in ops:
+                self.graph.add_operator(op, transform=True)
+
+            self.graph.try_restore_edges(mapping)
+
     def transform_graph(self):
         # Find transformable ops
         filtered_nodes = self.graph.graph.vs.select(
@@ -2271,6 +2320,7 @@ class GraphOptimizer(object):
 
         # TFLite micro specific
         self.cat_split_pass()
+        self.split_requantize()
 
         # Final cleanup
         self.cleanup_dead_nodes()
@@ -2386,6 +2436,14 @@ def is_activ_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
         and target_vertex['node_type'] in (ExtendedOperator.RELU, ExtendedOperator.RELU6)
         and source_vertex['op'].fusedActivationFunction == ActivationFunctionType.NONE
         and source_vertex.outdegree() == 1
+    )
+
+
+def is_requantize_node(vertex: ig.Vertex, graph_converter: ig.Graph):
+    return (
+        vertex['node_type'] == ExtendedOperator.QUANTIZE
+        and vertex['op'].inputs[0].quantization is not None
+        and vertex['op'].outputs[0].quantization is not None
     )
 
 
