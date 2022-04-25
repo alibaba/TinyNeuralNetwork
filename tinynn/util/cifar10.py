@@ -303,7 +303,7 @@ def calibrate(model, context: DLContext):
 
     with torch.no_grad():
         end = time.time()
-        for i, (image, _) in enumerate(context.val_loader):
+        for i, (image, _) in enumerate(context.train_loader):
 
             if context.max_iteration is not None and i >= context.max_iteration:
                 break

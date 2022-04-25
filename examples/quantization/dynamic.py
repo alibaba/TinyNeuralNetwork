@@ -40,17 +40,17 @@ def main_worker(args):
         # TinyNeuralNetwork provides a DynamicQuantizer class that performs dynamic quantization
         # The model returned by the `quantize` function is already dynamically quantized
         quantizer = DynamicQuantizer(model, dummy_input, work_dir='out', config={'asymmetric': False})
-        qat_model = quantizer.quantize()
+        q_model = quantizer.quantize()
 
-    print(qat_model)
+    print(q_model)
 
     with torch.no_grad():
-        qat_model.eval()
-        qat_model.cpu()
+        q_model.eval()
+        q_model.cpu()
 
         # The code section below is used to convert the model to the TFLite format
         converter = TFLiteConverter(
-            qat_model,
+            q_model,
             dummy_input,
             tflite_path='out/dynamic_quant_model.tflite',
             strict_symmetric_check=True,

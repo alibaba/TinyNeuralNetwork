@@ -55,17 +55,17 @@ def main_worker(args):
         #      The is same to (a) with no offsets. But it is rarely used, which just serves as a placeholder here.
 
         quantizer = PostQuantizer(model, dummy_input, work_dir='out')
-        qat_model = quantizer.quantize()
+        ptq_model = quantizer.quantize()
 
-    print(qat_model)
+    print(ptq_model)
 
     # Use DataParallel to speed up calibrating when possible
     if torch.cuda.device_count() > 1:
-        qat_model = nn.DataParallel(qat_model)
+        ptq_model = nn.DataParallel(ptq_model)
 
     # Move model to the appropriate device
     device = get_device()
-    qat_model.to(device=device)
+    ptq_model.to(device=device)
 
     context = DLContext()
     context.device = device
@@ -73,14 +73,14 @@ def main_worker(args):
     context.max_iteration = 100
 
     # Post quantization calibration
-    calibrate(qat_model, context)
+    calibrate(ptq_model, context)
 
     with torch.no_grad():
-        qat_model.eval()
-        qat_model.cpu()
+        ptq_model.eval()
+        ptq_model.cpu()
 
         # The step below converts the model to an actual quantized model, which uses the quantized kernels.
-        qat_model = torch.quantization.convert(qat_model)
+        ptq_model = torch.quantization.convert(ptq_model)
 
         # When converting quantized models, please ensure the quantization backend is set.
         torch.backends.quantized.engine = quantizer.backend
@@ -90,7 +90,7 @@ def main_worker(args):
         # you may specify `quantize_target_type='int8'` in the following line.
         # If you need a quantized model with strict symmetric quantization check (with pre-defined zero points),
         # you may specify `strict_symmetric_check=True` in the following line.
-        converter = TFLiteConverter(qat_model, dummy_input, tflite_path='out/qat_model.tflite')
+        converter = TFLiteConverter(ptq_model, dummy_input, tflite_path='out/qat_model.tflite')
         converter.convert()
 
 
