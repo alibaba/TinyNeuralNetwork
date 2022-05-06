@@ -509,6 +509,28 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_tensor_div(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                return x.div(2.0)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_int_div(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                s = x.shape[-1] / 2
+                x = x + s
+                return x
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
     def test_sub(self):
         class Model(nn.Module):
             def forward(self, x):

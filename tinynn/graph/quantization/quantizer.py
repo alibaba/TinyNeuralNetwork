@@ -694,6 +694,7 @@ class QATQuantizer(object):
                     and cur_module.prev_tensors[0].dtype == torch.float32
                     and cur_module.func_type != '__rtruediv__'
                     and node.next_tensors[0].dtype == torch.float32
+                    and node.prev_nodes[0].kind() not in ('size', 'shape')
                 )
 
         div_nodes = graph.filter_forward_nodes(_is_div_node)
@@ -879,7 +880,10 @@ class QATQuantizer(object):
             prev_tensor_size = len(node.prev_tensors)
             if op_kind in ('add', 'mul'):
                 if prev_tensor_size == 2:
-                    op_type = op_kind
+                    if node.prev_nodes[1].prev_nodes[0].kind() not in ('shape', 'size'):
+                        op_type = op_kind
+                    else:
+                        op_type = f'{op_kind}_scalar'
                 elif prev_tensor_size == 1:
                     op_type = f'{op_kind}_scalar'
                 else:
@@ -1225,6 +1229,9 @@ class QATQuantizer(object):
                 if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
                     if cur_module.kind in ('pad',):
                         return True
+                if node.type() in ('__truediv__', '__itruediv__', 'div', 'div_'):
+                    if node.prev_nodes[0].kind() in ('shape', 'size'):
+                        return False
                 return cur_module.kind in (
                     'pow',
                     'truediv',
