@@ -362,9 +362,11 @@ class ChannelModifier(Modifier):
 
         if self.masker() is not None and self.masker().in_remove_idx is not None:
             self.modify_input(self.masker().in_remove_idx)
+            self.masker().input_modified = True
 
         if self.masker() is not None and self.masker().ot_remove_idx is not None:
             self.modify_output(self.masker().ot_remove_idx)
+            self.masker().output_modified = True
 
         self.mask_applied = True
 
@@ -856,9 +858,15 @@ class RNNChannelModifier(ChannelModifier):
         preserve_idx = complementary_list([i for i in range(self.weight_mask['weight_ih_l0'].shape[1])], remove_idx)
 
         if rnn.weight_ih_l0.shape[1] != len(preserve_idx):
-            log.info(f'[RNN] {self.unique_name()}: input {rnn.input_size} -> {len(preserve_idx)}')
+            log.info(f'[RNN] {self.unique_name()}: weight_ih_l0 {rnn.input_size} -> {len(preserve_idx)}')
 
             rnn.weight_ih_l0 = torch.nn.Parameter(rnn.weight_ih_l0[:, preserve_idx])
+            rnn.input_size = len(preserve_idx)
+
+        if rnn.bidirectional and rnn.weight_ih_l0_reverse.shape[1] != len(preserve_idx):
+            log.info(f'[RNN] {self.unique_name()}: weight_ih_l0_reverse {rnn.input_size} -> {len(preserve_idx)}')
+
+            rnn.weight_ih_l0_reverse = torch.nn.Parameter(rnn.weight_ih_l0_reverse[:, preserve_idx])
             rnn.input_size = len(preserve_idx)
 
     def tile_indices_with_gate_size(self, indices, gate_size, offset):
@@ -872,6 +880,10 @@ class RNNChannelModifier(ChannelModifier):
         return idx_fwd, idx_bwd
 
     def modify_output(self, remove_idx):
+        if self.masker().output_modified:
+            log.debug(f"output of {self.unique_name()} has been modified")
+            return
+
         rnn = self.node.module
 
         num_directions = 2 if rnn.bidirectional else 1
