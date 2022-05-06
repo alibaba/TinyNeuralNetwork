@@ -2595,6 +2595,7 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         )
         and len(op.inputs) == 2
         and op.inputs[1].tensor.ndim == 1
+        and op.inputs[1].shape[0] == 1
     )
 
 
