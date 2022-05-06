@@ -2325,22 +2325,31 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
         else:
             assert False, "value should have type float, tensor in aten::masked_fill(input, mask, value)"
 
-        input_mask = self.create_transform_tensor(mask_tensor.tensor.astype(input_tensor.dtype))
-        ops.append(
-            tfl.CastOperator(
-                [mask_tensor],
-                [input_mask],
-                tfl.torch_tflite_dtype_mappings[mask.dtype],
-                tfl.torch_tflite_dtype_mappings[out.dtype],
+        if mask_tensor.buffer is None:
+            input_mask = self.create_transform_tensor(mask_tensor.tensor.astype(input_tensor.dtype))
+            ops.append(
+                tfl.CastOperator(
+                    [mask_tensor],
+                    [input_mask],
+                    tfl.torch_tflite_dtype_mappings[mask.dtype],
+                    tfl.torch_tflite_dtype_mappings[out.dtype],
+                )
             )
-        )
+        else:
+            input_mask = self.create_attr_tensor(mask_tensor.tensor.astype(input_tensor.dtype))
 
-        masked = self.create_transform_tensor(other_t.tensor * mask_tensor.tensor)
-        ops.append(tfl.MulOperator([other_t, input_mask], [masked]))
+        if mask_tensor.buffer is None or other_t.buffer is None:
+            masked = self.create_transform_tensor(other_t.tensor * mask_tensor.tensor)
+            ops.append(tfl.MulOperator([other_t, input_mask], [masked]))
+        else:
+            masked = self.create_attr_tensor(other_t.tensor * mask_tensor.tensor)
 
         one_tensor = self.create_attr_tensor(np.array([1], dtype=input_tensor.dtype))
-        rev_mask = self.create_transform_tensor(one_tensor.tensor - mask_tensor.tensor)
-        ops.append(tfl.SubOperator([one_tensor, input_mask], [rev_mask]))
+        if mask_tensor.buffer is None:
+            rev_mask = self.create_transform_tensor(one_tensor.tensor - mask_tensor.tensor)
+            ops.append(tfl.SubOperator([one_tensor, input_mask], [rev_mask]))
+        else:
+            rev_mask = self.create_attr_tensor(one_tensor.tensor - mask_tensor.tensor)
 
         non_masked = self.create_transform_tensor(input_tensor.tensor * rev_mask.tensor)
         ops.append(tfl.MulOperator([input_tensor, rev_mask], [non_masked]))
