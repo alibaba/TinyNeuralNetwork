@@ -689,7 +689,7 @@ class QATQuantizer(object):
             #   a / constant => a * (1 / constant)
             if cur_class == TraceFunction:
                 return (
-                    cur_module.kind == 'truediv'
+                    (cur_module.kind == 'truediv' or cur_module.func_type in ('div', 'div_'))
                     and len(cur_module.prev_tensors) == 1
                     and cur_module.prev_tensors[0].dtype == torch.float32
                     and cur_module.func_type != '__rtruediv__'
@@ -700,7 +700,13 @@ class QATQuantizer(object):
         log.info(f'rewriting div for {[node.unique_name for node in div_nodes]}')
         for idx, node in enumerate(div_nodes):
             op_type = node.module.func_type
-            node.module.func_type = '__mul__'
+            inplace = op_type in ('__itruediv__', 'itruediv', 'div_')
+
+            if inplace:
+                node.module.func_type = '__imul__'
+            else:
+                node.module.func_type = '__mul__'
+
             node.module.kind = 'mul'
 
             full_name_parts = node.module.full_name.split('.')
@@ -716,7 +722,7 @@ class QATQuantizer(object):
                 other_arg = int(node.module.args_string_no_self)
 
             with override_current_trace_graph(graph):
-                node.module.parse_args(node.prev_tensors[0], -1.0 / other_arg)
+                node.module.parse_args(node.prev_tensors[0], 1.0 / other_arg)
 
         def _is_sub_node(node: TraceNode, custom_data):
             cur_module = node.module
