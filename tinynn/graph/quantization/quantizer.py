@@ -558,7 +558,8 @@ class QATQuantizer(object):
                     if isinstance(next_node.module, torch_q.QuantStub):
                         acp = getattr(next_node.module, 'activation_post_process', None)
                         if acp is not None:
-                            if isinstance(acp, torch_q.FakeQuantizeBase):
+                            fq_base_cls = getattr(torch_q, 'FakeQuantizeBase', torch_q.FakeQuantize)
+                            if isinstance(acp, fq_base_cls):
                                 fake_quant = acp
 
                                 next_node.module.apply(torch_q.disable_observer)
