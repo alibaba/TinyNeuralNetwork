@@ -840,6 +840,8 @@ class GraphOptimizer(object):
             input_indices = op_input_indices(op)
             l_shape = op.inputs[0].shape
             r_shape = op.outputs[0].shape
+            if len(l_shape) == 0 or len(r_shape) == 0:
+                continue
             l_map, r_map, _, _ = reshape_mapping(l_shape, r_shape)
 
             mode = None
@@ -1284,6 +1286,16 @@ class GraphOptimizer(object):
                     tensor_node_dict[prev_out.name] = (prev_new_out, skip)
                 else:
                     perm_tensor = self.create_attr_tensor(inv_perm_arr)
+                    if len(prev_out.shape) != perm_tensor.tensor.size:
+                        new_shape = [1] * (perm_tensor.tensor.size - len(prev_out.shape)) + list(prev_out.shape)
+                        prev_out_reshaped = self.create_transform_tensor(
+                            np.reshape(prev_out.tensor, new_shape), quantization=prev_out.quantization
+                        )
+                        new_shape_tensor = self.create_attr_tensor(np.array(new_shape, dtype='int32'))
+                        self.graph.add_operator(
+                            tfl.ReshapeOperator([prev_out, new_shape_tensor], [prev_out_reshaped], new_shape)
+                        )
+                        prev_out = prev_out_reshaped
                     prev_new_out = self.create_transform_tensor(
                         np.transpose(prev_out.tensor, inv_perm_arr), quantization=prev_out.quantization
                     )
@@ -2585,17 +2597,6 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.MIRROR_PAD,
         ExtendedOperator.SLICE,
         ExtendedOperator.STRIDED_SLICE,
-    ) or (
-        op_code
-        in (
-            ExtendedOperator.ADD,
-            ExtendedOperator.SUB,
-            ExtendedOperator.MUL,
-            ExtendedOperator.DIV,
-        )
-        and len(op.inputs) == 2
-        and op.inputs[1].tensor.ndim == 1
-        and op.inputs[1].shape[0] == 1
     )
 
 
@@ -2618,7 +2619,6 @@ def is_elementwise_binary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
             ExtendedOperator.DIV,
         )
         and len(op.inputs) >= 2
-        and op.inputs[0].tensor.ndim == op.inputs[1].tensor.ndim
     )
 
 
@@ -2901,10 +2901,12 @@ def op_input_indices(op: tfl.BaseOperator):
     elif isinstance(op, tfl.BatchMatmulOperator):
         input_indices = range(2)
     elif isinstance(op, (tfl.AddOperator, tfl.SubOperator, tfl.MulOperator, tfl.DivOperator)):
-        if len(op.inputs[1].shape) != 1:
-            input_indices = range(2)
-        else:
+        if len(op.inputs[1].shape) == 1 and op.inputs[1].shape[0] == 1:
             input_indices = range(1)
+        elif len(op.inputs[0].shape) == 1 and op.inputs[0].shape[0] == 1:
+            input_indices = (1,)
+        else:
+            input_indices = range(2)
     else:
         input_indices = range(1)
 
