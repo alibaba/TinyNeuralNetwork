@@ -143,7 +143,7 @@ class QuantizedCatOperator(QuantizedCatSchema):
         assert type(dim) == int
 
         if dim < 0:
-            dim += self.input_tensors[0].ndim
+            dim += self.input_tensors[0][0].ndim
 
         names = graph_converter.get_list_expanded_names(self.input_names[0])
         inputs = self.to_tfl_tensors(
