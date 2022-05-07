@@ -1061,7 +1061,7 @@ class GraphOptimizer(object):
                                 or q_tensor.quantization.zero_point != 0
                             ):
                                 skip = True
-                        else:
+                        elif q_tensor.dtype != np.dtype('uint8'):
                             skip = True
                     elif node['node_type'] == ExtendedOperator.LOG_SOFTMAX:
                         if q_tensor.dtype == np.dtype('int8'):
