@@ -6,6 +6,8 @@ import os
 import sys
 import unittest
 
+from distutils.version import LooseVersion
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -519,6 +521,7 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    @unittest.skipIf(LooseVersion(torch.__version__) < LooseVersion('1.7.0'))
     def test_int_div(self):
         class Model(nn.Module):
             def forward(self, x):

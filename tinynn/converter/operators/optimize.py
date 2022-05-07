@@ -2425,6 +2425,7 @@ def is_requantize_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
             ExtendedOperator.MAX_POOL_2D,
             ExtendedOperator.AVERAGE_POOL_2D,
         )
+        and source_vertex['op'].outputs[0].quantization is not None
         and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
         and source_vertex.outdegree() == 1
     )
