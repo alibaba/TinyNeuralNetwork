@@ -1061,7 +1061,7 @@ class GraphOptimizer(object):
                                 or q_tensor.quantization.zero_point != 0
                             ):
                                 skip = True
-                        else:
+                        elif q_tensor.dtype != np.dtype('uint8'):
                             skip = True
                     elif node['node_type'] == ExtendedOperator.LOG_SOFTMAX:
                         if q_tensor.dtype == np.dtype('int8'):
@@ -2425,6 +2425,7 @@ def is_requantize_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
             ExtendedOperator.MAX_POOL_2D,
             ExtendedOperator.AVERAGE_POOL_2D,
         )
+        and source_vertex['op'].outputs[0].quantization is not None
         and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
         and source_vertex.outdegree() == 1
     )
