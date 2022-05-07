@@ -521,7 +521,9 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
-    @unittest.skipIf(LooseVersion(torch.__version__) < LooseVersion('1.7.0'))
+    @unittest.skipIf(
+        LooseVersion(torch.__version__) < LooseVersion('1.7.0'), 'Integer division not supported in PyTorch 1.6'
+    )
     def test_int_div(self):
         class Model(nn.Module):
             def forward(self, x):
