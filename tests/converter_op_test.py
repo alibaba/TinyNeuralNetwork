@@ -3770,7 +3770,7 @@ class ConverterQuantizedOPTester(unittest.TestCase):
                 self.q_func = torch.nn.quantized.QFunctional()
 
             def forward(self, x):
-                return self.q_func.cat([x, x], 1)
+                return self.q_func.cat([x, x], -1)
 
         model = Model()
         model.eval()
