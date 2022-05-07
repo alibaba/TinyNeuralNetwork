@@ -592,6 +592,12 @@ class QATQuantizer(object):
                                 continue
 
                             if observer is not None:
+                                if quant_min is None and quant_max is None:
+                                    if observer.reduce_range:
+                                        quant_min, quant_max = 0, 127
+                                    else:
+                                        quant_min, quant_max = 0, 255
+
                                 observer.min_val = scale * (quant_min - offset)
                                 observer.max_val = scale * (quant_max - offset)
 
