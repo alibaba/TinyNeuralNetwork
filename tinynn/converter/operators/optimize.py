@@ -1061,7 +1061,15 @@ class GraphOptimizer(object):
                                 or q_tensor.quantization.zero_point != 0
                             ):
                                 skip = True
-                        elif q_tensor.dtype != np.dtype('uint8'):
+                        elif q_tensor.dtype == np.dtype('uint8'):
+                            if (
+                                abs(q_tensor.quantization.scale - 1.0 / 256) > 0.001 * 1.0 / 256
+                                or q_tensor.quantization.zero_point != 0
+                            ):
+                                log.warning(
+                                    'On some chips, only softmax with scale=1.0/256 and zero_point=0 is supported'
+                                )
+                        else:
                             skip = True
                     elif node['node_type'] == ExtendedOperator.LOG_SOFTMAX:
                         if q_tensor.dtype == np.dtype('int8'):
