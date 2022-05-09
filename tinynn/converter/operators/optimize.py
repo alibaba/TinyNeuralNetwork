@@ -1352,7 +1352,12 @@ class GraphOptimizer(object):
                 new_dim = np.where(inv_perm_arr == old_dim)[0][0]
                 new_dim_tensor = self.create_attr_tensor(np.array([new_dim], dtype='int32'))
                 actions.append((self.graph.replace_operator_input, (node, 0, new_dim_tensor, True)))
-            elif node['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2, ExtendedOperator.MIRROR_PAD):
+            elif node['node_type'] in (
+                ExtendedOperator.PAD,
+                ExtendedOperator.PADV2,
+                ExtendedOperator.MIRROR_PAD,
+                ExtendedOperator.TILE,
+            ):
                 old_pad = op.inputs[1].tensor
                 new_pad = self.create_attr_tensor(old_pad[inv_perm_arr])
                 actions.append((self.graph.replace_operator_input, (node, 1, new_pad, True)))
@@ -1606,6 +1611,14 @@ class GraphOptimizer(object):
                 actions.append((self.graph.replace_operator_input, (node, 1, new_start_t, True)))
                 actions.append((self.graph.replace_operator_input, (node, 2, new_end_t, True)))
                 actions.append((self.graph.replace_operator_input, (node, 3, new_stride_t, True)))
+            elif node['node_type'] == ExtendedOperator.TILE:
+                old_shape = op.inputs[1].tensor
+                new_dim = prev_shape.index(-1)
+                old_dim = next_shape.index(-1)
+                new_shape = np.array(prev_shape, dtype='int32')
+                new_shape[new_dim] = old_shape[old_dim]
+                new_shape_tensor = self.create_attr_tensor(new_shape)
+                actions.append((self.graph.replace_operator_input, (node, 1, new_shape_tensor, True)))
             elif dim_indice is not None:
                 raise NotImplementedError(f'{node["node_type"]} has the property `dims` but is not handled')
 
@@ -2606,6 +2619,7 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.MIRROR_PAD,
         ExtendedOperator.SLICE,
         ExtendedOperator.STRIDED_SLICE,
+        ExtendedOperator.TILE,
     )
 
 
@@ -2891,7 +2905,7 @@ def op_input_dims(op: tfl.BaseOperator):
         nonzero_idx = np.nonzero(w_shape != 1)[0]
         if nonzero_idx.size == 1:
             dim_indices = nonzero_idx[0] + 1
-    elif isinstance(op, (tfl.SliceOperator, tfl.StridedSliceOperator)):
+    elif isinstance(op, (tfl.SliceOperator, tfl.StridedSliceOperator, tfl.TileOperator)):
         old_shape = np.array(op.inputs[0].shape)
         new_shape = np.array(op.outputs[0].shape)
         diff = new_shape - old_shape

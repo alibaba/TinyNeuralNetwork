@@ -468,6 +468,32 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
+    def test_unary_elementwise_transpose_tile(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = x.permute(0, 2, 3, 1)
+                y = x.expand((-1, 20, 20, -1))
+                y = y.permute(0, 3, 1, 2)
+                return y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 1, 1)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.TILE)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
     def test_binary_elementwise_transpose_as_unary(self):
         class TestModel(nn.Module):
             def __init__(self) -> None:
@@ -717,6 +743,32 @@ class ConverterOptimizerTester(unittest.TestCase):
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
         self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_unary_elementwise_reshape_tile(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                y = torch.reshape(x, (3, 1, 20))
+                y = y.expand((-1, 10, -1))
+                y = torch.reshape(y, (1, 3, 10, 20))
+                return y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 1, 20)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.TILE)
         self.assertEqual(tfl_model.SubgraphsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
