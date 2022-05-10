@@ -309,11 +309,10 @@ class ATenAvgPool2dOperator(ATenAvgPool2dSchema):
         kernel_h, kernel_w = self.input_tensors[1]
         stride_h, stride_w = self.input_tensors[2] or (kernel_h, kernel_w)
         padding_h, padding_w = self.input_tensors[3]
-        ceil_mode = self.input_tensors[4]
-        count_include_pad = self.input_tensors[5]
+        ceil_mode = self.input_tensors[4] in (True, 1)
+        count_include_pad = self.input_tensors[5] in (True, 1)
         divisor_override = self.input_tensors[6]
 
-        assert count_include_pad in (True, 1)
         assert divisor_override is None or divisor_override == kernel_h == kernel_w
 
         padding = tfl_schema.Padding.VALID
@@ -321,6 +320,23 @@ class ATenAvgPool2dOperator(ATenAvgPool2dSchema):
         avgpool_op = tfl.AveragePool2dOperator(inputs, outputs, padding, stride_w, stride_h, kernel_w, kernel_h)
         ops = self.wrap_ops_with_nhwc_nchw_transposes([avgpool_op])
         self.handle_padding(padding_h, padding_w, 1, ops, ceil_mode)
+
+        if not count_include_pad:
+            mask = 1.0 / torch.nn.functional.avg_pool2d(
+                torch.ones_like(self.input_tensors[0]),
+                (kernel_h, kernel_w),
+                (stride_h, stride_w),
+                (padding_h, padding_w),
+                ceil_mode,
+                count_include_pad=True,
+            )
+            mask_permuted = mask.permute(0, 2, 3, 1)
+            mask_t = self.create_attr_tensor(mask_permuted)
+            before_mask = outputs[0].tensor / mask_permuted
+            before_mask_t = self.create_transform_tensor(before_mask)
+            actual_out = ops[-2].outputs[0]
+            ops[-2].outputs[0] = before_mask_t
+            ops.insert(-1, tfl.MulOperator([before_mask_t, mask_t], [actual_out]))
 
         for op in ops:
             graph_converter.add_operator(op)

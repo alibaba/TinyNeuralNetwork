@@ -2083,6 +2083,20 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    def test_avg_pool_with_count_include_pad(self):
+        dummy_input = torch.randn(1, 3, 112, 112, dtype=torch.float32)
+
+        def model(x):
+            return F.avg_pool2d(x, 7, padding=(2, 1), count_include_pad=False)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_adaptive_pool(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
