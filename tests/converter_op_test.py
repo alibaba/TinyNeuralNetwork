@@ -2918,7 +2918,7 @@ class ConverterOPTester(unittest.TestCase):
     def test_norms(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        funcs = [nn.BatchNorm2d(3), nn.InstanceNorm2d(3), nn.LayerNorm([3, 224, 224])]
+        funcs = [nn.BatchNorm2d(3), nn.BatchNorm2d(3, affine=False), nn.InstanceNorm2d(3), nn.LayerNorm([3, 224, 224])]
 
         for func in funcs:
 

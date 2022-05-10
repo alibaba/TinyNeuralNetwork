@@ -195,6 +195,22 @@ class ATenBatchNormOperator(ATenBatchNormSchema):
 
         self.run(node)
         eps = self.input_tensors[args['eps']]
+
+        # weight
+        if self.input_tensors[1] is None:
+            self.input_names[1] = self.get_unique_attr_name()
+            self.input_tensors[1] = torch.ones(self.input_tensors[0].size(1), dtype=torch.float32)
+
+        # bias
+        if self.input_tensors[2] is None:
+            self.input_names[2] = self.get_unique_attr_name()
+            self.input_tensors[2] = torch.zeros(self.input_tensors[0].size(1), dtype=torch.float32)
+
+        # running mean & var
+        assert (
+            self.input_tensors[3] is not None and self.input_tensors[4] is not None
+        ), "Running mean and variance should not be None. Please use LayerNorm instead."
+
         inputs = [self.find_or_create_input(i, graph_converter) for i in range(5)]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
         graph_converter.add_operator(tfl.BatchNormOperator(inputs, outputs, eps))
