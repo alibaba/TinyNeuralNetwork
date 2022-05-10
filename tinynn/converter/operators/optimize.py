@@ -1338,7 +1338,7 @@ class GraphOptimizer(object):
                 tensor_node_dict[op_out.name] = self.graph.graph.vs.find(name=self.graph.tensor_node_map[op_out.name])
 
             # OP specific dim handling logic
-            if node['node_type'] == ExtendedOperator.CONCATENATION:
+            if node['node_type'] in (ExtendedOperator.CONCATENATION, ExtendedOperator.GATHER):
                 old_axis = op.axis
                 new_axis = np.where(inv_perm_arr == old_axis)[0][0]
                 op.axis = new_axis
@@ -1548,7 +1548,7 @@ class GraphOptimizer(object):
                 tensor_node_dict[op_out.name] = self.graph.graph.vs.find(name=self.graph.tensor_node_map[op_out.name])
 
             # OP specific dim handling logic
-            if node['node_type'] == ExtendedOperator.CONCATENATION:
+            if node['node_type'] in (ExtendedOperator.CONCATENATION, ExtendedOperator.GATHER):
                 new_axis = prev_shape.index(-1)
                 op.axis = new_axis
             elif node['node_type'] == ExtendedOperator.SPLIT_V:
@@ -2620,6 +2620,7 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.SLICE,
         ExtendedOperator.STRIDED_SLICE,
         ExtendedOperator.TILE,
+        ExtendedOperator.GATHER,
     )
 
 
@@ -2888,7 +2889,7 @@ def is_transpose_same_to_reshape_op(op: tfl.BaseOperator):
 def op_input_dims(op: tfl.BaseOperator):
     dim_indices = None
 
-    if isinstance(op, tfl.ConcatenationOperator):
+    if isinstance(op, (tfl.ConcatenationOperator, tfl.GatherOperator)):
         dim_indices = op.axis
     elif isinstance(op, tfl.SplitOperator):
         dim_indices = op.inputs[0].tensor[0]
