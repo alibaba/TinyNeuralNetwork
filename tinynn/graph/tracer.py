@@ -1771,6 +1771,17 @@ class TraceGraph(object):
                 first_arg = None
                 if node.is_class():
                     first_arg = node.prev_node_unique_name(0)
+                if node.type().startswith('__i') and node.type().endswith('__'):
+                    inner_op = node.module.func_type[3:-2]
+                    if inner_op in SPECIAL_OPERATORS:
+                        node.module.func_type = f'__{inner_op}__'
+                        parts = node.module.full_name.split('.')[:-1] + [node.module.func_type]
+                        node.module.full_name = '.'.join(parts)
+                        if first_arg is not None:
+                            alias = first_arg
+                        else:
+                            alias = node.module.get_tensor_name(0)
+                        node.module.add_alias(alias)
                 aliases = node.module.get_aliases()
                 prefix = ''
                 if aliases is not None:
