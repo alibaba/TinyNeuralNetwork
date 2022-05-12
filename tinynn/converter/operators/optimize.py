@@ -226,7 +226,16 @@ class GraphOptimizer(object):
 
             return skip
 
-        elinimate_sequences(self.graph, filtered_pairs, True, None, _remove_last_pred, _remove_last_action, _skip_pred)
+        elinimate_sequences(
+            self.graph,
+            filtered_pairs,
+            True,
+            None,
+            _remove_last_pred,
+            _remove_last_action,
+            _skip_pred,
+            force_forward_input=True,
+        )
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_same_padding_slicing(self):
@@ -3173,6 +3182,7 @@ def elinimate_sequences(
     remove_last_node_action: typing.Optional[typing.Callable] = None,
     skip_pred: typing.Union[bool, typing.Callable] = False,
     input_idx: int = 0,
+    force_forward_input: bool = False,
 ):
     remove_ids = []
     actions = []
@@ -3256,6 +3266,12 @@ def elinimate_sequences(
             if not has_output_nodes:
                 use_forward_input = True
             elif output_outdegree > 0:
+                skip = True
+
+        if force_forward_input and not use_forward_input:
+            if not has_output_nodes:
+                use_forward_input = True
+            else:
                 skip = True
 
         if skip:
