@@ -685,6 +685,8 @@ class QATQuantizer(object):
             full_name_parts = node.module.full_name.split('.')
             full_name_parts[-1] = node.module.func_type
 
+            node.module.full_name = '.'.join(full_name_parts)
+
             with override_current_trace_graph(graph):
                 node.module.parse_args(node.prev_tensors[0], -1.0)
 
@@ -899,6 +901,7 @@ class QATQuantizer(object):
                 # Don't check anything for other OPs.
                 # It is simply too complex for us.
                 op_type = op_kind
+            node.module.func_type = op_type
             node.module.full_name = f'self.{module_name}.{op_type}'
             # Inplace operations
             if node.module.func_type in ['__iadd__', '__imul__', 'add_', 'mul_']:
