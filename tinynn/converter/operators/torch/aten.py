@@ -2300,6 +2300,8 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
             if type(t) == torch.Tensor:
                 if t.dtype == torch.float64:
                     self.input_tensors[i] = t.to(dtype=torch.float32)
+                elif t.dtype == torch.int64:
+                    self.input_tensors[i] = t.to(dtype=torch.int32)
 
         if self.output_tensors[out_idx].dtype == torch.float64:
             self.output_tensors[out_idx] = self.output_tensors[out_idx].to(dtype=torch.float32)

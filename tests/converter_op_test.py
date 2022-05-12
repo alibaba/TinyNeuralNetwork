@@ -3319,6 +3319,33 @@ class ConverterOPTester(unittest.TestCase):
         class Model(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
+                self.norm = nn.Conv3d(16, 33, (3, 5, 2), stride=(2, 1, 1), padding=0)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.6.0'), 'pad with 5d-dim is not supported')
+    def test_conv3d_with_pad(self):
+        dummy_input = torch.randn(1, 16, 10, 50, 100, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
                 self.norm = nn.Conv3d(16, 33, (3, 5, 2), stride=(2, 1, 1), padding=(4, 2, 0))
 
             def forward(self, x):
