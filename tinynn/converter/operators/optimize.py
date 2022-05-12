@@ -330,6 +330,53 @@ class GraphOptimizer(object):
         # Delete activation nodes
         self.graph.graph.delete_vertices(remove_ids)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
+    def fuse_conv2d_gather(self):
+        # Find fusable ops
+        edges = self.graph.graph.es.select(functools.partial(is_conv2d_gather_edge, graph_converter=self.graph.graph))
+        filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target], x) for x in edges)
+
+        remove_ids = []
+        actions = []
+        for conv, gather, tensor in filtered_pairs:
+            # Find out the output of the batch-norm nodes
+            new_output = gather['outputs'][0]
+            assert new_output in self.graph.tensor_map
+
+            # For each node that is next of the activation node, we connect it with the previous node
+            self.graph.connect_next_tensors(gather, conv, new_output)
+
+            # Update graph, prepare to drop the output tensor of the gather node and use the output tensor of the
+            # conv instead
+            conv['outputs'][0] = new_output
+            conv['op'].outputs[0] = self.graph.tensor_map[new_output]
+            self.graph.tensor_node_map[new_output] = conv['name']
+            tensor['name'] = gather['outputs'][0]
+            tensor['label'] = gather['outputs'][0]
+            # permute weight of conv-op
+            indx = gather['op'].inputs[1].tensor.copy()
+            w = conv['op'].inputs[1].tensor.copy()
+            new_w = np.take(w, indx, axis=0)
+            new_w = self.create_attr_tensor(new_w)
+            actions.append((self.graph.replace_operator_input, (conv, 1, new_w)))
+
+            # permute bias of conv-op
+            b = conv['op'].inputs[2].tensor.copy() if len(conv['op'].inputs) > 2 else None
+            new_b = None
+            if b is not None:
+                new_b = np.take(b, indx, axis=0)
+                new_b = self.create_attr_tensor(new_b)
+                actions.append((self.graph.replace_operator_input, (conv, 2, new_b)))
+
+            # remove gather op
+            remove_ids.append(gather.index)
+
+        # Process actions
+        for func, args in actions:
+            func(*args)
+        # Delete activation nodes
+        self.graph.graph.delete_vertices(remove_ids)
+
     @class_conditional(lambda self: self.tflite_micro_rewrite)
     def split_requantize(self):
         vertices = self.graph.graph.vs.select(functools.partial(is_requantize_node, graph_converter=self.graph.graph))
@@ -2300,6 +2347,8 @@ class GraphOptimizer(object):
         self.fuse_simple_transpose_pass()
         self.fuse_simple_reshape_pass()
 
+        self.fuse_conv2d_gather()
+
         # Branch transpose & reshape cleanup
         if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED:
             trials = 11
@@ -2893,6 +2942,20 @@ def is_transpose_same_to_reshape_op(op: tfl.BaseOperator):
         return np.array_equal(new_tensor.flatten(), input_tensor.flatten())
     else:
         return False
+
+
+def is_conv2d_gather_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+
+    return (
+        source_vertex['node_type'] == ExtendedOperator.CONV_2D
+        and target_vertex['node_type'] == ExtendedOperator.GATHER
+        and source_vertex.outdegree() == 1
+        and target_vertex['op'].inputs[1].buffer is not None
+        and target_vertex['op'].axis == 3
+        and source_vertex['op'].inputs[1].tensor.shape[0] == target_vertex['op'].inputs[1].tensor.shape[0]
+    )
 
 
 def op_input_dims(op: tfl.BaseOperator):

@@ -3271,6 +3271,30 @@ class ConverterOPTester(unittest.TestCase):
 
         assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
+    def test_conv_pixelshuffle(self):
+        dummy_input = torch.randn(1, 3, 128, 128, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self):
+                super(Model, self).__init__()
+                self.block = nn.Sequential(
+                    nn.Conv2d(3, 16, 3, 1, 1),
+                    nn.PixelShuffle(2),
+                )
+
+            def forward(self, x):
+                return self.block(x)
+
+        model_path = get_model_path()
+
+        model = Model()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_topk(self):
         def model(x):
             return x.topk(5)
