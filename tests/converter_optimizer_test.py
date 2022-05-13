@@ -1768,6 +1768,40 @@ class ConverterOptimizerQuantizedTester(unittest.TestCase):
         )
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
+    def test_conv2d_gather(self):
+        class TestModel(nn.Module):
+            def __init__(self, with_bias=False):
+                super(TestModel, self).__init__()
+                self.block = nn.Sequential(
+                    nn.Conv2d(3, 16, 3, 1, 1, bias=with_bias),
+                    nn.PixelShuffle(2),
+                    nn.Conv2d(4, 4, 3, 1, 1, bias=with_bias),
+                    nn.PixelShuffle(2),
+                )
+
+            def forward(self, x):
+                return self.block(x)
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 3, 128, 128)
+        model_path = get_model_path()
+
+        nchw_transpose = False
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=nchw_transpose)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 6)
+        self.assertEqual(tfl_model.OperatorCodes(1).DeprecatedBuiltinCode(), tflite.BuiltinOperator.CONV_2D)
+        self.assertEqual(tfl_model.OperatorCodes(2).DeprecatedBuiltinCode(), tflite.BuiltinOperator.DEPTH_TO_SPACE)
+        self.assertEqual(tfl_model.OperatorCodes(3).DeprecatedBuiltinCode(), tflite.BuiltinOperator.CONV_2D)
+        self.assertEqual(tfl_model.OperatorCodes(4).DeprecatedBuiltinCode(), tflite.BuiltinOperator.DEPTH_TO_SPACE)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+
 
 if __name__ == '__main__':
     unittest.main()
