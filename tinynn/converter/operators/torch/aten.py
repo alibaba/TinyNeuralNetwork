@@ -2514,6 +2514,14 @@ class ATenMeshgridOperator(ATenMeshgridSchema):
         assert False, "aten::meshgrid for dynamic tensors is not supported"
 
 
+class ATenFillOperator(ATenFillSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        assert False, "aten::fill_ for dynamic tensors is not supported"
+
+
 class ATenUnbindOperator(ATenUnbindSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)

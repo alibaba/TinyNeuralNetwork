@@ -151,6 +151,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::cumsum": ATenCumsumOperator,
     "aten::meshgrid": ATenMeshgridOperator,
     "aten::unbind": ATenUnbindOperator,
+    "aten::fill_": ATenFillOperator,
     # quantized
     "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,
     "aten::fake_quantize_per_tensor_affine": ATenFakeQuantizePerTensorAffineOperator,
@@ -190,4 +191,6 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::ones_like": NoTrackOperator,
     "aten::zeros_like": NoTrackOperator,
     "aten::empty": NoTrackOperator,
+    "aten::new_zeros": NoTrackOperator,
+    "aten::new_ones": NoTrackOperator,
 }
