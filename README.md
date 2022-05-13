@@ -51,6 +51,19 @@ We appreciate your help for improving our framework. More details are listed [he
 + Nov. 2021: A new pruner with adaptive sparsity
 + Dec. 2021: Model compression for Transformers
 
+## Citation
+
+If you find this project useful in your research, please consider cite:
+
+```
+@misc{tinynn,
+    title={TinyNeuralNetwork: An efficient deep learning model compression framework},
+    author={Ding, Huanghao and Pu, Jiachen and Hu, Conggang},
+    howpublished = {\url{https://github.com/alibaba/TinyNeuralNetwork}},
+    year={2021}
+}
+```
+
 ## Frequently Asked Questions
 
 Because of the high complexity and frequent updates of PyTorch, we cannot ensure that all cases are covered through automated testing.

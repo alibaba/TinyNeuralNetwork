@@ -46,6 +46,19 @@ pip install git+https://github.com/alibaba/TinyNeuralNetwork.git
 + 2021.11：自适应剪枝率
 + 2021.12：Transformer压缩
 
+## 引用
+
+如果你的研究中使用了TinyNeuralNetwork，可以考虑引用本项目。
+
+```
+@misc{tinynn,
+    title={TinyNeuralNetwork: An efficient deep learning model compression framework},
+    author={Ding, Huanghao and Pu, Jiachen and Hu, Conggang},
+    howpublished = {\url{https://github.com/alibaba/TinyNeuralNetwork}},
+    year={2021}
+}
+```
+
 ## 常见问题
 
 由于PyTorch具有极高的编码自由度，我们无法确保所有的Case都能自动化覆盖，当你遇到问题时，
