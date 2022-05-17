@@ -88,6 +88,29 @@ A：一般有两种解法
   （由于qat_eval_model.py中并没self.conv1，因此load_state_dict的时候需要设置strict=False)
 + 仍然生成两份代码，然后复制一份qat_train_model.py并把forward函数手动替换为qat_eval_model.py中的forward函数即可
 
+#### 如何将预处理中的Normalization和Quantize OP融合起来，将图像原始数据作为输入？
+
+假设预处理中使用 `normalized = (image - mean) / std` 来做 normalization，可以在构造Quantizer的时候传入参数 `'quantized_input_stats': [(mean, std)]`，以及在Converter构造时传入`fuse_quant_dequant=True`，然后就可以将图片数据（公式中的`image`）以`uint8`的数据格式传入。
+
+举例来说，对于torchvision中的图像常采用如下的预处理流程。
+
+```py
+transforms = transforms.Compose(
+    [
+        transforms.Resize(img_size),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ]
+)
+```
+
+除去Resize过程，`ToTensor` 会将数据转变成浮点型，然后除以255，然后 `Normalize` 按照 `mean=(0.4914, 0.4822, 0.4465)` 以及 `std=(0.2023, 0.1994, 0.2010)` 做Normalization。在这种情况下，我们可以将其等效看作完成了 `mean=114.3884` 和 `std=58.3021` 的 Normalization。当然这种情况下，会导致一些精度损失。如果想有更高的精度，可以尝试
+
+1. 在训练浮点模型前或者QAT训练前尽量将通道的Normalization参数统一
+2. 尽量确保 `mean` 设置的是一个整数，因为对应的量化参数 `zero_point` 只能是一个整数。
+
+P.S. 对于 `int8` 类型的输入，你可能需要在模型输入前自行完成 `uint8` 到 `int8` 的转换 （手工减128）
+
 ## 模型转换
 
 #### 算子不支持如何处理？

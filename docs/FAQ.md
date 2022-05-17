@@ -88,6 +88,29 @@ A: There are generally two ways to tackle this problem.
   (Since there is no `self.conv1` in `qat_eval_model.py`, you need to set `strict=False` when calling `load_state_dict`)
 + Like the former one, generate two different copies of the model in training mode and evaluation mode respectively. And then, make a copy of `qat_train_model.py` and replace the forward function with that in `qat_eval_model.py` manually. Finally, use the modified script as the one for the evaluation mode.
 
+#### How to fuse normalization in preprocessing and the Quantize OP, so that the raw image data is used as input?
+
+Assuming normalization is done in preprocessing using `normalized = (image - mean) / std`, you can pass in the parameter `'quantized_input_stats': [(mean, std)]` when constructing `Quantizer`, as well as constructing `Converter` with `fuse_quant_dequant=True`, then the image data (`image` in the formula) can be passed in as the `uint8` data format.
+
+For example, the following preprocessing process is often used for images in torchvision.
+
+```py
+transforms = transforms.Compose(
+    [
+        Resize(img_size),
+        ToTensor(),
+        Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)). transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ]
+)
+```
+
+Except for the Resize process, `ToTensor` converts the data to floating point and divides it by 255, then `Normalize` performs normalization according to `mean=(0.4914, 0.4822, 0.4465)` and `std=(0.2023, 0.1994, 0.2010)`. In this case, it is simliar to the normalization of `mean=114.3884` and `std=58.3021`, which of course leads to some accuracy loss. If you want to have higher accuracy, you can try out the following things.
+
+1. Unify the normalization parameters of the channels before training the floating-point model or before QAT training
+2. Make sure `mean` is set to an integer, because the corresponding quantization parameter `zero_point` can only be an integer.
+
+P.S. For inputs of the `int8` type , you may need to perform the `uint8` to `int8` conversion yourself before feeding to the model as input (subtract 128 manually)
+
 ## Model conversion
 
 #### What should I do if the operator is not supported?
