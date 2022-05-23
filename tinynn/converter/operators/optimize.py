@@ -480,12 +480,27 @@ class GraphOptimizer(object):
         def _remove_first_pred(seq):
             new_perm = fuse_transpose_perms(seq)
 
+            hints = set()
+            for node in seq:
+                if 'direction' in node['op'].extra_hints:
+                    hints.add(node['op'].extra_hints['direction'])
+
+            if len(hints) == 1:
+                hint = next(iter(hints))
+            else:
+                hint = None
+
             remove_first = np.array_equal(new_perm, np.sort(new_perm))
-            return remove_first, new_perm
+            return remove_first, (new_perm, hint)
 
         def _remove_first_action(first_node, last_node, custom_data):
             # Set fused perm to the first transpose node
-            new_perm = custom_data
+            new_perm, hint = custom_data
+            if hint is None:
+                if 'direction' in first_node['op'].extra_hints:
+                    del first_node['op'].extra_hints['direction']
+            else:
+                first_node['op'].extra_hints['direction'] = hint
             new_perm_tensor = self.create_attr_tensor(new_perm)
             action = (self.graph.replace_operator_input, (first_node, 1, new_perm_tensor))
             return [action]
@@ -865,6 +880,7 @@ class GraphOptimizer(object):
             new_tensor = self.create_transform_tensor(op_out.tensor.copy(), quantization=op_out.quantization)
             new_perm = self.create_attr_tensor(op_perm.tensor.copy())
             new_op = tfl.TransposeOperator([prev_out, new_perm], [new_tensor])
+            new_op.extra_hints.update(op.extra_hints)
             self.graph.add_operator(new_op)
 
             next_indices = []
@@ -880,7 +896,7 @@ class GraphOptimizer(object):
         expand_op_outputs_in_branches(branch_transpose_nodes, _new_transpose, self.graph)
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
-    def elementwise_reshape_transpose_passthrough_pass(self):
+    def elementwise_reshape_transpose_passthrough_pass(self) -> int:
         edges = self.graph.graph.es.select(
             functools.partial(is_transpose_reshape_op_edge, graph_converter=self.graph.graph)
         )
@@ -891,6 +907,7 @@ class GraphOptimizer(object):
         actions = []
         remove_edges = []
         remove_vertices = []
+        num_actions = 0
         for node in unique_nodes:
             op = node['op']
             input_indices = op_input_indices(op)
@@ -976,6 +993,8 @@ class GraphOptimizer(object):
             if len(next_nodes) == 0 or new_transpose_size >= cur_transpose_size:
                 continue
 
+            num_actions += 1
+
             remove_edges.extend([x.index for x in next_edges])
             remove_vertices.extend([x.index for x in out_nodes])
 
@@ -1053,6 +1072,8 @@ class GraphOptimizer(object):
 
         self.graph.graph.delete_edges(remove_edges)
         self.graph.graph.delete_vertices(remove_vertices)
+
+        return num_actions
 
     @class_conditional(lambda self: self.rewrite_quantizable)
     def elementwise_op_quantize_passthrough_pass(self):
@@ -1207,7 +1228,7 @@ class GraphOptimizer(object):
         self.graph.graph.delete_vertices(remove_vertices)
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
-    def elementwise_op_transpose_passthrough_pass(self, extended_logic=False):
+    def elementwise_op_transpose_passthrough_pass(self) -> int:
         edges = self.graph.graph.es.select(
             functools.partial(is_transpose_elementwise_op_edge, graph_converter=self.graph.graph)
         )
@@ -1218,6 +1239,7 @@ class GraphOptimizer(object):
         actions = []
         remove_edges = []
         remove_vertices = []
+        num_actions = 0
         for node in unique_nodes:
             op = node['op']
             input_indices = op_input_indices(op)
@@ -1227,6 +1249,7 @@ class GraphOptimizer(object):
             prev_output_indices = []
             num_constant_nodes = 0
             num_reshape_transpose = 0
+            prev_hints = set()
             for i in input_indices:
                 prev_node_name = op.inputs[i].name
                 prev_node = self.graph.graph.vs.find(name=self.graph.tensor_node_map[prev_node_name])
@@ -1237,6 +1260,8 @@ class GraphOptimizer(object):
                     perm = tuple(prev_node['op'].inputs[1].tensor.tolist())
                     cand_perms.setdefault(perm, 0)
                     cand_perms[perm] += 1
+                    if 'direction' in prev_node['op'].extra_hints:
+                        prev_hints.add(prev_node['op'].extra_hints['direction'])
 
                 if prev_node['node_type'] == ExtendedOperator.CONSTANT_NODE:
                     num_constant_nodes += 1
@@ -1246,11 +1271,17 @@ class GraphOptimizer(object):
                     prev_prev_node = self.graph.graph.vs.find(name=prev_prev_node_name)
                     if prev_prev_node['node_type'] == ExtendedOperator.TRANSPOSE:
                         num_reshape_transpose += 1
+                        if 'direction' in prev_prev_node['op'].extra_hints:
+                            prev_hints.add(prev_prev_node['op'].extra_hints['direction'])
+
+            if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED and 'up' in prev_hints:
+                continue
 
             next_nodes = []
             next_edges = []
             out_nodes = []
             skip_names = []
+            next_hints = set()
             for edge in node.out_edges():
                 if edge.index in remove_edges:
                     continue
@@ -1268,11 +1299,18 @@ class GraphOptimizer(object):
                     perm = tuple(np.argsort(next_node['op'].inputs[1].tensor).tolist())
                     cand_perms.setdefault(perm, 0)
                     cand_perms[perm] += 1
+                    if 'direction' in next_node['op'].extra_hints:
+                        next_hints.add(next_node['op'].extra_hints['direction'])
 
                 if next_node['node_type'] == ExtendedOperator.RESHAPE:
                     o_nodes = [e.target_vertex for e in next_node.out_edges()]
                     if len(o_nodes) == 1 and o_nodes[0]['node_type'] == ExtendedOperator.TRANSPOSE:
                         num_reshape_transpose += 1
+                        if 'direction' in o_nodes[0]['op'].extra_hints:
+                            next_hints.add(o_nodes[0]['op'].extra_hints['direction'])
+
+            if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED and 'down' in next_hints:
+                continue
 
             cur_transpose_size = sum(cand_perms.values()) + num_reshape_transpose
             new_transpose_size = (
@@ -1284,47 +1322,13 @@ class GraphOptimizer(object):
                 continue
             elif new_transpose_size == cur_transpose_size:
                 skip = True
-                if not extended_logic:
-                    continue
-                for i in range(len(next_nodes)):
-                    if next_nodes[i]['node_type'] == ExtendedOperator.TRANSPOSE:
-                        next_next_edges = [e for e in next_nodes[i].out_edges()]
-                        if len(next_next_edges) == 1:
-                            next_next_node = next_next_edges[0].target_vertex
-                            if is_non_passthrough_op(next_next_node['node_type'], next_next_node['op']):
-                                skip = False
-                                log.debug(
-                                    f'transpose (backward), (OP->Transpose->NonPassThru): {node["name"]},'
-                                    f' {node["outputs"]}'
-                                )
-                    elif next_nodes[0]['node_type'] == ExtendedOperator.RESHAPE:
-                        next_next_edges = [e for e in next_nodes[i].out_edges()]
-                        if len(next_next_edges) != 1:
-                            next_next_node = next_next_edges[0].target_vertex
-                            if next_next_node['node_type'] != ExtendedOperator.TRANSPOSE:
-                                skip = False
-                                log.debug(
-                                    f'transpose (backward), (OP->Reshape->Transpose): {node["name"]}, {node["outputs"]}'
-                                )
-                for i in range(len(prev_nodes)):
-                    if prev_nodes[i]['node_type'] == ExtendedOperator.TRANSPOSE:
-                        prev_prev_node_name = self.graph.tensor_node_map[prev_nodes[i]['op'].inputs[0].name]
-                        prev_prev_node = self.graph.graph.vs.find(name=prev_prev_node_name)
-                        if is_non_passthrough_op(prev_prev_node['node_type'], prev_prev_node['op']):
-                            skip = False
-                            log.debug(
-                                f'transpose (forward), (NonPassThru->Transpose->OP): {node["name"]}, {node["outputs"]}'
-                            )
-                    elif prev_nodes[i]['node_type'] == ExtendedOperator.RESHAPE:
-                        prev_prev_node_name = self.graph.tensor_node_map[prev_nodes[i]['op'].inputs[0].name]
-                        prev_prev_node = self.graph.graph.vs.find(name=prev_prev_node_name)
-                        if prev_prev_node['node_type'] == ExtendedOperator.TRANSPOSE:
-                            skip = False
-                            log.debug(
-                                f'transpose (forward), (Transpose->Reshape->OP): {node["name"]}, {node["outputs"]}'
-                            )
+                if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED:
+                    if 'down' in prev_hints or 'up' in next_hints:
+                        skip = False
                 if skip:
                     continue
+
+            num_actions += 1
 
             remove_edges.extend([x.index for x in next_edges])
             remove_vertices.extend([x.index for x in out_nodes])
@@ -1364,7 +1368,9 @@ class GraphOptimizer(object):
                         np.transpose(prev_out.tensor, inv_perm_arr), quantization=prev_out.quantization
                     )
                     tensor_node_dict[prev_out.name] = (prev_new_out, 1)
-                    self.graph.add_operator(tfl.TransposeOperator([prev_out, perm_tensor], [prev_new_out]))
+                    transpose_op = tfl.TransposeOperator([prev_out, perm_tensor], [prev_new_out])
+                    transpose_op.extra_hints['direction'] = 'up'
+                    self.graph.add_operator(transpose_op)
                     actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
 
             tensor_node_dict = {}
@@ -1389,7 +1395,9 @@ class GraphOptimizer(object):
                 node['outputs'][i] = new_out.name
                 op.outputs[i] = new_out
 
-                self.graph.add_operator(tfl.TransposeOperator([new_out, perm_tensor], [op_out]))
+                transpose_op = tfl.TransposeOperator([new_out, perm_tensor], [op_out])
+                transpose_op.extra_hints['direction'] = 'down'
+                self.graph.add_operator(transpose_op)
 
                 tensor_node_dict[op_out.name] = self.graph.graph.vs.find(name=self.graph.tensor_node_map[op_out.name])
 
@@ -1448,7 +1456,9 @@ class GraphOptimizer(object):
         self.graph.graph.delete_edges(remove_edges)
         self.graph.graph.delete_vertices(remove_vertices)
 
-    def elementwise_op_reshape_passthrough_pass(self):
+        return num_actions
+
+    def elementwise_op_reshape_passthrough_pass(self) -> int:
         edges = self.graph.graph.es.select(
             functools.partial(is_reshape_elementwise_op_edge, graph_converter=self.graph.graph)
         )
@@ -1459,6 +1469,7 @@ class GraphOptimizer(object):
         actions = []
         remove_edges = []
         remove_vertices = []
+        num_actions = 0
         for node in unique_nodes:
             op = node['op']
             dim_indice = op_input_dims(op)
@@ -1546,6 +1557,8 @@ class GraphOptimizer(object):
             # Skip if not wrapped by reshapes
             if len(next_nodes) == 0 or cur_reshape_size < full_size or cur_next_reshape_size < full_size:
                 continue
+
+            num_actions += 1
 
             remove_edges.extend([x.index for x in next_edges])
             remove_vertices.extend([x.index for x in out_nodes])
@@ -1689,6 +1702,8 @@ class GraphOptimizer(object):
         for func, args in actions:
             node = args[0]
             func(*args)
+
+        return num_actions
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_bmm_add_pass(self):
@@ -1978,6 +1993,7 @@ class GraphOptimizer(object):
                     np.transpose(last_tensor.tensor, nhwc2nchw_perm), quantization=last_tensor.quantization
                 )
                 transpose_op = tfl.TransposeOperator([last_tensor, nhwc2nchw_perm_tensor], [transposed])
+                transpose_op.extra_hints['direction'] = 'down'
                 self.graph.add_operator(transpose_op)
 
                 # Get the newly-generated node
@@ -2097,7 +2113,9 @@ class GraphOptimizer(object):
                         np.transpose(prev_out.tensor, nchw2nhwc_perm), quantization=prev_out.quantization
                     )
                     tensor_node_dict[prev_out.name] = (prev_new_out, 1)
-                    self.graph.add_operator(tfl.TransposeOperator([prev_out, perm_tensor], [prev_new_out]))
+                    prev_transpose_op = tfl.TransposeOperator([prev_out, perm_tensor], [prev_new_out])
+                    prev_transpose_op.extra_hints['direction'] = 'up'
+                    self.graph.add_operator(prev_transpose_op)
                     actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
 
             tensor_mapping = {}
@@ -2110,7 +2128,9 @@ class GraphOptimizer(object):
                     new_t = self.create_transform_tensor(np.transpose(t.tensor, nhwc2nchw_perm))
                     perm_t = self.create_attr_tensor(nhwc2nchw_perm)
 
-                    self.graph.add_operator(tfl.TransposeOperator([t, perm_t], [new_t]))
+                    next_transpose_op = tfl.TransposeOperator([t, perm_t], [new_t])
+                    next_transpose_op.extra_hints['direction'] = 'down'
+                    self.graph.add_operator(next_transpose_op)
 
                     tensor_mapping[t.name] = new_t
 
@@ -2171,7 +2191,9 @@ class GraphOptimizer(object):
                 node['outputs'][i] = new_out.name
                 op.outputs[i] = new_out
 
-                self.graph.add_operator(tfl.TransposeOperator([new_out, perm_tensor], [op_out]))
+                next_transpose_op = tfl.TransposeOperator([new_out, perm_tensor], [op_out])
+                next_transpose_op.extra_hints['direction'] = 'up'
+                self.graph.add_operator(next_transpose_op)
 
                 tensor_node_dict[op_out.name] = (
                     self.graph.graph.vs.find(name=self.graph.tensor_node_map[new_out.name]),
@@ -2350,31 +2372,25 @@ class GraphOptimizer(object):
         self.fuse_conv2d_gather()
 
         # Branch transpose & reshape cleanup
-        if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED:
-            trials = 11
-            fold_buffer = True
-            extended_logic = [i in (0, 2, 5, 9) for i in range(trials)]
-        else:
-            trials = 5
-            fold_buffer = False
-            extended_logic = [False] * trials
+        for i in range(11):
+            t_count = self.elementwise_op_transpose_passthrough_pass()
+            if t_count > 0:
+                self.branch_transpose_expand_pass()
+                self.fuse_simple_transpose_pass()
 
-        for extended in extended_logic:
-            if fold_buffer:
-                self.fold_reshape_buffer()
-                self.fold_transpose_buffer()
+            r_count = self.elementwise_op_reshape_passthrough_pass()
+            if r_count > 0:
+                self.branch_reshape_expand_pass()
+                self.fuse_simple_reshape_pass()
 
-            self.elementwise_op_transpose_passthrough_pass(extended)
-            self.branch_transpose_expand_pass()
-            self.fuse_simple_transpose_pass()
+            c_count = self.elementwise_reshape_transpose_passthrough_pass()
+            if c_count > 0:
+                self.branch_transpose_expand_pass()
+                self.fuse_simple_transpose_pass()
 
-            self.elementwise_op_reshape_passthrough_pass()
-            self.branch_reshape_expand_pass()
-            self.fuse_simple_reshape_pass()
-
-            self.elementwise_reshape_transpose_passthrough_pass()
-            self.branch_transpose_expand_pass()
-            self.fuse_simple_transpose_pass()
+            if t_count + r_count + c_count == 0:
+                log.debug(f'elem p/t pass finished in {i + 1} steps')
+                break
 
         # Other cleanups
         self.fuse_simple_slice_pass()

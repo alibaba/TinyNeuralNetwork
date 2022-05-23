@@ -364,6 +364,9 @@ class OperatorConverter(ABC):
         nchw2nhwc_transpose = tfl.TransposeOperator([orig_input, nchw2nhwc_perm_tensor], [new_input])
         nhwc2nchw_transpose = tfl.TransposeOperator([new_output, nhwc2nchw_perm_tensor], [orig_output])
 
+        nchw2nhwc_transpose.extra_hints['direction'] = 'up'
+        nhwc2nchw_transpose.extra_hints['direction'] = 'down'
+
         ops[0].inputs[input_idx] = new_input
         ops[-1].outputs[output_idx] = new_output
 

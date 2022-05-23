@@ -50,6 +50,7 @@ class BaseOperator(object):
     tfl_op: Offset
     tfl_inputs_idx: typing.Iterable[int]
     tfl_outputs_idx: typing.Iterable[int]
+    extra_hints: typing.Dict[str, typing.Any]
 
     def __init__(self, op: int, inputs: typing.List['Tensor'], outputs: typing.List['Tensor'], op_version: int = 1):
         self.inputs = inputs
@@ -59,6 +60,8 @@ class BaseOperator(object):
         self.tfl_op = 0
         self.tfl_inputs_idx = []
         self.tfl_outputs_idx = []
+
+        self.extra_hints = {}
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)

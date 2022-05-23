@@ -156,7 +156,7 @@ def conditional(cond: typing.Callable[[], bool]) -> typing.Callable:
         @wraps(f)
         def wrapper(*args, **kwds):
             if cond():
-                f(*args, **kwds)
+                return f(*args, **kwds)
 
         return wrapper
 
@@ -177,7 +177,7 @@ def class_conditional(cond: typing.Callable[[typing.Any], bool]) -> typing.Calla
         @wraps(f)
         def wrapper(*args, **kwds):
             if cond(args[0]):
-                f(*args, **kwds)
+                return f(*args, **kwds)
 
         return wrapper
 
