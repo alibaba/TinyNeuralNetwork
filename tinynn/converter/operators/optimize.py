@@ -2374,19 +2374,16 @@ class GraphOptimizer(object):
         # Branch transpose & reshape cleanup
         for i in range(11):
             t_count = self.elementwise_op_transpose_passthrough_pass()
-            if t_count > 0:
-                self.branch_transpose_expand_pass()
-                self.fuse_simple_transpose_pass()
+            self.branch_transpose_expand_pass()
+            self.fuse_simple_transpose_pass()
 
             r_count = self.elementwise_op_reshape_passthrough_pass()
-            if r_count > 0:
-                self.branch_reshape_expand_pass()
-                self.fuse_simple_reshape_pass()
+            self.branch_reshape_expand_pass()
+            self.fuse_simple_reshape_pass()
 
             c_count = self.elementwise_reshape_transpose_passthrough_pass()
-            if c_count > 0:
-                self.branch_transpose_expand_pass()
-                self.fuse_simple_transpose_pass()
+            self.branch_transpose_expand_pass()
+            self.fuse_simple_transpose_pass()
 
             if t_count + r_count + c_count == 0:
                 log.debug(f'elem p/t pass finished in {i + 1} steps')

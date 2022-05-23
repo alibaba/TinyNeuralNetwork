@@ -240,19 +240,17 @@ class ConverterOptimizerTester(unittest.TestCase):
         converter = TFLiteConverter(model, dummy_input, model_path)
         converter.convert()
 
-        # TODO: Optimize this case
-
         tfl_model = parse_model(model_path)
-        self.assertEqual(tfl_model.OperatorCodesLength(), 8)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 6)
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 4)
-        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 8)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 6)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
         split_output_indices = tfl_model.Subgraphs(0).Operators(1).OutputsAsNumpy().tolist()
         split_output_names = [tfl_model.Subgraphs(0).Tensors(i).Name() for i in split_output_indices]
 
-        for i in range(2, 8):
+        for i in range(2, 6):
             op_index = tfl_model.Subgraphs(0).Operators(0).OpcodeIndex()
             op_code = tfl_model.OperatorCodes(op_index)
 
