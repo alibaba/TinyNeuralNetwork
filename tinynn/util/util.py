@@ -163,7 +163,7 @@ def conditional(cond: typing.Callable[[], bool]) -> typing.Callable:
     return conditional_decorator
 
 
-def class_conditional(cond: typing.Callable[[typing.Any], bool]) -> typing.Callable:
+def class_conditional(cond: typing.Callable[[typing.Any], bool], default_val=None) -> typing.Callable:
     """A class function wrapper that only runs the code of the function under given condition
 
     Args:
@@ -178,6 +178,8 @@ def class_conditional(cond: typing.Callable[[typing.Any], bool]) -> typing.Calla
         def wrapper(*args, **kwds):
             if cond(args[0]):
                 return f(*args, **kwds)
+            else:
+                return default_val
 
         return wrapper
 
