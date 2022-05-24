@@ -473,9 +473,16 @@ class OperatorConverter(ABC):
         if transpose_opt:
             # For some ops the codepath is optimized for nhwc.
             # For example, for tfl.Mean, if it is a pooling 2d op, consider wrapping it with transposes
-            if len(input_tensor.shape) == 4 and dims == [2, 3]:
-                dims = [1, 2]
-                transpose = True
+            if len(input_tensor.shape) == 4:
+                if dims == [2, 3]:
+                    dims = [1, 2]
+                    transpose = True
+                elif dims == [3, 2]:
+                    dims = [2, 1]
+                    transpose = True
+                elif converter_class == tfl.MeanOperator and dims == [1]:
+                    dims = [3]
+                    transpose = True
 
         dim_tensor = self.create_attr_tensor(np.array(dims, dtype='int32'))
 
