@@ -25,6 +25,7 @@ class GraphOptimizer(object):
     fuse_quant: bool
     group_conv_rewrite: bool
     tflite_micro_rewrite: bool
+    quantize_input_output_type: typing.Optional[str]
 
     # Optimization levels
     NO_OPTIMIZE: int = 0
@@ -43,6 +44,7 @@ class GraphOptimizer(object):
         group_conv_rewrite: bool,
         rewrite_quantizable: bool,
         tflite_micro_rewrite: bool,
+        quantize_input_output_type: typing.Optional[str],
     ) -> None:
         self.graph = graph
         self.fuse_tensor_count = 0
@@ -52,6 +54,7 @@ class GraphOptimizer(object):
         self.group_conv_rewrite = group_conv_rewrite
         self.rewrite_quantizable = rewrite_quantizable
         self.tflite_micro_rewrite = tflite_micro_rewrite
+        self.quantize_input_output_type = quantize_input_output_type
 
     def create_attr_tensor(
         self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
@@ -2013,6 +2016,110 @@ class GraphOptimizer(object):
         # Remove the collected edges
         self.graph.graph.delete_edges(remove_edges)
 
+    @class_conditional(lambda self: self.quantize_input_output_type is not None)
+    def quantize_input_output_type_pass(self):
+        remove_edges = []
+        remove_vertices = []
+        for name in self.graph.inputs:
+            node_name = self.graph.tensor_node_map[name]
+            node = self.graph.graph.vs.find(name=node_name)
+            assert node['node_type'] == ExtendedOperator.INPUT_NODE
+
+            # Update input tensor
+            input_tensor = self.graph.tensor_map[node['outputs'][0]]
+            input_type = str(input_tensor.dtype)
+            if input_type == self.quantize_input_output_type:
+                continue
+
+            input_arr = input_tensor.tensor.copy()
+            input_quantization = copy.deepcopy(input_tensor.quantization)
+            if input_type == 'int8' and self.quantize_input_output_type == 'uint8':
+                input_tensor.tensor = (input_tensor.tensor.astype('int32') + 128).astype('uint8')
+                input_tensor.quantization.zero_point += 128
+                input_tensor.dtype = input_tensor.tensor.dtype
+            elif input_type == 'uint8' and self.quantize_input_output_type == 'int8':
+                input_tensor.tensor = (input_tensor.tensor.astype('int32') - 128).astype('int8')
+                input_tensor.quantization.zero_point -= 128
+                input_tensor.dtype = input_tensor.tensor.dtype
+            else:
+                raise AssertionError(
+                    f'Unsupported types: input_type: {input_type}, quantize_input_type:'
+                    f' {self.quantize_input_output_type}'
+                )
+
+            # Create new quantize op
+            requantized = self.create_transform_tensor(input_arr, quantization=input_quantization)
+            quantize_op = tfl.QuantizeOperator([input_tensor], [requantized])
+            self.graph.add_operator(quantize_op)
+
+            # Get the newly-generated node
+            new_node_name = self.graph.tensor_node_map[requantized.name]
+            new_node = self.graph.graph.vs.find(name=new_node_name)
+
+            # Connect the quantize op to the graph
+            self.graph.replace_next_tensors(node, new_node, requantized.name, [new_node_name])
+
+            # Collect the unused connections
+            for edge in node.out_edges():
+                target_vertex = edge.target_vertex
+                if target_vertex['name'] != new_node_name:
+                    remove_edges.append(edge.index)
+
+        output_mapping = {}
+        for name in self.graph.outputs:
+            output_tensor = self.graph.tensor_map[name]
+            output_type = str(output_tensor.dtype)
+            if output_type == self.quantize_input_output_type:
+                continue
+
+            node_name = self.graph.tensor_node_map[name]
+            node = self.graph.graph.vs.find(name=node_name)
+
+            for edge in node.out_edges():
+                next_node = edge.target_vertex
+
+                if next_node['node_type'] == ExtendedOperator.OUTPUT_NODE:
+                    remove_vertices.append(next_node.index)
+
+            # Update output tensor
+            output_arr = output_tensor.tensor.copy()
+            output_quantization = copy.deepcopy(output_tensor.quantization)
+            if output_type == 'int8' and self.quantize_input_output_type == 'uint8':
+                output_arr = (output_arr.astype('int32') + 128).astype('uint8')
+                output_quantization.zero_point += 128
+            elif output_type == 'uint8' and self.quantize_input_output_type == 'int8':
+                output_arr = (output_arr.astype('int32') - 128).astype('int8')
+                output_quantization.zero_point -= 128
+            else:
+                raise AssertionError(
+                    f'Unsupported types: output_type: {output_type}, quantize_input_type:'
+                    f' {self.quantize_input_output_type}'
+                )
+
+            requantized = self.create_transform_tensor(output_arr, quantization=output_quantization)
+            quantize_op = tfl.QuantizeOperator([output_tensor], [requantized])
+            self.graph.add_operator(quantize_op)
+
+            output_mapping[name] = requantized.name
+
+        if len(output_mapping) > 0:
+            new_outputs = []
+            output_names = []
+            for name in self.graph.outputs:
+                if name in output_mapping:
+                    new_outputs.append(output_mapping[name])
+                    output_names.append(output_mapping[name])
+                else:
+                    new_outputs.append(name)
+
+            self.graph.outputs.clear()
+            self.graph.outputs.extend(new_outputs)
+            self.graph.add_outputs(output_names)
+
+        # Remove the collected edges & vertices
+        self.graph.graph.delete_edges(remove_edges)
+        self.graph.graph.delete_vertices(remove_vertices)
+
     def output_transpose_pass(self):
         nhwc2nchw_perm = np.array([0, 3, 1, 2], dtype='int32')
         nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
@@ -2415,6 +2522,9 @@ class GraphOptimizer(object):
 
         # Fuse quant/dequant nodes
         self.fuse_quant_dequant_nodes()
+
+        # Input output quantize type
+        self.quantize_input_output_type_pass()
 
         # Fuse same padding
         self.fuse_same_padding()

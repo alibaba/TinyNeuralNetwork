@@ -33,6 +33,7 @@ class TFLiteConverter(object):
         preserve_tensors: bool = False,
         optimize: int = GraphOptimizer.ALL_OPTIMIZE,
         quantize_target_type: str = 'uint8',
+        quantize_input_output_type: typing.Optional[str] = None,
         hybrid_quantization_from_float: bool = False,
         hybrid_per_channel: bool = False,
         hybrid_asymmetric_inputs: bool = True,
@@ -62,6 +63,7 @@ class TFLiteConverter(object):
             preserve_tensors (bool): Preserve the copies of the intermediate tensors. Defaults to False
             optimize (int): The level of graph optimization. Defaults to `GraphOptimizer.ALL_OPTIMIZE`
             quantize_target_type (str): Target type for quantization. Defaults to 'uint8'
+            quantize_input_output_type (str): Input and output type for quantization. Defaults to None (inferred)
             hybrid_quantization_from_float (bool): Direct hybrid quantization from a float model. Defaults to False
             hybrid_per_channel (bool): Prefer per-channel kernels in hybrid quantization. Defaults to False
             hybrid_asymmetric_inputs (bool): Prefer asymmetric inputs while performing hybrid quantization
@@ -131,6 +133,19 @@ class TFLiteConverter(object):
             self.q_type = np.int16
         else:
             raise AttributeError(f'unknown quantize_target_type: {quantize_target_type}, expected: uint8, int8, int16')
+
+        if quantize_input_output_type is not None:
+            assert fuse_quant_dequant, 'Please set fuse_quant_dequant=True, otherwise quantize_input_type is ignored'
+            assert quantize_input_output_type in (
+                'int8',
+                'uint8',
+                'int16',
+            ), f'unknown quantize_input_output_type: {quantize_input_output_type}, expected: uint8, int8, int16'
+            if quantize_input_output_type == 'int16' and quantize_target_type != 'int16':
+                raise AttributeError(
+                    'quantize_input_output_type == \'int16\' and quantize_target_type != \'int16\' is not supported'
+                )
+            self.quantize_input_output_type = quantize_input_output_type
 
         if dump_config_path and not dump_jit_model_path:
             raise AssertionError("when dump_config_path is set, dump_jit_model_path is required to be set")
@@ -385,6 +400,7 @@ class TFLiteConverter(object):
                 self.group_conv_rewrite,
                 self.rewrite_quantizable,
                 self.tflite_micro_rewrite,
+                self.quantize_input_output_type,
             )
             optimizer.optimize()
 
