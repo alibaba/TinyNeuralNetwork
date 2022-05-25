@@ -136,6 +136,7 @@ current_graph = GlobalData(None)
 
 # Generated module constructor lines
 module_constructor_lines = {}
+module_constructor_weakrefs = {}
 
 # Directory of the current script
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -806,7 +807,9 @@ def new_init_gen(orig_init, key: str):
         class_fullname = '.'.join(init_fullname.split('.')[:-1])
         log.debug(f'{key} before with block, lock: {lock}')
         with no_catch() as res:
-            if id(obj) not in module_constructor_lines:
+            if id(obj) not in module_constructor_lines or (
+                id(obj) in module_constructor_weakrefs and module_constructor_weakrefs[id(obj)]() is None
+            ):
                 if not res:
                     log.warning(
                         f'Failed to acquire the tracing lock while tracing {init_fullname}, which is unexpected.'
@@ -827,6 +830,7 @@ def new_init_gen(orig_init, key: str):
                     full_args_content = args_as_string(args, kwargs)
                     orig_constructor_line = f'{class_fullname}({full_args_content})'
                     module_constructor_lines[id(obj)] = orig_constructor_line
+                    module_constructor_weakrefs[id(obj)] = weakref.ref(obj)
             orig_init(obj, *args, **kwargs)
         log.debug(f'{key} after with block, lock: {lock}')
 
@@ -1426,7 +1430,10 @@ def hook_modules(module):
 
         related = False
         if id(module) in module_constructor_traced:
-            if id(module) in module_constructor_lines:
+            if (
+                id(module) in module_constructor_lines
+                and module_constructor_weakrefs.get(id(module), type(None))() is not None
+            ):
                 related = True
         else:
             if type(module) in overridable_modules:
@@ -2181,7 +2188,6 @@ class TraceGraph(object):
             if not rev_mode:
                 new_node.prev_nodes.extend(node.prev_nodes)
             else:
-                print(new_node.unique_name, node.prev_nodes[idx].unique_name)
                 new_node.prev_nodes.append(node.prev_nodes[idx])
             new_node.next_nodes.append(node)
 
