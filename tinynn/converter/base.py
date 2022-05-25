@@ -145,7 +145,7 @@ class TFLiteConverter(object):
                 raise AttributeError(
                     'quantize_input_output_type == \'int16\' and quantize_target_type != \'int16\' is not supported'
                 )
-            self.quantize_input_output_type = quantize_input_output_type
+        self.quantize_input_output_type = quantize_input_output_type
 
         if dump_config_path and not dump_jit_model_path:
             raise AssertionError("when dump_config_path is set, dump_jit_model_path is required to be set")
