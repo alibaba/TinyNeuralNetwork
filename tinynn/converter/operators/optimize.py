@@ -219,7 +219,7 @@ class GraphOptimizer(object):
                 dilation = (next_op.dilationDFactor, next_op.dilationHFactor, next_op.dilationWFactor)
 
             pad_args = get_same_padding_args(input_shape, kernel_shape, strides, dilation)
-            pad_arr = np.array(pad_args, dtype='float32')
+            pad_arr = np.array(pad_args, dtype='int32')
 
             old_pad_arr = pad_op.inputs[1].tensor
             skip = not np.array_equal(pad_arr, old_pad_arr)
@@ -259,7 +259,7 @@ class GraphOptimizer(object):
                 dilation = (prev_op.dilationDFactor, prev_op.dilationHFactor, prev_op.dilationWFactor)
 
             pad_args = get_same_padding_args(input_shape, kernel_shape, strides, dilation)
-            pad_arr = np.array(pad_args, dtype='float32')
+            pad_arr = np.array(pad_args, dtype='int32')
 
             start_arr = [x for x in slice_op.inputs[1].tensor]
             end_arr = [slice_op.inputs[0].shape[i] - x - slice_op.outputs[0].shape[i] for i, x in enumerate(start_arr)]
