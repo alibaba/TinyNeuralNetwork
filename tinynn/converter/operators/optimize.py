@@ -1441,6 +1441,23 @@ class GraphOptimizer(object):
                 for i, t in enumerate(op.inputs[1:]):
                     new_t = self.create_attr_tensor(t.tensor[inv_perm_arr])
                     actions.append((self.graph.replace_operator_input, (node, i + 1, new_t, True)))
+            elif node['node_type'] in (
+                ExtendedOperator.SUM,
+                ExtendedOperator.ARG_MIN,
+                ExtendedOperator.ARG_MAX,
+                ExtendedOperator.REDUCE_MIN,
+                ExtendedOperator.REDUCE_MAX,
+                ExtendedOperator.REDUCE_PROD,
+                ExtendedOperator.MEAN,
+            ):
+                old_axis = op.inputs[1].tensor.tolist()
+                new_axis = []
+                for t in old_axis:
+                    new_t = np.where(inv_perm_arr == t)[0][0]
+                    new_axis.append(new_t)
+                axis_arr = np.array(new_axis, dtype='int32')
+                axis_tensor = self.create_attr_tensor(axis_arr)
+                actions.append((self.graph.replace_operator_input, (node, 1, axis_tensor, True)))
 
             for edge in next_edges:
                 source = tensor_node_dict[edge['name']]
@@ -1692,6 +1709,19 @@ class GraphOptimizer(object):
                 new_shape[new_dim] = old_shape[old_dim]
                 new_shape_tensor = self.create_attr_tensor(new_shape)
                 actions.append((self.graph.replace_operator_input, (node, 1, new_shape_tensor, True)))
+            elif node['node_type'] in (
+                ExtendedOperator.SUM,
+                ExtendedOperator.ARG_MIN,
+                ExtendedOperator.ARG_MAX,
+                ExtendedOperator.REDUCE_MIN,
+                ExtendedOperator.REDUCE_MAX,
+                ExtendedOperator.REDUCE_PROD,
+                ExtendedOperator.MEAN,
+            ):
+                new_axis = prev_shape.index(-1)
+                axis_arr = np.array([new_axis], dtype='int32')
+                axis_tensor = self.create_attr_tensor(axis_arr)
+                actions.append((self.graph.replace_operator_input, (node, 1, axis_tensor, True)))
             elif dim_indice is not None:
                 raise NotImplementedError(f'{node["node_type"]} has the property `dims` but is not handled')
 
@@ -2771,6 +2801,31 @@ def is_reshape_elementwise_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
     ) and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
 
 
+def is_elementwise_reduce_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
+    return (
+        op_code
+        in (
+            ExtendedOperator.SUM,
+            ExtendedOperator.ARG_MIN,
+            ExtendedOperator.ARG_MAX,
+            ExtendedOperator.REDUCE_MIN,
+            ExtendedOperator.REDUCE_MAX,
+            ExtendedOperator.REDUCE_PROD,
+        )
+        and len(op.inputs[0].shape) == len(op.outputs[0].shape)
+    ) or (
+        op_code == ExtendedOperator.MEAN
+        and len(op.inputs[0].shape) == len(op.outputs[0].shape)
+        and (
+            len(op.inputs[0].shape) != 4
+            or (
+                not np.array_equal(op.inputs[1].tensor, np.array([1, 2], dtype='int32'))
+                and not np.array_equal(op.inputs[1].tensor, np.array([2, 1], dtype='int32'))
+            )
+        )
+    )
+
+
 def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
     return op_code in (
         ExtendedOperator.RELU,
@@ -2803,7 +2858,7 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.STRIDED_SLICE,
         ExtendedOperator.TILE,
         ExtendedOperator.GATHER,
-    )
+    ) or is_elementwise_reduce_op(op_code, op)
 
 
 def is_quantizable_rewrite_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
@@ -3110,6 +3165,21 @@ def op_input_dims(op: tfl.BaseOperator):
         # TODO: support multi indices
         if nonzero_idx.size == 1:
             dim_indices = nonzero_idx[0]
+    elif isinstance(
+        op,
+        (
+            tfl.SumOperator,
+            tfl.MeanOperator,
+            tfl.ArgMinOperator,
+            tfl.ArgMaxOperator,
+            tfl.ReduceMinOperator,
+            tfl.ReduceMaxOperator,
+            tfl.ReduceProdOperator,
+        ),
+    ):
+        # TODO: support multi indices
+        if op.inputs[1].tensor.size == 1:
+            dim_indices = op.inputs[1].tensor[0]
     return dim_indices
 
 
