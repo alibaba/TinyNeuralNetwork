@@ -895,7 +895,7 @@ class GraphOptimizer(object):
 
         expand_op_outputs_in_branches(branch_transpose_nodes, _new_transpose, self.graph)
 
-    @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
+    @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE, 0)
     def elementwise_reshape_transpose_passthrough_pass(self) -> int:
         edges = self.graph.graph.es.select(
             functools.partial(is_transpose_reshape_op_edge, graph_converter=self.graph.graph)
@@ -1227,7 +1227,7 @@ class GraphOptimizer(object):
         self.graph.graph.delete_edges(remove_edges)
         self.graph.graph.delete_vertices(remove_vertices)
 
-    @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE)
+    @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE, 0)
     def elementwise_op_transpose_passthrough_pass(self) -> int:
         edges = self.graph.graph.es.select(
             functools.partial(is_transpose_elementwise_op_edge, graph_converter=self.graph.graph)
@@ -1458,6 +1458,7 @@ class GraphOptimizer(object):
 
         return num_actions
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE, 0)
     def elementwise_op_reshape_passthrough_pass(self) -> int:
         edges = self.graph.graph.es.select(
             functools.partial(is_reshape_elementwise_op_edge, graph_converter=self.graph.graph)
