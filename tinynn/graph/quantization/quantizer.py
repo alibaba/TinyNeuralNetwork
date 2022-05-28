@@ -54,6 +54,13 @@ FUSE_RULE_LIST = {
     (torch.nn.BatchNorm3d, torch.nn.ReLU),
 }
 
+FUSE_RULE_LIST_PTQ_ONLY = {
+    (nn.Linear, nn.BatchNorm1d): '1.8.0',
+    (nn.ConvTranspose1d, nn.BatchNorm1d): '1.11.0',
+    (nn.ConvTranspose2d, nn.BatchNorm2d): '1.11.0',
+    (nn.ConvTranspose3d, nn.BatchNorm3d): '1.11.0',
+}
+
 FUSE_RULE_LIST_EXTRA = {
     (torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.ReLU6),
     (torch.nn.Conv2d, torch.nn.BatchNorm2d, torch.nn.ReLU6),
@@ -71,6 +78,7 @@ FUSE_RULE_LIST_EXTRA = {
 
 # Processed QAT fuse rules
 processed_qat_rules = {}
+processed_ptq_rules = {}
 processed_extra_qat_rules = {}
 
 # Constant func names
@@ -287,8 +295,12 @@ class QATQuantizer(object):
         if not graph.quantized:
             return
 
-        processed_qat_rules = load_processed_qat_rules()
-        is_fusable = functools.partial(self.is_fusable, current_rules=processed_qat_rules, graph=graph)
+        if isinstance(self, PostQuantizer):
+            processed_rules = load_processed_ptq_rules()
+        else:
+            processed_rules = load_processed_qat_rules()
+
+        is_fusable = functools.partial(self.is_fusable, current_rules=processed_rules, graph=graph)
 
         def _find_quantized_prelu_nodes(node: TraceNode, custom_node):
             # Find quantized PReLU nodes
@@ -1812,6 +1824,27 @@ def load_processed_qat_rules():
             base_rule_pair[0] = True
         processed_qat_rules.update(rule_dict)
     return processed_qat_rules
+
+
+def load_processed_ptq_rules():
+    if len(processed_ptq_rules) == 0:
+        # Constructor a prefix tree for the QAT rules
+        filtered_ptq_rules = {
+            k for k, v in FUSE_RULE_LIST_PTQ_ONLY.items() if LooseVersion(torch.__version__) >= LooseVersion(v)
+        }
+        ptq_rules = set(FUSE_RULE_LIST).union(set(filtered_ptq_rules))
+        fuse_rules = sorted(ptq_rules, key=lambda x: len(x), reverse=True)
+        rule_dict = {}
+        for fuse_rule in fuse_rules:
+            base_rule_dict = rule_dict
+            for module_cls in reversed(fuse_rule):
+                # Node properties (has_key, child_nodes)
+                base_rule_dict.setdefault(module_cls, [False, {}])
+                base_rule_pair = base_rule_dict[module_cls]
+                base_rule_dict = base_rule_pair[1]
+            base_rule_pair[0] = True
+        processed_ptq_rules.update(rule_dict)
+    return processed_ptq_rules
 
 
 def load_processed_extra_qat_rules():
