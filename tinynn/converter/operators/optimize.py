@@ -1499,10 +1499,12 @@ class GraphOptimizer(object):
             prev_nodes = []
             cand_shapes = dict()
             cand_next_shapes = dict()
+            prev_output_indices = []
             for i in input_indices:
                 prev_node_name = op.inputs[i].name
                 prev_node = self.graph.graph.vs.find(name=self.graph.tensor_node_map[prev_node_name])
                 prev_nodes.append(prev_node)
+                prev_output_indices.append(prev_node['outputs'].index(prev_node_name))
 
                 if prev_node['node_type'] == ExtendedOperator.RESHAPE:
                     mapping = dict()
@@ -1592,25 +1594,26 @@ class GraphOptimizer(object):
             next_shape = max(cand_next_shapes.items(), key=lambda x: x[1])[0]
 
             tensor_node_dict = {}
-            for i, prev_node in enumerate(prev_nodes):
+            for prev_node, prev_idx, next_idx in zip(prev_nodes, input_indices, prev_output_indices):
                 if prev_node['op'] is None:
                     prev_out = self.graph.tensor_map[prev_node['outputs'][0]]
                 else:
-                    prev_out = prev_node['op'].outputs[0]
+                    prev_out = prev_node['op'].outputs[next_idx]
                 if prev_out.name in tensor_node_dict:
-                    prev_new_out = tensor_node_dict[prev_out.name]
-                    actions.append((self.graph.replace_operator_input, (node, i, prev_new_out, True)))
-                    tensor_node_dict[prev_out.name] = prev_new_out
+                    prev_new_out, skip = tensor_node_dict[prev_out.name]
+                    actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True, skip)))
+                    skip += 1
+                    tensor_node_dict[prev_out.name] = (prev_new_out, skip)
                 else:
                     prev_new_out = self.create_transform_tensor(
                         np.reshape(prev_out.tensor, prev_shape), quantization=prev_out.quantization
                     )
-                    tensor_node_dict[prev_out.name] = prev_new_out
+                    tensor_node_dict[prev_out.name] = (prev_new_out, 1)
                     shape_tensor = self.create_attr_tensor(np.array(prev_new_out.shape, dtype='int32'))
                     self.graph.add_operator(
                         tfl.ReshapeOperator([prev_out, shape_tensor], [prev_new_out], newShape=shape_tensor.tensor)
                     )
-                    actions.append((self.graph.replace_operator_input, (node, i, prev_new_out, True)))
+                    actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
 
             tensor_node_dict = {}
             for i, op_out in enumerate(op.outputs):
