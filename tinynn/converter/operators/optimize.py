@@ -1599,7 +1599,7 @@ class GraphOptimizer(object):
                     prev_out = prev_node['op'].outputs[0]
                 if prev_out.name in tensor_node_dict:
                     prev_new_out = tensor_node_dict[prev_out.name]
-                    actions.append((self.graph.replace_operator_input, (node, i, prev_new_out)))
+                    actions.append((self.graph.replace_operator_input, (node, i, prev_new_out, True)))
                     tensor_node_dict[prev_out.name] = prev_new_out
                 else:
                     prev_new_out = self.create_transform_tensor(
@@ -1610,7 +1610,7 @@ class GraphOptimizer(object):
                     self.graph.add_operator(
                         tfl.ReshapeOperator([prev_out, shape_tensor], [prev_new_out], newShape=shape_tensor.tensor)
                     )
-                    actions.append((self.graph.replace_operator_input, (node, i, prev_new_out)))
+                    actions.append((self.graph.replace_operator_input, (node, i, prev_new_out, True)))
 
             tensor_node_dict = {}
             for i, op_out in enumerate(op.outputs):
@@ -1644,11 +1644,11 @@ class GraphOptimizer(object):
             elif node['node_type'] == ExtendedOperator.SPLIT_V:
                 new_dim = prev_shape.index(-1)
                 new_dim_tensor = self.create_attr_tensor(np.array([new_dim], dtype='int32'))
-                actions.append((self.graph.replace_operator_input, (node, 2, new_dim_tensor)))
+                actions.append((self.graph.replace_operator_input, (node, 2, new_dim_tensor, True)))
             elif node['node_type'] == ExtendedOperator.SPLIT:
                 new_dim = prev_shape.index(-1)
                 new_dim_tensor = self.create_attr_tensor(np.array([new_dim], dtype='int32'))
-                actions.append((self.graph.replace_operator_input, (node, 0, new_dim_tensor)))
+                actions.append((self.graph.replace_operator_input, (node, 0, new_dim_tensor, True)))
             elif node['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2, ExtendedOperator.MIRROR_PAD):
                 old_pad = op.inputs[1].tensor
                 new_dim = prev_shape.index(-1)
@@ -1729,13 +1729,18 @@ class GraphOptimizer(object):
                 source = tensor_node_dict[edge['name']]
                 self.graph.graph.add_edge(source, edge.target_vertex, name=edge['name'], label=edge['name'])
 
-        self.graph.graph.delete_vertices(remove_vertices)
-        self.graph.graph.delete_edges(remove_edges)
-
         # Process actions
+        ids = []
         for func, args in actions:
             node = args[0]
-            func(*args)
+            res = func(*args)
+            if res is not None:
+                ids.extend(res)
+
+        remove_edges = list(set(remove_edges + ids))
+
+        self.graph.graph.delete_edges(remove_edges)
+        self.graph.graph.delete_vertices(remove_vertices)
 
         return num_actions
 
