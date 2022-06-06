@@ -1547,9 +1547,10 @@ class ATenRepeatOperator(ATenRepeatSchema):
             if len(repeats) > len(input_shape):
                 new_shape = [1] * (len(repeats) - len(input_shape)) + list(input_shape)
                 new_shape_arr = np.array(new_shape, dtype='int32')
+                new_shape_tensor = self.create_attr_tensor(new_shape_arr)
                 reshaped = self.create_transform_tensor(np.reshape(input_tensor.tensor, new_shape_arr))
                 actual_input = reshaped
-                ops.append(tfl.ReshapeOperator([input_tensor], [reshaped], new_shape_arr))
+                ops.append(tfl.ReshapeOperator([input_tensor, new_shape_tensor], [reshaped], new_shape_arr))
             repeat_tensor = self.create_attr_tensor(np.array(repeats, dtype='int32'))
             ops.append(tfl.TileOperator([actual_input, repeat_tensor], outputs))
 
@@ -1936,9 +1937,10 @@ class ATenExpandOperator(ATenExpandSchema):
             if len(output_shape) > len(input_shape):
                 new_shape = [1] * (len(output_shape) - len(input_shape)) + list(input_shape)
                 new_shape_arr = np.array(new_shape, dtype='int32')
+                new_shape_tensor = self.create_attr_tensor(new_shape_arr)
                 reshaped = self.create_transform_tensor(np.reshape(input_tensor.tensor, new_shape_arr))
                 actual_input = reshaped
-                reshape_op = tfl.ReshapeOperator([input_tensor], [reshaped], new_shape_arr)
+                reshape_op = tfl.ReshapeOperator([input_tensor, new_shape_tensor], [reshaped], new_shape_arr)
                 reshape_op.extra_hints['direction'] = 'up'
                 ops.append(reshape_op)
 
@@ -2073,8 +2075,9 @@ class ATenCopyOperator(ATenCopySchema):
                     if len(output_shape) > len(other_shape):
                         new_shape = [1] * (len(output_shape) - len(other_shape)) + list(other_shape)
                         new_shape_arr = np.array(new_shape, dtype='int32')
+                        new_shape_tensor = self.create_attr_tensor(new_shape_arr)
                         reshaped = self.create_transform_tensor(np.reshape(actual_input.tensor, new_shape_arr))
-                        reshape_op = tfl.ReshapeOperator([actual_input], [reshaped], new_shape_arr)
+                        reshape_op = tfl.ReshapeOperator([actual_input, new_shape_tensor], [reshaped], new_shape_arr)
                         reshape_op.extra_hints['direction'] = 'up'
                         ops.append(reshape_op)
                         actual_input = reshaped
