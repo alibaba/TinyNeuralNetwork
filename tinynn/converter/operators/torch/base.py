@@ -337,6 +337,9 @@ class OperatorConverter(ABC):
         input_reshape_op = tfl.ReshapeOperator([orig_input, input_shape_tensor], [new_input], input_shape)
         output_reshape_op = tfl.ReshapeOperator([new_output, output_shape_tensor], [orig_output], output_shape)
 
+        input_reshape_op.extra_hints['direction'] = 'up'
+        output_reshape_op.extra_hints['direction'] = 'down'
+
         ops[0].inputs[input_idx] = new_input
         ops[-1].outputs[output_idx] = new_output
 

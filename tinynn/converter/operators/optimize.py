@@ -564,12 +564,27 @@ class GraphOptimizer(object):
             new_shape = last_node['op'].inputs[1].tensor
             orig_shape = np.array(first_node['op'].inputs[0].shape, dtype='int32')
 
+            hints = set()
+            for node in seq:
+                if 'direction' in node['op'].extra_hints:
+                    hints.add(node['op'].extra_hints['direction'])
+
+            if len(hints) == 1:
+                hint = next(iter(hints))
+            else:
+                hint = None
+
             remove_first = np.array_equal(new_shape, orig_shape)
-            return remove_first, new_shape
+            return remove_first, (new_shape, hint)
 
         def _remove_first_action(first_node, last_node, custom_data):
             # Set final shape to the first reshape node
-            new_shape = custom_data
+            new_shape, hint = custom_data
+            if hint is None:
+                if 'direction' in first_node['op'].extra_hints:
+                    del first_node['op'].extra_hints['direction']
+            else:
+                first_node['op'].extra_hints['direction'] = hint
             new_shape_tensor = self.create_attr_tensor(np.array(new_shape, dtype='int32'))
             first_node['op'].newShape = new_shape_tensor.tensor
             action = (self.graph.replace_operator_input, (first_node, 1, new_shape_tensor))
@@ -845,6 +860,7 @@ class GraphOptimizer(object):
             new_tensor = self.create_transform_tensor(op_out.tensor.copy(), quantization=op_out.quantization)
             new_shape = self.create_attr_tensor(op_shape.tensor.copy())
             new_op = tfl.ReshapeOperator([prev_out, new_shape], [new_tensor], new_shape.tensor)
+            new_op.extra_hints.update(op.extra_hints)
             self.graph.add_operator(new_op)
 
             next_indices = []
@@ -1500,11 +1516,16 @@ class GraphOptimizer(object):
             cand_shapes = dict()
             cand_next_shapes = dict()
             prev_output_indices = []
+            num_constant_nodes = 0
+            prev_hints = set()
             for i in input_indices:
                 prev_node_name = op.inputs[i].name
                 prev_node = self.graph.graph.vs.find(name=self.graph.tensor_node_map[prev_node_name])
                 prev_nodes.append(prev_node)
                 prev_output_indices.append(prev_node['outputs'].index(prev_node_name))
+
+                if prev_node['node_type'] == ExtendedOperator.CONSTANT_NODE:
+                    num_constant_nodes += 1
 
                 if prev_node['node_type'] == ExtendedOperator.RESHAPE:
                     mapping = dict()
@@ -1530,10 +1551,17 @@ class GraphOptimizer(object):
                     cand_next_shapes.setdefault(next_shape, 0)
                     cand_next_shapes[next_shape] += 1
 
+                    if 'direction' in prev_node['op'].extra_hints:
+                        prev_hints.add(prev_node['op'].extra_hints['direction'])
+
+            if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED and 'up' in prev_hints:
+                continue
+
             next_nodes = []
             next_edges = []
             out_nodes = []
             skip_names = []
+            next_hints = set()
             for edge in node.out_edges():
                 if edge.index in remove_edges:
                     continue
@@ -1570,16 +1598,36 @@ class GraphOptimizer(object):
                     cand_next_shapes.setdefault(next_shape, 0)
                     cand_next_shapes[next_shape] += 1
 
+                    if 'direction' in next_node['op'].extra_hints:
+                        next_hints.add(next_node['op'].extra_hints['direction'])
+
             if len(cand_shapes) == 0:
+                continue
+
+            if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED and 'down' in next_hints:
                 continue
 
             cur_reshape_size = max(cand_shapes.values())
             cur_next_reshape_size = max(cand_next_shapes.values())
             full_size = len(prev_nodes) + len(next_nodes)
 
-            # Skip if not wrapped by reshapes
-            if len(next_nodes) == 0 or cur_reshape_size < full_size or cur_next_reshape_size < full_size:
+            if cur_reshape_size != cur_next_reshape_size:
                 continue
+
+            new_reshape_size = full_size - cur_reshape_size - num_constant_nodes
+
+            # Skip if not wrapped by reshapes
+            if (
+                len(next_nodes) == 0 or new_reshape_size > cur_reshape_size
+            ):  # cur_reshape_size < full_size or cur_next_reshape_size < full_size:
+                continue
+            elif new_reshape_size == cur_reshape_size:
+                skip = True
+                if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED:
+                    if 'down' in prev_hints or 'up' in next_hints:
+                        skip = False
+                if skip:
+                    continue
 
             num_actions += 1
 
@@ -1610,9 +1658,11 @@ class GraphOptimizer(object):
                     )
                     tensor_node_dict[prev_out.name] = (prev_new_out, 1)
                     shape_tensor = self.create_attr_tensor(np.array(prev_new_out.shape, dtype='int32'))
-                    self.graph.add_operator(
-                        tfl.ReshapeOperator([prev_out, shape_tensor], [prev_new_out], newShape=shape_tensor.tensor)
+                    reshape_op = tfl.ReshapeOperator(
+                        [prev_out, shape_tensor], [prev_new_out], newShape=shape_tensor.tensor
                     )
+                    reshape_op.extra_hints['direction'] = 'up'
+                    self.graph.add_operator(reshape_op)
                     actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
 
             tensor_node_dict = {}
@@ -1636,7 +1686,9 @@ class GraphOptimizer(object):
                 node['outputs'][i] = new_out.name
                 op.outputs[i] = new_out
 
-                self.graph.add_operator(tfl.ReshapeOperator([new_out, shape_tensor], [op_out], shape_tensor.tensor))
+                reshape_op = tfl.ReshapeOperator([new_out, shape_tensor], [op_out], shape_tensor.tensor)
+                reshape_op.extra_hints['direction'] = 'down'
+                self.graph.add_operator(reshape_op)
 
                 tensor_node_dict[op_out.name] = self.graph.graph.vs.find(name=self.graph.tensor_node_map[op_out.name])
 

@@ -775,6 +775,10 @@ class ATenStackOperator(ATenStackSchema):
             tfl.ReshapeOperator([orig, attr], [new], new.tensor.shape)
             for orig, new, attr in zip(orig_inputs, inputs, attrs)
         ]
+
+        for op in ops:
+            op.extra_hints['direction'] = 'up'
+
         ops.append(tfl.ConcatenationOperator(inputs, outputs, dim))
 
         for op in ops:
@@ -1176,7 +1180,9 @@ class ATenSelectOperator(ATenSelectSchema):
 
         reshape_inputs = [gather_out, reshape_attr]
         reshape_outputs = [all_out]
-        ops.append(tfl.ReshapeOperator(reshape_inputs, reshape_outputs, reshape_attr.tensor))
+        reshape_op = tfl.ReshapeOperator(reshape_inputs, reshape_outputs, reshape_attr.tensor)
+        reshape_op.extra_hints['direction'] = 'down'
+        ops.append(reshape_op)
 
         for op in ops:
             graph_converter.add_operator(op)
@@ -1932,7 +1938,9 @@ class ATenExpandOperator(ATenExpandSchema):
                 new_shape_arr = np.array(new_shape, dtype='int32')
                 reshaped = self.create_transform_tensor(np.reshape(input_tensor.tensor, new_shape_arr))
                 actual_input = reshaped
-                ops.append(tfl.ReshapeOperator([input_tensor], [reshaped], new_shape_arr))
+                reshape_op = tfl.ReshapeOperator([input_tensor], [reshaped], new_shape_arr)
+                reshape_op.extra_hints['direction'] = 'up'
+                ops.append(reshape_op)
 
             repeats = []
             for x, y in zip(new_shape, output_shape):
@@ -1978,9 +1986,9 @@ class ATenGatherOperator(ATenGatherSchema):
             axis = len(index_shape) - 1
             shape_tensor = self.create_attr_tensor(np.array(index_shape, dtype='int32'))
             index_reshaped = self.create_transform_tensor(np.reshape(index_tensor.tensor, index_shape))
-            graph_converter.add_operator(
-                tfl.ReshapeOperator([index_tensor, shape_tensor], [index_reshaped], index_shape)
-            )
+            reshape_op = tfl.ReshapeOperator([index_tensor, shape_tensor], [index_reshaped], index_shape)
+            reshape_op.extra_hints['direction'] = 'up'
+            graph_converter.add_operator(reshape_op)
 
             if str(index_reshaped.dtype) != 'int32':
                 index_casted = self.create_transform_tensor(index_reshaped.tensor.astype('int32'))
@@ -2066,7 +2074,9 @@ class ATenCopyOperator(ATenCopySchema):
                         new_shape = [1] * (len(output_shape) - len(other_shape)) + list(other_shape)
                         new_shape_arr = np.array(new_shape, dtype='int32')
                         reshaped = self.create_transform_tensor(np.reshape(actual_input.tensor, new_shape_arr))
-                        ops.append(tfl.ReshapeOperator([actual_input], [reshaped], new_shape_arr))
+                        reshape_op = tfl.ReshapeOperator([actual_input], [reshaped], new_shape_arr)
+                        reshape_op.extra_hints['direction'] = 'up'
+                        ops.append(reshape_op)
                         actual_input = reshaped
 
                     repeats = []
