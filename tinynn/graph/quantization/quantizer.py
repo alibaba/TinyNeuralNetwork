@@ -407,7 +407,6 @@ class QATQuantizer(object):
             for node in lstm_nodes:
                 node.quantized = True
                 node.module.qconfig = torch_q.default_dynamic_qconfig
-                print(node.module)
 
     def prepare_qat(
         self,
@@ -470,6 +469,10 @@ class QATQuantizer(object):
                     if hasattr(n.module, "qconfig"):
                         delattr(n.module, "qconfig")
             model = torch_q.convert(graph.module, mapping=mapping, inplace=True, remove_qconfig=False)
+
+            if self.dynamic_lstm_quant:
+                mapping.pop(nn.LSTM)
+
             torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
             for n in graph.forward_nodes:
                 if not n.quantized:
@@ -1729,7 +1732,6 @@ class PostQuantizer(QATQuantizer):
             for node in lstm_nodes:
                 node.quantized = True
                 node.module.qconfig = torch_q.default_dynamic_qconfig
-                print(node.module)
 
     def prepare_qat(
         self,
