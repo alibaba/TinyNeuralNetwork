@@ -997,36 +997,12 @@ class TransposeOperator(BaseOperator):
         self,
         inputs,
         outputs,
-        padding=tflite.Padding.SAME,
-        strideD=0,
-        strideW=0,
-        strideH=0,
-        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
-        dilationDFactor=0,
-        dilationWFactor=0,
-        dilationHFactor=0,
     ) -> None:
         super().__init__(tflite.BuiltinOperator.TRANSPOSE, inputs, outputs)
-        self.padding = padding
-        self.strideD = strideD
-        self.strideW = strideW
-        self.strideH = strideH
-        self.fusedActivationFunction = fusedActivationFunction
-        self.dilationDFactor = dilationDFactor
-        self.dilationWFactor = dilationWFactor
-        self.dilationHFactor = dilationHFactor
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
-        tflite.Conv3DOptionsStart(builder)
-        tflite.Conv3DOptionsAddPadding(builder, self.padding)
-        tflite.Conv3DOptionsAddStrideD(builder, self.strideD)
-        tflite.Conv3DOptionsAddStrideW(builder, self.strideW)
-        tflite.Conv3DOptionsAddStrideH(builder, self.strideH)
-        tflite.Conv3DOptionsAddFusedActivationFunction(builder, self.fusedActivationFunction)
-        tflite.Conv3DOptionsAddDilationDFactor(builder, self.dilationDFactor)
-        tflite.Conv3DOptionsAddDilationWFactor(builder, self.dilationWFactor)
-        tflite.Conv3DOptionsAddDilationHFactor(builder, self.dilationHFactor)
-        options = tflite.Conv3DOptionsEnd(builder)
+        tflite.TransposeOptionsStart(builder)
+        options = tflite.TransposeOptionsEnd(builder)
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
@@ -1035,7 +1011,7 @@ class TransposeOperator(BaseOperator):
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
-        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Conv3DOptions)
+        tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.TransposeOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
 
