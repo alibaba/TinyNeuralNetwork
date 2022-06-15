@@ -265,7 +265,7 @@ class ATenUpsampleNearest2dOperator(ATenUpsampleNearest2dSchema):
         inputs = [input_tensor, output_sizes]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
-        ops = [tfl.ResizeNearestNeighborOperator(inputs, outputs, halfPixelCenters=True)]
+        ops = [tfl.ResizeNearestNeighborOperator(inputs, outputs, halfPixelCenters=False)]
         ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
 
         for op in ops:

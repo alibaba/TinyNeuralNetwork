@@ -2293,6 +2293,20 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    def test_upsample_nearest_output_size_complex(self):
+        dummy_input = torch.randn(1, 3, 8, 22, dtype=torch.float32)
+
+        def model(x):
+            return F.interpolate(x, size=(15, 43), mode='nearest')
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_lstm(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
 
