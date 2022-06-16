@@ -3618,13 +3618,16 @@ def elinimate_sequences(
                 first_node['op'].outputs[output_idx] = graph_converter.tensor_map[new_output]
             graph_converter.tensor_node_map[new_output] = first_node['name']
 
-        if remove_first and remove_last:
-            # When the first node is a constant node, we need to set the buffer back
-            if first_node['node_type'] == ExtendedOperator.CONSTANT_NODE and not use_forward_input:
+        # When the first node is a constant node, we need to set the buffer back
+        if first_node['node_type'] == ExtendedOperator.CONSTANT_NODE and not use_forward_input:
+            if seq[0]['node_type'] == ExtendedOperator.CONSTANT_NODE:
+                old_tensor = graph_converter.tensor_map[seq[0]['name']]
+            else:
                 old_tensor = seq[0]['op'].inputs[input_idx]
-                new_tensor = seq[-1]['op'].outputs[0]
-                new_tensor.buffer = old_tensor.buffer
+            new_tensor = seq[-1]['op'].outputs[0]
+            new_tensor.buffer = old_tensor.buffer
 
+        if remove_first and remove_last:
             # Push the sequence to the removing list
             remove_ids.extend([x.index for x in seq])
         else:
