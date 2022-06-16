@@ -1,8 +1,8 @@
-# Quantization-aware Training
+# Quantization
 [简体中文](README_zh-CN.md)
 
-TinyNeuralNetwork uses PyTorch ([PyTorch Quantization-aware Training Tutorial](https://pytorch.org/tutorials/advanced/static_quantization_tutorial.html#quantization-aware-training) )
-as the backend for quantization-aware training and focuses on optimizing its usability (**Please use PyTorch 1.6 and later due to the frequent updates of quantization part**).
+TinyNeuralNetwork uses PyTorch ([PyTorch Quantization Tutorial](https://pytorch.org/tutorials/advanced/static_quantization_tutorial.html#quantization-aware-training) )
+as the backend for quantization and focuses on optimizing its usability (**Please use PyTorch 1.6 and later due to the frequent updates of quantization part**).
 
 ## The quantization process in PyTorch
 1. Modify the forward function of the model to insert `QuantStub`s and `DeQuantStub`s for the inputs and outputs.
@@ -17,6 +17,12 @@ as the backend for quantization-aware training and focuses on optimizing its usa
 + Generate a new model description script `model.py` based on the model provided by the user (*which is equivalent to step 1 and 2 above*)
 + A more efficient `prepare_qat` function that automatically fuses the operators within the graph and performs the analysis for mixed precision quantization (*which is equivalent to steps 3, 4 above*)
 + Use direct conversion from TorchScript to TFLite (*supporting both floating-point and quantized models*) to simplify the end-to-end deployment.
+
+## Suppored quantization methods
+- [Quantization-aware training](qat.py)
+- [Post training quantization](post.py)
+- [Dynamic quantization](dynamic.py)
+- [BFloat16 quantization](bf16.py)
 
 ## Frequently Asked Questions
 

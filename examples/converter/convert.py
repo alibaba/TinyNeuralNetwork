@@ -29,6 +29,8 @@ def main_worker():
     # If you want perform dynamic quantization on the float models,
     # you may pass the following arguments.
     #   `quantize_target_type='int8', hybrid_quantization_from_float=True, hybrid_per_channel=False`
+    # As for static quantization (e.g. quantization-aware training and post-training quantization),
+    # please refer to the code examples in the `examples/quantization` folfer.
     converter = TFLiteConverter(model, dummy_input, output_path)
     converter.convert()
 
