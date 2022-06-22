@@ -1171,6 +1171,7 @@ def gen_module_constrctor_line(module, mod_cache=None):
         'torch.nn.FractionalMaxPool3d',
         'torch.nn.TransformerEncoderLayer',
         'torch.nn.TransformerDecoderLayer',
+        'torch.nn.Upsample',
     }
 
     def _skip_ignored_args(name, *args, **kwargs):
