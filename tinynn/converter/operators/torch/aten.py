@@ -380,6 +380,50 @@ class ATenAdaptiveAvgPool2dOperator(ATenAdaptiveAvgPool2dSchema):
             graph_converter.add_operator(op)
 
 
+class ATenAdaptiveMaxPool2dOperator(ATenAdaptiveMaxPool2dSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        output_h, output_w = self.input_tensors[1]
+
+        dim_h, dim_w = input_tensor.shape[2:]
+        assert (
+            dim_h % output_h == 0 and dim_w % output_w == 0
+        ), f'not supported: input dim: [{dim_h}, {dim_w}], output size: [{output_h}, {output_w}]'
+        assert input_tensor.tensor.ndim == 4, 'Only 4D input is supported'
+
+        ops = []
+
+        dims = self.create_attr_tensor(np.array([1, 2], dtype='int32'))
+
+        log.warning(
+            'OPs like`F.adaptive_maxpool_2d` have multiple outputs. However, only the first '
+            'output will be preserved in our converter. If you need that tensor, please '
+            'use the `torch.argmax` instead.'
+        )
+
+        outputs = self.to_tfl_tensors(self.output_names[:1], self.output_tensors[:1])
+
+        if output_h == 1 and output_w == 1:
+            inputs = [input_tensor, dims]
+            ops.append(tfl.ReduceMaxOperator(inputs, outputs, True))
+        else:
+            inputs = [input_tensor]
+            padding = tfl_schema.Padding.VALID
+
+            stride_h, stride_w = dim_h // output_h, dim_w // output_w
+            kernel_h, kernel_w = dim_h - (output_h - 1) * stride_h, dim_w - (output_w - 1) * stride_w
+
+            ops.append(tfl.MaxPool2dOperator(inputs, outputs, padding, stride_w, stride_h, kernel_w, kernel_h))
+
+        ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
+
 class ATenLeakyReluOperator(ATenLeakyReluSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
@@ -2552,3 +2596,10 @@ class ATenUnbindOperator(ATenUnbindSchema):
         outputs = self.to_tfl_tensors(output_names, self.output_tensors[0])
 
         graph_converter.add_operator(tfl.UnpackOperator([input_tensor], outputs, chunks, dim))
+
+
+class ATenRollOperator(ATenRollSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)

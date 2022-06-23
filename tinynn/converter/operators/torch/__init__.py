@@ -35,6 +35,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::avg_pool2d": ATenAvgPool2dOperator,
     "aten::max_pool2d": ATenMaxPool2dOperator,
     "aten::adaptive_avg_pool2d": ATenAdaptiveAvgPool2dOperator,
+    "aten::adaptive_max_pool2d": ATenAdaptiveMaxPool2dOperator,
     "aten::mean": ATenMeanOperator,
     "aten::softmax": ATenSoftmaxOperator,
     "aten::log_softmax": ATenLogSoftmaxOperator,
