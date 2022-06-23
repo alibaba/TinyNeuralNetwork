@@ -528,9 +528,20 @@ class QATQuantizer(object):
                             names.append(f'{orig_name}.activation_post_process')
                             props.append('activation_post_process')
                         fq_count += 1
+                    elif (
+                        isinstance(new_mod, nn.Sequential)
+                        and type(new_mod).__module__.startswith(nni.__name__)
+                        and len(new_mod) > 0
+                        and hasattr(new_mod[-1], 'activation_post_process')
+                    ):
+                        if fq_count == 0:
+                            parents.append(new_mod[-1])
+                            names.append(f'{orig_name}[-1].activation_post_process')
+                            props.append('activation_post_process')
+                        fq_count += 1
                     if isinstance(new_mod, (torch_q.DeQuantStub, torch_q.QuantStub)):
                         fq_count = 2
-                elif n.type() in connected_types:
+                elif n.type() in connected_types and not (fq_count >= 1 and mode == 'up'):
                     mode = 'both'
                     fq_count = 0
 
