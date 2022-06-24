@@ -1653,8 +1653,16 @@ class GraphOptimizer(object):
                     skip += 1
                     tensor_node_dict[prev_out.name] = (prev_new_out, skip)
                 else:
+                    prev_shape_aligned = prev_shape
+                    if np.prod(prev_out.tensor.shape) != np.prod(prev_shape):
+                        mapping = dict()
+                        is_simple_reshape(prev_shape, next_shape, mapping)
+                        prev_shape_aligned = np.ones(len(prev_shape), dtype='int32')
+                        for pi, ni in mapping.items():
+                            prev_shape_aligned[pi] = prev_out.shape[ni]
+
                     prev_new_out = self.create_transform_tensor(
-                        np.reshape(prev_out.tensor, prev_shape), quantization=prev_out.quantization
+                        np.reshape(prev_out.tensor, prev_shape_aligned), quantization=prev_out.quantization
                     )
                     tensor_node_dict[prev_out.name] = (prev_new_out, 1)
                     shape_tensor = self.create_attr_tensor(np.array(prev_new_out.shape, dtype='int32'))
