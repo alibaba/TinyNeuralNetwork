@@ -106,6 +106,7 @@ class QATQuantizer(object):
     asymmetric: bool
     per_tensor: bool
     disable_requantization_for_cat: bool
+    dynamic_lstm_quant: bool
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new QATQuantizer object
@@ -163,6 +164,7 @@ class QATQuantizer(object):
             'per_tensor': True,
             'disable_requantization_for_cat': None,
             'quantized_input_stats': None,
+            'dynamic_lstm_quant': False,
             'quantized_op_stats': None,
             'set_quantizable_op_stats': False,
         }
@@ -408,6 +410,15 @@ class QATQuantizer(object):
                         for c in m.children():
                             q.put(c)
 
+        def _lstm_node(node, custom_data):
+            return isinstance(node.module, nn.LSTM)
+
+        if self.dynamic_lstm_quant:
+            lstm_nodes = graph.filter_forward_nodes(_lstm_node)
+            for node in lstm_nodes:
+                node.quantized = True
+                node.module.qconfig = torch_q.default_dynamic_qconfig
+
     def prepare_qat(
         self,
         graph: TraceGraph,
@@ -446,6 +457,10 @@ class QATQuantizer(object):
         else:
             mapping = torch_q.DEFAULT_QAT_MODULE_MAPPING
 
+        if self.dynamic_lstm_quant:
+            mapping = dict(mapping)
+            mapping.update({nn.LSTM: nnqd.LSTM})
+
         if LooseVersion(torch.__version__) < LooseVersion("1.7.0"):
             model = torch_q.prepare(graph.module, inplace=True)
             for n in graph.forward_nodes:
@@ -465,6 +480,10 @@ class QATQuantizer(object):
                     if hasattr(n.module, "qconfig"):
                         delattr(n.module, "qconfig")
             model = torch_q.convert(graph.module, mapping=mapping, inplace=True, remove_qconfig=False)
+
+            if self.dynamic_lstm_quant:
+                mapping.pop(nn.LSTM)
+
             torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
             for n in graph.forward_nodes:
                 if not n.quantized:
@@ -1692,8 +1711,13 @@ class PostQuantizer(QATQuantizer):
     rewrite_graph: bool
     force_overwrite: bool
     is_input_quantized: typing.Optional[typing.Tuple[bool]]
+    quantized_input_stats: typing.Optional[typing.List[typing.Optional[typing.Tuple[float, float]]]]
     backend: str
     remove_weights_after_load: bool
+    asymmetric: bool
+    per_tensor: bool
+    disable_requantization_for_cat: bool
+    dynamic_lstm_quant: bool
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new PostQuantizer object
@@ -1767,6 +1791,15 @@ class PostQuantizer(QATQuantizer):
                         for c in m.children():
                             q.put(c)
 
+        def _lstm_node(node, custom_data):
+            return isinstance(node.module, nn.LSTM)
+
+        if self.dynamic_lstm_quant:
+            lstm_nodes = graph.filter_forward_nodes(_lstm_node)
+            for node in lstm_nodes:
+                node.quantized = True
+                node.module.qconfig = torch_q.default_dynamic_qconfig
+
     def prepare_qat(
         self,
         graph: TraceGraph,
@@ -1810,6 +1843,11 @@ class PostQuantizer(QATQuantizer):
                     if hasattr(n.module, "qconfig"):
                         delattr(n.module, "qconfig")
             torch_q.add_observer_(graph.module, qconfig_propagation_list=whitelist)
+
+        if self.dynamic_lstm_quant:
+            mapping = {nn.LSTM: nnqd.LSTM}
+            torch_q.convert(graph.module, mapping=mapping, inplace=True, remove_qconfig=False)
+
         for n in graph.forward_nodes:
             if not n.quantized:
                 if hasattr(n.module, "_forward_hooks"):
