@@ -345,7 +345,7 @@ class QuantizedLinearDynamicOperator(QuantizedLinearDynamicSchema):
         weight = state[0][0]
         bias = state[0][1]
 
-        weight_tensor = self.create_attr_tensor(weight)
+        weight_tensor = self.create_attr_tensor(weight, hybrid=True)
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
         output_tensor = outputs[0]
 

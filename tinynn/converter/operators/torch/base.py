@@ -18,7 +18,7 @@ log = get_logger(__name__, 'INFO')
 
 
 class OperatorConverter(ABC):
-    def __init__(self, node, tensor_map, asymmetric=True, q_type=np.uint8) -> None:
+    def __init__(self, node, tensor_map, asymmetric=True, q_type=np.uint8, hybrid_q_type=np.int8) -> None:
         self.input_names = self.get_input_names(node)
         self.output_names = self.get_output_names(node)
         self.input_tensors = self.get_input_tensors(tensor_map)
@@ -29,6 +29,7 @@ class OperatorConverter(ABC):
         self.transform_count = 0
         self.asymmetric = asymmetric
         self.q_type = q_type
+        self.hybrid_q_type = hybrid_q_type
 
     @abstractmethod
     def parse(self, node, attrs, args, graph_converter):
@@ -198,10 +199,21 @@ class OperatorConverter(ABC):
             tensor, name, has_buffer=False, quantization=quantization, asymmetric=self.asymmetric, q_type=self.q_type
         )
 
-    def create_attr_tensor(self, tensor, name=None):
+    def create_attr_tensor(self, tensor, name=None, hybrid=False):
         if name is None:
             name = self.get_unique_attr_name()
-        return tfl.Tensor(tensor, name, has_buffer=True, asymmetric=self.asymmetric, q_type=self.q_type)
+
+        if hybrid:
+            q_type = np.int8
+        else:
+            q_type = self.q_type
+
+        tensor = tfl.Tensor(tensor, name, has_buffer=True, asymmetric=self.asymmetric, q_type=q_type)
+
+        if hybrid and self.hybrid_q_type == np.uint8:
+            tensor.reinterpret_as(self.hybrid_q_type)
+
+        return tensor
 
     def unpack_params(self, params):
         result = {}

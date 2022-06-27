@@ -17,14 +17,15 @@ class ATenLstmOperator(ATenLstmSchema):
     def lstm_input_helper(
         self, input_tensors, params_tensors, has_biases, param_start_index, input_start_index, layer_idx, suffix
     ):
+        hybrid = isinstance(self, ATenQuantizedLstmOperator)
         weight_ih_slices = torch.chunk(params_tensors[param_start_index], 4, 0)
         gates = ["input", "forget", "cell", "output"]
         for idx, (weight_ih, gate) in enumerate(zip(weight_ih_slices, gates)):
-            input_tensors[input_start_index + idx] = self.create_attr_tensor(weight_ih)
+            input_tensors[input_start_index + idx] = self.create_attr_tensor(weight_ih, hybrid=hybrid)
 
         weight_hh_slices = torch.chunk(params_tensors[param_start_index + 1], 4, 0)
         for idx, (weight_hh, gate) in enumerate(zip(weight_hh_slices, gates)):
-            input_tensors[input_start_index + 4 + idx] = self.create_attr_tensor(weight_hh)
+            input_tensors[input_start_index + 4 + idx] = self.create_attr_tensor(weight_hh, hybrid=hybrid)
 
         if has_biases:
             assert params_tensors[param_start_index + 2].dtype == torch.float32
