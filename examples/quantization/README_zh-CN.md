@@ -1,7 +1,7 @@
-# 量化训练
+# 量化
 [English](README.md)
 
-TinyNeuralNetwork采用PyTorch的量化训练（[PyTorch 量化训练教程](https://pytorch.org/tutorials/advanced/static_quantization_tutorial.html#quantization-aware-training) ）
+TinyNeuralNetwork采用PyTorch的量化（[PyTorch 量化教程](https://pytorch.org/tutorials/advanced/static_quantization_tutorial.html) ）
 模块作为后端，但着重优化了其易用性（ **尽量使用PyTorch 1.6及以后的版本，量化这块迭代很快** ）。
 
 ## PyTorch量化流程
@@ -18,6 +18,12 @@ TinyNeuralNetwork采用PyTorch的量化训练（[PyTorch 量化训练教程](htt
 + 基于用户提供的模型代码，codegen一份新的代码（*等价于上述的步骤1，步骤2*）
 + 提供更智能的`prepare_qat`函数，内部自动完成计算图的算子融合，以及混合精度的分析（*等价于上述步骤3， 4*）
 + 提供TorchScript到TFLite的转换（*支持浮点、量化模型*），简化端上部署
+
+## 支持的量化方法
+- [训练时量化](qat.py)
+- [训练后量化](post.py)
+- [动态量化](dynamic.py)
+- [BFloat16量化](bf16.py)
 
 ## 常见问题
 

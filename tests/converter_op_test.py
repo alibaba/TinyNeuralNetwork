@@ -878,6 +878,53 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    def test_prelu_0d(self):
+        class Model(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.prelu = torch.nn.PReLU(48)
+
+            def forward(self, x):
+                return self.prelu(x)
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.randn(1, 48)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_prelu_0d_with_reshapes(self):
+        class Model(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.prelu = torch.nn.PReLU(48)
+
+            def forward(self, x):
+                x = x.reshape(1, 48, 1)
+                x = self.prelu(x)
+                x = x.reshape(1, 48)
+                return x
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.randn(1, 48)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_softmax_like_funcs(self):
         dummy_input = torch.randn(1, 1000, dtype=torch.float32)
 
@@ -2100,58 +2147,82 @@ class ConverterOPTester(unittest.TestCase):
     def test_adaptive_pool(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        def model(x):
-            return F.adaptive_avg_pool2d(x, 32)
+        funcs = [F.adaptive_avg_pool2d, F.adaptive_max_pool2d]
 
-        model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
-        converter.convert()
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
 
-        dummy_output = model(dummy_input)
-        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output)
+            def model(x):
+                return func(x, 32)
+
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_adaptive_pool_2(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        def model(x):
-            return F.adaptive_avg_pool2d(x, (16, 32))
+        funcs = [F.adaptive_avg_pool2d, F.adaptive_max_pool2d]
 
-        model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
-        converter.convert()
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
 
-        dummy_output = model(dummy_input)
-        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output)
+            def model(x):
+                return func(x, (16, 32))
+
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_adaptive_pool_3(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        def model(x):
-            return F.adaptive_avg_pool2d(x, (None, 32))
+        funcs = [F.adaptive_avg_pool2d, F.adaptive_max_pool2d]
 
-        model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
-        converter.convert()
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
 
-        dummy_output = model(dummy_input)
-        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output)
+            def model(x):
+                return func(x, (None, 32))
+
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_adaptive_pool_4(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
-        def model(x):
-            return F.adaptive_avg_pool2d(x, 1)
+        funcs = [F.adaptive_avg_pool2d, F.adaptive_max_pool2d]
 
-        model_path = get_model_path()
-        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
-        converter.convert()
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
 
-        dummy_output = model(dummy_input)
-        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output)
+            def model(x):
+                return func(x, 1)
+
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            assert_close(dummy_output, tfl_output)
 
     def test_constant_pad_1d(self):
         dummy_input = torch.randn(1, 3, 224, dtype=torch.float32)
@@ -2284,6 +2355,20 @@ class ConverterOPTester(unittest.TestCase):
 
         def model(x):
             return F.interpolate(x, size=(448, 448), mode='nearest')
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_upsample_nearest_output_size_complex(self):
+        dummy_input = torch.randn(1, 3, 8, 22, dtype=torch.float32)
+
+        def model(x):
+            return F.interpolate(x, size=(15, 43), mode='nearest')
 
         model_path = get_model_path()
         converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)

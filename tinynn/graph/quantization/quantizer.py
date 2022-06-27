@@ -76,6 +76,13 @@ FUSE_RULE_LIST_EXTRA = {
     ('add', 'relu6'),
 }
 
+KNOWN_QSTATS = {
+    nn.Softmax: (0, 256.0),
+    'softmax': (0, 256.0),
+    nn.LogSoftmax: (255, 16.0),
+    'log_softmax': (255, 16.0),
+}
+
 # Processed QAT fuse rules
 processed_qat_rules = {}
 processed_ptq_rules = {}
@@ -92,6 +99,8 @@ class QATQuantizer(object):
     force_overwrite: bool
     is_input_quantized: typing.Optional[typing.Tuple[bool]]
     quantized_input_stats: typing.Optional[typing.List[typing.Optional[typing.Tuple[float, float]]]]
+    quantized_op_stats: typing.Optional[typing.List[typing.Optional[typing.Tuple[float, float]]]]
+    set_quantizable_op_stats: bool
     backend: str
     remove_weights_after_load: bool
     asymmetric: bool
@@ -156,6 +165,8 @@ class QATQuantizer(object):
             'disable_requantization_for_cat': None,
             'quantized_input_stats': None,
             'dynamic_lstm_quant': False,
+            'quantized_op_stats': None,
+            'set_quantizable_op_stats': False,
         }
 
         if config is None:
@@ -501,6 +512,14 @@ class QATQuantizer(object):
         if self.quantized_input_stats is not None:
             self.prepare_quantized_inputs_pass(graph)
 
+        if self.set_quantizable_op_stats:
+            if self.quantized_op_stats is None:
+                self.quantized_op_stats = {}
+            self.quantized_op_stats.update(KNOWN_QSTATS)
+
+        if self.quantized_op_stats is not None:
+            self.prepare_quantized_ops_pass(graph)
+
         return graph.module
 
     def disable_requantization_for_cat_pass(self, graph):
@@ -547,9 +566,20 @@ class QATQuantizer(object):
                             names.append(f'{orig_name}.activation_post_process')
                             props.append('activation_post_process')
                         fq_count += 1
+                    elif (
+                        isinstance(new_mod, nn.Sequential)
+                        and type(new_mod).__module__.startswith(nni.__name__)
+                        and len(new_mod) > 0
+                        and hasattr(new_mod[-1], 'activation_post_process')
+                    ):
+                        if fq_count == 0:
+                            parents.append(new_mod[-1])
+                            names.append(f'{orig_name}[-1].activation_post_process')
+                            props.append('activation_post_process')
+                        fq_count += 1
                     if isinstance(new_mod, (torch_q.DeQuantStub, torch_q.QuantStub)):
                         fq_count = 2
-                elif n.type() in connected_types:
+                elif n.type() in connected_types and not (fq_count >= 1 and mode == 'up'):
                     mode = 'both'
                     fq_count = 0
 
@@ -587,50 +617,87 @@ class QATQuantizer(object):
 
                 for next_node in node.next_nodes:
                     if isinstance(next_node.module, torch_q.QuantStub):
-                        acp = getattr(next_node.module, 'activation_post_process', None)
-                        if acp is not None:
-                            fq_base_cls = getattr(torch_q, 'FakeQuantizeBase', torch_q.FakeQuantize)
-                            if isinstance(acp, fq_base_cls):
-                                fake_quant = acp
+                        self.set_module_quantization(next_node.module, qstats[0], qstats[1])
 
-                                next_node.module.apply(torch_q.disable_observer)
+    def prepare_quantized_ops_pass(self, graph):
+        if self.quantized_op_stats:
 
-                                scale = torch.tensor(1.0 / qstats[1], dtype=fake_quant.scale.dtype)
-                                offset = torch.tensor(qstats[0], dtype=fake_quant.zero_point.dtype)
+            def _find_quantized_ops_with_type(node, custom_data):
+                if isinstance(node.module, nn.Module) and hasattr(node.module, 'activation_post_process'):
+                    qstats = self.quantized_op_stats.get(node.kind(), None)
+                    if qstats is not None:
+                        custom_data.append((qstats, node))
+                        return True
+                    else:
+                        if isinstance(node.module, torch_q.QuantStub):
+                            qstats = self.quantized_op_stats.get(node.prev_nodes[0].kind(), None)
+                            if qstats is not None:
+                                custom_data.append((qstats, node))
+                                return True
+                return False
 
-                                fake_quant.scale.copy_(scale)
-                                fake_quant.zero_point.copy_(offset)
+            node_with_qstats = []
+            graph.filter_forward_nodes(_find_quantized_ops_with_type, node_with_qstats)
 
-                                quant_min = fake_quant.quant_min
-                                quant_max = fake_quant.quant_max
+            for qstats, node in node_with_qstats:
+                if qstats is not None:
+                    assert (
+                        isinstance(qstats, (list, tuple))
+                        and len(qstats) == 2
+                        and all((isinstance(q, (int, float)) for q in qstats))
+                    ), (
+                        "quantized_op_stats format: {'op_0': (mean_1, std_1), 'op_1': (mean_2, std_2), ..., 'op_n':"
+                        " (mean_n, std_n)}"
+                    )
 
-                                observer = getattr(fake_quant, 'activation_post_process', None)
-                            elif isinstance(acp, torch_q.ObserverBase):
-                                observer = acp
+                self.set_module_quantization(node.module, qstats[0], qstats[1])
 
-                                # We cannot use `disable_observer` which is designed for `FakeQuant` modules`.
-                                # Instead, we need to monkey-patch the forward function of the observer.
-                                identity = nn.Identity()
-                                observer.forward = identity.forward
+    def set_module_quantization(self, module: nn.Module, mean: int, std: float):
+        acp = getattr(module, 'activation_post_process', None)
+        if acp is not None:
+            fq_base_cls = getattr(torch_q, 'FakeQuantizeBase', torch_q.FakeQuantize)
+            if isinstance(acp, fq_base_cls):
+                fake_quant = acp
 
-                                scale = torch.tensor(1.0 / qstats[1], dtype=torch.float32)
-                                offset = torch.tensor(qstats[0], dtype=torch.int32)
+                module.apply(torch_q.disable_observer)
 
-                                quant_min = observer.quant_min
-                                quant_max = observer.quant_max
+                scale = torch.tensor(1.0 / std, dtype=fake_quant.scale.dtype)
+                offset = torch.tensor(mean, dtype=fake_quant.zero_point.dtype)
 
-                            else:
-                                continue
+                fake_quant.scale.copy_(scale)
+                fake_quant.zero_point.copy_(offset)
 
-                            if observer is not None:
-                                if quant_min is None and quant_max is None:
-                                    if observer.reduce_range:
-                                        quant_min, quant_max = 0, 127
-                                    else:
-                                        quant_min, quant_max = 0, 255
+                quant_min = fake_quant.quant_min
+                quant_max = fake_quant.quant_max
 
-                                observer.min_val = scale * (quant_min - offset)
-                                observer.max_val = scale * (quant_max - offset)
+                observer = getattr(fake_quant, 'activation_post_process', None)
+            elif isinstance(acp, torch_q.ObserverBase):
+                observer = acp
+
+                # We cannot use `disable_observer` which is designed for `FakeQuant` modules`.
+                # Instead, we need to monkey-patch the forward function of the observer.
+                identity = nn.Identity()
+                observer.forward = identity.forward
+
+                scale = torch.tensor(1.0 / std, dtype=torch.float32)
+                offset = torch.tensor(mean, dtype=torch.int32)
+
+                quant_min = observer.quant_min
+                quant_max = observer.quant_max
+
+            else:
+                log.warning(f'Given module {type(module)} doesn\'t seem to be a quantized module')
+                return
+
+            if observer is not None:
+                if quant_min is None and quant_max is None:
+                    if observer.reduce_range:
+                        quant_min, quant_max = 0, 127
+                    else:
+                        quant_min, quant_max = 0, 255
+
+                observer.min_val = scale * (quant_min - offset)
+                observer.max_val = scale * (quant_max - offset)
 
     def rescale_activations_with_quant_min_max(self, quant_min: int, quant_max: int) -> None:
         """Rescales activations with provided quant_min and quant_max"""
@@ -1796,6 +1863,14 @@ class PostQuantizer(QATQuantizer):
 
         if self.quantized_input_stats is not None:
             self.prepare_quantized_inputs_pass(graph)
+
+        if self.set_quantizable_op_stats:
+            if self.quantized_op_stats is None:
+                self.quantized_op_stats = {}
+            self.quantized_op_stats.update(KNOWN_QSTATS)
+
+        if self.quantized_op_stats is not None:
+            self.prepare_quantized_ops_pass(graph)
 
         return graph.module
 

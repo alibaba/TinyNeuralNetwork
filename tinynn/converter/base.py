@@ -37,6 +37,7 @@ class TFLiteConverter(object):
         hybrid_quantization_from_float: bool = False,
         hybrid_per_channel: bool = False,
         hybrid_asymmetric_inputs: bool = True,
+        hybrid_quantize_weight_type: typing.Optional[str] = None,
         fuse_quant_dequant: bool = False,
         gc_when_reload: bool = False,
         group_conv_rewrite: bool = False,
@@ -67,6 +68,8 @@ class TFLiteConverter(object):
             hybrid_quantization_from_float (bool): Direct hybrid quantization from a float model. Defaults to False
             hybrid_per_channel (bool): Prefer per-channel kernels in hybrid quantization. Defaults to False
             hybrid_asymmetric_inputs (bool): Prefer asymmetric inputs while performing hybrid quantization
+            hybrid_quantize_weight_type (typing.Optional[str]): Quantized weight type for hybrid quantization. \
+                If it is unset, then the value of `quantize_target_type` will be used. Defaults to None
             fuse_quant_dequant (bool): Remove quant and dequant nodes directly connected to i/o nodes. Defaults to False
             gc_when_reload (bool): Apply GC when reloading the torchscript into memory
             group_conv_rewrite (bool): Rewriting for group convolution. Defaults to False
@@ -117,17 +120,9 @@ class TFLiteConverter(object):
             self.q_type = np.uint8
             if self.strict_symmetric_check:
                 log.warning('Symmetric quantized model with uint8 is unsupported in most backends of TFLite')
-            if self.hybrid:
-                if self.hybrid_per_channel:
-                    raise AttributeError('Per-channel kernels supports int8 only')
-                log.warning(
-                    'Unless you are using legacy TFLite (<1.14), please set quantize_target_type to int8 instead'
-                )
         elif quantize_target_type == 'int8':
             self.q_type = np.int8
         elif quantize_target_type == 'int16':
-            if self.hybrid:
-                raise AttributeError('Hybrid kernels supports int8 only')
             if not self.strict_symmetric_check:
                 raise AttributeError('Int16 quantization requires strict_symmetric_check=True')
             self.q_type = np.int16
@@ -146,6 +141,22 @@ class TFLiteConverter(object):
                     'quantize_input_output_type == \'int16\' and quantize_target_type != \'int16\' is not supported'
                 )
         self.quantize_input_output_type = quantize_input_output_type
+
+        if hybrid_quantize_weight_type is None:
+            hybrid_quantize_weight_type = quantize_target_type
+
+        if hybrid_quantize_weight_type == 'uint8':
+            if self.hybrid:
+                if self.hybrid_per_channel:
+                    raise AttributeError('Per-channel kernels supports int8 only')
+                log.warning(
+                    'Unless you are using legacy TFLite (<1.14), please set quantize_target_type to int8 instead'
+                )
+            self.hybrid_q_type = np.uint8
+        elif hybrid_quantize_weight_type == 'int8':
+            self.hybrid_q_type = np.int8
+        elif hybrid_quantize_weight_type == 'int16':
+            raise AttributeError('Hybrid kernels supports int8 and uint8 only')
 
         if dump_config_path and not dump_jit_model_path:
             raise AssertionError("when dump_config_path is set, dump_jit_model_path is required to be set")
@@ -321,7 +332,9 @@ class TFLiteConverter(object):
             output_tensors = []
 
             converter_type = OPERATOR_CONVERTER_DICT.get(k, NoTrackOperator)
-            converter = converter_type(node, self.tensor_map, not self.strict_symmetric_check, self.q_type)
+            converter = converter_type(
+                node, self.tensor_map, not self.strict_symmetric_check, self.q_type, self.hybrid_q_type
+            )
             # Don't track the operator if all the input nodes are not tracked unless it has custom implementation
             # (e.g prim::* ops)
             if converter_type.run == NoTrackOperator.run and converter_type != NoTrackOperator:
@@ -338,7 +351,9 @@ class TFLiteConverter(object):
                         break
                 if no_track_flag:
                     converter_type = NoTrackOperator
-                    converter = converter_type(node, self.tensor_map, not self.strict_symmetric_check, self.q_type)
+                    converter = converter_type(
+                        node, self.tensor_map, not self.strict_symmetric_check, self.q_type, self.hybrid_q_type
+                    )
             if k != 'prim::Constant':
                 log.debug(f'{k} {converter.input_names} -> {converter.output_names} {converter_type.__name__}')
             # Don't fetch attrs and schemas for non-tracking nodes
@@ -408,7 +423,7 @@ class TFLiteConverter(object):
 
             if self.hybrid:
                 quantizer = HybridQuantizer(
-                    self.common_graph, self.hybrid_asymmetric_inputs, self.q_type, self.hybrid_per_channel
+                    self.common_graph, self.hybrid_asymmetric_inputs, self.hybrid_q_type, self.hybrid_per_channel
                 )
                 quantizer.quantize()
                 optimizer.cleanup_dead_nodes()

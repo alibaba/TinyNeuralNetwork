@@ -17,14 +17,15 @@ class ATenLstmOperator(ATenLstmSchema):
     def lstm_input_helper(
         self, input_tensors, params_tensors, has_biases, param_start_index, input_start_index, layer_idx, suffix
     ):
+        hybrid = isinstance(self, ATenQuantizedLstmOperator)
         weight_ih_slices = torch.chunk(params_tensors[param_start_index], 4, 0)
         gates = ["input", "forget", "cell", "output"]
         for idx, (weight_ih, gate) in enumerate(zip(weight_ih_slices, gates)):
-            input_tensors[input_start_index + idx] = self.create_attr_tensor(weight_ih)
+            input_tensors[input_start_index + idx] = self.create_attr_tensor(weight_ih, hybrid=hybrid)
 
         weight_hh_slices = torch.chunk(params_tensors[param_start_index + 1], 4, 0)
         for idx, (weight_hh, gate) in enumerate(zip(weight_hh_slices, gates)):
-            input_tensors[input_start_index + 4 + idx] = self.create_attr_tensor(weight_hh)
+            input_tensors[input_start_index + 4 + idx] = self.create_attr_tensor(weight_hh, hybrid=hybrid)
 
         if has_biases:
             assert params_tensors[param_start_index + 2].dtype == torch.float32
@@ -265,7 +266,7 @@ class ATenUpsampleNearest2dOperator(ATenUpsampleNearest2dSchema):
         inputs = [input_tensor, output_sizes]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
-        ops = [tfl.ResizeNearestNeighborOperator(inputs, outputs, halfPixelCenters=True)]
+        ops = [tfl.ResizeNearestNeighborOperator(inputs, outputs, halfPixelCenters=False)]
         ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
 
         for op in ops:
@@ -373,6 +374,50 @@ class ATenAdaptiveAvgPool2dOperator(ATenAdaptiveAvgPool2dSchema):
             kernel_h, kernel_w = dim_h - (output_h - 1) * stride_h, dim_w - (output_w - 1) * stride_w
 
             ops.append(tfl.AveragePool2dOperator(inputs, outputs, padding, stride_w, stride_h, kernel_w, kernel_h))
+
+        ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
+
+class ATenAdaptiveMaxPool2dOperator(ATenAdaptiveMaxPool2dSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        output_h, output_w = self.input_tensors[1]
+
+        dim_h, dim_w = input_tensor.shape[2:]
+        assert (
+            dim_h % output_h == 0 and dim_w % output_w == 0
+        ), f'not supported: input dim: [{dim_h}, {dim_w}], output size: [{output_h}, {output_w}]'
+        assert input_tensor.tensor.ndim == 4, 'Only 4D input is supported'
+
+        ops = []
+
+        dims = self.create_attr_tensor(np.array([1, 2], dtype='int32'))
+
+        log.warning(
+            'OPs like`F.adaptive_maxpool_2d` have multiple outputs. However, only the first '
+            'output will be preserved in our converter. If you need that tensor, please '
+            'use the `torch.argmax` instead.'
+        )
+
+        outputs = self.to_tfl_tensors(self.output_names[:1], self.output_tensors[:1])
+
+        if output_h == 1 and output_w == 1:
+            inputs = [input_tensor, dims]
+            ops.append(tfl.ReduceMaxOperator(inputs, outputs, True))
+        else:
+            inputs = [input_tensor]
+            padding = tfl_schema.Padding.VALID
+
+            stride_h, stride_w = dim_h // output_h, dim_w // output_w
+            kernel_h, kernel_w = dim_h - (output_h - 1) * stride_h, dim_w - (output_w - 1) * stride_w
+
+            ops.append(tfl.MaxPool2dOperator(inputs, outputs, padding, stride_w, stride_h, kernel_w, kernel_h))
 
         ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
 
@@ -775,6 +820,10 @@ class ATenStackOperator(ATenStackSchema):
             tfl.ReshapeOperator([orig, attr], [new], new.tensor.shape)
             for orig, new, attr in zip(orig_inputs, inputs, attrs)
         ]
+
+        for op in ops:
+            op.extra_hints['direction'] = 'up'
+
         ops.append(tfl.ConcatenationOperator(inputs, outputs, dim))
 
         for op in ops:
@@ -1176,7 +1225,9 @@ class ATenSelectOperator(ATenSelectSchema):
 
         reshape_inputs = [gather_out, reshape_attr]
         reshape_outputs = [all_out]
-        ops.append(tfl.ReshapeOperator(reshape_inputs, reshape_outputs, reshape_attr.tensor))
+        reshape_op = tfl.ReshapeOperator(reshape_inputs, reshape_outputs, reshape_attr.tensor)
+        reshape_op.extra_hints['direction'] = 'down'
+        ops.append(reshape_op)
 
         for op in ops:
             graph_converter.add_operator(op)
@@ -1541,9 +1592,10 @@ class ATenRepeatOperator(ATenRepeatSchema):
             if len(repeats) > len(input_shape):
                 new_shape = [1] * (len(repeats) - len(input_shape)) + list(input_shape)
                 new_shape_arr = np.array(new_shape, dtype='int32')
+                new_shape_tensor = self.create_attr_tensor(new_shape_arr)
                 reshaped = self.create_transform_tensor(np.reshape(input_tensor.tensor, new_shape_arr))
                 actual_input = reshaped
-                ops.append(tfl.ReshapeOperator([input_tensor], [reshaped], new_shape_arr))
+                ops.append(tfl.ReshapeOperator([input_tensor, new_shape_tensor], [reshaped], new_shape_arr))
             repeat_tensor = self.create_attr_tensor(np.array(repeats, dtype='int32'))
             ops.append(tfl.TileOperator([actual_input, repeat_tensor], outputs))
 
@@ -1930,9 +1982,12 @@ class ATenExpandOperator(ATenExpandSchema):
             if len(output_shape) > len(input_shape):
                 new_shape = [1] * (len(output_shape) - len(input_shape)) + list(input_shape)
                 new_shape_arr = np.array(new_shape, dtype='int32')
+                new_shape_tensor = self.create_attr_tensor(new_shape_arr)
                 reshaped = self.create_transform_tensor(np.reshape(input_tensor.tensor, new_shape_arr))
                 actual_input = reshaped
-                ops.append(tfl.ReshapeOperator([input_tensor], [reshaped], new_shape_arr))
+                reshape_op = tfl.ReshapeOperator([input_tensor, new_shape_tensor], [reshaped], new_shape_arr)
+                reshape_op.extra_hints['direction'] = 'up'
+                ops.append(reshape_op)
 
             repeats = []
             for x, y in zip(new_shape, output_shape):
@@ -1978,9 +2033,9 @@ class ATenGatherOperator(ATenGatherSchema):
             axis = len(index_shape) - 1
             shape_tensor = self.create_attr_tensor(np.array(index_shape, dtype='int32'))
             index_reshaped = self.create_transform_tensor(np.reshape(index_tensor.tensor, index_shape))
-            graph_converter.add_operator(
-                tfl.ReshapeOperator([index_tensor, shape_tensor], [index_reshaped], index_shape)
-            )
+            reshape_op = tfl.ReshapeOperator([index_tensor, shape_tensor], [index_reshaped], index_shape)
+            reshape_op.extra_hints['direction'] = 'up'
+            graph_converter.add_operator(reshape_op)
 
             if str(index_reshaped.dtype) != 'int32':
                 index_casted = self.create_transform_tensor(index_reshaped.tensor.astype('int32'))
@@ -2065,8 +2120,11 @@ class ATenCopyOperator(ATenCopySchema):
                     if len(output_shape) > len(other_shape):
                         new_shape = [1] * (len(output_shape) - len(other_shape)) + list(other_shape)
                         new_shape_arr = np.array(new_shape, dtype='int32')
+                        new_shape_tensor = self.create_attr_tensor(new_shape_arr)
                         reshaped = self.create_transform_tensor(np.reshape(actual_input.tensor, new_shape_arr))
-                        ops.append(tfl.ReshapeOperator([actual_input], [reshaped], new_shape_arr))
+                        reshape_op = tfl.ReshapeOperator([actual_input, new_shape_tensor], [reshaped], new_shape_arr)
+                        reshape_op.extra_hints['direction'] = 'up'
+                        ops.append(reshape_op)
                         actual_input = reshaped
 
                     repeats = []
@@ -2539,3 +2597,10 @@ class ATenUnbindOperator(ATenUnbindSchema):
         outputs = self.to_tfl_tensors(output_names, self.output_tensors[0])
 
         graph_converter.add_operator(tfl.UnpackOperator([input_tensor], outputs, chunks, dim))
+
+
+class ATenRollOperator(ATenRollSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)

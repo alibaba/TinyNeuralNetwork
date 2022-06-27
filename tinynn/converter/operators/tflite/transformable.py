@@ -216,6 +216,9 @@ class GenericConvOperator(TransformableOperator):
                 for old, new, attr in zip(self.inputs[:reshape_input_size], reshape_outputs, reshape_attrs)
             ]
 
+            for op in reshape_ops:
+                op.extra_hints['direction'] = 'up'
+
             prev_ops.extend(reshape_ops)
 
             conv_outputs = [
@@ -233,6 +236,9 @@ class GenericConvOperator(TransformableOperator):
                 tfl_ops.ReshapeOperator([old, attr], [new], attr.tensor)
                 for old, new, attr in zip(conv_outputs, self.outputs[:reshape_output_size], conv_attrs)
             ]
+
+            for op in conv_ops:
+                op.extra_hints['direction'] = 'down'
 
             next_ops.extend(conv_ops)
 
@@ -464,6 +470,9 @@ class GenericTransposeConvOperator(TransformableOperator):
                 for old, new, attr in zip(self.inputs[:2], reshape_outputs, reshape_attrs)
             ]
 
+            for op in reshape_ops:
+                op.extra_hints['direction'] = 'up'
+
             if weight_dim == 3 and input_dim == 3:
                 prev_ops.extend(reshape_ops)
             elif weight_dim == 3:
@@ -483,6 +492,9 @@ class GenericTransposeConvOperator(TransformableOperator):
                 tfl_ops.ReshapeOperator([old, attr], [new], attr.tensor)
                 for old, new, attr in zip(conv_outputs, self.outputs[:1], conv_attrs)
             ]
+
+            for op in conv_ops:
+                op.extra_hints['direction'] = 'down'
 
             next_ops.extend(conv_ops)
 

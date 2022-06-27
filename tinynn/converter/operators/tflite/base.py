@@ -135,7 +135,10 @@ class Buffer(object):
         self.tfl_buffer = 0
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
-        data = create_byte_array(builder, tflite.Buffer.Data, self.data)
+        if len(self.data) != 0:
+            data = create_byte_array(builder, tflite.Buffer.Data, self.data)
+        else:
+            data = 0
         tflite.BufferStart(builder)
         tflite.BufferAddData(builder, data)
         self.tfl_buffer = tflite.BufferEnd(builder)
