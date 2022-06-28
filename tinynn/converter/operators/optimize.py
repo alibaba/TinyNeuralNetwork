@@ -2913,8 +2913,6 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.RSQRT,
         ExtendedOperator.CAST,
         ExtendedOperator.LOGISTIC,
-        ExtendedOperator.SOFTMAX,
-        ExtendedOperator.LOG_SOFTMAX,
         ExtendedOperator.HARD_SWISH,
         ExtendedOperator.LEAKY_RELU,
         ExtendedOperator.SPLIT,

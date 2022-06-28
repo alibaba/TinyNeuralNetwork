@@ -944,6 +944,25 @@ class ConverterOPTester(unittest.TestCase):
             tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
             assert_close(dummy_output, tfl_output)
 
+    def test_softmax_like_funcs_non_last_dim(self):
+        dummy_input = torch.randn(1, 1000, 1, 1, dtype=torch.float32)
+
+        funcs = [F.softmax, F.log_softmax]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+
+            def model(x):
+                return func(x, dim=1)
+
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+            assert_close(dummy_output, tfl_output)
+
     def test_argminmax(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 

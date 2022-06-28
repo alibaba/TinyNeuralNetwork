@@ -752,11 +752,17 @@ class ATenSoftmaxOperator(ATenSoftmaxSchema):
         if dim < 0:
             dim += len(self.input_tensors[0].shape)
 
-        assert dim == len(self.input_tensors[0].shape) - 1, "only softmax with last dim is supported"
+        ops = []
 
         inputs = [self.find_or_create_input(0, graph_converter)]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-        graph_converter.add_operator(tfl.SoftmaxOperator(inputs, outputs, 1.0))
+        softmax_op = tfl.SoftmaxOperator(inputs, outputs, 1.0)
+        ops.append(softmax_op)
+
+        ops = self.wrap_ops_with_last_dim_transposes(ops, dim)
+
+        for op in ops:
+            graph_converter.add_operator(op)
 
 
 class ATenAtan2Operator(ATenAtan2Schema):
@@ -1564,8 +1570,17 @@ class ATenLogSoftmaxOperator(ATenLogSoftmaxSchema):
         if dim < 0:
             dim += len(self.input_tensors[0].shape)
 
-        assert dim == len(self.input_tensors[0].shape) - 1, "only log_softmax with last dim is supported"
-        self.elementwise_unary(tfl.LogSoftmaxOperator, graph_converter)
+        ops = []
+
+        inputs = [self.find_or_create_input(0, graph_converter)]
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        log_softmax_op = tfl.LogSoftmaxOperator(inputs, outputs)
+        ops.append(log_softmax_op)
+
+        ops = self.wrap_ops_with_last_dim_transposes(ops, dim)
+
+        for op in ops:
+            graph_converter.add_operator(op)
 
 
 class ATenCloneOperator(ATenCloneSchema):
