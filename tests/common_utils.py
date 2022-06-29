@@ -23,7 +23,7 @@ def collect_torchvision_models():
                 if p.name != 'kwargs' and p.default is p.empty:
                     no_arg = False
                     break
-                elif p.name == 'pretrained':
+                elif p.name in ('pretrained', 'weights'):
                     has_pretrained = True
             if no_arg and has_pretrained:
                 torchvision_model_classes.append(item)

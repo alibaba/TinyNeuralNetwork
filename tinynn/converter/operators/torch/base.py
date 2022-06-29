@@ -117,6 +117,8 @@ class OperatorConverter(ABC):
 
     def run(self, node):
         func = torch._C._jit_get_operation(node.kind())
+        if isinstance(func, tuple):
+            func = func[0]
         with torch.no_grad():
             legacy = True
             if LooseVersion(torch.__version__) >= LooseVersion('1.8.0'):
