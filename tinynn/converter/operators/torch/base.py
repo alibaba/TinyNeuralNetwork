@@ -387,6 +387,42 @@ class OperatorConverter(ABC):
 
         return [nchw2nhwc_transpose] + ops + [nhwc2nchw_transpose]
 
+    def wrap_ops_with_last_dim_transposes(
+        self, ops: typing.List[tfl.BaseOperator], dim: int, input_idx: int = 0, output_idx: int = 0
+    ) -> typing.List[tfl.BaseOperator]:
+        orig_input = ops[0].inputs[input_idx]
+        orig_output = ops[-1].outputs[output_idx]
+
+        assert len(orig_input.shape) == len(orig_output.shape), "Numbers of dimensions mismatch"
+
+        n_dim = len(orig_input.shape)
+        if n_dim == dim:
+            return ops
+
+        last_dim_perm = np.array([i for i in range(n_dim) if i != dim] + [dim], dtype='int32')
+        rev_last_dim_perm = np.argsort(last_dim_perm).astype('int32')
+
+        last_dim_perm_tensor = self.create_attr_tensor(last_dim_perm)
+        rev_last_dim_perm_tensor = self.create_attr_tensor(rev_last_dim_perm)
+
+        new_input = self.create_transform_tensor(
+            np.transpose(orig_input.tensor, last_dim_perm), quantization=orig_input.quantization
+        )
+        new_output = self.create_transform_tensor(
+            np.transpose(orig_output.tensor, last_dim_perm), quantization=orig_output.quantization
+        )
+
+        last_dim_transpose = tfl.TransposeOperator([orig_input, last_dim_perm_tensor], [new_input])
+        rev_last_dim_transpose = tfl.TransposeOperator([new_output, rev_last_dim_perm_tensor], [orig_output])
+
+        last_dim_transpose.extra_hints['direction'] = 'up'
+        rev_last_dim_transpose.extra_hints['direction'] = 'down'
+
+        ops[0].inputs[input_idx] = new_input
+        ops[-1].outputs[output_idx] = new_output
+
+        return [last_dim_transpose] + ops + [rev_last_dim_transpose]
+
     def handle_padding(self, pad_h, pad_w, pad_op_index, ops, ceil_mode=False):
         fill_nan = False
         if ceil_mode:
