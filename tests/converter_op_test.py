@@ -388,7 +388,11 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output, check_dtype=False)
 
-    @unittest.skipIf(LooseVersion(torch.__version__) < LooseVersion('1.7.0'), "torch.where cannot take scalar inputs")
+    @unittest.skipIf(
+        LooseVersion(torch.__version__) < LooseVersion('1.7.0')
+        or LooseVersion(torch.__version__) >= LooseVersion('1.12.0'),
+        "torch.where cannot take scalar inputs",
+    )
     def test_where_float_scalars(self):
         class TestModel(nn.Module):
             def forward(self, x):

@@ -125,7 +125,7 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
-    @unittest.skipIf(not hasattr(nn, 'hardsigmoid'), 'nn.Hardsigmoid not supported')
+    @unittest.skipIf(not hasattr(nn, 'Hardsigmoid'), 'nn.Hardsigmoid not supported')
     def test_not_quantizable_hardsigmoid_module(self):
         class Model(nn.Module):
             def __init__(self) -> None:

@@ -2619,3 +2619,40 @@ class ATenRollOperator(ATenRollSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+
+
+class ATenPadOperator(ATenPadSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        pads = self.input_tensors[1]
+        mode = self.input_tensors[2]
+        constant_value = self.input_tensors[3]
+
+        op_cls_dict = {'constant': (tfl.PadOperator, tfl.Padv2Operator), 'reflect': (tfl.MirrorPadOperator, None)}
+        assert mode in op_cls_dict, f"Unknown mode for aten::pad : {mode}"
+
+        orig_pad = np.array(pads, dtype='int32').reshape(-1, 2)
+        pad_fill = np.zeros((input_tensor.tensor.ndim - orig_pad.shape[0], 2), dtype='int32')
+        pad_arr = np.flip(np.concatenate((orig_pad, pad_fill)), 0)
+        pad_tensor = self.create_attr_tensor(pad_arr)
+
+        inputs = [input_tensor, pad_tensor]
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        if constant_value not in (0, 0.0, None):
+            output = outputs[0]
+            if output.quantization is None:
+                constant_arr = np.array([constant_value], dtype='float32')
+            else:
+                float_arr = torch.tensor([constant_value], dtype=torch.float32)
+                constant_arr = torch.quantize_per_tensor(
+                    float_arr, output.quantization.scale, output.quantization.zero_point, torch.quint8
+                )
+
+            inputs.append(self.create_attr_tensor(constant_arr))
+
+            graph_converter.add_operator(op_cls_dict[mode][1](inputs, outputs))
+        else:
+            graph_converter.add_operator(op_cls_dict[mode][0](inputs, outputs))

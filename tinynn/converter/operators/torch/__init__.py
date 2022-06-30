@@ -68,6 +68,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::rsub": ATenRsubOperator,
     "aten::rsub_": ATenRsubOperator,
     "aten::atan2": ATenAtan2Operator,
+    "aten::pad": ATenPadOperator,
     "aten::constant_pad_nd": ATenConstantPadNdOperator,
     "aten::reflection_pad1d": ATenReflectionPad1dOperator,
     "aten::reflection_pad2d": ATenReflectionPad2dOperator,
