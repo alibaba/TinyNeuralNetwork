@@ -2621,7 +2621,7 @@ class ATenRollOperator(ATenRollSchema):
         self.run(node)
 
 
-class ATenPadOperator(OperatorConverter):
+class ATenPadOperator(ATenPadSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
 
