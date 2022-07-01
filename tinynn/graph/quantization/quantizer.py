@@ -1361,33 +1361,40 @@ class QATQuantizer(object):
                 )
             else:
                 if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
-                    if cur_class in (
-                        nn.ConvTranspose2d,
-                        nn.ConstantPad1d,
-                        nn.ConstantPad2d,
-                        nn.ConstantPad3d,
-                        nn.ZeroPad2d,
+                    if isinstance(
+                        cur_module,
+                        (
+                            nn.ConvTranspose2d,
+                            nn.ConstantPad1d,
+                            nn.ConstantPad2d,
+                            nn.ConstantPad3d,
+                            nn.ZeroPad2d,
+                        ),
                     ):
                         return True
                 else:
-                    if cur_class == nn.SiLU:
+                    if isinstance(cur_module, nn.SiLU):
                         return True
-                return cur_class in (
-                    nn.LSTM,
-                    nn.RNN,
-                    nn.GRU,
-                    nn.LayerNorm,
-                    nn.InstanceNorm1d,
-                    nn.InstanceNorm2d,
-                    nn.Hardsigmoid,
-                    nn.Softmax,
-                    nn.LogSoftmax,
+                return isinstance(
+                    cur_module,
+                    (
+                        nn.LSTM,
+                        nn.RNN,
+                        nn.GRU,
+                        nn.LayerNorm,
+                        nn.InstanceNorm1d,
+                        nn.InstanceNorm2d,
+                        nn.Hardsigmoid,
+                        nn.Softmax,
+                        nn.LogSoftmax,
+                    ),
                 )
 
         unsupported_nodes = graph.filter_forward_nodes(_is_not_quantizable)
         for idx, node in enumerate(reversed(unsupported_nodes)):
             node_map = dict()
-            for inner_idx, next_node in enumerate(node.next_nodes):
+            next_nodes = {n.unique_name: n for n in node.next_nodes}.values()
+            for inner_idx, next_node in enumerate(next_nodes):
                 prev_indices = []
                 for pt in next_node.prev_tensors:
                     for j, nt in enumerate(node.next_tensors):
@@ -1424,7 +1431,8 @@ class QATQuantizer(object):
         for idx, node in enumerate(unsupported_nodes):
             fake_dequant_cls = torch_q.DeQuantStub
             assert node.rev_index is False
-            for inner_idx, prev_node in enumerate(node.prev_nodes):
+            prev_nodes = {n.unique_name: n for n in node.prev_nodes}.values()
+            for inner_idx, prev_node in enumerate(prev_nodes):
                 fake_dequant = fake_dequant_cls()
 
                 graph.module_unique_name_dict[id(fake_dequant)] = f'fake_dequant_inner_{idx}_{inner_idx}'

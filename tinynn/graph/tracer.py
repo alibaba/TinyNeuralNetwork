@@ -4,6 +4,7 @@ import importlib
 import inspect
 import io
 import os
+import queue
 import re
 import sys
 import traceback
@@ -816,21 +817,27 @@ def new_init_gen(orig_init, key: str):
                     )
                 log.debug(f'{key} in with block, lock: {lock}')
 
-                rckwa = check_types(kwargs.values())
-                rca = check_types(args)
-                err_type = rca or rckwa
-                if err_type:
-                    log.warning(
-                        f'Constructor of {class_fullname} has arguments of type {err_type} which is unsupported'
-                    )
-                    log.warning(f'  Args: {args}')
-                    log.warning(f'  Keyword args: {kwargs}')
+                actual_class_name = qualified_name(type(obj))
+                if actual_class_name == class_fullname:
+                    rckwa = check_types(kwargs.values())
+                    rca = check_types(args)
+                    err_type = rca or rckwa
+                    if err_type:
+                        log.warning(
+                            f'Constructor of {class_fullname} has arguments of type {err_type} which is unsupported'
+                        )
+                        log.warning(f'  Args: {args}')
+                        log.warning(f'  Keyword args: {kwargs}')
+                    else:
+                        log.info(f'Constructor of {class_fullname} registered')
+                        full_args_content = args_as_string(args, kwargs)
+                        orig_constructor_line = f'{class_fullname}({full_args_content})'
+                        module_constructor_lines[id(obj)] = orig_constructor_line
+                        module_constructor_weakrefs[id(obj)] = weakref.ref(obj)
                 else:
-                    log.info(f'Constructor of {class_fullname} registered')
-                    full_args_content = args_as_string(args, kwargs)
-                    orig_constructor_line = f'{class_fullname}({full_args_content})'
-                    module_constructor_lines[id(obj)] = orig_constructor_line
-                    module_constructor_weakrefs[id(obj)] = weakref.ref(obj)
+                    module_constructor_traced.remove(id(obj))
+                    if not actual_class_name.startswith('torch.'):
+                        log.warning(f'Constructor of class {actual_class_name} is not captured')
             orig_init(obj, *args, **kwargs)
         log.debug(f'{key} after with block, lock: {lock}')
 
@@ -1652,10 +1659,14 @@ class TraceGraph(object):
 
     def __active_detection(self, node: TraceNode):
         """Detects whether the node is active or not"""
-        if not node.active:
-            node.active = True
-            for i in node.prev_nodes:
-                self.__active_detection(i)
+        q = queue.Queue()
+        q.put(node)
+        while not q.empty():
+            node = q.get()
+            if not node.active:
+                node.active = True
+                for i in node.prev_nodes:
+                    q.put(i)
 
     def init(self) -> None:
         """Builds a computation graph"""
@@ -2110,7 +2121,6 @@ class TraceGraph(object):
         for idx in range(len(next_node.prev_nodes)):
             if next_node.prev_nodes[idx] == prev_node:
                 next_node.prev_nodes[idx] = new_node
-                break
 
         # Update tensors in output nodes
         index_mapping = []
@@ -2138,8 +2148,8 @@ class TraceGraph(object):
                 prev_unique_name = tensor_name_from_parts(old_unique_name, old_idx, is_constant_node)
                 next_unique_name = tensor_name_from_parts(new_node.unique_name, new_idx, is_new_constant_node)
                 log.debug('tensor rename: ', prev_unique_name, '->', next_unique_name)
-                n.module.replace_tensor_name(prev_unique_name, next_unique_name)
-                n.module.update_args_string()
+                next_node.module.replace_tensor_name(prev_unique_name, next_unique_name)
+                next_node.module.update_args_string()
 
     def insert_before(
         self,
@@ -2261,6 +2271,12 @@ class TraceGraph(object):
         is_new_constant_node = type(module) == ConstantNode
         node.unique_name = self.module_unique_name_dict[id(module)]
 
+        # Drop original module constructor line
+        if id(node.module) in module_constructor_lines:
+            if id(node.module) in module_constructor_traced:
+                module_constructor_traced.remove(id(node.module))
+            del module_constructor_lines[id(node.module)]
+
         # Update module for node
         node.module = module
 
@@ -2308,6 +2324,11 @@ class TraceGraph(object):
                     name = node.unique_name
                     del self.nodes_map[name]
                     self.forward_nodes.remove(node)
+
+                    if id(node.module) in module_constructor_lines:
+                        if id(node.module) in module_constructor_traced:
+                            module_constructor_traced.remove(id(node.module))
+                        del module_constructor_lines[id(node.module)]
 
                 node = nodes[0]
 
@@ -2395,7 +2416,6 @@ class TraceGraph(object):
             for i, pn in enumerate(n.prev_nodes):
                 if pn == node:
                     n.prev_nodes[i] = prev_node
-                    break
             # Handle previous tensors
             for i, pt in enumerate(n.prev_tensors):
                 if pt in tensor_dict:
@@ -2417,6 +2437,11 @@ class TraceGraph(object):
         # Remove this node
         self.forward_nodes.remove(node)
         del self.nodes_map[node.unique_name]
+
+        if id(node.module) in module_constructor_lines:
+            if id(node.module) in module_constructor_traced:
+                module_constructor_traced.remove(id(node.module))
+            del module_constructor_lines[id(node.module)]
 
 
 def load_overridable_modules():

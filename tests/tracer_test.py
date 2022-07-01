@@ -5,6 +5,7 @@ import torchvision.models
 import inspect
 import logging
 import os
+import re
 import unittest
 
 import numpy as np
@@ -14,7 +15,10 @@ from tinynn.util.util import import_from
 from common_utils import collect_custom_models, collect_torchvision_models, prepare_inputs
 
 
-BLACKLIST = ()
+BLACKLIST = (
+    'swin.*',
+    'vit.*',
+)
 
 
 class TestModelMeta(type):
@@ -49,8 +53,9 @@ class TestModelMeta(type):
             if eliminate_dead_graph:
                 model_file += '_edg'
 
-            if model_name in BLACKLIST:
-                raise unittest.SkipTest('IN BLACKLIST')
+            for item in BLACKLIST:
+                if re.match(item, model_name):
+                    raise unittest.SkipTest('IN BLACKLIST')
 
             if os.path.exists(f'out/{model_file}.py'):
                 raise unittest.SkipTest('TESTED')

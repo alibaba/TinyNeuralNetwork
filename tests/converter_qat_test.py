@@ -7,6 +7,7 @@ import io
 import inspect
 import logging
 import os
+import re
 import sys
 import unittest
 
@@ -60,24 +61,14 @@ def get_tflite_out(model_path, inputs):
 # resnext: group convs
 # regnet: group convs
 # yolov4: 5-d slices
+# swin: roll
+# vit: native_multi_head_attention
 BLACKLIST = (
-    'resnext50_32x4d',
-    'resnext101_32x8d',
+    'resnext.*',
     'Build_Model',
-    'regnet_x_16gf',
-    'regnet_x_1_6gf',
-    'regnet_x_32gf',
-    'regnet_x_3_2gf',
-    'regnet_x_400mf',
-    'regnet_x_800mf',
-    'regnet_x_8gf',
-    'regnet_y_16gf',
-    'regnet_y_1_6gf',
-    'regnet_y_32gf',
-    'regnet_y_3_2gf',
-    'regnet_y_400mf',
-    'regnet_y_800mf',
-    'regnet_y_8gf',
+    'regnet.*',
+    'swin.*',
+    'vit.*',
 )
 
 
@@ -126,8 +117,9 @@ class TestModelMeta(type):
             model_file = model_name
             model_file += '_qat_simple'
 
-            if model_name in BLACKLIST:
-                raise unittest.SkipTest('IN BLACKLIST')
+            for item in BLACKLIST:
+                if re.match(item, model_name):
+                    raise unittest.SkipTest('IN BLACKLIST')
 
             if os.path.exists(f'out/{model_file}.tflite'):
                 raise unittest.SkipTest('TESTED')
