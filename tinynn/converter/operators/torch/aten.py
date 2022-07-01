@@ -2620,6 +2620,78 @@ class ATenRollOperator(ATenRollSchema):
 
         self.run(node)
 
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        shifts, dims = self.input_tensors[1:3]
+
+        ops = []
+        actual_input = input_tensor
+        if len(dims) == 0:
+            assert len(shifts) == 1
+            shift = shifts[0]
+
+            if len(input_tensor.shape) != 1:
+                flat_input = self.create_transform_tensor(
+                    input_tensor.tensor.ravel(), quantization=input_tensor.quantization
+                )
+                flat_shape = self.create_attr_tensor(np.array(flat_input.shape, dtype='int32'))
+
+                prev_reshape_op = tfl.ReshapeOperator([input_tensor, flat_shape], [flat_input], flat_shape.tensor)
+                prev_reshape_op.extra_hints['direction'] = 'up'
+                ops.append(prev_reshape_op)
+
+                actual_input = flat_input
+
+            dims.append(0)
+
+        assert len(shifts) == len(dims)
+        for shift, dim in zip(shifts, dims):
+            if dim < 0:
+                dim += len(actual_input.shape)
+
+            dim_size = actual_input.shape[dim]
+            if shift < 0:
+                shift += dim_size
+
+            actual_shift = shift % dim_size
+            if actual_shift != 0:
+                split_sizes = self.create_attr_tensor(np.array([dim_size - actual_shift, actual_shift], dtype='int32'))
+                dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
+                chunks = 2
+
+                splitted = [
+                    self.create_transform_tensor(x, quantization=actual_input.quantization)
+                    for x in np.split(actual_input.tensor, [actual_shift], dim)
+                ]
+                ops.append(tfl.SplitVOperator([actual_input, split_sizes, dim_tensor], splitted, chunks))
+
+                reversed_s = splitted[::-1]
+                outputs = [
+                    self.create_transform_tensor(
+                        np.concatenate([s.tensor for s in reversed_s], dim), quantization=actual_input.quantization
+                    )
+                ]
+                ops.append(tfl.ConcatenationOperator(reversed_s, outputs, dim))
+            else:
+                inputs = [actual_input, self.create_attr_tensor(actual_input.shape)]
+                outputs = [
+                    self.create_transform_tensor(actual_input.tensor.copy(), quantization=actual_input.quantization)
+                ]
+                ops.append(tfl.ReshapeOperator(inputs, outputs, input_tensor.shape))
+
+            actual_input = outputs[0]
+
+        output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
+        if len(actual_input.shape) != len(output_tensor.shape):
+            output_shape = self.create_attr_tensor(np.array(output_tensor.shape, dtype='int32'))
+            post_reshape_op = tfl.ReshapeOperator([actual_input, output_shape], [output_tensor], output_shape.tensor)
+            post_reshape_op.extra_hints['direction'] = 'down'
+            ops.append(post_reshape_op)
+        else:
+            ops[-1].outputs[0] = output_tensor
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
 
 class ATenPadOperator(ATenPadSchema):
     def parse(self, node, attrs, args, graph_converter):

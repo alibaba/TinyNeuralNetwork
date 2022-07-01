@@ -3633,6 +3633,150 @@ class ConverterOPTester(unittest.TestCase):
 
         assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
+    @unittest.skipIf(not hasattr(torch, 'roll'), "Roll is not supported")
+    def test_roll(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.roll(x, 1)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    @unittest.skipIf(not hasattr(torch, 'roll'), "Roll is not supported")
+    def test_roll_1d(self):
+        dummy_input = torch.randn(100, dtype=torch.float32)
+
+        def model(x):
+            return torch.roll(x, 1)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    @unittest.skipIf(not hasattr(torch, 'roll'), "Roll is not supported")
+    def test_roll_negative_shift(self):
+        dummy_input = torch.arange(10 * 10).to(dtype=torch.float32).reshape(10, 10)
+
+        def model(x):
+            return torch.roll(x, -1)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    @unittest.skipIf(not hasattr(torch, 'roll'), "Roll is not supported")
+    def test_roll_noop(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.roll(x, 100)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    @unittest.skipIf(not hasattr(torch, 'roll'), "Roll is not supported")
+    def test_roll_noop_1(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.roll(x, -100)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    @unittest.skipIf(not hasattr(torch, 'roll'), "Roll is not supported")
+    def test_roll_single_dim(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.roll(x, 1, 0)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    @unittest.skipIf(not hasattr(torch, 'roll'), "Roll is not supported")
+    def test_roll_negative_shift_single_dim(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.roll(x, -1, 0)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    @unittest.skipIf(not hasattr(torch, 'roll'), "Roll is not supported")
+    def test_roll_negative_shift_single_negative_dim(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.roll(x, -1, -1)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    @unittest.skipIf(not hasattr(torch, 'roll'), "Roll is not supported")
+    def test_roll_multi_dim(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.roll(x, [-1, 1], [0, 1])
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
 
 class ConverterQuantizedOPTester(unittest.TestCase):
     backend: str
