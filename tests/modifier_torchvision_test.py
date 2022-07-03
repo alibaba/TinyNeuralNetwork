@@ -14,7 +14,7 @@ from tinynn.graph.tracer import patch_helper, trace, tracer_context, model_trace
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
 from tinynn.util.util import import_from
 
-from common_utils import collect_torchvision_models, prepare_inputs
+from common_utils import collect_torchvision_models, prepare_inputs, IS_CI
 
 
 def transform_output(output):
@@ -28,9 +28,13 @@ def transform_output(output):
 
 
 BLACKLIST = (
-    'convnext.*',
     'vit.*',
-    'swin.*'
+    'swin.*',
+)
+
+CI_BLACKLIST = (
+    'convnext.*',
+    'regnet_y_128gf',
 )
 
 
@@ -53,6 +57,11 @@ class TestModelMeta(type):
             for item in BLACKLIST:
                 if re.match(item, model_name):
                     raise unittest.SkipTest('IN BLACKLIST')
+
+            if IS_CI:
+                for item in CI_BLACKLIST:
+                    if re.match(item, model_name):
+                        raise unittest.SkipTest('IN CI BLACKLIST')
 
             with model_tracer():
                 m = model_class()
