@@ -2575,8 +2575,6 @@ class GraphOptimizer(object):
         self.fuse_simple_transpose_pass()
         self.fuse_simple_reshape_pass()
 
-        self.fuse_conv2d_gather()
-
         # Branch transpose & reshape cleanup
         for i in range(11):
             t_count = self.elementwise_op_transpose_passthrough_pass()
@@ -2611,6 +2609,9 @@ class GraphOptimizer(object):
             self.transpose_to_reshape_pass()
             self.fuse_simple_reshape_pass()
             self.fuse_simple_transpose_pass()
+
+        # Some advanced fusion logic
+        self.fuse_conv2d_gather()
 
         # Remove consecutive dequantize and quantize nodes
         self.fuse_dequant_quant_pass(q_first=True)
