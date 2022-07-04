@@ -151,6 +151,9 @@ original_values_for_tracked_objects = {}
 # Original module class names
 importable_module_names = {}
 
+# Ignore warning for update module parameters
+mod_param_update_warning_ignore = GlobalData(False)
+
 
 class TraceNode(object):
     """A basic data structure to represent a node in the computation graph"""
@@ -292,8 +295,8 @@ class ConstantNode(object):
         self.is_class = False
 
         # Numbering of the name of the node
-        if not current_graph().global_functions.get(self.kind, None):
-            current_graph().global_functions[self.kind] = 1
+        if current_graph().global_functions.get(self.kind, None) is None:
+            current_graph().global_functions[self.kind] = 0
         else:
             current_graph().global_functions[self.kind] += 1
 
@@ -352,8 +355,8 @@ class TraceFunction(object):
                 self.kind = self.func_type
 
         # Numbering of the nodes
-        if not current_graph().global_functions.get(self.kind, None):
-            current_graph().global_functions[self.kind] = 1
+        if current_graph().global_functions.get(self.kind, None) is None:
+            current_graph().global_functions[self.kind] = 0
         else:
             current_graph().global_functions[self.kind] += 1
 
@@ -380,9 +383,10 @@ class TraceFunction(object):
 
         # Arguments
         self.args = None
-        self.kargs = None
+        self.kwargs = None
         self.args_string = None
         self.args_parsed = None
+        self.args_parsed_origin = None
         self.tensor_names = None
         self.args_template = None
         self.args_template_no_self = None
@@ -547,17 +551,6 @@ class TraceFunction(object):
 
             return new_arg
 
-        def _flatten_list(content):
-            """Flatten a list of nested list or string into a string"""
-            if isinstance(content, list):
-                sub_contents = []
-                for item in content:
-                    sub_contents.append(_flatten_list(item))
-                inner_content = ', '.join(sub_contents)
-                return f'[{inner_content}]'
-            else:
-                return content
-
         self.tensor_names = []
         self.prev_tensors.clear()
         arg_str = _parse_args(args)
@@ -569,16 +562,33 @@ class TraceFunction(object):
 
             for (k, v) in zip(kw_keys, kw_val_strs):
                 if type(v) is list:
-                    v_str = _flatten_list(v)
+                    v_str = self._flatten_list(v)
                     arg_str.append(f"{k}={v_str}")
                 else:
                     arg_str.append(f"{k}={v}")
 
-        self.args_parsed = arg_str
+        self.args_parsed = copy.deepcopy(arg_str)
+        self.kwargs = copy.deepcopy(kwargs)
+        self.args_parsed_origin = copy.deepcopy(self.args_parsed)
+        self.args_to_string(self.args_parsed)
 
+        return self
+
+    def _flatten_list(self, content):
+        """Flatten a list of nested list or string into a string"""
+        if isinstance(content, list):
+            sub_contents = []
+            for item in content:
+                sub_contents.append(self._flatten_list(item))
+            inner_content = ', '.join(sub_contents)
+            return f'[{inner_content}]'
+        else:
+            return content
+
+    def args_to_string(self, arg_str):
         for i in range(len(arg_str)):
             if type(arg_str[i]) is list:
-                arg_str[i] = _flatten_list(arg_str[i])
+                arg_str[i] = self._flatten_list(arg_str[i])
 
         try:
             self.args_template = ", ".join(arg_str)
@@ -666,7 +676,10 @@ def new_setattr_gen(orig_setattr, key: str):
                     related = False
                 if related:
                     class_name = '.'.join(key.split('.')[:-1])
-                    log.warning(
+                    log_func = log.warning
+                    if mod_param_update_warning_ignore():
+                        log_func = log.debug
+                    log_func(
                         f'The constant property `{name}` of {class_name} is changed. We need to drop the original'
                         ' constructor line.'
                     )
@@ -1533,6 +1546,16 @@ def model_constructor_tracer():
 
 
 @contextlib.contextmanager
+def ignore_mod_param_update_warning():
+    if not mod_param_update_warning_ignore():
+        mod_param_update_warning_ignore(True)
+        yield True
+        mod_param_update_warning_ignore(False)
+    else:
+        yield False
+
+
+@contextlib.contextmanager
 def model_tracer():
     """Simple context manager for tracing. Also captures module constructors"""
     with tracer_context():
@@ -1644,6 +1667,14 @@ class TraceGraph(object):
     def all_nodes(self) -> typing.List[TraceNode]:
         """Returns all the nodes in a computation graph during forward process"""
         return self.input_nodes + self.forward_nodes + self.output_nodes + self.constant_nodes
+
+    def all_tensors(self) -> typing.List[torch.Tensor]:
+        tensors = dict()
+        for n in self.all_nodes():
+            for t in n.prev_tensors + n.next_tensors:
+                if isinstance(t, torch.Tensor):
+                    tensors[id(t)] = t
+        return list(tensors.values())
 
     def __tag_nodes(self) -> None:
         """Gives the modules and the submodules a unique name"""
@@ -1810,6 +1841,10 @@ class TraceGraph(object):
                 line = f"        {output} = self.{node.unique_name}({param})"
             lines.append(line)
 
+            for pn in {pn.unique_name: pn for pn in node.prev_nodes}.values():
+                if node.forward_order == max([n.forward_order for n in pn.next_nodes]):
+                    lines.append(f"        {pn.unique_name} = None")
+
         def _gen_output_node(node):
             if node.rev_index:
                 return f'[{", ".join([node.prev_node_unique_name(i) for i in range(len(node.prev_nodes))])}]'
@@ -1871,8 +1906,10 @@ class TraceGraph(object):
         for node in self.constant_nodes:
             if id(node.module) not in module_constructor_lines:
                 dtype = getattr(torch, node.module.dtype.split('.')[-1])
-                weight = torch.nn.Parameter(torch.tensor(node.module.data, dtype=dtype))
-                dummy_model.register_parameter(node.unique_name, weight)
+                new_tensor = torch.tensor(node.module.data, dtype=dtype)
+                if torch.is_floating_point(new_tensor):
+                    weight = torch.nn.Parameter(new_tensor)
+                    dummy_model.register_parameter(node.unique_name, weight)
 
         if output_weight_path:
             torch.save(dummy_model.state_dict(), output_weight_path)

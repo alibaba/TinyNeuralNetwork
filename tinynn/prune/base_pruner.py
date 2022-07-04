@@ -156,16 +156,15 @@ class BasePruner(ABC):
             else:
                 model = self.model
 
-            with model_tracer():
-                old_device = get_module_device(model)
+            old_device = get_module_device(model)
 
-                model.cpu()
-                graph = trace(model, self.dummy_input)
+            model.cpu()
+            graph = trace(model, self.dummy_input)
 
-                if old_device is not None:
-                    model.to(device=old_device)
+            if old_device is not None:
+                model.to(device=old_device)
 
-                return graph
+            return graph
 
     def reset(self):
         """Regenerate the TraceGraph when it is invalidated"""

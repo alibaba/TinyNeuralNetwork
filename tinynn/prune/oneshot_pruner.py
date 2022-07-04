@@ -1,12 +1,14 @@
 import copy
 import sys
 import typing
+import time
 
 import torch
 import torch.nn as nn
 import torch.distributed as dist
 
 from tinynn.graph import modifier
+from tinynn.graph.tracer import ignore_mod_param_update_warning
 from tinynn.util.util import get_logger
 from tinynn.prune.base_pruner import BasePruner
 from tinynn.graph.modifier import is_dw_conv
@@ -21,6 +23,8 @@ class OneShotChannelPruner(BasePruner):
     sparsity: typing.Union[typing.Dict[str, float], float]
     default_sparsity: float
     metric_func: typing.Callable[[torch.Tensor, torch.nn.Module], float]
+    skip_last_fc: bool
+    exclude_ops: list
 
     def __init__(self, model, dummy_input, config):
         """Constructs a new OneShotPruner (including random, l1_norm, l2_norm, fpgm)
@@ -39,7 +43,6 @@ class OneShotChannelPruner(BasePruner):
         self.center_nodes = []
         self.sparsity = {}
         self.parse_config()
-        self.exclude_ops = []
 
         for n in self.graph.forward_nodes:
             # Only prune the specific operators
@@ -60,15 +63,15 @@ class OneShotChannelPruner(BasePruner):
             raise Exception("No operations to prune")
 
         # 除非人工指定了剪枝率，否则当最后一个中心节点是linear时不对其进行剪枝（通常网络最后的全连接层与类别数量有关）
-        if last_center_node.type() in [nn.Linear]:
+        if self.skip_last_fc and last_center_node.type() in [nn.Linear]:
             if self.sparsity[last_center_node.unique_name] == self.default_sparsity:
                 self.sparsity[last_center_node.unique_name] = 0.0
 
-        self.graph_modifier = modifier.ChannelModifierGraph(self.graph, self.center_nodes)
+        self.graph_modifier = modifier.GraphChannelModifier(self.graph, self.center_nodes)
 
-        for sub_graph in self.graph_modifier.sub_graphs:
+        for sub_graph in self.graph_modifier.sub_graphs.values():
             exclude = False
-            for m in sub_graph:
+            for m in sub_graph.modifiers:
                 if m.node.type() in self.exclude_ops:
                     exclude = True
                     break
@@ -78,9 +81,7 @@ class OneShotChannelPruner(BasePruner):
                     break
 
             if exclude:
-                for m in sub_graph:
-                    if m.unique_name() in self.sparsity.keys():
-                        self.sparsity[m.unique_name()] = 0.0
+                sub_graph.skip = True
 
     def parse_config(self):
         """Parses the context and copy the needed items to the pruner"""
@@ -89,11 +90,13 @@ class OneShotChannelPruner(BasePruner):
 
         all_param_keys = list(self.required_params) + list(self.default_values.keys())
         for param_key in all_param_keys:
-            if param_key not in ['sparsity', 'metrics']:
+            if param_key not in ['sparsity', 'metrics', 'skip_last_fc', 'exclude_ops']:
                 setattr(self, param_key, self.config[param_key])
 
         sparsity = self.config['sparsity']
         metrics = self.config['metrics']
+        self.skip_last_fc = self.config.get('skip_last_fc', True)
+        self.exclude_ops = self.config.get('exclude_ops', [])
 
         if isinstance(sparsity, float):
             self.default_sparsity = sparsity
@@ -119,29 +122,40 @@ class OneShotChannelPruner(BasePruner):
         """
 
         self.register_mask()
-        self.apply_mask()
+
+        with ignore_mod_param_update_warning():
+            self.apply_mask()
 
     def register_mask(self):
         """Computes the mask for the parameters in the model and register them through the maskers"""
+        log.info("Register a mask for each operator")
 
-        for sub_graph in self.graph_modifier.sub_graphs:
-            importance = {}
+        importance = {}
 
-            for m in sub_graph:
-                # 仅有output发生变化的中心节点参与Importance计算（主动变化）
-                if m.node in self.center_nodes and m.output_modify_:
+        for sub_graph in self.graph_modifier.sub_graphs.values():
+            if sub_graph.skip:
+                log.info(f"skip subgraph {sub_graph.center}")
+                continue
+
+            for m in sub_graph.modifiers:
+                if m.node in self.center_nodes and m in sub_graph.dependent_centers:
                     modifier.update_weight_metric(importance, self.metric_func, m.module(), m.unique_name())
 
-            modifier.register_sub_masker(sub_graph, importance, self.sparsity)
+            sub_graph.calc_prune_idx(importance, self.sparsity)
+            log.info(f"subgraph [{sub_graph.center}] compute over")
+
+        for m in self.graph_modifier.modifiers.values():
+            m.register_mask(self.graph_modifier.modifiers, importance, self.sparsity)
 
     def apply_mask(self):
         """Applies the masks for the parameters and updates the shape and properties of the tensors and modules"""
 
-        for modifiers in self.graph_modifier.sub_graphs:
-            for m in modifiers:
-                m.apply_mask()
+        log.info("Apply the mask of each operator")
 
-        self.graph_modifier.unregister_masker()
+        for m in self.graph_modifier.modifiers.values():
+            m.apply_mask(self.graph_modifier.modifiers)
+
+        self.graph_modifier.unregister_modifier()
 
         # Sync parameters after the size of the tensors has been shrunk
         if dist.is_available() and dist.is_initialized():
@@ -169,4 +183,4 @@ class OneShotChannelPruner(BasePruner):
                 if n.unique_name not in self.sparsity:
                     self.sparsity[n.unique_name] = self.default_sparsity
 
-        self.graph_modifier = modifier.ChannelModifierGraph(self.graph, self.center_nodes)
+        self.graph_modifier = modifier.GraphChannelModifier(self.graph, self.center_nodes)

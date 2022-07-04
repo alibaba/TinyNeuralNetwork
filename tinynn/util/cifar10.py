@@ -6,6 +6,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
+from torch.cuda.amp import autocast
+
 from tinynn.util.train_util import AverageMeter, DLContext
 
 
@@ -16,8 +18,10 @@ def get_dataloader(
     worker: int = 4,
     distributed: bool = False,
     download: bool = False,
+    mean: tuple = (0.4914, 0.4822, 0.4465),
+    std: tuple = (0.2023, 0.1994, 0.2010),
 ) -> typing.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
-    """Constructs the dataloaders for training and validating
+    """ Constructs the dataloaders for training and validating
 
     Args:
         data_path (str): The path of the dataset
@@ -26,6 +30,8 @@ def get_dataloader(
         worker (int, optional): The number of workers. Defaults to 4.
         distributed (bool, optional): Whether to use DDP. Defaults to False.
         download (bool, optional): Whether to download the dataset. Defaults to False.
+        mean (tuple, optional): Normalize mean
+        std (tuple, optional): Normalize std
 
     Returns:
         typing.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]: The dataloaders for training and \
@@ -42,7 +48,7 @@ def get_dataloader(
                 transforms.Resize(img_size),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
-                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                transforms.Normalize(mean, std),
             ]
         ),
     )
@@ -66,11 +72,7 @@ def get_dataloader(
         train=False,
         download=False,
         transform=transforms.Compose(
-            [
-                transforms.Resize(img_size),
-                transforms.ToTensor(),
-                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-            ]
+            [transforms.Resize(img_size), transforms.ToTensor(), transforms.Normalize(mean, std)]
         ),
     )
     val_loader = torch.utils.data.DataLoader(
@@ -95,24 +97,7 @@ def train_one_epoch(model, context: DLContext):
         context (DLContext): The context object
     """
 
-    avg_batch_time = AverageMeter()
-    avg_data_time = AverageMeter()
-    avg_losses = AverageMeter()
-    avg_acc = AverageMeter()
-
-    model.to(device=context.device)
-    model.train()
-
-    end = time.time()
-    for i, (image, label) in enumerate(context.train_loader):
-
-        if context.max_iteration is not None and context.iteration >= context.max_iteration:
-            break
-
-        avg_data_time.update(time.time() - end)
-        image = image.to(device=context.device)
-        output = model(image)
-
+    def _calc_loss(label):
         if isinstance(context.criterion, nn.BCEWithLogitsLoss):
             label.unsqueeze_(1)
             label_onehot = torch.FloatTensor(label.shape[0], 10)
@@ -126,17 +111,47 @@ def train_one_epoch(model, context: DLContext):
             label = label.to(device=context.device)
             loss = context.criterion(output, label)
 
-        context.optimizer.zero_grad()
-        loss.backward()
+        return loss, label
 
-        context.optimizer.step()
+    avg_batch_time = AverageMeter()
+    avg_data_time = AverageMeter()
+    avg_losses = AverageMeter()
+    avg_acc = AverageMeter()
+
+    model.to(device=context.device)
+    model.train()
+
+    epoch_start = time.time()
+    batch_end = time.time()
+    for i, (image, label) in enumerate(context.train_loader):
+
+        if context.max_iteration is not None and context.iteration >= context.max_iteration:
+            break
+
+        avg_data_time.update(time.time() - batch_end)
+        image = image.to(device=context.device)
+        context.optimizer.zero_grad()
+
+        if context.grad_scaler:
+            with autocast():
+                output = model(image)
+                loss, label = _calc_loss(label)
+
+                context.grad_scaler.scale(loss).backward()
+                context.grad_scaler.step(context.optimizer)
+                context.grad_scaler.update()
+        else:
+            output = model(image)
+            loss, label = _calc_loss(label)
+            loss.backward()
+            context.optimizer.step()
 
         avg_losses.update(loss.item(), image.size(0))
+        avg_batch_time.update(time.time() - batch_end)
         avg_acc.update(compute_accuracy(output, label), image.size(0))
-        avg_batch_time.update(time.time() - end)
-        end = time.time()
+        batch_end = time.time()
 
-        if i % context.print_freq == 0:
+        if i > 0 and i % context.print_freq == 0:
             current_lr = 0.0
             for param_group in context.optimizer.param_groups:
                 current_lr = param_group['lr']
@@ -144,10 +159,10 @@ def train_one_epoch(model, context: DLContext):
             print(
                 f'Epoch:{context.epoch}\t'
                 f'Iter:[{i}|{len(context.train_loader)}]\t'
-                f'Lr:{current_lr:.5f}\t'
-                f'Time:{avg_batch_time.avg:.5f}\t'
-                f'Loss:{avg_losses.avg:.5f}\t'
-                f'Accuracy:{avg_acc.avg:.5f}'
+                f'Lr:{current_lr:.8f}\t'
+                f'Time:{avg_batch_time.val:.2f}|{time.time() - epoch_start:.2f}\t'
+                f'Loss:{avg_losses.val:.5f}\t'
+                f'Accuracy:{avg_acc.val:.3f}'
             )
 
         if context.warmup_scheduler is not None and context.warmup_iteration > context.iteration:
@@ -155,6 +170,11 @@ def train_one_epoch(model, context: DLContext):
 
         context.iteration += 1
 
+        # schedule per iteration
+        if context.iter_scheduler and context.warmup_iteration <= context.iteration:
+            context.iter_scheduler.step()
+
+    # schedule per epoch
     if context.scheduler and context.warmup_iteration <= context.iteration:
         context.scheduler.step()
 
@@ -166,6 +186,32 @@ def train_one_epoch_distill(model, context: DLContext):
         model: Student model
         context (DLContext): The context object
     """
+
+    def _calc_loss(label, label_teacher):
+        if isinstance(context.criterion, nn.BCEWithLogitsLoss):
+            label.unsqueeze_(1)
+            label_onehot = torch.FloatTensor(label.shape[0], 10)
+            label_onehot.zero_()
+            label_onehot.scatter_(1, label, 1)
+            label.squeeze_(1)
+            label_onehot = label_onehot.to(device=context.device)
+            label = label.to(device=context.device)
+            origin_loss = context.criterion(output, label_onehot)
+        else:
+            label = label.to(device=context.device)
+            origin_loss = context.criterion(output, label)
+
+        distill_loss = (
+            F.kl_div(F.log_softmax(output / T, dim=1), F.softmax(label_teacher / T, dim=1), reduction='batchmean')
+            * T
+            * T
+        )
+
+        avg_origin_losses.update(origin_loss * (1 - A))
+        loss = origin_loss * (1 - A) + distill_loss * A
+
+        return loss, label
+
     A = context.custom_args['distill_A']
     T = context.custom_args['distill_T']
     teacher = context.custom_args['distill_teacher']
@@ -181,51 +227,41 @@ def train_one_epoch_distill(model, context: DLContext):
 
     teacher.to(device=context.device)
     teacher.eval()
-    end = time.time()
+
+    epoch_start = time.time()
+    batch_end = time.time()
     for i, (image, label) in enumerate(context.train_loader):
 
         if context.max_iteration is not None and context.iteration >= context.max_iteration:
             break
 
-        avg_data_time.update(time.time() - end)
+        avg_data_time.update(time.time() - batch_end)
         image = image.to(device=context.device)
-        output = model(image)
 
-        if isinstance(context.criterion, nn.BCEWithLogitsLoss):
-            label.unsqueeze_(1)
-            label_onehot = torch.FloatTensor(label.shape[0], 10)
-            label_onehot.zero_()
-            label_onehot.scatter_(1, label, 1)
-            label.squeeze_(1)
-            label_onehot = label_onehot.to(device=context.device)
-            label = label.to(device=context.device)
-            origin_loss = context.criterion(output, label_onehot)
+        if context.grad_scaler:
+            with autocast():
+                output = model(image)
+                with torch.no_grad():
+                    label_teacher = teacher(image)
+                loss, label = _calc_loss(label, label_teacher)
+
+                context.grad_scaler.scale(loss).backward()
+                context.grad_scaler.step(context.optimizer)
+                context.grad_scaler.update()
         else:
-            label = label.to(device=context.device)
-            origin_loss = context.criterion(output, label)
-
-        with torch.no_grad():
-            label_teacher = teacher(image)
-
-        distill_loss = (
-            F.kl_div(F.log_softmax(output / T, dim=1), F.softmax(label_teacher / T, dim=1), reduction='batchmean')
-            * T
-            * T
-        )
-
-        avg_origin_losses.update(origin_loss * (1 - A))
-        loss = origin_loss * (1 - A) + distill_loss * A
-
-        context.optimizer.zero_grad()
-        loss.backward()
-        context.optimizer.step()
+            output = model(image)
+            with torch.no_grad():
+                label_teacher = teacher(image)
+            loss, label = _calc_loss(label, label_teacher)
+            loss.backward()
+            context.optimizer.step()
 
         avg_losses.update(loss.item(), image.size(0))
         avg_acc.update(compute_accuracy(output, label), image.size(0))
-        avg_batch_time.update(time.time() - end)
-        end = time.time()
+        avg_batch_time.update(time.time() - batch_end)
+        batch_end = time.time()
 
-        if i % context.print_freq == 0:
+        if i > 0 and i % context.print_freq == 0:
             current_lr = 0.0
             for param_group in context.optimizer.param_groups:
                 current_lr = param_group['lr']
@@ -233,9 +269,9 @@ def train_one_epoch_distill(model, context: DLContext):
             print(
                 f'Epoch:{context.epoch}\t'
                 f'Iter:[{i}|{len(context.train_loader)}]\t'
-                f'Lr:{current_lr:.6f}\t'
-                f'Time:{avg_batch_time.val:.3f}\t'
-                f'Loss:{avg_origin_losses.val:.6f} | {avg_losses.val - avg_origin_losses.val:.6f}\t'
+                f'Lr:{current_lr:.8f}\t'
+                f'Time:{avg_batch_time.val:.2f}|{time.time() - epoch_start:.2f}\t'
+                f'Loss:{avg_origin_losses.val:.5f}|{avg_losses.val - avg_origin_losses.val:.5f}\t'
                 f'Accuracy:{avg_acc.val:.3f}'
             )
 

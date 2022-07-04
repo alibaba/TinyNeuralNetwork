@@ -17,6 +17,7 @@ class DLContext(object):
         criterion=None,
         optimizer=None,
         scheduler=None,
+        iter_scheduler=None,
         warmup_scheduler=None,
         epoch=0,
         max_epoch=None,
@@ -25,6 +26,7 @@ class DLContext(object):
         max_iteration=None,
         gpu=None,
         device=None,
+        grad_scaler=None,
         print_freq=50,
         train_func=None,
         validate_fun=None,
@@ -36,6 +38,7 @@ class DLContext(object):
         self.criterion = criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
+        self.iter_scheduler = iter_scheduler
         self.warmup_scheduler = warmup_scheduler
         self.epoch = epoch
         self.max_epoch = max_epoch
@@ -44,6 +47,7 @@ class DLContext(object):
         self.max_iteration = max_iteration
         self.gpu = gpu
         self.device = device
+        self.grad_scaler = grad_scaler
         self.print_freq = print_freq
         self.best_acc = 0.0
         self.best_epoch = -1
@@ -93,8 +97,8 @@ def train(
         model: The model to be trained
         context (DLContext): the DLContext object
         train_func (typing.Callable[[torch.nn.Module, DLContext], None]): The function to train the model by one step
-        validate_func (typing.Callable[[torch.nn.Module, DLContext], float]): The function to get the accuracy of the \
-            model
+        validate_func (typing.Callable[[torch.nn.Module, DLContext], float]): The function to get the \
+        accuracy of the model
         distributed (bool, optional): Whether DDP training is used. Defaults to False.
         main_process (bool, optional): Whether the code runs in the main process. Defaults to True.
         qat (bool, optional): Whether to perform quantization-aware training. Defaults to False.
