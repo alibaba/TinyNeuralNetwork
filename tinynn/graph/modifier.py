@@ -2631,12 +2631,12 @@ class SubGraph(object):
                             if max(center_idxes) >= len(importance[center_name]):
                                 assert False
 
-                            importance_ += sum(importance[center_name][center_idxes])
+                            importance_ += float(sum(importance[center_name][center_idxes]))
                             center_to_center = center_to_center_all[center_name]
                             for center_idx in center_idxes:
                                 for depend_center_name in center_to_center[center_idx].keys():
                                     depend_center_idxes = list(center_to_center[center_idx][depend_center_name])
-                                    importance_ += sum(importance[depend_center_name][depend_center_idxes])
+                                    importance_ += float(sum(importance[depend_center_name][depend_center_idxes]))
 
                     leaf_importance.append((constraint, importance_))
 

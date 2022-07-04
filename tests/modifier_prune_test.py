@@ -785,9 +785,9 @@ class ModifierTester(unittest.TestCase):
                 init_conv_by_list(model.conv2, ch_conv2)
                 init_conv_by_list(model.conv3, ch_conv3)
 
-                importance_conv1 = l2_norm(model.conv1.weight, model.conv1)
-                importance_conv2 = l2_norm(model.conv2.weight, model.conv2)
-                importance_conv3 = l2_norm(model.conv3.weight, model.conv3)
+                importance_conv1 = l2_norm(model.conv1.weight, model.conv1).tolist()
+                importance_conv2 = l2_norm(model.conv2.weight, model.conv2).tolist()
+                importance_conv3 = l2_norm(model.conv3.weight, model.conv3).tolist()
 
                 importance_conv12 = list(map(add, importance_conv1[:16], importance_conv2))
                 importance_conv13 = list(map(add, importance_conv1[16:], importance_conv3))
@@ -840,7 +840,7 @@ class ModifierTester(unittest.TestCase):
 
             model(torch.ones(1, 3, 9, 9))
 
-        for i in range(20):
+        for i in range(200):
             test_func()
 
     def group_element_wise_graph(self, op):
