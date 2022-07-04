@@ -78,10 +78,6 @@ class ChannelMasker(Masker):
         # Custom channel to be deleted
         self.custom_remove_idx = None
 
-        self.input_modified = False
-
-        self.output_modified = False
-
     def set_in_remove_idx(self, in_remove_idx):
         if self.in_remove_idx is not None:
             self.in_remove_idx.extend(deepcopy(in_remove_idx))

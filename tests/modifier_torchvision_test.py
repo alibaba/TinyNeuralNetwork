@@ -1,18 +1,16 @@
+import time
+
 import torch
 import torchvision
 import torchvision.models
 
 import inspect
-import logging
-import os
 import unittest
 
-import numpy as np
-
-from tinynn.graph.tracer import patch_helper, trace, tracer_context, model_tracer
-import models
+from tinynn.graph.tracer import model_tracer
 
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
+from tinynn.util.util import import_from_path
 
 
 def import_from(module, name):
@@ -75,9 +73,15 @@ class TestModelMeta(type):
                 outputs = transform_output(outputs)
 
                 # prune
-                pruner = OneShotChannelPruner(m, inputs, {"sparsity": 0.75, "metrics": "l2_norm"})
+                st = time.time()
+                pruner = OneShotChannelPruner(m, inputs, {"sparsity": 0.5, "metrics": "l2_norm"})
                 pruner.prune()
-                outputs = m(*inputs)
+
+                pruner.graph.generate_code('out/new_model.py', 'out/new_model.pth', 'new_model')
+                new_model = import_from_path(f'out.new_model', "out/new_model.py", "new_model")()
+
+                print(f"[TEST] {model_name} cost {time.time() - st}")
+                outputs = new_model(*inputs)
 
         return f
 

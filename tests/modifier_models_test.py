@@ -41,19 +41,20 @@ class ModifierTester(unittest.TestCase):
             import timm
         except ImportError:
             print('Timm can not find!')
+            return
         model_list = [
             'gluon_xception65',
             'resnest14d',
             'legacy_seresnet18',
             'inception_v4',
-            'resnest14d',
             'mnasnet_050',
         ]
         for model_name in model_list:
             print(f"prune {model_name} ing!\n")
             model = timm.create_model(model_name, pretrained=False)
+            model.eval()
             dummy_input = torch.ones((1, 3, 224, 224))
-            pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.75, "metrics": "l2_norm"})
+            pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.75, "metrics": "l2_norm", "skip_last_fc": True})
             pruner.prune()
             model(dummy_input)
             print(f"test {model_name} over!\n")

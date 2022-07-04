@@ -1,1060 +1,870 @@
-import random
+import os
 import unittest
+from copy import deepcopy
 
-from distutils.version import LooseVersion
-from operator import add, mul, sub, truediv
-from unittest.case import SkipTest
-
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-from interval import Interval
-from tinynn.graph.modifier import l2_norm
+from tinynn.converter import TFLiteConverter
+from tinynn.graph.modifier import is_dw_conv
+from tinynn.graph.modifier import (
+    Modifier,
+    GraphChannelModifier,
+    fill_tensor_by_dim_changes,
+    calc_dim_changes,
+    calc_dim_constraint,
+    merge_group,
+    merge_constraint, merge_constraint,
+)
+from tinynn.graph.tracer import model_tracer, trace
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
+from tinynn.util.util import import_from_path
+
+CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 
 
-def removed_idx_group_check(removed_idx, total_idx_len, removed_idx_len, group, offset=0):
-    for i in range(group):
-        remove_group_len = removed_idx_len // group
-        for j in range(i * remove_group_len, i * remove_group_len + remove_group_len):
-            idx_group_len = total_idx_len // group
-            assert removed_idx[j] in Interval(
-                offset + i * idx_group_len, offset + i * idx_group_len + idx_group_len, upper_closed=False
-            )
+def model_generate(model, dummy_input, name='test.tflite'):
+    converter = TFLiteConverter(model, dummy_input, os.path.join(CURRENT_PATH, 'out', name))
+    converter.convert()
 
 
-def get_rd_lst(length):
-    rd_lst = random.sample(range(0, 1000), length)
-    random.shuffle(rd_lst)
-
-    print(rd_lst)
-    return rd_lst
-
-
-def get_topk(lst, k, offset=0):
-    _, idx = torch.topk(torch.tensor(lst), k, largest=False)
-
-    return sorted([i + offset for i in idx.tolist()])
+def graph_generate(model, dummy_input, center_types):
+    with model_tracer():
+        graph = trace(model, dummy_input)
+        center_nodes = []
+        for n in graph.forward_nodes:
+            if n.type() in center_types and not is_dw_conv(n.module):
+                center_nodes.append(n)
+    return graph, center_nodes
 
 
-def init_conv_by_list(conv, ch_value):
-    assert conv.weight.shape[0] == len(ch_value)
-
-    for i in range(len(ch_value)):
-        conv.weight.data[i, :] = ch_value[i]
-
-
-class ModifierTester(unittest.TestCase):
-    def test_cat_graph(self):
+class ModifierForwardTester(unittest.TestCase):
+    def test_case_0(self):
         class TestModel(nn.Module):
             def __init__(self):
                 super().__init__()
                 self.conv0 = nn.Conv2d(3, 8, (3, 3))
-                self.conv1 = nn.Conv2d(3, 8, (3, 3))
-                self.conv2 = nn.Conv2d(16, 32, (3, 3))
-                self.linear = nn.Linear(800, 100)
+                self.conv1 = nn.Conv2d(8, 16, (3, 3))
+                self.linear = nn.Linear(400, 100)
 
             def forward(self, x):
-                x0 = self.conv0(x)
-                x1 = self.conv1(x)
-
-                cat0 = torch.cat([x0, x1], dim=1)
-                conv2 = self.conv2(cat0)
-                view0 = conv2.view((1, -1))
+                conv0 = self.conv0(x)
+                conv1 = self.conv1(conv0)
+                view0 = conv1.view((1, -1))
                 linear0 = self.linear(view0)
                 return linear0
 
-        def test_func():
-            model = TestModel()
+        model = TestModel()
 
-            rd_lst_8 = get_rd_lst(8)
-            rd_lst_32 = get_rd_lst(32)
-            init_conv_by_list(model.conv0, rd_lst_8)
-            init_conv_by_list(model.conv1, rd_lst_8)
-            init_conv_by_list(model.conv2, rd_lst_32)
+        dummy_input = torch.ones((1, 3, 9, 9))
 
-            importance_conv0 = l2_norm(model.conv0.weight, model.conv0).tolist()
-            importance_conv1 = l2_norm(model.conv1.weight, model.conv1).tolist()
-            importance_conv2 = l2_norm(model.conv2.weight, model.conv2).tolist()
+        model(dummy_input)
 
-            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
-            pruner.register_mask()
+        pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm"})
 
-            conv0_idxes = get_topk(importance_conv0, 4)
-            conv1_idxes = get_topk(importance_conv1, 4)
-            conv2_idxes = get_topk(importance_conv2, 16)
+        pruner.register_mask()
 
-            assert model.conv0.masker.ot_remove_idx == conv0_idxes
-            assert model.conv1.masker.ot_remove_idx == conv1_idxes
-            assert model.conv2.masker.in_remove_idx == conv0_idxes + [i + 8 for i in conv0_idxes]
-            assert model.conv2.masker.ot_remove_idx == conv2_idxes
+        pruner.apply_mask()
 
-            pruner.apply_mask()
+        model(dummy_input)
 
-            assert model.conv1.out_channels == 4
-            assert model.conv0.out_channels == 4
-            assert model.conv2.in_channels == 8
-            assert model.conv2.out_channels == 16
-            assert model.linear.in_features == 400
-            assert model.linear.out_features == 100
-
-            model(torch.ones(1, 3, 9, 9))
-
-        for i in range(100):
-            test_func()
-
-    def test_cat_add_graph(self):
+    def test_case_1(self):
         class TestModel(nn.Module):
             def __init__(self):
                 super().__init__()
-                self.conv0 = nn.Conv2d(3, 8, (3, 3), padding=(1, 1))
-                self.conv1 = nn.Conv2d(3, 8, (3, 3), padding=(1, 1))
-                self.conv2 = nn.Conv2d(3, 16, (3, 3), padding=(1, 1))
-                self.conv3 = nn.Conv2d(16, 32, (3, 3), padding=(1, 1))
+                self.linear0 = nn.Linear(4, 8)
+                self.linear1 = nn.Linear(4, 16)
+                self.linear2 = nn.Linear(8, 4)
 
             def forward(self, x):
-                x0 = self.conv0(x)
-                x1 = self.conv1(x)
-                x2 = self.conv2(x)
+                linear0 = self.linear0(x)
+                reshape0 = linear0.reshape((2, 4))
 
-                cat0 = torch.cat([x0, x1], dim=1)
-                add0 = torch.add(cat0, x2)
-                return self.conv3(add0)
+                linear1 = self.linear1(x)
+                reshape1 = linear1.reshape((8, 2))
+                transpose0 = reshape1.transpose(0, 1)
+                linear2 = self.linear2(transpose0)
+                add0 = torch.add(reshape0, linear2)
+
+                return add0
 
         def test_func():
             model = TestModel()
 
-            while True:
-                ch_8 = get_rd_lst(8)
-                ch_16 = get_rd_lst(16)
-                ch_32 = get_rd_lst(32)
-                init_conv_by_list(model.conv0, ch_8)
-                init_conv_by_list(model.conv1, ch_8)
-                init_conv_by_list(model.conv2, ch_16)
-                init_conv_by_list(model.conv3, ch_32)
+            dummy_input = torch.ones((1, 4))
 
-                importance_conv0 = l2_norm(model.conv0.weight, model.conv0).tolist()
-                importance_conv1 = l2_norm(model.conv1.weight, model.conv1).tolist()
-                importance_conv2 = l2_norm(model.conv2.weight, model.conv2).tolist()
-                importance_conv3 = l2_norm(model.conv3.weight, model.conv3).tolist()
+            model_generate(model, dummy_input)
 
-                importance_add0 = list(map(add, importance_conv0 + importance_conv1, importance_conv2))
+            model(dummy_input)
 
-                # Duplicate values may lead to multiple possibilities for remove idx
-                if len(set(importance_add0)) == len(importance_add0):
-                    break
+            pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm", "skip_last_fc":False})
 
-            conv0_idxes = get_topk(importance_add0[:8], 4)
-            conv1_idxes = get_topk(importance_add0[8:], 4)
-            conv3_idxes = get_topk(importance_conv3, 16)
-
-            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
             pruner.register_mask()
 
-            assert model.conv0.masker.ot_remove_idx == conv0_idxes
-            assert model.conv1.masker.ot_remove_idx == conv1_idxes
-            assert model.conv2.masker.ot_remove_idx == conv0_idxes + [8 + i for i in conv1_idxes]
-            assert model.conv3.masker.ot_remove_idx == conv3_idxes
+            graph_modifier = pruner.graph_modifier
+
+            m_linear0 = graph_modifier.get_modifier(model.linear0)
+            m_linear1 = graph_modifier.get_modifier(model.linear1)
+            m_linear2 = graph_modifier.get_modifier(model.linear2)
+            m_add0 = graph_modifier.get_modifier(unique_name='add_0_f')
+            m_reshape0 = graph_modifier.get_modifier(unique_name="reshape_0_f")
+
+            assert m_add0.dim_changes_info.get_neighbor_changes(m_linear0, m_reshape0) == [[0, 1]]
+            assert m_add0.dim_changes_info.get_neighbor_changes(m_linear1, m_linear2) is None
+            assert m_add0.dim_changes_info.get_neighbor_changes(m_linear2, m_linear2) == [[1]]
+
+            assert m_add0.dim_changes_info.constraints_i == {
+                1: {
+                    'linear0': [[{0.0, 4.0}, {1.0, 5.0}, {2.0, 6.0}, {3.0, 7.0}]],
+                    'linear2': [[{0.0}, {1.0}, {2.0}, {3.0}]],
+                }
+            }
 
             pruner.apply_mask()
 
-            model(torch.ones(1, 3, 9, 9))
+            pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
 
-            assert model.conv0.out_channels == 4
-            assert model.conv1.out_channels == 4
-            assert model.conv2.out_channels == 8
-            assert model.conv3.in_channels == 8
-            assert model.conv3.out_channels == 16
+            model = import_from_path(f'out.test', "out/test.py", "test")()
 
-        for i in range(100):
+            model(dummy_input)
+
+        for i in range(20):
             test_func()
 
-    def test_flatten_graph(self):
-        class TestFlattenModel(nn.Module):
+    def test_case_2(self):
+        class TestModel(nn.Module):
             def __init__(self):
-                super(TestFlattenModel, self).__init__()
-                self.conv0 = nn.Conv2d(3, 16, (3, 3))
-                self.conv1 = nn.Conv2d(16, 32, (3, 3))
-                self.dropout = nn.Dropout()
-                self.linear1 = nn.Linear(800, 100)
-                self.linear2 = nn.Linear(100, 10)
+                super().__init__()
+                self.linear0 = nn.Linear(4, 4)
+                self.linear1 = nn.Linear(4, 4)
+                self.linear2 = nn.Linear(4, 4)
+                self.linear3 = nn.Linear(4, 4)
 
             def forward(self, x):
-                conv0 = self.conv0(x)
-                conv1 = self.conv1(conv0)
-                flatten0 = torch.flatten(conv1, 1)
-                dropout0 = self.dropout(flatten0)
-                linear1 = self.linear1(dropout0)
+                linear0 = self.linear0(x)
+                linear1 = self.linear1(x)
+
+                cat0 = torch.cat([linear0, linear1], dim=1)
+                sp0, sp1 = torch.split(cat0, 4, dim=1)
+                linear2 = self.linear2(sp0)
+                linear3 = self.linear3(sp1)
+
+                return linear2, linear3
+
+        model = TestModel()
+
+        dummy_input = torch.ones((1, 4))
+
+        model_generate(model, dummy_input)
+
+        model(dummy_input)
+
+        pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm"})
+
+        pruner.register_mask()
+
+        graph_modifier = pruner.graph_modifier
+
+        m_linear0 = graph_modifier.get_modifier(model.linear0)
+        m_linear1 = graph_modifier.get_modifier(model.linear1)
+        m_cat0 = graph_modifier.get_modifier(unique_name='cat_0_f')
+        m_split_0 = graph_modifier.get_modifier(unique_name="split_0_f")
+        m_linear2 = graph_modifier.get_modifier(model.linear2)
+        m_linear3 = graph_modifier.get_modifier(model.linear3)
+
+        assert m_linear2.dim_changes_info.get_neighbor_changes(m_linear0, m_split_0) == [[1]]
+        assert m_linear2.dim_changes_info.get_neighbor_changes(m_linear1, m_split_0) is None
+
+        assert m_linear3.dim_changes_info.get_neighbor_changes(m_linear0, m_split_0) is None
+        assert m_linear3.dim_changes_info.get_neighbor_changes(m_linear1, m_split_0) == [[1]]
+
+        pruner.apply_mask()
+
+        pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
+
+        model = import_from_path(f'out.test', "out/test.py", "test")()
+
+        model(dummy_input)
+
+    def test_case_3(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear0 = nn.Linear(4, 4)
+                self.linear1 = nn.Linear(4, 4)
+
+            def forward(self, x):
+                linear0 = self.linear0(x)
+                reshape0 = linear0.reshape((4, 2))
+                transpose0 = reshape0.transpose(0, 1)
+
+                cat0 = torch.cat([linear0, transpose0], dim=0)
+                linear1 = self.linear1(cat0)
+                return linear1
+
+        model = TestModel()
+
+        dummy_input = torch.ones((2, 4))
+
+        model_generate(model, dummy_input)
+
+        model(dummy_input)
+
+        graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
+
+        try:
+            graph_modifier = GraphChannelModifier(graph, center_nodes)
+            assert False
+        except Exception as e:
+            assert str(e) == "conflict can't be eliminated"
+
+    def test_case_4(self):
+        """
+        测试最基本的冲突消除
+
+        Returns:
+
+        """
+
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear0 = nn.Linear(4, 32)
+                self.linear1 = nn.Linear(8, 16)
+
+            def forward(self, x):
+                linear0 = self.linear0(x)
+                reshape0 = linear0.reshape((4, 8))
+                linear1 = self.linear1(reshape0)
+                return linear1
+
+        model = TestModel()
+
+        dummy_input = torch.ones((1, 4))
+
+        model_generate(model, dummy_input)
+
+        model(dummy_input)
+
+        graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
+
+        graph_modifier = GraphChannelModifier(graph, center_nodes)
+
+        m_linear0 = graph_modifier.get_modifier(model.linear0)
+        m_linear1 = graph_modifier.get_modifier(model.linear1)
+        m_reshape0 = graph_modifier.get_modifier(unique_name='reshape_0_f')
+        m_output0 = graph_modifier.get_modifier(unique_name='output_0_f')
+
+        assert m_reshape0.dim_changes_info.get_neighbor_choices(m_linear0) == [[1]]
+        assert m_linear1.dim_changes_info.get_neighbor_choices(m_reshape0) == [[1]]
+        assert m_linear1.dim_changes_info.get_neighbor_choices(m_output0) == [[1]]
+
+    def test_case_5(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv0 = nn.Conv2d(in_channels=2, out_channels=2, kernel_size=(1, 1), padding=(0, 0))
+                self.linear0 = nn.Linear(in_features=2, out_features=2)
+                self.linear1 = nn.Linear(in_features=2, out_features=8)
+                self.linear2 = nn.Linear(in_features=2, out_features=8)
+
+            def forward(self, x1, x2):
+                conv0 = self.conv0(x1)
+                reshape0 = conv0.reshape((2, 4))
+                transpose0 = reshape0.transpose(0, 1)
+                linear0 = self.linear0(transpose0)
+
+                linear1 = self.linear1(x2)
+                reshape1 = linear1.reshape((4, 2))
+
+                add0 = linear0 + reshape1
+                linear2 = self.linear2(add0)
+                return linear2
+
+        model = TestModel()
+
+        dummy_input = (torch.ones((1, 2, 2, 2)), torch.ones((1, 2)))
+
+        model(*dummy_input)
+
+        model_generate(model, dummy_input)
+
+        graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
+
+        graph_modifier = GraphChannelModifier(graph, center_nodes)
+
+        m_reshape1 = graph_modifier.get_modifier(unique_name='reshape_1_f')
+
+        assert (
+            str(m_reshape1.dim_changes_info)
+            == 'dim_changes_i:OrderedDict([(\'linear1:input_0\', [1])]),'
+            ' dim_changes_o:OrderedDict([(\'linear1:output_0\', [0, 1])]), dim_choices:OrderedDict([(\'input_0\','
+            ' [1]), (\'output_0\', [1])])'
+        )
+
+    def test_case_6(self):
+        """
+        根据dim choice缩小子图
+
+        Returns:
+
+        """
+
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear0 = nn.Linear(in_features=2, out_features=8)
+                self.linear1 = nn.Linear(in_features=4, out_features=8)
+                self.linear2 = nn.Linear(in_features=8, out_features=16)
+
+            def forward(self, x):
+                linear0 = self.linear0(x)
+                reshape_0 = linear0.reshape((2, 4))
+                linear1 = self.linear1(reshape_0)
                 linear2 = self.linear2(linear1)
                 return linear2
 
-        def test_func():
-            model = TestFlattenModel()
+        model = TestModel()
 
-            ch_32 = get_rd_lst(32)
-            init_conv_by_list(model.conv1, ch_32)
+        dummy_input = torch.ones((1, 2))
 
-            importance_conv1 = l2_norm(model.conv1.weight, model.conv1).tolist()
-            conv1_idxes = get_topk(importance_conv1, 24)
+        model(dummy_input)
 
-            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.75, "metrics": "l2_norm"})
+        model_generate(model, dummy_input)
 
-            pruner.register_mask()
+        graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
 
-            linear1_idxes = np.array([i for i in range(800)])
-            linear1_idxes = linear1_idxes.reshape([32, 25])
-            linear1_idxes = linear1_idxes[conv1_idxes, :]
-            linear1_idxes = linear1_idxes.reshape([600]).tolist()
+        graph_modifier = GraphChannelModifier(graph, center_nodes)
 
-            assert model.conv1.masker.ot_remove_idx == conv1_idxes
-            assert model.linear1.masker.in_remove_idx == linear1_idxes
+        m_linear0 = graph_modifier.get_modifier(model.linear0)
+        m_reshape0 = graph_modifier.get_modifier(unique_name='reshape_0_f')
+        m_linear1 = graph_modifier.get_modifier(model.linear1)
+        m_linear2 = graph_modifier.get_modifier(model.linear2)
+        m_output0 = graph_modifier.get_modifier(unique_name='output_0_f')
 
-            pruner.apply_mask()
+        assert graph_modifier.sub_graphs[m_linear0.unique_name()] == [m_linear0, m_reshape0, m_linear1]
+        assert graph_modifier.sub_graphs[m_linear1.unique_name()] == [m_linear1, m_linear2]
+        assert graph_modifier.sub_graphs[m_linear2.unique_name()] == [m_linear2, m_output0]
 
-            model(torch.ones(1, 3, 9, 9))
+    def test_case_7(self):
+        """
+        根据dim choice缩小子图
 
-            assert model.conv0.out_channels == 4
-            assert model.conv1.out_channels == 8
-            assert model.linear1.in_features == 200
-            assert model.linear1.out_features == 25
-            assert model.linear2.in_features == 25
-            assert model.linear2.out_features == 10
+        Returns:
 
-        for i in range(10):
-            test_func()
+        """
 
-    def test_loop_cat_graph(self):
         class TestModel(nn.Module):
             def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv1 = nn.Conv2d(3, 16, (3, 3))
-                self.conv2 = nn.Conv2d(64, 128, (3, 3))
-                self.relu1 = torch.nn.modules.activation.ReLU(inplace=True)
-                self.relu2 = torch.nn.modules.activation.ReLU(inplace=True)
-                self.relu3 = torch.nn.modules.activation.ReLU(inplace=True)
-                self.relu4 = torch.nn.modules.activation.ReLU(inplace=True)
+                super().__init__()
+                self.conv0 = nn.Conv2d(in_channels=2, out_channels=2, kernel_size=(1, 1), padding=(0, 0))
+                self.linear0 = nn.Linear(in_features=2, out_features=2)
+                self.linear1 = nn.Linear(in_features=4, out_features=4)
+                self.linear2 = nn.Linear(in_features=4, out_features=8)
 
-            def forward(self, x):
-                conv1 = self.conv1(x)
-                relu1 = self.relu1(conv1)
-                relu2 = self.relu2(conv1)
-                relu3 = self.relu3(conv1)
-                relu4 = self.relu4(conv1)
-                z = torch.cat([relu1, relu2, relu3, relu4], dim=1)
-                return self.conv2(z)
+            def forward(self, x1, x2):
+                conv0 = self.conv0(x1)
+                reshape0 = conv0.reshape((2, 4))
 
-        def test_func():
-            model = TestModel()
+                linear0 = self.linear0(x2)
+                transpose0 = linear0.transpose(0, 1)
+                linear1 = self.linear1(transpose0)
 
-            ch_16 = get_rd_lst(16)
-            init_conv_by_list(model.conv1, ch_16)
+                add0 = reshape0 + linear1
+                linear2 = self.linear2(add0)
 
-            importance_conv1 = l2_norm(model.conv1.weight, model.conv1).tolist()
-            conv1_idxes = get_topk(importance_conv1, 8)
-
-            pruner = OneShotChannelPruner(model, torch.randn((1, 3, 9, 9)), {"sparsity": 0.5, "metrics": "l2_norm"})
-            pruner.register_mask()
-
-            assert model.conv1.masker.ot_remove_idx == conv1_idxes
-            assert model.conv2.masker.in_remove_idx == [j + i * 16 for i in range(4) for j in conv1_idxes]
-
-            pruner.apply_mask()
-
-            model(torch.ones(1, 3, 9, 9))
-            assert model.conv1.out_channels == 8
-            assert model.conv2.in_channels == 32
-            assert model.conv2.out_channels == 64
-
-        for i in range(10):
-            test_func()
-
-    def test_group_cat_graph(self):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv1 = nn.Conv2d(3, 16, (3, 3))
-                self.conv2 = nn.Conv2d(3, 32, (3, 3))
-                self.conv3 = nn.Conv2d(48, 64, (3, 3), groups=4)
-
-            def forward(self, x):
-                conv1 = self.conv1(x)
-                conv2 = self.conv2(x)
-                cat0 = torch.cat([conv1, conv2], dim=1)
-                return self.conv3(cat0)
-
-        def test_func():
-            model = TestModel()
-
-            ch_16 = get_rd_lst(16)
-            ch_32 = get_rd_lst(32)
-            init_conv_by_list(model.conv1, ch_16)
-            init_conv_by_list(model.conv2, ch_32)
-
-            importance_conv1 = l2_norm(model.conv1.weight, model.conv1).tolist()
-            importance_conv2 = l2_norm(model.conv2.weight, model.conv2).tolist()
-
-            conv1_idxes_g1 = get_topk(importance_conv1[:12], 6)
-            conv1_idxes_g2 = get_topk(importance_conv1[12:], 2, offset=12)
-            conv1_idxes = conv1_idxes_g1 + conv1_idxes_g2
-
-            conv2_idxes_g1 = get_topk(importance_conv2[:8], 4)
-            conv2_idxes_g2 = get_topk(importance_conv2[8:20], 6, offset=8)
-            conv2_idxes_g3 = get_topk(importance_conv2[20:], 6, offset=20)
-            conv2_idxes = conv2_idxes_g1 + conv2_idxes_g2 + conv2_idxes_g3
-
-            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
-
-            pruner.register_mask()
-
-            assert model.conv1.masker.ot_remove_idx == conv1_idxes
-            assert model.conv2.masker.ot_remove_idx == conv2_idxes
-            assert model.conv3.masker.in_remove_idx == conv1_idxes + [i + 16 for i in conv2_idxes]
-
-            pruner.apply_mask()
-
-            model(torch.ones(1, 3, 9, 9))
-
-            assert model.conv1.out_channels == 8
-            assert model.conv2.out_channels == 16
-            assert model.conv3.in_channels == 24
-            assert model.conv3.out_channels == 32
-
-        for i in range(10):
-            test_func()
-
-    def test_nonaligned_cat_graph(self):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv1 = nn.Conv2d(3, 8, (3, 3))
-                self.conv2 = nn.Conv2d(3, 4, (3, 3))
-                self.conv3 = nn.Conv2d(3, 4, (3, 3))
-                self.conv4 = nn.Conv2d(16, 64, (3, 3))
-
-            def forward(self, x):
-                conv1 = self.conv1(x)
-                conv2 = self.conv2(x)
-                conv3 = self.conv3(x)
-                cat0 = torch.cat([conv1, conv2, conv3], dim=1)
-                return self.conv4(cat0)
+                return linear2
 
         model = TestModel()
-        pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.25, "metrics": "l2_norm"})
-        pruner.prune()
 
-        model(torch.ones(1, 3, 9, 9))
+        dummy_input = (torch.ones((1, 2, 2, 2)), torch.ones((4, 2)))
 
-        assert model.conv1.out_channels == 6
-        assert model.conv2.out_channels == 3
-        assert model.conv3.out_channels == 3
-        assert model.conv4.in_channels == 12
-        assert model.conv4.out_channels == 48
+        model(*dummy_input)
 
-    def test_group_graph(self):
+        model_generate(model, dummy_input)
+
+        graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
+
+        graph_modifier = GraphChannelModifier(graph, center_nodes)
+
+        m_conv0 = graph_modifier.get_modifier(model.conv0)
+        m_reshape0 = graph_modifier.get_modifier(unique_name='reshape_0_f')
+        m_linear0 = graph_modifier.get_modifier(model.linear0)
+        m_transpose0 = graph_modifier.get_modifier(unique_name='transpose_0_f')
+        m_linear1 = graph_modifier.get_modifier(model.linear1)
+        m_add0 = graph_modifier.get_modifier(unique_name='add_0_f')
+        m_linear2 = graph_modifier.get_modifier(model.linear2)
+        m_output0 = graph_modifier.get_modifier(unique_name='output_0_f')
+
+        assert len(graph_modifier.sub_graphs) == 1
+        assert graph_modifier.sub_graphs[m_conv0.unique_name()] == [
+            m_conv0,
+            m_reshape0,
+            m_linear0,
+            m_transpose0,
+            m_linear1,
+            m_add0,
+            m_linear2,
+            m_output0,
+        ]
+
+        assert m_linear2.dim_changes_info.dim_changes_i == {'conv0:input_0': [0], 'linear0:input_0': [0]}
+        assert m_linear2.dim_changes_info.dim_changes_o == {'linear0:output_0': [0], 'conv0:output_0': [0]}
+        assert m_linear2.dim_changes_info.dim_choices == {'input_0': [0], 'output_0': [0]}
+
+    def test_case_8(self):
+        """
+        测试两种不同constraint的收束
+
+        Returns:
+
+        """
+
         class TestModel(nn.Module):
             def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv0 = nn.Conv2d(3, 16, (3, 3))
-                self.conv1 = nn.Conv2d(16, 32, (3, 3), groups=8)
-                self.conv2 = nn.Conv2d(32, 32, (3, 3))
+                super().__init__()
+                self.linear0 = nn.Linear(in_features=2, out_features=8)
+                self.linear1 = nn.Linear(in_features=4, out_features=8)
+                self.linear2 = nn.Linear(in_features=2, out_features=8)
+                self.linear3 = nn.Linear(in_features=8, out_features=8)
 
             def forward(self, x):
-                conv0 = self.conv0(x)
-                conv1 = self.conv1(conv0)
-                return self.conv2(conv1)
-
-        def test_func():
-
-            model = TestModel()
-
-            ch_16 = get_rd_lst(16)
-            ch_32 = get_rd_lst(32)
-            init_conv_by_list(model.conv0, ch_16)
-            init_conv_by_list(model.conv1, ch_32)
-
-            importance_conv0 = l2_norm(model.conv0.weight, model.conv0).tolist()
-            importance_conv1 = l2_norm(model.conv1.weight, model.conv1).tolist()
-
-            conv0_idxes = []
-            conv1_idxes = []
-
-            for i in range(8):
-                conv0_idxes += get_topk(importance_conv0[i * 2 : (i + 1) * 2], 1, offset=i * 2)
-                conv1_idxes += get_topk(importance_conv1[i * 4 : (i + 1) * 4], 2, offset=i * 4)
-
-            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
-
-            pruner.register_mask()
-
-            removed_idx_group_check(model.conv0.masker.ot_remove_idx, 16, 8, 8)
-            removed_idx_group_check(model.conv1.masker.in_remove_idx, 16, 8, 8)
-
-            removed_idx_group_check(model.conv1.masker.ot_remove_idx, 32, 16, 8)
-            removed_idx_group_check(model.conv2.masker.in_remove_idx, 32, 16, 8)
-
-            assert model.conv0.masker.ot_remove_idx == conv0_idxes
-            assert model.conv1.masker.ot_remove_idx == conv1_idxes
-
-            pruner.apply_mask()
-
-            model(torch.ones(1, 3, 9, 9))
-
-            assert model.conv0.out_channels == 8
-            assert model.conv1.in_channels == 8
-            assert model.conv1.out_channels == 16
-            assert model.conv2.out_channels == 16
-
-        for i in range(10):
-            test_func()
-
-    def test_multi_group_graph(self):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv0 = nn.Conv2d(3, 16, (3, 3))
-                self.conv1 = nn.Conv2d(16, 32, (3, 3), groups=4)
-                self.conv2 = nn.Conv2d(16, 32, (3, 3), groups=8)
-
-            def forward(self, x):
-                conv0 = self.conv0(x)
-                conv1 = self.conv1(conv0)
-                conv2 = self.conv2(conv0)
-                return conv1, conv2
-
-        def test_func():
-            model = TestModel()
-
-            ch_16 = get_rd_lst(16)
-            ch_32 = get_rd_lst(32)
-            init_conv_by_list(model.conv0, ch_16)
-            init_conv_by_list(model.conv1, ch_32)
-            init_conv_by_list(model.conv2, ch_32)
-
-            conv0_idxes = []
-            conv1_idxes = []
-            conv2_idxes = []
-
-            importance_conv0 = l2_norm(model.conv0.weight, model.conv0).tolist()
-            importance_conv1 = l2_norm(model.conv1.weight, model.conv1).tolist()
-            importance_conv2 = l2_norm(model.conv2.weight, model.conv2).tolist()
-
-            for i in range(4):
-                conv1_idxes += get_topk(importance_conv1[i * 8 : (i + 1) * 8], 4, offset=i * 8)
-
-            for i in range(8):
-                conv0_idxes += get_topk(importance_conv0[i * 2 : (i + 1) * 2], 1, offset=i * 2)
-                conv2_idxes += get_topk(importance_conv2[i * 4 : (i + 1) * 4], 2, offset=i * 4)
-
-            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
-
-            pruner.register_mask()
-
-            removed_idx_group_check(model.conv0.masker.ot_remove_idx, 16, 8, 8)
-            removed_idx_group_check(model.conv1.masker.in_remove_idx, 16, 8, 8)
-            removed_idx_group_check(model.conv2.masker.in_remove_idx, 16, 8, 8)
-
-            removed_idx_group_check(model.conv1.masker.ot_remove_idx, 32, 16, 4)
-            removed_idx_group_check(model.conv2.masker.ot_remove_idx, 32, 16, 8)
-
-            assert model.conv0.masker.ot_remove_idx == conv0_idxes
-            assert model.conv1.masker.ot_remove_idx == conv1_idxes
-            assert model.conv2.masker.ot_remove_idx == conv2_idxes
-
-            pruner.apply_mask()
-
-            model(torch.ones(1, 3, 9, 9))
-
-            assert model.conv0.out_channels == 8
-            assert model.conv1.in_channels == 8
-            assert model.conv1.out_channels == 16
-            assert model.conv2.out_channels == 16
-
-        for i in range(10):
-            test_func()
-
-    def test_add_cat_group_graph(self):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv0 = nn.Conv2d(3, 16, (3, 3))
-                self.conv1 = nn.Conv2d(16, 32, (3, 3), groups=2)
-                self.conv2 = nn.Conv2d(16, 32, (3, 3), groups=4)
-                self.conv3 = nn.Conv2d(3, 16, (3, 3))
-                self.conv4 = nn.Conv2d(16, 32, (3, 3), groups=8)
-                self.conv5 = nn.Conv2d(64, 64, (3, 3))
-
-            def forward(self, x):
-                conv0 = self.conv0(x)
-                conv1 = self.conv1(conv0)
-                conv2 = self.conv2(conv0)
-                add1 = conv1.__add__(conv2)
-                conv3 = self.conv3(x)
-                conv4 = self.conv4(conv3)
-                cat0 = torch.cat([add1, conv4], dim=1)
-                return self.conv5(cat0)
-
-        def test_func():
-            while True:
-                model = TestModel()
-
-                ch_conv0 = get_rd_lst(16)
-                ch_conv1 = get_rd_lst(32)
-                ch_conv2 = get_rd_lst(32)
-                ch_conv4 = get_rd_lst(32)
-
-                init_conv_by_list(model.conv0, ch_conv0)
-                init_conv_by_list(model.conv1, ch_conv1)
-                init_conv_by_list(model.conv2, ch_conv2)
-                init_conv_by_list(model.conv4, ch_conv4)
-
-                importance_conv0 = l2_norm(model.conv0.weight, model.conv0).tolist()
-                importance_conv1 = l2_norm(model.conv1.weight, model.conv1).tolist()
-                importance_conv2 = l2_norm(model.conv2.weight, model.conv2).tolist()
-                importance_conv4 = l2_norm(model.conv4.weight, model.conv4).tolist()
-                importance_conv12 = list(map(add, importance_conv1, importance_conv2))
-
-                if len(importance_conv12) == len(set(importance_conv12)):
-                    break
-
-            conv0_idxes = []
-            conv4_idxes = []
-            conv12_idxes = []
-
-            for i in range(4):
-                conv0_idxes += get_topk(importance_conv0[i * 4 : (i + 1) * 4], 2, i * 4)
-                conv12_idxes += get_topk(importance_conv12[i * 8 : (i + 1) * 8], 4, i * 8)
-
-            for i in range(8):
-                conv4_idxes += get_topk(importance_conv4[i * 4 : (i + 1) * 4], 2, i * 4)
-
-            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
-
-            pruner.register_mask()
-
-            assert model.conv0.masker.ot_remove_idx == conv0_idxes
-            assert model.conv1.masker.ot_remove_idx == conv12_idxes
-            assert model.conv2.masker.ot_remove_idx == conv12_idxes
-            assert model.conv5.masker.in_remove_idx == conv12_idxes + [i + 32 for i in conv4_idxes]
-
-            removed_idx_group_check(model.conv0.masker.ot_remove_idx, 16, 8, 4)
-            removed_idx_group_check(model.conv1.masker.in_remove_idx, 16, 8, 4)
-            removed_idx_group_check(model.conv2.masker.in_remove_idx, 16, 8, 4)
-
-            removed_idx_group_check(model.conv1.masker.ot_remove_idx, 32, 16, 4)
-            removed_idx_group_check(model.conv2.masker.ot_remove_idx, 32, 16, 4)
-
-            removed_idx_group_check(model.conv4.masker.in_remove_idx, 16, 8, 8)
-            removed_idx_group_check(model.conv4.masker.ot_remove_idx, 32, 16, 8)
-
-            removed_idx_group_check(model.conv5.masker.in_remove_idx[:16], 32, 16, 4)
-            removed_idx_group_check(model.conv5.masker.in_remove_idx[16:], 32, 16, 8, offset=32)
-
-            pruner.apply_mask()
-
-            model(torch.ones(1, 3, 9, 9))
-
-        for i in range(50):
-            test_func()
-
-    def test_multi_cat_graph(self):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv0 = nn.Conv2d(3, 8, (3, 3))
-                self.conv1 = nn.Conv2d(8, 16, (3, 3))
-                self.conv2 = nn.Conv2d(8, 16, (3, 3), groups=4)
-                self.conv3 = nn.Conv2d(8, 16, (3, 3))
-                self.conv4 = nn.Conv2d(32, 64, (3, 3))
-                self.conv5 = nn.Conv2d(32, 64, (3, 3))
-
-            def forward(self, x):
-                conv0 = self.conv0(x)
-                relu0 = F.relu(conv0)
-                x1 = self.conv1(relu0)
-                x2 = self.conv2(relu0)
-                x3 = self.conv3(relu0)
-                cat0 = torch.cat([x1, x2], dim=1)
-                cat1 = torch.cat([x2, x3], dim=1)
-                cat0 = self.conv4(cat0)
-                cat1 = self.conv5(cat1)
-                return cat0, cat1
-
-        def test_func():
-
-            model = TestModel()
-
-            conv0_ch = get_rd_lst(8)
-            conv1_ch = get_rd_lst(16)
-            conv2_ch = get_rd_lst(16)
-            conv3_ch = get_rd_lst(16)
-
-            init_conv_by_list(model.conv0, conv0_ch)
-            init_conv_by_list(model.conv1, conv1_ch)
-            init_conv_by_list(model.conv2, conv2_ch)
-            init_conv_by_list(model.conv3, conv3_ch)
-
-            importance_conv0 = l2_norm(model.conv0.weight, model.conv0)
-            importance_conv1 = l2_norm(model.conv1.weight, model.conv1)
-            importance_conv2 = l2_norm(model.conv2.weight, model.conv2)
-            importance_conv3 = l2_norm(model.conv3.weight, model.conv3)
-
-            conv0_idxes = []
-            conv2_idxes = []
-
-            conv1_idxes = get_topk(importance_conv1, 8)
-            conv3_idxes = get_topk(importance_conv3, 8)
-
-            for i in range(4):
-                conv0_idxes += get_topk(importance_conv0[i * 2 : (i + 1) * 2], 1, offset=i * 2)
-                conv2_idxes += get_topk(importance_conv2[i * 4 : (i + 1) * 4], 2, offset=i * 4)
-
-            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
-            pruner.register_mask()
-
-            assert model.conv0.masker.ot_remove_idx == conv0_idxes
-            assert model.conv1.masker.ot_remove_idx == conv1_idxes
-            assert model.conv2.masker.ot_remove_idx == conv2_idxes
-            assert model.conv3.masker.ot_remove_idx == conv3_idxes
-
-            removed_idx_group_check(model.conv0.masker.ot_remove_idx, 8, 4, 4)
-            removed_idx_group_check(model.conv1.masker.in_remove_idx, 8, 4, 4)
-            removed_idx_group_check(model.conv2.masker.in_remove_idx, 8, 4, 4)
-            removed_idx_group_check(model.conv3.masker.in_remove_idx, 8, 4, 4)
-            removed_idx_group_check(model.conv2.masker.ot_remove_idx, 16, 8, 4)
-            removed_idx_group_check(model.conv4.masker.in_remove_idx[8:], 16, 8, 4, offset=16)
-            removed_idx_group_check(model.conv5.masker.in_remove_idx[:8], 16, 8, 4)
-
-            pruner.apply_mask()
-
-            model(torch.ones(1, 3, 9, 9))
-
-        for i in range(50):
-            test_func()
-
-    def test_split_group_graph(self):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv1 = nn.Conv2d(3, 32, (3, 3))
-                self.conv2 = nn.Conv2d(3, 16, (3, 3))
-                self.conv3 = nn.Conv2d(3, 16, (3, 3))
-                self.conv4 = nn.Conv2d(16, 32, (3, 3), groups=2)
-                self.conv5 = nn.Conv2d(16, 32, (3, 3), groups=4)
-
-            def forward(self, x):
-                conv1 = self.conv1(x)
-                conv2 = self.conv2(x)
-                conv3 = self.conv3(x)
-                size = conv1.shape[1] // 2
-                sp1, sp2 = torch.split(conv1, size, 1)
-                add0 = conv2 + sp1
-                add1 = sp2 + conv3
-                return self.conv4(add0), self.conv5(add1)
-
-        def test_func():
-            model = TestModel()
-
-            ch_conv1 = get_rd_lst(32)
-            ch_conv2 = get_rd_lst(16)
-            ch_conv3 = get_rd_lst(16)
-
-            init_conv_by_list(model.conv1, ch_conv1)
-            init_conv_by_list(model.conv2, ch_conv2)
-            init_conv_by_list(model.conv3, ch_conv3)
-
-            importance_conv1 = l2_norm(model.conv1.weight, model.conv1)
-            importance_conv2 = l2_norm(model.conv2.weight, model.conv2)
-            importance_conv3 = l2_norm(model.conv3.weight, model.conv3)
-
-            importance_conv12 = list(map(add, importance_conv1[:16], importance_conv2))
-            importance_conv13 = list(map(add, importance_conv1[16:], importance_conv3))
-
-            conv2_idxes = []
-            conv3_idxes = []
-
-            for i in range(2):
-                conv2_idxes += get_topk(importance_conv12[i * 8 : (i + 1) * 8], 4, offset=i * 8)
-
-            for i in range(4):
-                conv3_idxes += get_topk(importance_conv13[i * 4 : (i + 1) * 4], 2, offset=i * 4)
-
-            conv1_idxes = conv2_idxes + [i + 16 for i in conv3_idxes]
-
-            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
-
-            pruner.register_mask()
-
-            assert model.conv1.masker.ot_remove_idx == conv1_idxes
-            assert model.conv2.masker.ot_remove_idx == conv2_idxes
-            assert model.conv3.masker.ot_remove_idx == conv3_idxes
-            assert model.conv4.masker.in_remove_idx == conv2_idxes
-            assert model.conv5.masker.in_remove_idx == conv3_idxes
-
-            removed_idx_group_check(model.conv1.masker.ot_remove_idx[:8], 16, 8, 2)
-            removed_idx_group_check(model.conv1.masker.ot_remove_idx[8:], 16, 8, 4, offset=16)
-
-            removed_idx_group_check(model.conv2.masker.ot_remove_idx, 16, 8, 2)
-            removed_idx_group_check(model.conv3.masker.ot_remove_idx, 16, 8, 4)
-
-            removed_idx_group_check(model.conv4.masker.in_remove_idx, 16, 8, 2)
-            removed_idx_group_check(model.conv4.masker.ot_remove_idx, 32, 16, 2)
-
-            removed_idx_group_check(model.conv5.masker.in_remove_idx, 16, 8, 4)
-            removed_idx_group_check(model.conv5.masker.ot_remove_idx, 32, 16, 4)
-
-            pruner.apply_mask()
-
-            model(torch.ones(1, 3, 9, 9))
-
-        for i in range(50):
-            test_func()
-
-    def group_element_wise_graph(self, op):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv0 = nn.Conv2d(16, 16, (1, 1), groups=8)
-                self.conv1 = nn.Conv2d(16, 16, (1, 1))
-                self.conv2 = nn.Conv2d(16, 16, (1, 1), groups=4)
-
-            def forward(self, x):
-                conv0 = self.conv0(x)
-                conv1 = self.conv1(x)
-                add0 = op(conv0, conv1)
-                conv2 = self.conv2(add0)
-                return conv2
-
-        def test_func():
-            model = TestModel()
-
-            ch_conv0 = get_rd_lst(16)
-            ch_conv1 = get_rd_lst(16)
-            ch_conv2 = get_rd_lst(16)
-
-            init_conv_by_list(model.conv0, ch_conv0)
-            init_conv_by_list(model.conv1, ch_conv1)
-            init_conv_by_list(model.conv2, ch_conv2)
-
-            importance_conv0 = l2_norm(model.conv0.weight, model.conv0)
-            importance_conv1 = l2_norm(model.conv1.weight, model.conv1)
-            importance_conv2 = l2_norm(model.conv2.weight, model.conv2)
-            importance_conv01 = list(map(add, importance_conv0, importance_conv1))
-
-            idxes_conv0 = []
-            idxes_conv2 = []
-
-            for i in range(8):
-                idxes_conv0 += get_topk(importance_conv01[i * 2 : (i + 1) * 2], 1, offset=i * 2)
-            for i in range(4):
-                idxes_conv2 += get_topk(importance_conv2[i * 4 : (i + 1) * 4], 2, offset=i * 4)
-
-            pruner = OneShotChannelPruner(model, torch.ones(16, 16, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
-
-            pruner.register_mask()
-
-            assert model.conv0.masker.ot_remove_idx == idxes_conv0
-            assert model.conv1.masker.ot_remove_idx == idxes_conv0
-            assert model.conv2.masker.ot_remove_idx == idxes_conv2
-
-            removed_idx_group_check(model.conv0.masker.ot_remove_idx, 16, 8, 8)
-            removed_idx_group_check(model.conv1.masker.ot_remove_idx, 16, 8, 8)
-            removed_idx_group_check(model.conv2.masker.ot_remove_idx, 16, 8, 4)
-
-            pruner.apply_mask()
-
-            model(torch.ones(16, 16, 9, 9))
-
-        for i in range(50):
-            test_func()
-
-    def test_group_element_wise_graph(self):
-        self.group_element_wise_graph(add)
-        self.group_element_wise_graph(mul)
-        self.group_element_wise_graph(sub)
-        self.group_element_wise_graph(truediv)
-
-    def group_element_wise_split_graph(self, op):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv0 = nn.Conv2d(3, 32, (1, 1))
-                self.conv1 = nn.Conv2d(16, 16, (1, 1), groups=8)
-                self.conv2 = nn.Conv2d(16, 16, (1, 1), groups=2)
-
-            def forward(self, x):
-                conv0 = self.conv0(x)
-                sp0, sp1 = torch.split(conv0, conv0.shape[1] // 2, 1)
-                conv1 = self.conv1(sp0)
-                add0 = op(conv1, sp1)
-                conv2 = self.conv2(add0)
-                return conv2
-
-        def test_func():
-            model = TestModel()
-
-            ch_conv0 = get_rd_lst(32)
-            ch_conv1 = get_rd_lst(16)
-
-            init_conv_by_list(model.conv0, ch_conv0)
-            init_conv_by_list(model.conv1, ch_conv1)
-
-            importance_conv0 = l2_norm(model.conv0.weight, model.conv0)
-            importance_conv1 = l2_norm(model.conv1.weight, model.conv1)
-            importance_conv01 = list(map(add, importance_conv0[16:], importance_conv1))
-
-            idxes_conv0 = []
-            idxes_conv1 = []
-
-            for i in range(8):
-                idxes_conv0 += get_topk(importance_conv0[i * 2 : (i + 1) * 2], 1, offset=i * 2)
-                idxes_conv1 += get_topk(importance_conv01[i * 2 : (i + 1) * 2], 1, offset=i * 2)
-
-            idxes_conv0 += [i + 16 for i in idxes_conv1]
-
-            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
-
-            pruner.register_mask()
-
-            assert model.conv0.masker.ot_remove_idx == idxes_conv0
-            assert model.conv1.masker.ot_remove_idx == idxes_conv1
-
-            removed_idx_group_check(model.conv0.masker.ot_remove_idx, 32, 16, 8)
-            removed_idx_group_check(model.conv1.masker.in_remove_idx, 16, 8, 8)
-            removed_idx_group_check(model.conv1.masker.ot_remove_idx, 16, 8, 8)
-            removed_idx_group_check(model.conv2.masker.in_remove_idx, 16, 8, 8)
-            removed_idx_group_check(model.conv2.masker.ot_remove_idx, 16, 8, 2)
-
-            pruner.apply_mask()
-
-            model(torch.ones(1, 3, 9, 9))
-
-        for i in range(50):
-            test_func()
-
-    def test_group_element_wise_split_graph(self):
-        self.group_element_wise_split_graph(add)
-        self.group_element_wise_split_graph(sub)
-        self.group_element_wise_split_graph(mul)
-        self.group_element_wise_split_graph(truediv)
-
-    def test_res_2_net_block(self):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv1 = nn.Conv2d(3, 64, (1, 1))
-                self.conv2 = nn.Conv2d(16, 16, (1, 1), groups=8)
-                self.conv3 = nn.Conv2d(16, 16, (1, 1), groups=2)
-                self.conv4 = nn.Conv2d(16, 16, (1, 1))
-                self.conv5 = nn.Conv2d(64, 64, (1, 1))
-
-            def forward(self, x):
-                conv1 = self.conv1(x)
-                size0 = conv1.shape[1] // 4
-                split0 = torch.split(conv1, size0, 1)
-                conv2 = self.conv2(split0[0])
-                add0 = conv2 + split0[1]
-                conv3 = self.conv3(add0)
-                add3 = conv3 + split0[2]
-                conv4 = self.conv4(add3)
-                cat0 = torch.cat([conv2, conv3, conv4, split0[3]], 1)
-                return self.conv5(cat0)
+                linear0 = self.linear0(x)
+                reshape0 = linear0.reshape((2, 4))
+                reshape1 = linear0.reshape((4, 2))
+                linear1 = self.linear1(reshape0)
+                linear2 = self.linear2(reshape1)
+                linear3 = self.linear3(linear0)
+
+                return linear1, linear2, linear3
 
         model = TestModel()
-        pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
+
+        dummy_input = torch.ones((1, 2))
+
+        model(dummy_input)
+
+        model_generate(model, dummy_input)
+
+        graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
+
+        graph_modifier = GraphChannelModifier(graph, center_nodes)
+
+        m_linear0 = graph_modifier.get_modifier(model.linear0)
+        m_linear1 = graph_modifier.get_modifier(model.linear1)
+        m_linear2 = graph_modifier.get_modifier(model.linear2)
+        m_linear3 = graph_modifier.get_modifier(model.linear3)
+
+        m_reshape0 = graph_modifier.get_modifier(unique_name='reshape_0_f')
+        m_reshape0 = graph_modifier.get_modifier(unique_name='reshape_1_f')
+        m_output0 = graph_modifier.get_modifier(unique_name='output_0_f')
+
+        assert m_linear1.dim_changes_info.constraints_i == {
+            1: {'linear0': [[{0.0, 4.0}, {1.0, 5.0}, {2.0, 6.0}, {3.0, 7.0}]]}
+        }
+        assert m_linear2.dim_changes_info.constraints_i == {
+            1: {'linear0': [[{0.0, 2.0, 4.0, 6.0}, {1.0, 3.0, 5.0, 7.0}]]}
+        }
+        assert m_linear3.dim_changes_info.constraints_i == {
+            1: {'linear0': [[{0.0}, {1.0}, {2.0}, {3.0}, {4.0}, {5.0}, {6.0}, {7.0}]]}
+        }
+
+    def test_case_9(self):
+        """
+        constraint冲突，无法剪枝
+
+        Returns:
+
+        """
+
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear0 = nn.Linear(in_features=2, out_features=6)
+                self.linear1 = nn.Linear(in_features=3, out_features=6)
+                self.linear2 = nn.Linear(in_features=2, out_features=4)
+
+            def forward(self, x):
+                linear0 = self.linear0(x)
+                reshape0 = linear0.reshape((2, 3))
+                reshape1 = linear0.reshape((3, 2))
+                linear1 = self.linear1(reshape0)
+                linear2 = self.linear2(reshape1)
+
+                return linear1, linear2
+
+        model = TestModel()
+
+        dummy_input = torch.ones((1, 2))
+
+        model(dummy_input)
+
+        model_generate(model, dummy_input)
+
+        pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm"})
+        graph_modifier = pruner.graph_modifier
+        pruner.register_mask()
+
+        m_linear0 = graph_modifier.get_modifier(model.linear0)
+        m_linear1 = graph_modifier.get_modifier(model.linear1)
+        m_linear2 = graph_modifier.get_modifier(model.linear2)
+
+        assert graph_modifier.sub_graphs[m_linear0.unique_name()].center_constraint == {
+            'linear0': [{0.0, 1.0, 2.0, 3.0, 4.0, 5.0}]
+        }
+
+        assert graph_modifier.sub_graphs[m_linear1.unique_name()].center_constraint == {
+            'linear1': [{0.0}, {1.0}, {2.0}, {3.0}, {4.0}, {5.0}]
+        }
+
+        assert graph_modifier.sub_graphs[m_linear2.unique_name()].center_constraint == {
+            'linear2': [{0.0}, {1.0}, {2.0}, {3.0}]
+        }
+
+    def test_case_10(self):
+        """
+        constraint冲突，无法剪枝
+
+        Returns:
+
+        """
+
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear0 = nn.Linear(in_features=2, out_features=4)
+                self.linear1 = nn.Linear(in_features=2, out_features=8)
+                self.linear2 = nn.Linear(in_features=12, out_features=12)
+
+            def forward(self, x):
+                linear0 = self.linear0(x)
+                linear1 = self.linear1(x)
+                cat0 = torch.cat([linear0, linear1], dim=1)
+                linear2 = self.linear2(cat0)
+
+                return linear2
+
+        model = TestModel()
+
+        dummy_input = torch.ones((1, 2))
+
+        model(dummy_input)
+
+        model_generate(model, dummy_input)
+
+        pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm"})
 
         pruner.register_mask()
-        removed_idx_group_check(model.conv1.masker.ot_remove_idx[:16], 32, 16, 8)
-        removed_idx_group_check(model.conv1.masker.ot_remove_idx[16:24], 16, 8, 2, offset=32)
+
+        m_linear0 = pruner.graph_modifier.get_modifier(model.linear0)
+
+        assert pruner.graph_modifier.sub_graphs[m_linear0.unique_name()].center_constraint == {
+            'linear0': [{0.0}, {1.0}, {2.0}, {3.0}],
+            'linear1': [{0.0}, {1.0}, {2.0}, {3.0}, {4.0}, {5.0}, {6.0}, {7.0}],
+        }
+
+    def test_case_11(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear0 = nn.Linear(in_features=2, out_features=12)
+                self.linear1 = nn.Linear(in_features=2, out_features=4)
+                self.linear2 = nn.Linear(in_features=2, out_features=8)
+                self.linear3 = nn.Linear(in_features=12, out_features=12)
+                self.linear4 = nn.Linear(in_features=2, out_features=4)
+                self.linear5 = nn.Linear(in_features=2, out_features=4)
+                self.linear6 = nn.Linear(in_features=8, out_features=8)
+
+            def forward(self, x):
+                linear0 = self.linear0(x)
+                linear1 = self.linear1(x)
+                linear2 = self.linear2(x)
+                linear4 = self.linear4(x)
+                linear5 = self.linear5(x)
+
+                cat0 = torch.cat([linear1, linear2], dim=1)
+                add0 = linear0 + cat0
+                linear3 = self.linear3(add0)
+
+                cat1 = torch.cat([linear4, linear5], dim=1)
+                add1 = linear2 + cat1
+                linear6 = self.linear6(add1)
+
+                return linear3, linear6
+
+        model = TestModel()
+
+        dummy_input = torch.ones((1, 2))
+
+        model(dummy_input)
+
+        model_generate(model, dummy_input)
+
+        graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
+
+        graph_modifier = GraphChannelModifier(graph, center_nodes)
+
+        m_linear0 = graph_modifier.get_modifier(model.linear0)
+        m_linear1 = graph_modifier.get_modifier(model.linear1)
+        m_linear2 = graph_modifier.get_modifier(model.linear2)
+        m_linear3 = graph_modifier.get_modifier(model.linear3)
+        m_linear4 = graph_modifier.get_modifier(model.linear4)
+        m_linear5 = graph_modifier.get_modifier(model.linear5)
+        m_linear6 = graph_modifier.get_modifier(model.linear6)
+
+    def test_case_12(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear0 = nn.Linear(in_features=2, out_features=8)
+                self.linear1 = nn.Linear(in_features=8, out_features=8)
+
+            def forward(self, x):
+                linear0 = self.linear0(x)
+
+                reshape0 = linear0.reshape((8, 1))
+                reshape1 = reshape0.reshape((1, 8))
+                add0 = linear0 + reshape1
+                linear1 = self.linear1(add0)
+
+                return linear1
+
+        model = TestModel()
+
+        dummy_input = torch.ones((1, 2))
+
+        model(dummy_input)
+
+        model_generate(model, dummy_input)
+
+        graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
+
+        graph_modifier = GraphChannelModifier(graph, center_nodes)
+
+        m_linear0 = graph_modifier.get_modifier(model.linear0)
+        m_linear1 = graph_modifier.get_modifier(model.linear1)
+
+    def test_case_13(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear0 = nn.Linear(in_features=2, out_features=16)
+                self.linear1 = nn.Linear(in_features=8, out_features=8)
+
+            def forward(self, x):
+                linear0 = self.linear0(x)
+                sp0, sp1 = torch.split(linear0, 8, dim=1)
+
+                reshape0 = sp1.reshape((8, 1))
+                reshape1 = reshape0.reshape((1, 8))
+                add0 = sp0 + reshape1
+                linear1 = self.linear1(add0)
+
+                return linear1
+
+        model = TestModel()
+
+        dummy_input = torch.ones((1, 2))
+
+        model(dummy_input)
+
+        model_generate(model, dummy_input)
+
+        graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
+
+        graph_modifier = GraphChannelModifier(graph, center_nodes)
+
+        m_linear0 = graph_modifier.get_modifier(model.linear0)
+        m_linear1 = graph_modifier.get_modifier(model.linear1)
+
+        assert m_linear1.dim_changes_info.constraints_i == {
+            1: {
+                'linear0': [
+                    [
+                        {0.0, 8.0},
+                        {1.0, 9.0},
+                        {2.0, 10.0},
+                        {11.0, 3.0},
+                        {4.0, 12.0},
+                        {13.0, 5.0},
+                        {6.0, 14.0},
+                        {15.0, 7.0},
+                    ]
+                ]
+            }
+        }
+
+    def test_case_14(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear0 = nn.Linear(in_features=2, out_features=12)
+                self.linear1 = nn.Linear(in_features=2, out_features=4)
+                self.linear2 = nn.Linear(in_features=2, out_features=8)
+                self.linear3 = nn.Linear(in_features=4, out_features=4)
+                self.linear4 = nn.Linear(in_features=12, out_features=12)
+
+            def forward(self, x):
+                linear0 = self.linear0(x)
+                linear1 = self.linear1(x)
+                linear2 = self.linear2(x)
+
+                reshape0 = linear0.reshape((3, 4))
+                linear3 = self.linear3(reshape0)
+
+                cat0 = torch.cat([linear1, linear2], dim=1)
+                add0 = linear0 + cat0
+                linear4 = self.linear4(add0)
+
+                return linear3, linear4
+
+        model = TestModel()
+
+        dummy_input = torch.ones((1, 2))
+
+        model(dummy_input)
+
+        model_generate(model, dummy_input)
+
+        graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
+
+        graph_modifier = GraphChannelModifier(graph, center_nodes)
+
+        m_linear0 = graph_modifier.get_modifier(model.linear0)
+        m_linear1 = graph_modifier.get_modifier(model.linear1)
+        m_linear2 = graph_modifier.get_modifier(model.linear2)
+        m_linear3 = graph_modifier.get_modifier(model.linear3)
+        m_linear4 = graph_modifier.get_modifier(model.linear4)
+
+        print("test ok")
+
+    def test_case_15(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear0 = nn.Linear(4, 8)
+                self.linear1 = nn.Linear(4, 8)
+                self.linear2 = nn.Linear(2, 4)
+                self.linear3 = nn.Linear(4, 8)
+
+            def forward(self, x):
+                linear0 = self.linear0(x)
+                reshape0 = linear0.reshape((2, 4))
+                linear1 = self.linear1(reshape0)
+                permute0 = linear1.transpose(0, 1)
+                linear2 = self.linear2(permute0)
+                linear3 = self.linear3(linear2)
+
+                return linear3
+
+        model = TestModel()
+
+        dummy_input = torch.ones((1, 4))
+
+        model(dummy_input)
+
+        pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm"})
+
+        pruner.register_mask()
+
+        graph_modifier = pruner.graph_modifier
+        m_linear0 = graph_modifier.get_modifier(model.linear0)
+        m_reshape0 = graph_modifier.get_modifier(unique_name='reshape_0_f')
+        m_transpose0 = graph_modifier.get_modifier(unique_name='transpose_0_f')
+        m_linear1 = graph_modifier.get_modifier(model.linear1)
+        m_linear2 = graph_modifier.get_modifier(model.linear2)
+        m_linear3 = graph_modifier.get_modifier(model.linear3)
+        m_output0 = graph_modifier.get_modifier(unique_name='output_0_f')
+
+        assert graph_modifier.sub_graphs[m_linear0.unique_name()] == [
+            m_linear0,
+            m_reshape0,
+            m_linear1,
+            m_transpose0,
+            m_linear2,
+        ]
+        assert graph_modifier.sub_graphs[m_linear2.unique_name()] == [m_linear2, m_linear3]
+        assert graph_modifier.sub_graphs[m_linear3.unique_name()] == [m_linear3, m_output0]
+
         pruner.apply_mask()
 
-        model(torch.ones(1, 3, 9, 9))
+        pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
+        new_module = import_from_path(f'out.test', "out/test.py", "test")()
 
-    def test_conv1d_block(self):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv1 = nn.Conv1d(3, 16, (3,))
-                self.conv2 = nn.Conv1d(16, 32, (3,))
+        new_module(dummy_input)
 
-            def forward(self, x):
-                conv1 = self.conv1(x)
-                return self.conv2(conv1)
+    def test_calc_dim_changes(self):
+        def test_func(shape, dims, node):
+            tensor = fill_tensor_by_dim_changes(torch.zeros(shape, dtype=torch.int32), dims)
 
-        model = TestModel()
-        pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9), {"sparsity": 0.25, "metrics": "l2_norm"})
-        pruner.prune()
+            dim_changes = None
 
-        model(torch.ones(1, 3, 9))
+            if isinstance(node, list):
+                for n in node:
+                    dim_changes, tensor = calc_dim_changes(n, tensor)[0]
+            else:
+                dim_changes, tensor = calc_dim_changes(node, tensor)[0]
 
-        assert model.conv1.out_channels == 12
-        assert model.conv2.out_channels == 24
+            return dim_changes
 
-    def test_loop_conv_block(self):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.conv0 = nn.Conv2d(3, 16, (3, 3))
-                self.conv1 = nn.Conv2d(16, 32, (3, 3))
+        assert test_func((2, 2, 2), [1], lambda x: x[0].reshape((2, 4))) == [1]
+        assert test_func((2, 4), [1], [lambda x: x[0].reshape((1, 8)), lambda x: x[0].reshape((2, 4))]) == [1]
+        assert test_func((2, 4, 3), [0, 2], lambda x: x[0].reshape((2, 3, 4))) == [0, 1]
+        assert test_func((4, 24, 24), [0], lambda x: x[0].reshape((2, 48, 24))) == [0, 1]
+        assert test_func((2, 4, 3), [1], lambda x: x[0].reshape((2, 2, 6))) == [1, 2]
+        assert test_func((2, 4, 2, 4, 2), [1, 3], lambda x: x[0].reshape((2, 2, 2, 2, 2, 4))) == [1, 2, 4, 5]
+        assert test_func((2, 2, 2), [1, 2], lambda x: x[0].reshape((2, 4))) == [1]
+        assert test_func((2, 2, 2, 3), [1, 2], lambda x: x[0].reshape((2, 4, 3))) == [1]
+        assert test_func((2, 2, 2, 3), [1, 3], lambda x: x[0].reshape((4, 6))) == [0, 1]
+        assert test_func((2, 2, 2), [1], lambda x: x[0].transpose(1, 2)) == [2]
+        assert test_func((2, 2, 2), [1], lambda x: x[0].permute((0, 2, 1))) == [2]
 
-            def forward(self, x):
-                conv0 = self.conv0(x)
-                return self.conv1(conv0 + conv0 + conv0)
+    def test_merge_group(self):
+        def test_func(group):
+            return merge_group(group)
 
-        def test_func():
-            model = TestModel()
+        assert merge_group([{0, 1, 2, 3}, {2, 3}]) == [{0, 1}, {2, 3}]
+        assert merge_group([{0, 1, 2, 3}, {2, 3, 4, 5}]) == [{0, 1}, {4, 5}, {2, 3}]
+        assert merge_group([{0, 1, 2, 3, 4, 5, 6, 7, 8}, {0, 1, 2, 3}, {2, 3, 4, 5}]) == [
+            {6, 7, 8},
+            {4, 5},
+            {0, 1},
+            {2, 3},
+        ]
 
-            ch_conv0 = get_rd_lst(16)
-            init_conv_by_list(model.conv0, ch_conv0)
-            importance_conv0 = l2_norm(model.conv0.weight, model.conv0)
-            idxes_conv0 = get_topk(importance_conv0, 8)
+    def test_merge_constraint(self):
+        def test_func(constraint, result):
+            constraint.sort()
+            result.sort()
+            sorted_constraint = merge_constraint(constraint)
+            assert sorted_constraint == result
 
-            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
+        test_func([{0, 1, 2, 3}, {2, 3}], [{0, 1, 2, 3}])
+        test_func([{0, 1}, {1, 2}, {2, 3}], [{0, 1, 2, 3}])
+        test_func([{0, 1}, {2, 3}, {4, 5}, {0, 6}], [{0, 1, 6}, {2, 3}, {4, 5}])
+        test_func([{0}, {0, 1}, {2, 3, 4}, {4, 5}], [{0, 1}, {2, 3, 4, 5}])
 
-            pruner.register_mask()
+    def test_calc_index_constraint(self):
+        def test_func(shape, dims, node):
+            tensor = fill_tensor_by_dim_changes(torch.zeros(shape, dtype=torch.int32), dims)
 
-            assert model.conv0.masker.ot_remove_idx == idxes_conv0
+            dim_changes = None
 
-            pruner.apply_mask()
-            model(torch.ones(1, 3, 9, 9))
+            if isinstance(node, list):
+                for n in node:
+                    dim_changes, tensor = calc_dim_changes(n, tensor)[0]
+            else:
+                dim_changes, tensor = calc_dim_changes(node, tensor)[0]
 
-        for i in range(10):
-            test_func()
+            constraint = calc_dim_constraint(tensor, dim_changes)
 
-    def test_multi_dim_fc(self):
-        class TestModel(nn.Module):
-            def __init__(self):
-                super(TestModel, self).__init__()
-                self.fc0 = nn.Linear(8, 32)
-                self.fc1 = nn.Linear(32, 32)
+            return constraint
 
-            def forward(self, x):
-                fc0 = self.fc0(x)
-                fc1 = self.fc1(fc0)
-                return fc1
-
-        model = TestModel()
-
-        pruner = OneShotChannelPruner(model, torch.rand((16, 16, 8)), {"sparsity": 0.5, "metrics": "l2_norm"})
-        pruner.prune()
-        model(torch.rand((16, 8)))
-
-        assert model.fc0.out_features == 16
-        assert model.fc1.in_features == 16
-        assert model.fc1.out_features == 32
-
-    def test_rnn(self):
-        rnn_in_size = 28
-        rnn_hidden_size = 128
-        fc_out_channel = 10
-
-        class TestModel(nn.Module):
-            def __init__(self, *args, **kwargs):
-                super(TestModel, self).__init__()
-
-                assert 'cell_type' in kwargs
-
-                cell_type = kwargs.pop('cell_type')
-                assert cell_type in (nn.RNN, nn.GRU, nn.LSTM)
-
-                bidirectional = kwargs.get('bidirectional', False)
-                num_directions = 2 if bidirectional else 1
-                fc_in_channel = rnn_hidden_size * num_directions
-
-                if 'proj_size' in kwargs:
-                    fc_in_channel = kwargs['proj_size'] * num_directions
-
-                self.rnn = cell_type(rnn_in_size, rnn_hidden_size, *args, **kwargs)
-                self.fc = nn.Linear(fc_in_channel, fc_out_channel)
-
-            def forward(self, x):
-                rnn, _ = self.rnn(x)
-                fc = self.fc(rnn)
-                return fc
-
-        for cell_type in (nn.RNN, nn.GRU, nn.LSTM):
-            for num_layers in (1, 2):
-                for bidirectional in (False, True):
-                    for batch_first in (False, True):
-                        for proj_size in (0, 120):
-
-                            if cell_type != nn.LSTM and proj_size > 0:
-                                continue
-
-                            kwargs = {
-                                'num_layers': num_layers,
-                                'bidirectional': bidirectional,
-                                'batch_first': batch_first,
-                                'cell_type': cell_type,
-                            }
-
-                            if proj_size > 0:
-                                if LooseVersion(torch.__version__) >= LooseVersion('1.8.0'):
-                                    kwargs.update({'proj_size': proj_size})
-                                else:
-                                    continue
-
-                            filtered_args = {k: v for k, v in kwargs.items() if k != 'cell_type'}
-                            print(f'\nTesting {cell_type.__name__} with {filtered_args}')
-
-                            model = TestModel(**kwargs)
-
-                            pruner = OneShotChannelPruner(
-                                model, torch.rand((3, 3, rnn_in_size)), {"sparsity": 0.5, "metrics": "l2_norm"}
-                            )
-                            pruner.prune()
-                            model(torch.rand((3, 3, rnn_in_size)))
-
-                            assert model.rnn.hidden_size == 64
-
-    def test_lstm_proj_add_fc(self):
-        if LooseVersion(torch.__version__) < LooseVersion('1.8.0'):
-            raise SkipTest("LSTM with projection is not supported in PyTorch < 1.8")
-
-        rnn_in_size = 28
-        rnn_hidden_size = 128
-        fc_out_channel = 10
-        proj_size = 120
-
-        class TestModel(nn.Module):
-            def __init__(self, *args, **kwargs):
-                super(TestModel, self).__init__()
-
-                bidirectional = kwargs.get('bidirectional', False)
-                num_directions = 2 if bidirectional else 1
-                fc_in_channel = proj_size * num_directions
-
-                self.rnn = nn.LSTM(rnn_in_size, rnn_hidden_size, proj_size=proj_size, *args, **kwargs)
-                self.fc0 = nn.Linear(rnn_in_size, fc_in_channel)
-                self.fc1 = nn.Linear(fc_in_channel, fc_out_channel)
-
-            def forward(self, x):
-                rnn, _ = self.rnn(x)
-                fc0 = self.fc0(x) + rnn
-                fc1 = self.fc1(fc0)
-                return fc1
-
-        for num_layers in (1, 2):
-            for bidirectional in (False, True):
-
-                kwargs = {
-                    'num_layers': num_layers,
-                    'bidirectional': bidirectional,
-                }
-
-                print(f'\nTesting with {kwargs}')
-
-                model = TestModel(**kwargs)
-
-                model(torch.rand((3, 3, rnn_in_size)))
-
-                pruner = OneShotChannelPruner(
-                    model, torch.rand((3, 3, rnn_in_size)), {"sparsity": 0.5, "metrics": "l2_norm"}
-                )
-                pruner.prune()
-
-                model(torch.rand((3, 3, rnn_in_size)))
+        assert test_func((1, 8), [1], lambda x: x[0].reshape((2, 4))) == {
+            0: [{0, 1, 2, 3}, {4, 5, 6, 7}],
+            1: [{0, 4}, {1, 5}, {2, 6}, {3, 7}],
+        }
+        assert test_func((2, 8), [0], lambda x: x[0].transpose(0, 1)) == {1: [{0}, {1}]}
 
 
 if __name__ == '__main__':
