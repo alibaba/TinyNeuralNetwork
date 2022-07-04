@@ -1175,7 +1175,7 @@ class ModifierTester(unittest.TestCase):
 
             pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
 
-            model = import_from_path(f'out.test', "out/test.py", "test")()
+            model = import_from_path('out.test', "out/test.py", "test")()
 
             model(torch.ones(1, 3, 9, 9))
 
@@ -1462,8 +1462,6 @@ class ModifierTester(unittest.TestCase):
 
             importance_conv0 = l2_norm(model.conv0.weight, model.conv0).tolist()
             importance_conv1 = l2_norm(model.conv1.weight, model.conv1).tolist()
-            importance_conv2 = l2_norm(model.conv2.weight, model.conv2).tolist()
-            importance_conv3 = l2_norm(model.conv3.weight, model.conv3).tolist()
 
             pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
             pruner.register_mask()
@@ -1496,7 +1494,7 @@ class ModifierTester(unittest.TestCase):
             assert model.conv3.out_channels == 16
 
             pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
-            model = import_from_path(f'out.test', "out/test.py", "test")()
+            model = import_from_path('out.test', "out/test.py", "test")()
 
             model(torch.ones(1, 3, 9, 9))
 
@@ -1528,7 +1526,7 @@ class ModifierTester(unittest.TestCase):
             pruner.prune()
 
             pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
-            model = import_from_path(f'out.test', "out/test.py", "test")()
+            model = import_from_path('out.test', "out/test.py", "test")()
 
             print([i.shape for i in model(dummy_input)])
 
@@ -1672,7 +1670,7 @@ class ModifierTester(unittest.TestCase):
         pruner.prune()
 
         pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
-        model = import_from_path(f'out.test', "out/test.py", "test")()
+        model = import_from_path('out.test', "out/test.py", "test")()
         model(torch.rand((197, 768)))
 
     def test_transformer_matmul(self):
@@ -1709,7 +1707,7 @@ class ModifierTester(unittest.TestCase):
         )
         pruner.prune()
         pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
-        model = import_from_path(f'out.test', "out/test.py", "test")()
+        model = import_from_path('out.test', "out/test.py", "test")()
         model(dummy_input)
 
     def test_matmul_dim_mapping(self):
@@ -1835,9 +1833,7 @@ class ModifierTester(unittest.TestCase):
         model = TestModel()
         model_generate(model, dummy_input=dummy_input, name="transformer.tflite")
 
-        pruner = OneShotChannelPruner(
-            model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm", "skip_last_fc": True}
-        )
+        pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm", "skip_last_fc": True})
         pruner.prune()
 
         model(dummy_input)
@@ -1890,34 +1886,6 @@ class ModifierTester(unittest.TestCase):
 
         model(dummy_input)
 
-    #
-    # def test_constant_node(self):
-    #     class TestModel(nn.Module):
-    #         def __init__(self):
-    #             super().__init__()
-    #             self.register_parameter("tensor_1", torch.nn.Parameter(torch.empty((1, 1, 768), dtype=torch.float32)))
-    #             self.register_parameter("tensor_2", torch.nn.Parameter(torch.empty((1, 197, 768), dtype=torch.float32)))
-    #             self.conv0 = torch.nn.Conv2d(3, 768, kernel_size=(16, 16), stride=(16, 16))
-    #
-    #         def forward(self, input_1):
-    #             shape_1 = input_1.shape
-    #             conv0 = self.conv0(input_1)
-    #             flatten_1 = conv0.flatten(2)
-    #             transpose_1 = flatten_1.transpose(1, 2)
-    #             expand_1 = self.tensor_1.expand(shape_1[0], -1, -1)
-    #             cat_1 = torch.cat([expand_1, transpose_1], dim=1)
-    #             return cat_1
-    #
-    #     model = TestModel()
-    #
-    #     pruner = OneShotChannelPruner(
-    #         model, torch.rand((1, 3, 224, 224)), {"sparsity": 0.5, "metrics": "l2_norm", "skip_last_fc": False}
-    #     )
-    #
-    #     pruner.prune()
-    #
-    #     out = model(torch.rand((1, 3, 224, 224)))
-    #
     def test_reshape_prune_node(self):
         class TestModel(nn.Module):
             def __init__(self):
@@ -1941,9 +1909,9 @@ class ModifierTester(unittest.TestCase):
         pruner.prune()
 
         pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
-        new_module = import_from_path(f'out.test', "out/test.py", "test")()
+        new_module = import_from_path('out.test', "out/test.py", "test")()
 
-        out = new_module(torch.rand((1, 16)))
+        new_module(torch.rand((1, 16)))
 
     def test_channel_shuffle(self):
         class TestModel(nn.Module):
@@ -1971,9 +1939,9 @@ class ModifierTester(unittest.TestCase):
         pruner.prune()
 
         pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
-        new_module = import_from_path(f'out.test', "out/test.py", "test")()
+        new_module = import_from_path('out.test', "out/test.py", "test")()
 
-        out = new_module(torch.rand((1, 3, 6, 6)))
+        new_module(torch.rand((1, 3, 6, 6)))
 
     def test_shufflenetv2_chunk(self):
         class TestModel(nn.Module):
@@ -2005,7 +1973,7 @@ class ModifierTester(unittest.TestCase):
         pruner.prune()
 
         pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
-        new_module = import_from_path(f'out.test', "out/test.py", "test")()
+        new_module = import_from_path('out.test', "out/test.py", "test")()
 
         new_module(torch.rand((1, 3, 6, 6)))
 

@@ -21,7 +21,7 @@ from tinynn.graph.tracer import patch_helper, no_catch, model_tracer
 from tinynn.util.cifar10 import get_dataloader, validate
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
 from tinynn.util.train_util import train, DLContext, get_device
-from transformers import BertTokenizer
+
 with model_tracer():
     with patch_helper(wrap_creation_funcs=False, wrap_funcs=True, wrap_modules=False):
         with no_catch():
@@ -44,7 +44,6 @@ def main_worker(args):
     model.cpu()
     device = get_device()
 
-    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
     dummy_input_0 = torch.ones((1, 8), dtype=torch.int64)
     dummy_input_1 = torch.ones((1, 8), dtype=torch.int64)
     dummy_input_2 = torch.ones((1, 8), dtype=torch.int64)
@@ -54,13 +53,13 @@ def main_worker(args):
     context = DLContext()
     context.device = device
 
-    pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 3 / 12,
-                                                       "metrics": "l2_norm",
-                                                       "exclude_ops": [nn.LayerNorm]})
+    pruner = OneShotChannelPruner(
+        model, dummy_input, {"sparsity": 3 / 12, "metrics": "l2_norm", "exclude_ops": [nn.LayerNorm]}
+    )
     pruner.prune()  # Get the pruned model
     pruner.graph.generate_code('out/vit.py', 'out/vit.pth', 'vit')
 
-    model = import_from_path(f'out.vit', "out/vit.py", "vit")()
+    model = import_from_path('out.vit', "out/vit.py", "vit")()
     model.load_state_dict(torch.load("out/vit.pth"))
     model.eval()
     model(*dummy_input)

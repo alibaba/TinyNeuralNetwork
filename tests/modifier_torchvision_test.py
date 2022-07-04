@@ -78,10 +78,10 @@ class TestModelMeta(type):
                 pruner.prune()
 
                 pruner.graph.generate_code('out/new_model.py', 'out/new_model.pth', 'new_model')
-                new_model = import_from_path(f'out.new_model', "out/new_model.py", "new_model")()
+                new_model = import_from_path('out.new_model', "out/new_model.py", "new_model")()
 
                 print(f"[TEST] {model_name} cost {time.time() - st}")
-                outputs = new_model(*inputs)
+                new_model(*inputs)
 
         return f
 

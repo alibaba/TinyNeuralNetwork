@@ -295,7 +295,7 @@ class ConstantNode(object):
         self.is_class = False
 
         # Numbering of the name of the node
-        if not current_graph().global_functions.get(self.kind, None):
+        if current_graph().global_functions.get(self.kind, None) is None:
             current_graph().global_functions[self.kind] = 0
         else:
             current_graph().global_functions[self.kind] += 1
@@ -1544,12 +1544,14 @@ def model_constructor_tracer():
     with patch_helper(wrap_funcs=False, wrap_creation_funcs=False):
         yield True
 
+
 @contextlib.contextmanager
 def ignore_mod_param_update_warning():
     if not mod_param_update_warning_ignore():
         mod_param_update_warning_ignore(True)
         yield True
         mod_param_update_warning_ignore(False)
+
 
 @contextlib.contextmanager
 def model_tracer():

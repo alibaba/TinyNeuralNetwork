@@ -1056,7 +1056,8 @@ class PoolingModifier(Modifier):
             changes = self.calc_dim_changes()
             tensor_o = changes[0][1]
 
-        # TODO：If the dimension of pooling is not in dim_changes, the input constraint can be reused to reduce the amount of computation
+        # TODO：If the dimension of pooling is not in dim_changes,
+        #  the input constraint can be reused to reduce the amount of computation
         self.dim_changes_info.update_i(
             center, tensor, dim_changes_i, dim_transform, tensor_constraint=tensor_constraint
         )

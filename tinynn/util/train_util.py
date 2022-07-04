@@ -97,7 +97,8 @@ def train(
         model: The model to be trained
         context (DLContext): the DLContext object
         train_func (typing.Callable[[torch.nn.Module, DLContext], None]): The function to train the model by one step
-        validate_func (typing.Callable[[torch.nn.Module, DLContext], float]): The function to get the accuracy of the model
+        validate_func (typing.Callable[[torch.nn.Module, DLContext], float]): The function to get the \
+        accuracy of the model
         distributed (bool, optional): Whether DDP training is used. Defaults to False.
         main_process (bool, optional): Whether the code runs in the main process. Defaults to True.
         qat (bool, optional): Whether to perform quantization-aware training. Defaults to False.

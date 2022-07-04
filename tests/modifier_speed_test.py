@@ -82,10 +82,9 @@ def speed_test(model, dummy_input):
         pruner_new.apply_mask()
 
         log.info(f"[SPEED TEST][Apply Mask] {time.time() - st}")
-        st = time.time()
 
         pruner_new.graph.generate_code('out/new_model.py', 'out/new_model.pth', 'new_model')
-        new_model_pruned = import_from_path(f'out.new_model', "out/new_model.py", "new_model")()
+        new_model_pruned = import_from_path('out.new_model', "out/new_model.py", "new_model")()
         new_model_pruned(dummy_input)
 
 

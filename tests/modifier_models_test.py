@@ -54,7 +54,9 @@ class ModifierTester(unittest.TestCase):
             model = timm.create_model(model_name, pretrained=False)
             model.eval()
             dummy_input = torch.ones((1, 3, 224, 224))
-            pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.75, "metrics": "l2_norm", "skip_last_fc": True})
+            pruner = OneShotChannelPruner(
+                model, dummy_input, {"sparsity": 0.75, "metrics": "l2_norm", "skip_last_fc": True}
+            )
             pruner.prune()
             model(dummy_input)
             print(f"test {model_name} over!\n")

@@ -67,7 +67,7 @@ def main_worker(args):
     pruner.prune()  # Get the pruned model
     pruner.graph.generate_code('out/vit.py', 'out/vit.pth', 'vit')
 
-    model = import_from_path(f'out.vit', "out/vit.py", "vit")()
+    model = import_from_path('out.vit', "out/vit.py", "vit")()
     model.load_state_dict(torch.load("out/vit.pth"))
     model.eval()
 
@@ -108,11 +108,9 @@ def main_worker(args):
     print("\n###### Start finetune the pruned model ######")
     """
     Original accuracy: 98.52
-    1. Pruning 1/12: (96.31)95.21 -> (98.64)98.68 (warmup_epoch=1， max_epoch=5)
-    2. pruning 2/12: (81.81)75.20 -> (98.33)98.19 (warmup_epoch=1， max_epoch=5)
-    3. pruning 3/12: 35.59 -> 98.13 (warmup_epoch=5， max_epoch=25)
-    
-    This is just a simple example, you can further improve the accuracy by 
+    1. Pruning 1/12: 95.21 -> 98.68 (warmup_epoch=1， max_epoch=5)
+    2. pruning 2/12: 75.20 -> 98.19 (warmup_epoch=1， max_epoch=5)
+    This is just a simple example, you can further improve the accuracy by
     optimizing hyperparameters, distillation, optimizing the loss function, etc.
     """
     train(model, context, train_one_epoch, validate)

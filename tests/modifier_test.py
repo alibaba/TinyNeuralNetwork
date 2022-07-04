@@ -8,13 +8,12 @@ import torch.nn as nn
 from tinynn.converter import TFLiteConverter
 from tinynn.graph.modifier import is_dw_conv
 from tinynn.graph.modifier import (
-    Modifier,
     GraphChannelModifier,
     fill_tensor_by_dim_changes,
     calc_dim_changes,
     calc_dim_constraint,
     merge_group,
-    merge_constraint, merge_constraint,
+    merge_constraint,
 )
 from tinynn.graph.tracer import model_tracer, trace
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
@@ -97,7 +96,9 @@ class ModifierForwardTester(unittest.TestCase):
 
             model(dummy_input)
 
-            pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm", "skip_last_fc":False})
+            pruner = OneShotChannelPruner(
+                model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm", "skip_last_fc": False}
+            )
 
             pruner.register_mask()
 
@@ -124,7 +125,7 @@ class ModifierForwardTester(unittest.TestCase):
 
             pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
 
-            model = import_from_path(f'out.test', "out/test.py", "test")()
+            model = import_from_path('out.test', "out/test.py", "test")()
 
             model(dummy_input)
 
@@ -167,7 +168,6 @@ class ModifierForwardTester(unittest.TestCase):
 
         m_linear0 = graph_modifier.get_modifier(model.linear0)
         m_linear1 = graph_modifier.get_modifier(model.linear1)
-        m_cat0 = graph_modifier.get_modifier(unique_name='cat_0_f')
         m_split_0 = graph_modifier.get_modifier(unique_name="split_0_f")
         m_linear2 = graph_modifier.get_modifier(model.linear2)
         m_linear3 = graph_modifier.get_modifier(model.linear3)
@@ -182,7 +182,7 @@ class ModifierForwardTester(unittest.TestCase):
 
         pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
 
-        model = import_from_path(f'out.test', "out/test.py", "test")()
+        model = import_from_path('out.test', "out/test.py", "test")()
 
         model(dummy_input)
 
@@ -213,7 +213,7 @@ class ModifierForwardTester(unittest.TestCase):
         graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
 
         try:
-            graph_modifier = GraphChannelModifier(graph, center_nodes)
+            GraphChannelModifier(graph, center_nodes)
             assert False
         except Exception as e:
             assert str(e) == "conflict can't be eliminated"
@@ -450,14 +450,9 @@ class ModifierForwardTester(unittest.TestCase):
 
         graph_modifier = GraphChannelModifier(graph, center_nodes)
 
-        m_linear0 = graph_modifier.get_modifier(model.linear0)
         m_linear1 = graph_modifier.get_modifier(model.linear1)
         m_linear2 = graph_modifier.get_modifier(model.linear2)
         m_linear3 = graph_modifier.get_modifier(model.linear3)
-
-        m_reshape0 = graph_modifier.get_modifier(unique_name='reshape_0_f')
-        m_reshape0 = graph_modifier.get_modifier(unique_name='reshape_1_f')
-        m_output0 = graph_modifier.get_modifier(unique_name='output_0_f')
 
         assert m_linear1.dim_changes_info.constraints_i == {
             1: {'linear0': [[{0.0, 4.0}, {1.0, 5.0}, {2.0, 6.0}, {3.0, 7.0}]]}
@@ -602,15 +597,7 @@ class ModifierForwardTester(unittest.TestCase):
 
         graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
 
-        graph_modifier = GraphChannelModifier(graph, center_nodes)
-
-        m_linear0 = graph_modifier.get_modifier(model.linear0)
-        m_linear1 = graph_modifier.get_modifier(model.linear1)
-        m_linear2 = graph_modifier.get_modifier(model.linear2)
-        m_linear3 = graph_modifier.get_modifier(model.linear3)
-        m_linear4 = graph_modifier.get_modifier(model.linear4)
-        m_linear5 = graph_modifier.get_modifier(model.linear5)
-        m_linear6 = graph_modifier.get_modifier(model.linear6)
+        GraphChannelModifier(graph, center_nodes)
 
     def test_case_12(self):
         class TestModel(nn.Module):
@@ -639,10 +626,7 @@ class ModifierForwardTester(unittest.TestCase):
 
         graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
 
-        graph_modifier = GraphChannelModifier(graph, center_nodes)
-
-        m_linear0 = graph_modifier.get_modifier(model.linear0)
-        m_linear1 = graph_modifier.get_modifier(model.linear1)
+        GraphChannelModifier(graph, center_nodes)
 
     def test_case_13(self):
         class TestModel(nn.Module):
@@ -674,7 +658,6 @@ class ModifierForwardTester(unittest.TestCase):
 
         graph_modifier = GraphChannelModifier(graph, center_nodes)
 
-        m_linear0 = graph_modifier.get_modifier(model.linear0)
         m_linear1 = graph_modifier.get_modifier(model.linear1)
 
         assert m_linear1.dim_changes_info.constraints_i == {
@@ -728,15 +711,7 @@ class ModifierForwardTester(unittest.TestCase):
 
         graph, center_nodes = graph_generate(model, dummy_input, [nn.Linear])
 
-        graph_modifier = GraphChannelModifier(graph, center_nodes)
-
-        m_linear0 = graph_modifier.get_modifier(model.linear0)
-        m_linear1 = graph_modifier.get_modifier(model.linear1)
-        m_linear2 = graph_modifier.get_modifier(model.linear2)
-        m_linear3 = graph_modifier.get_modifier(model.linear3)
-        m_linear4 = graph_modifier.get_modifier(model.linear4)
-
-        print("test ok")
+        GraphChannelModifier(graph, center_nodes)
 
     def test_case_15(self):
         class TestModel(nn.Module):
@@ -789,7 +764,7 @@ class ModifierForwardTester(unittest.TestCase):
         pruner.apply_mask()
 
         pruner.graph.generate_code('out/test.py', 'out/test.pth', 'test')
-        new_module = import_from_path(f'out.test', "out/test.py", "test")()
+        new_module = import_from_path('out.test', "out/test.py", "test")()
 
         new_module(dummy_input)
 
