@@ -12,13 +12,15 @@ import numpy as np
 
 from tinynn.graph.tracer import trace, model_tracer
 from tinynn.util.util import import_from
-from common_utils import collect_custom_models, collect_torchvision_models, prepare_inputs
+from common_utils import collect_custom_models, collect_torchvision_models, prepare_inputs, IS_CI
 
 
 BLACKLIST = (
     'swin.*',
     'vit.*',
 )
+
+CI_BLACKLIST = ('regnet_y_128gf',)
 
 
 class TestModelMeta(type):
@@ -56,6 +58,11 @@ class TestModelMeta(type):
             for item in BLACKLIST:
                 if re.match(item, model_name):
                     raise unittest.SkipTest('IN BLACKLIST')
+
+            if IS_CI:
+                for item in CI_BLACKLIST:
+                    if re.match(item, model_name):
+                        raise unittest.SkipTest('IN CI BLACKLIST')
 
             if os.path.exists(f'out/{model_file}.py'):
                 raise unittest.SkipTest('TESTED')

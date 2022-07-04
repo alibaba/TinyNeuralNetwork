@@ -2084,13 +2084,24 @@ class ATenGeluOperator(ATenGeluSchema):
         input_tensor = self.find_or_create_input(0, graph_converter)
         constant_tensor = self.create_attr_tensor(np.array([1.702], dtype='float32'))
         sigmoid_in = self.create_transform_tensor(input_tensor.tensor * constant_tensor.tensor)
-        ops.append(tfl.MulOperator([input_tensor, constant_tensor], [sigmoid_in]))
+
+        actual_input = input_tensor
+        output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
+        if input_tensor.quantization is not None:
+            actual_input = self.create_transform_tensor(actual_input.tensor.astype('float32'))
+            ops.append(tfl.DequantizeOperator([input_tensor], [actual_input]))
+
+        ops.append(tfl.MulOperator([actual_input, constant_tensor], [sigmoid_in]))
 
         sigmoid_out = self.create_transform_tensor(torch.sigmoid(torch.from_numpy(input_tensor.tensor)).numpy())
         ops.append(tfl.LogisticOperator([sigmoid_in], [sigmoid_out]))
 
-        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-        ops.append(tfl.MulOperator([sigmoid_out, input_tensor], outputs))
+        if input_tensor.quantization is not None:
+            actual_output = self.create_transform_tensor(output_tensor.tensor.astype('float32'))
+            ops.append(tfl.MulOperator([sigmoid_out, actual_input], [actual_output]))
+            ops.append(tfl.QuantizeOperator([actual_output], [output_tensor]))
+        else:
+            ops.append(tfl.MulOperator([sigmoid_out, actual_input], [output_tensor]))
 
         for op in ops:
             graph_converter.add_operator(op)
