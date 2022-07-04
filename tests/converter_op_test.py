@@ -968,7 +968,7 @@ class ConverterOPTester(unittest.TestCase):
             assert_close(dummy_output, tfl_output)
 
     def test_argminmax(self):
-        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+        dummy_input = torch.randperm(1 * 3 * 10 * 10).to(dtype=torch.float32).reshape(1, 3, 10, 10)
 
         funcs = [torch.argmin, torch.argmax]
 
@@ -987,7 +987,7 @@ class ConverterOPTester(unittest.TestCase):
             assert_close(dummy_output, tfl_output, check_dtype=False)
 
     def test_argminmax_keepdim(self):
-        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+        dummy_input = torch.randperm(1 * 3 * 10 * 10).to(dtype=torch.float32).reshape(1, 3, 10, 10)
 
         funcs = [torch.argmin, torch.argmax]
 
