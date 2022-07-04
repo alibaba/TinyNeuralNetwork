@@ -2894,7 +2894,8 @@ class GraphChannelModifier(object):
         self.graph = graph
         self.center_nodes = center_nodes
         self.modifiers = self.register_modifier()
-        self.sub_graphs = SubGraphDivider(self.graph, self.modifiers).divide()
+        with torch.no_grad():
+            self.sub_graphs = SubGraphDivider(self.graph, self.modifiers).divide()
         self.reset_masker()
 
     def reset_masker(self):
