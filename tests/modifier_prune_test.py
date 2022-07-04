@@ -1204,6 +1204,32 @@ class ModifierTester(unittest.TestCase):
         assert model.fc1.in_features == 16
         assert model.fc1.out_features == 32
 
+    def test_issue_65(self):
+        class LSTMModel(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+                self.fc1 = torch.nn.Linear(2049, 1024, bias=False)
+                self.bn1 = torch.nn.BatchNorm1d(1024)
+                self.lstm = torch.nn.LSTM(
+                    input_size=1024, hidden_size=512, num_layers=3, bidirectional=False, batch_first=False, dropout=0.4
+                )
+
+            def forward(self, input_1):
+                shape_1 = input_1.shape
+                permute_1 = input_1.permute(3, 0, 1, 2)
+                reshape_1 = permute_1.reshape(-1, 2049)
+                fc1 = self.fc1(reshape_1)
+                bn1 = self.bn1(fc1)
+                reshape_2 = bn1.reshape(shape_1[3], shape_1[0], 1024)
+                lstm = self.lstm(reshape_2)
+                return lstm[0]
+
+        dummy_input_0 = torch.ones((16, 1, 2049, 47), dtype=torch.float32)
+        model = LSTMModel()
+        pruner = OneShotChannelPruner(model, dummy_input_0, {"sparsity": 0.5, "metrics": "l2_norm"})
+        pruner.prune()
+
     def test_basic_rnn(self):
         rnn_in_size = 28
         rnn_hidden_size = 128
@@ -1218,7 +1244,7 @@ class ModifierTester(unittest.TestCase):
                 if proj_size != 0:
                     fc_in_channel = proj_size * 2 if bidirectional else proj_size
 
-                if module is nn.LSTM:
+                if module is nn.LSTM and proj_size > 0:
                     self.rnn = module(
                         rnn_in_size,
                         rnn_hidden_size,
@@ -1245,7 +1271,7 @@ class ModifierTester(unittest.TestCase):
                 return fc
 
         def test_func(module, bidirectional=False, proj_size=0, num_layers=1, bias=True):
-            if module != nn.LSTM:
+            if module != nn.LSTM or LooseVersion(torch.__version__) < LooseVersion('1.8.0'):
                 proj_size = 0
 
             model = TestModel(module, bidirectional, proj_size, num_layers, bias)
@@ -1294,23 +1320,6 @@ class ModifierTester(unittest.TestCase):
             model(torch.rand((3, 3, rnn_in_size)))
 
             assert model.rnn.hidden_size == 64
-
-        # test_func(nn.RNN)
-        # test_func(nn.LSTM)
-        # test_func(nn.GRU)
-        #
-        # test_func(nn.RNN, bidirectional=True)
-        # test_func(nn.LSTM, bidirectional=True)
-        # test_func(nn.GRU, bidirectional=True)
-        #
-        # test_func(nn.RNN, num_layers=2)
-        # test_func(nn.LSTM, num_layers=2)
-        # test_func(nn.GRU, num_layers=2)
-        #
-        # test_func(nn.LSTM, proj_size=64)
-        # test_func(nn.LSTM, proj_size=64, bidirectional=True, num_layers=2)
-
-        # test_func(nn.LSTM, proj_size=120, bidirectional=True, num_layers=1)
 
         for cell_type in (nn.RNN, nn.GRU, nn.LSTM):
             for num_layers in (1, 2):

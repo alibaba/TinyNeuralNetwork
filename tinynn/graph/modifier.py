@@ -278,7 +278,7 @@ def calc_dim_changes(node, tensors_i, tensors_o=None) -> typing.List[typing.Tupl
 
     if tensors_o is not None:
         for i in range(len(tensors_o)):
-            tensors_o[i].data.copy_(tensors[i].data)
+            tensors_o[i].data.copy_(tensors[i].clone().data)
     else:
         tensors_o = tensors
 
@@ -1255,7 +1255,11 @@ class ReshapeModifier(ReIndexModifier):
     def apply_mask(self, modifiers):
         # reshape does not need to register the mask, but if the parameters are constant, you need to modify the
         # parameters, otherwise it will cause abnormal inference after pruning
-        output_modify_dim = self.dim_changes_info.get_tensor_choices(self.next_tensors()[0])[0]
+        choice = self.dim_changes_info.get_tensor_choices(self.next_tensors()[0])
+        if choice is None:
+            return
+
+        output_modify_dim = choice[0]
 
         args_origin = self.node.module.args_parsed_origin[1]
 

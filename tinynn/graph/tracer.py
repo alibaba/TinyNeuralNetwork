@@ -1551,6 +1551,8 @@ def ignore_mod_param_update_warning():
         mod_param_update_warning_ignore(True)
         yield True
         mod_param_update_warning_ignore(False)
+    else:
+        yield False
 
 
 @contextlib.contextmanager
