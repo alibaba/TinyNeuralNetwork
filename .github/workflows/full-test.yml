@@ -3,9 +3,6 @@ name: Full tests
 on:
   schedule:
     - cron:  '00 19 * * *'
-  pull_request:
-    branches:
-      - main
 
 jobs:
   unit-test:
@@ -15,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
-        vers: [ {pt_ver: "1.6.0", tv_ver: "0.7.0"}, {pt_ver: "1.7.0", tv_ver: "0.8.1"}, {pt_ver: "1.8.0", tv_ver: "0.9.0"}, {pt_ver: "1.9.0", tv_ver: "0.10.0"}, {pt_ver: "1.10.0", tv_ver: "0.11.1"}, {pt_ver: "1.11.0", tv_ver: "0.12.0"} ]
+        vers: [ {pt_ver: "1.6.0", tv_ver: "0.7.0"}, {pt_ver: "1.7.0", tv_ver: "0.8.1"}, {pt_ver: "1.8.0", tv_ver: "0.9.0"}, {pt_ver: "1.9.0", tv_ver: "0.10.0"}, {pt_ver: "1.10.0", tv_ver: "0.11.1"}, {pt_ver: "1.11.0", tv_ver: "0.12.0"}, {pt_ver: "1.12.0", tv_ver: "0.13.0"} ]
     defaults:
       run:
         shell: bash -l {0}
@@ -64,4 +61,4 @@ jobs:
       - name: Run tests
         run: |
           source activate.sh
-          pytest tests -v -k test_efficientnet_v2_s
+          pytest tests -v
