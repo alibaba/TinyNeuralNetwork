@@ -3,6 +3,9 @@ name: Full tests
 on:
   schedule:
     - cron:  '00 19 * * *'
+  pull_request:
+    branches:
+      - main
 
 jobs:
   unit-test:
@@ -61,4 +64,4 @@ jobs:
       - name: Run tests
         run: |
           source activate.sh
-          pytest tests -v
+          pytest tests -v -k test_efficientnet_v2_s
