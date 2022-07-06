@@ -1746,14 +1746,8 @@ class TraceGraph(object):
 
             self.input_nodes = active_input_nodes
             self.forward_nodes = active_forward_nodes
+            self.recompute_forward_order()
 
-            forward_order = 0
-            for n in self.input_nodes + self.forward_nodes + self.output_nodes:
-                n.forward_order = forward_order
-                forward_order += 1
-                for prev in n.prev_nodes:
-                    if n not in prev.next_nodes:
-                        prev.next_nodes.append(n)
         self.inited = True
 
     @contextlib.contextmanager
@@ -1880,6 +1874,15 @@ class TraceGraph(object):
             input_block += f"    dummy_input_{i} = torch.ones(({shape}), dtype={dtype})"
 
         return input_block
+
+    def recompute_forward_order(self):
+        forward_order = 0
+        for n in self.input_nodes + self.forward_nodes + self.output_nodes:
+            n.forward_order = forward_order
+            forward_order += 1
+            for prev in n.prev_nodes:
+                if n not in prev.next_nodes:
+                    prev.next_nodes.append(n)
 
     def generate_code(
         self,

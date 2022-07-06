@@ -1502,6 +1502,7 @@ class QATQuantizer(object):
             graph.insert_after(node, fake_dequant)
 
         graph.quantized = True
+        graph.recompute_forward_order()
 
     def is_fusable(
         self, node, custom_data, current_rules=None, check_node_quantized=True, use_original_name=True, graph=None
