@@ -93,10 +93,12 @@ class ModifierForwardTester(unittest.TestCase):
         model = torchvision.models.mobilenet_v2(pretrained=False)
         speed_test(model, torch.randn((1, 3, 224, 224)))
 
+    @unittest.skipIf(not hasattr(torchvision.models, 'mobilenet_v3_small'), 'mobilenet_v3_small is not available')
     def test_mbv3(self):
         model = torchvision.models.mobilenet_v3_small(pretrained=False)
         speed_test(model, torch.randn((1, 3, 224, 224)))
 
+    @unittest.skipIf(not hasattr(torchvision.models, 'mobilenet_v3_large'), 'mobilenet_v3_large is not available')
     def test_mbv3_large(self):
         model = torchvision.models.mobilenet_v3_large(pretrained=False)
         speed_test(model, torch.randn((1, 3, 224, 224)))
