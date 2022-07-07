@@ -814,6 +814,9 @@ class Modifier(object):
             self.dim_changes_info.update_i(center, tensor, dim_changes_i, dim_transform)
             return True
 
+        if self.node.kind() == "data":
+            return True
+
         # Skip constant node
         if self.constant_node:
             return True

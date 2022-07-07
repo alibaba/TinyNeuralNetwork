@@ -1,20 +1,14 @@
 import os
 import time
 import unittest
-from operator import add
 
 import torch
 import torch.nn as nn
-import copy
 import torchvision
-import numpy as np
 import random
 import torch.nn.functional
 
-from tinynn.converter import TFLiteConverter
-from tinynn.graph.modifier import is_dw_conv, l2_norm
-from tinynn.prune.oneshot_pruner import OneShotChannelPruner as OneShotChannelPrunerOld
-from tinynn.prune.oneshot_pruner import OneShotChannelPruner as OneShotChannelPrunerNew
+from tinynn.prune.oneshot_pruner import OneShotChannelPruner
 from tinynn.util.util import import_from_path, get_logger
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
@@ -72,7 +66,7 @@ def speed_test(model, dummy_input):
     with torch.no_grad():
         model.eval()
         st = time.time()
-        pruner_new = OneShotChannelPrunerNew(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm"})
+        pruner_new = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm"})
         log.info(f"[SPEED TEST][Pruner Init] {time.time() - st}")
         st = time.time()
 
