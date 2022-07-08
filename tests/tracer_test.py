@@ -81,11 +81,11 @@ class TestModelMeta(type):
                 # Remove the weights file to save space
                 os.unlink(f'out/{model_file}.pth')
 
-            del m
-            del graph
-            del inputs
-
-            gc.collect()
+            if IS_CI:
+                del m
+                del graph
+                del inputs
+                gc.collect()
 
         return f
 
