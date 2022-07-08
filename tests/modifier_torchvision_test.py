@@ -7,6 +7,7 @@ import torchvision.models
 import inspect
 import os
 import re
+import gc
 import unittest
 
 from tinynn.graph.tracer import model_tracer
@@ -82,6 +83,15 @@ class TestModelMeta(type):
 
                 print(f"[TEST] {model_name} cost {time.time() - st}")
                 new_model(*inputs)
+
+            if IS_CI:
+                # Lower memory usage
+                del inputs
+                del outputs
+                del pruner
+                del new_model
+                del m
+                gc.collect()
 
         return f
 

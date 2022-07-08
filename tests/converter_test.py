@@ -153,6 +153,11 @@ class TestModelMeta(type):
                 if IS_CI and os.path.exists(out_path):
                     os.remove(out_path)
 
+            if IS_CI:
+                # Lower memory usage
+                del converter
+                gc.collect()
+
         return f
 
 
