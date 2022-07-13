@@ -1654,12 +1654,15 @@ class GraphOptimizer(object):
                     tensor_node_dict[prev_out.name] = (prev_new_out, skip)
                 else:
                     prev_shape_aligned = prev_shape
-                    if np.prod(prev_out.tensor.shape) != np.prod(prev_shape):
-                        mapping = dict()
+                    if np.prod(prev_out.shape) != np.prod(prev_shape):
+                        new_prev_shape = prev_out.shape
+                        if len(prev_out.shape) < len(next_shape):
+                            new_prev_shape = [1] * (len(next_shape) - len(prev_out.shape)) + list(prev_out.shape)
+                        mapping = {}
                         is_simple_reshape(prev_shape, next_shape, mapping)
                         prev_shape_aligned = np.ones(len(prev_shape), dtype='int32')
                         for pi, ni in mapping.items():
-                            prev_shape_aligned[pi] = prev_out.shape[ni]
+                            prev_shape_aligned[pi] = new_prev_shape[ni]
 
                     prev_new_out = self.create_transform_tensor(
                         np.reshape(prev_out.tensor, prev_shape_aligned), quantization=prev_out.quantization
@@ -1768,7 +1771,7 @@ class GraphOptimizer(object):
                 old_shape = op.inputs[1].tensor
                 new_dim = prev_shape.index(-1)
                 old_dim = next_shape.index(-1)
-                new_shape = np.array(prev_shape, dtype='int32')
+                new_shape = np.ones(len(prev_shape), dtype='int32')
                 new_shape[new_dim] = old_shape[old_dim]
                 new_shape_tensor = self.create_attr_tensor(new_shape)
                 actions.append((self.graph.replace_operator_input, (node, 1, new_shape_tensor, True)))
