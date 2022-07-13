@@ -80,9 +80,13 @@ class TestModelMeta(type):
 
                 pruner.graph.generate_code('out/new_model.py', 'out/new_model.pth', 'new_model')
                 new_model = import_from_path('out.new_model', "out/new_model.py", "new_model")()
+                new_model.load_state_dict(torch.load('out/new_model.pth'))
 
                 print(f"[TEST] {model_name} cost {time.time() - st}")
                 new_model(*inputs)
+
+                # Remove the weights file to save space
+                os.unlink('out/new_model.pth')
 
             if IS_CI:
                 # Lower memory usage
