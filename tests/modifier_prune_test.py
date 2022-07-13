@@ -41,7 +41,7 @@ def removed_idx_group_check(removed_idx, total_idx_len, removed_idx_len, group, 
 
 
 def get_rd_lst(length):
-    rd_lst = random.sample(range(0, 1000), length)
+    rd_lst = random.sample(range(0, 100000), length)
     random.shuffle(rd_lst)
 
     print(rd_lst)
@@ -1276,7 +1276,13 @@ class ModifierTester(unittest.TestCase):
 
             model = TestModel(module, bidirectional, proj_size, num_layers, bias)
 
+            cnt = 0
+
             while True:
+                cnt += 1
+                if cnt > 100:
+                    assert False
+
                 h_lst = get_rd_lst(rnn_hidden_size)
                 init_rnn_by_list(model.rnn, h_lst)
 
