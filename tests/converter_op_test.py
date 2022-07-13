@@ -3223,6 +3223,58 @@ class ConverterOPTester(unittest.TestCase):
 
         assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
+    def test_group_deconv(self):
+        dummy_input = torch.randn(1, 4, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.ConvTranspose2d(4, 8, 3, groups=2)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, group_conv_rewrite=True)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
+    def test_group_deconv_no_bias(self):
+        dummy_input = torch.randn(1, 4, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.ConvTranspose2d(4, 8, 3, groups=2, bias=False)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, group_conv_rewrite=True)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
     def test_depthwise_conv(self):
         dummy_input = torch.randn(1, 4, 224, 224, dtype=torch.float32)
 
