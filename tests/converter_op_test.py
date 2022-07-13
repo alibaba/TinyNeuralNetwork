@@ -3777,6 +3777,22 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    @unittest.skipIf(not hasattr(torch, 'round'), "Round is not supported")
+    def test_round(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.round(x)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
 
 class ConverterQuantizedOPTester(unittest.TestCase):
     backend: str

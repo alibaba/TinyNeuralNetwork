@@ -2739,3 +2739,11 @@ class ATenPadOperator(ATenPadSchema):
             graph_converter.add_operator(op_cls_dict[mode][1](inputs, outputs))
         else:
             graph_converter.add_operator(op_cls_dict[mode][0](inputs, outputs))
+
+
+class ATenRoundOperator(ATenRoundSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.elementwise_unary(tfl.RoundOperator, graph_converter)
