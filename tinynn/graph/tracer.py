@@ -154,6 +154,9 @@ importable_module_names = {}
 # Ignore warning for update module parameters
 mod_param_update_warning_ignore = GlobalData(False)
 
+# Modules that are skipped while tracing
+skip_modules = set()
+
 
 class TraceNode(object):
     """A basic data structure to represent a node in the computation graph"""
@@ -261,7 +264,7 @@ class TraceNode(object):
             node_name = self.prev_nodes[idx].unique_name
             node_idx = self.prev_indices[idx]
             ns = ''
-            if type(self.prev_nodes[idx].module) == ConstantNode:
+            if type(self.prev_nodes[idx].module) in (ConstantNode, torch.nn.quantized.FloatFunctional):
                 ns = 'self.'
             if node_idx is None:
                 return f'{ns}{node_name}'
@@ -492,7 +495,7 @@ class TraceFunction(object):
             else:
                 pre_node_name = current_graph().tensor_pre_node_dict[id(a)]
                 node = current_graph().nodes_map[pre_node_name]
-                if type(node.module) == ConstantNode:
+                if type(node.module) in (ConstantNode, torch.nn.quantized.FloatFunctional):
                     ns = 'self.'
             if id(a) in current_graph().tensor_pre_index_dict:
                 pre_node_index = current_graph().tensor_pre_index_dict[id(a)]
@@ -545,6 +548,17 @@ class TraceFunction(object):
                     if r.endswith(':'):
                         r = r[:-1]
                     new_arg.append(r)
+                elif isinstance(a, torch.nn.quantized.FloatFunctional):
+                    float_functional_cls = type(a)
+                    module_constructor_lines[id(a)] = f'{qualified_name(float_functional_cls, short=True)}()'
+
+                    new_node = TraceNode(a)
+                    current_graph().nodes_map[new_node.unique_name] = new_node
+                    current_graph().other_init_nodes.append(new_node)
+                    current_graph().tensor_pre_node_dict[id(a)] = new_node.unique_name
+                    self.tensor_names.append(_tensor_name(a))
+                    self.prev_tensors.append(a)
+                    new_arg.append('{}')
                 else:
                     log.error(f"unsupported type {type(a)} while generating arg for func {self.full_name}")
                     assert False
@@ -1363,9 +1377,17 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
     node.next_tensors.extend(output_tensors)
 
     for i, t in enumerate(input_tensors):
-        assert type(t) in (torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter), (
+        assert type(t) in (
+            torch.dtype,
+            torch.device,
+            torch.Size,
+            torch.Tensor,
+            torch.nn.Parameter,
+            torch.nn.quantized.FloatFunctional,
+        ), (
             f'Input #{i} of {node.unique_name}({node.type()}) should be one of the following type            '
-            f' [torch.dtype, torch.device, torch.Size, torch.Tensor, torch.nn.Parameter], but got {type(t)}'
+            ' [torch.dtype, torch.device, torch.Size, torch.Tensor,'
+            f' torch.nn.Parameter,torch.nn.quantized.FloatFunctional], but got {type(t)}'
         )
         if id(t) not in current_graph().tensor_pre_node_dict:
             if not t.is_leaf:
@@ -1431,9 +1453,17 @@ def hook_modules(module):
     def register_submodule_tracer(module):
         def _submodule_pre_tracer(module, input):
             log.debug(f'pre tracer in _submodule_pre_tracer in {type(module).__name__}')
+            if lock():
+                skip_modules.add(weakref.ref(module))
+
             lock(True)
 
         def _submodule_tracer(module, inputs, outputs):
+            m_ref = weakref.ref(module)
+            if m_ref in skip_modules:
+                skip_modules.remove(m_ref)
+                return None
+
             log.debug(f'tracer in _submodule_tracer in {type(module).__name__}')
             node = TraceNode(module)
             modified_outputs = noop_handler(node, inputs, outputs)
@@ -2050,7 +2080,7 @@ class TraceGraph(object):
         else:
             new_node = module
 
-        is_constant_node = type(node.module) == ConstantNode
+        is_constant_node = type(node.module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
 
         new_node.prev_nodes.append(node)
         new_node.next_nodes.extend(node.next_nodes)
@@ -2071,7 +2101,7 @@ class TraceGraph(object):
         # Connect the next nodes to the new node
         tensor_replace_dict = dict(zip(new_node.prev_tensors, new_node.next_tensors))
         for next_node in new_node.next_nodes:
-            is_next_constant_node = type(next_node) == ConstantNode
+            is_next_constant_node = type(next_node) in (ConstantNode, torch.nn.quantized.FloatFunctional)
             for i, n in enumerate(next_node.prev_nodes):
                 if n == node:
                     next_node.prev_nodes[i] = new_node
@@ -2108,7 +2138,7 @@ class TraceGraph(object):
         """Insert a module or an existing node between two nodes in the computation graph"""
         # Create a new node and connects it to the previous node/tensors
         old_unique_name = prev_node.unique_name
-        is_constant_node = type(prev_node.module) == ConstantNode
+        is_constant_node = type(prev_node.module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
 
         if type(module) != TraceNode:
             new_node = TraceNode(module, cur_graph=self)
@@ -2126,7 +2156,7 @@ class TraceGraph(object):
         else:
             new_node = module
 
-        is_new_constant_node = type(new_node.module) == ConstantNode
+        is_new_constant_node = type(new_node.module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
 
         # Gather tensors from previous nodes
         prev_tensors = []
@@ -2295,8 +2325,8 @@ class TraceGraph(object):
         if type(node.module) == TraceFunction and node not in self.output_nodes:
             new_node = new_nodes[0]
             old_unique_name = new_node.prev_nodes[0].unique_name
-            is_constant_node = type(new_node.prev_nodes[0].module) == ConstantNode
-            is_next_constant_node = type(new_node.module) == ConstantNode
+            is_constant_node = type(new_node.prev_nodes[0].module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
+            is_next_constant_node = type(new_node.module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
             prev_unique_name = tensor_name_from_parts(old_unique_name, is_constant_node=is_constant_node)
             next_unique_name = tensor_name_from_parts(new_node.unique_name, is_constant_node=is_next_constant_node)
             log.debug('node rename: ', prev_unique_name, '->', next_unique_name)
@@ -2307,8 +2337,8 @@ class TraceGraph(object):
         """Replaces a module in a node with another"""
         # Update unique name for node
         old_unique_name = node.unique_name
-        is_constant_node = type(node.module) == ConstantNode
-        is_new_constant_node = type(module) == ConstantNode
+        is_constant_node = type(node.module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
+        is_new_constant_node = type(module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
         node.unique_name = self.module_unique_name_dict[id(module)]
 
         # Drop original module constructor line
@@ -2438,8 +2468,8 @@ class TraceGraph(object):
         next_nodes = node.next_nodes
         tensor_dict = dict(zip(node.next_tensors, node.prev_tensors))
         index_dict = dict(zip(node.next_tensors, node.prev_indices))
-        is_constant_node = type(node.module) == ConstantNode
-        is_prev_constant_node = type(prev_node.module) == ConstantNode
+        is_constant_node = type(node.module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
+        is_prev_constant_node = type(prev_node.module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
         old_unique_name = node.unique_name
 
         # Deal with previous nodes
@@ -2499,6 +2529,8 @@ def load_overridable_funcs():
         funcs = overridable_funcs
     else:
         funcs = fetch_funcs()
+        config = os.path.join(current_dir, 'configs/torch_quant_stub_func.yml')
+        funcs.update(fetch_funcs(config))
         overridable_funcs.update(funcs)
         overridable_funcs_loaded(True)
     return funcs

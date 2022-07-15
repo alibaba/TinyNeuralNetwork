@@ -523,8 +523,6 @@ class QATQuantizer(object):
         return graph.module
 
     def disable_requantization_for_cat_pass(self, graph):
-        connected_types = ['cat', 'chunk', 'split']
-
         def _find_quantized_cat_nodes(node: TraceNode, custom_node):
             # Find quantized cat nodes
             return node.type() == 'cat' and node.quantized
@@ -545,54 +543,80 @@ class QATQuantizer(object):
                 if n.kind() in ('shape', 'size') or n.unique_name in visited_center or n.unique_name in visited_other:
                     continue
 
-                if n.type() in connected_types:
+                if n.type() == 'cat':
                     visited_center.add(n.unique_name)
                 else:
                     visited_other.add(n.unique_name)
 
+                new_fq_count = fq_count
+
                 if isinstance(n.module, nn.Module):
+                    is_prev_float_functional = False
                     orig_name = graph.module_original_name_dict.get(id(n.module))
                     new_mod, parent = graph.get_submodule_with_parent_from_name(orig_name)
                     prop = orig_name.split('.')[-1]
                     if isinstance(new_mod, (torch_q.FakeQuantize, torch_q.ObserverBase)):
-                        if fq_count == 0:
+                        if new_fq_count == 0:
                             parents.append(parent)
                             names.append(orig_name)
                             props.append(prop)
-                        fq_count += 1
+                        new_fq_count += 1
                     elif hasattr(new_mod, 'activation_post_process'):
-                        if fq_count == 0:
+                        if new_fq_count == 0:
                             parents.append(new_mod)
                             names.append(f'{orig_name}.activation_post_process')
                             props.append('activation_post_process')
-                        fq_count += 1
+                        new_fq_count += 1
                     elif (
                         isinstance(new_mod, nn.Sequential)
                         and type(new_mod).__module__.startswith(nni.__name__)
                         and len(new_mod) > 0
                         and hasattr(new_mod[-1], 'activation_post_process')
                     ):
-                        if fq_count == 0:
+                        if new_fq_count == 0:
                             parents.append(new_mod[-1])
                             names.append(f'{orig_name}[-1].activation_post_process')
                             props.append('activation_post_process')
-                        fq_count += 1
+                        new_fq_count += 1
                     if isinstance(new_mod, (torch_q.DeQuantStub, torch_q.QuantStub)):
-                        fq_count = 2
-                elif n.type() in connected_types and not (fq_count >= 1 and mode == 'up'):
-                    mode = 'both'
-                    fq_count = 0
+                        new_fq_count = 2
+                else:
+                    is_prev_float_functional = (
+                        len(n.prev_nodes) > 1 and n.prev_nodes[0].type() == torch.nn.quantized.FloatFunctional
+                    )
+                    if n.type() == 'cat':
+                        mode = 'both'
+                        fq_count = 0
+                        new_fq_count = 0
+                    if is_prev_float_functional:
+                        m = n.prev_nodes[0].module
+                        orig_name = graph.module_original_name_dict.get(id(m))
+                        if new_fq_count == 0:
+                            parents.append(m)
+                            names.append(f'{orig_name}.activation_post_process')
+                            props.append('activation_post_process')
+                        new_fq_count += 1
 
-                if fq_count < 2:
+                if new_fq_count < 2:
+                    if mode in ('both', 'down'):
+                        fq_up = fq_count
+                        fq_down = new_fq_count
+                    elif mode == 'up':
+                        fq_up = new_fq_count
+                        fq_down = fq_count
+
                     if mode == 'up' and len(n.next_nodes) > 1:
                         mode = 'both'
 
                     if mode in ('both', 'up'):
-                        for node in n.prev_nodes:
-                            q.put((node, 'up', fq_count))
+                        for i, node in enumerate(n.prev_nodes):
+                            if is_prev_float_functional and i == 0:
+                                continue
+
+                            q.put((node, 'up', fq_up))
                     if mode in ('both', 'down'):
                         for node in n.next_nodes:
-                            q.put((node, 'down', fq_count))
+                            q.put((node, 'down', fq_down))
 
             if len(names) > 1:
                 log.debug(f'Unifying the following nodes into one: {", ".join(names)}')

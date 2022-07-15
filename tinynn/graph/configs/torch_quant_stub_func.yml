@@ -1,0 +1,7 @@
+torch.nn.quantized.FloatFunctional:
+- add
+- cat
+- mul
+- add_relu
+- add_scalar
+- mul_scalar
