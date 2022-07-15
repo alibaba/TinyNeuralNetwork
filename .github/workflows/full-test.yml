@@ -45,6 +45,12 @@ jobs:
             else
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER -c pytorch
             fi
+         elif [ "$RUNNER_OS" == "Windows" ]; then
+            if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
+              conda install pytorch torchvision cpuonly pillow=6 -c pytorch
+            else
+              conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER cpuonly pillow=6 -c pytorch
+            fi
          else
             if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
               conda install pytorch torchvision cpuonly -c pytorch
