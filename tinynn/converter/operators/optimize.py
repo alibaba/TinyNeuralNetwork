@@ -352,24 +352,35 @@ class GraphOptimizer(object):
             # Update graph, prepare to drop the output tensor of the gather node and use the output tensor of the
             # conv instead
             conv['outputs'][0] = new_output
+            conv_out_quant_param = conv['op'].outputs[0].quantization
             conv['op'].outputs[0] = self.graph.tensor_map[new_output]
+            conv['op'].outputs[0].quantization = conv_out_quant_param
             self.graph.tensor_node_map[new_output] = conv['name']
             tensor['name'] = gather['outputs'][0]
             tensor['label'] = gather['outputs'][0]
             # permute weight of conv-op
             indx = gather['op'].inputs[1].tensor.copy()
             w = conv['op'].inputs[1].tensor.copy()
+            w_quant_param = conv['op'].inputs[1].quantization
             new_w = np.take(w, indx, axis=0)
-            new_w = self.create_attr_tensor(new_w)
-            actions.append((self.graph.replace_operator_input, (conv, 1, new_w)))
-
             # permute bias of conv-op
             b = conv['op'].inputs[2].tensor.copy() if len(conv['op'].inputs) > 2 else None
-            new_b = None
-            if b is not None:
-                new_b = np.take(b, indx, axis=0)
-                new_b = self.create_attr_tensor(new_b)
-                actions.append((self.graph.replace_operator_input, (conv, 2, new_b)))
+            b_quant_param = conv['op'].inputs[2].quantization
+            new_b = np.take(b, indx, axis=0) if b is not None else None
+            if w_quant_param is not None and isinstance(w_quant_param.scale, list) and w_quant_param.dim == 0:
+                new_w_scale = np.take(w_quant_param.scale, indx, axis=0)
+                new_w_zeros = np.take(w_quant_param.zero_point, indx, axis=0)
+                w_quant_param.scale = new_w_scale
+                w_quant_param.zero_point = new_w_zeros
+                if new_b is not None:
+                    new_b_scale = np.take(b_quant_param.scale, indx, axis=0)
+                    new_b_zeros = np.take(b_quant_param.zero_point, indx, axis=0)
+                    b_quant_param.scale = new_b_scale
+                    b_quant_param.zero_point = new_b_zeros
+            new_w = self.create_attr_tensor(new_w, quantization=w_quant_param)
+            actions.append((self.graph.replace_operator_input, (conv, 1, new_w)))
+            new_b = self.create_attr_tensor(new_b, quantization=b_quant_param)
+            actions.append((self.graph.replace_operator_input, (conv, 2, new_b)))
 
             # remove gather op
             remove_ids.append(gather.index)

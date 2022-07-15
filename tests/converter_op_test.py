@@ -5030,6 +5030,113 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output, atol=256, rtol=256, check_stride=False)
 
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
+    def test_quantized_conv_pixelshuffle_per_channel_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.Conv2d(4, 4, 1)
+                q_w = self.q_func.weight()
+                q_b = self.q_func.bias()
+                w = q_w.dequantize()
+                new_w = torch.quantize_per_channel(
+                    w, torch.tensor([1.0, 1.0, 1.0, 1.0]), torch.tensor([0, 0, 0, 0]), 0, torch.qint8
+                )
+                self.q_func.set_weight_bias(new_w, q_b)
+                self.q_pixs = torch.nn.PixelShuffle(2)
+
+            def forward(self, x):
+                return self.q_pixs(self.q_func(x))
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 4, 48, 48), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256, check_stride=False)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
+    def test_quantized_conv_pixelshuffle(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.Conv2d(4, 4, 1)
+                self.q_pixs = torch.nn.PixelShuffle(2)
+
+            def forward(self, x):
+                return self.q_pixs(self.q_func(x))
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 4, 48, 48), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256, check_stride=False)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized, 'Conv2d'), 'Quantized conv2d is not supported')
+    def test_quantized_conv_pixelshuffle_int8(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.quantized.Conv2d(4, 4, 1)
+                self.q_pixs = torch.nn.PixelShuffle(2)
+
+            def forward(self, x):
+                return self.q_pixs(self.q_func(x))
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 4, 48, 48), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = u8_to_s8(model(dummy_input))
+        dummy_input = u8_to_s8(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256, check_stride=False)
+
+    @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'ConvReLU2d'), 'Quantized conv2d_relu is not supported')
+    def test_quantized_conv_relu_pixelshuffle(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.q_func = torch.nn.intrinsic.quantized.ConvReLU2d(4, 4, 1)
+                self.q_pixs = torch.nn.PixelShuffle(2)
+
+            def forward(self, x):
+                return self.q_pixs(self.q_func(x))
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.quantize_per_tensor(torch.randn(1, 4, 48, 48), 0.5, 128, torch.quint8)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = torch.int_repr(model(dummy_input))
+        dummy_input = torch.int_repr(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256, rtol=256, check_stride=False)
+
     @unittest.skipIf(not hasattr(torch.nn.intrinsic.quantized, 'ConvReLU1d'), 'Quantized conv1d_relu is not supported')
     def test_quantized_conv1d_relu(self):
         class Model(nn.Module):
