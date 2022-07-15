@@ -2649,6 +2649,10 @@ class GraphOptimizer(object):
             self.fold_reshape_buffer()
             self.fold_transpose_buffer()
 
+        self.elementwise_op_transpose_passthrough_pass()
+        self.branch_transpose_expand_pass()
+        self.fuse_simple_transpose_pass()
+
         # Map quantizable ops to quantized kernels
         self.elementwise_op_quantize_passthrough_pass()
 
