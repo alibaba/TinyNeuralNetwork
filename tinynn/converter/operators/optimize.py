@@ -1995,6 +1995,7 @@ class GraphOptimizer(object):
 
             self.graph.try_restore_edges(mapping)
 
+    @class_conditional(lambda self: self.group_conv_rewrite)
     def group_deconv_rewrite_pass(self):
         vertices = self.graph.graph.vs.select(functools.partial(is_group_deconv_node, graph_converter=self.graph.graph))
 

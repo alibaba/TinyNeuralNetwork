@@ -72,7 +72,7 @@ class TFLiteConverter(object):
                 If it is unset, then the value of `quantize_target_type` will be used. Defaults to None
             fuse_quant_dequant (bool): Remove quant and dequant nodes directly connected to i/o nodes. Defaults to False
             gc_when_reload (bool): Apply GC when reloading the torchscript into memory
-            group_conv_rewrite (bool): Rewriting for group convolution. Defaults to False
+            group_conv_rewrite (bool): Rewriting for group [de]convolution. Defaults to False
             rewrite_quantizable (bool): Rewriting quantizable ops (e.g. BATCH_MATMUL, SOFTMAX, LOG_SOFTMAX) \
                 to use quantized kernels. Defaults to False
             tflite_micro_rewrite (bool): Rewriting for running on TFLite-micro. Defaults to False

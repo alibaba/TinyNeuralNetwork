@@ -3431,6 +3431,33 @@ class ConverterOPTester(unittest.TestCase):
 
         assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
+    def test_conv_transpose_with_group(self):
+        # dummy_input = torch.zeros(1, 4, 50, 100, dtype=torch.float32)
+        dummy_input = ((torch.arange(1 * 4 * 50 * 100) % 255 - 128) / 128.0).float().reshape(1, 4, 50, 100)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.ConvTranspose2d(4, 4, 1, groups=2)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, group_conv_rewrite=True)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+        def msg(*args, **kwargs):
+            return f'testing failed: {args}'
+
+        assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
     def test_conv_pixelshuffle(self):
         dummy_input = torch.randn(1, 3, 128, 128, dtype=torch.float32)
 

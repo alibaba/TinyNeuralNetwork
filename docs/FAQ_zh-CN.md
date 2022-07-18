@@ -160,8 +160,8 @@ export_converter_files(model, dummy_input, export_dir, export_name)
 #### 为什么输入输出的shape和原始的不一样？
 一般在视觉模型中，PyTorch这边采用的输入数据的内存排布为NCHW，而在嵌入式设备侧，一般支持的图片数据的排布为NHWC。因此，默认对4维的输入输出都做了内存排布的转换，如果你不需要这种转换，可以在定义TFLiteConverter时加上`nchw_transpose=False`这个参数(或是`input_transpose=False`以及 `output_transpose=True`)。
 
-#### 为何有分组卷积的模型转换出来无法运行？
-由于TFLite官方无分组卷积的支持，我们在内部基于`CONV_2D`算子拓展了分组卷积的实现。如需生成标准的TFLite模型，可以在定义TFLiteConverter时加上`group_conv_rewrite=True`这个参数。
+#### 为何有分组(反)卷积的模型转换出来无法运行？
+由于TFLite官方无分组(反)卷积的支持，我们在内部基于`CONV_2D`和`TRANSPOSE_CONV`算子拓展了分组(反)卷积的实现。如需生成标准的TFLite模型，可以在定义TFLiteConverter时加上`group_conv_rewrite=True`这个参数。
 
 #### 如何转换带LSTM的模型？
 由于我们转换的目标为TFLite，因此需要先了解一下在PyTorch和Tensorflow中LSTM分别是如何运行的。
