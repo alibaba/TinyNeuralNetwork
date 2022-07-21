@@ -788,13 +788,17 @@ class QuantizerTester(unittest.TestCase):
         class Model(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
-                self.fc = nn.Linear(3072, 10)
-                self.bn = nn.BatchNorm1d(10)
+                self.fc_0 = nn.Linear(3072, 100)
+                self.bn_0 = nn.BatchNorm1d(100)
+                self.fc_1 = nn.Linear(100, 10, bias=False)
+                self.bn_1 = nn.BatchNorm1d(10)
 
             def forward(self, x):
                 s_0 = x.view(x.shape[0], -1)
-                s = self.fc(s_0)
-                return self.bn(s)
+                s_1 = self.fc_0(s_0)
+                b_0 = self.bn_0(s_1)
+                s_2 = self.fc_1(b_0)
+                return self.bn_1(s_2)
 
         model = Model()
         inputs = torch.randn(2, 3, 32, 32)
