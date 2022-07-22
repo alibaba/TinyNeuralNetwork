@@ -1327,74 +1327,71 @@ class QATQuantizer(object):
 
         for idx, names in enumerate(reversed(rewrite_fuse_names_list)):
             # case fc-bn1d
-            if len(names) == 2:
-                node_fc = graph.nodes_map[names[0]]
-                node_bn1d = graph.nodes_map[names[1]]
-                mod_fc = node_fc.module
-                mod_bn = node_bn1d.module
-                if type(mod_fc) == nn.Linear and type(mod_bn) == nn.BatchNorm1d:
-                    if len(node_fc.prev_tensors[0].shape) != 2:
-                        log.debug('the [fc-bn]\'s input dimension != 2')
-                        continue
-                    # for fc-bn1d, rewrite [fc-bn1d] to [conv2d-bn2d]
-                    new_conv2d = torch.nn.Conv2d(
-                        in_channels=mod_fc.in_features,
-                        out_channels=mod_fc.out_features,
-                        kernel_size=[1, 1],
-                        bias=mod_fc.bias is not None,
-                    )
-                    fc_weight = mod_fc.weight
-                    new_conv2d.weight = nn.Parameter(
-                        torch.reshape(fc_weight, [fc_weight.shape[0], fc_weight.shape[1], 1, 1])
-                    )
-                    if mod_fc.bias is not None:
-                        new_conv2d.bias = mod_fc.bias
-                    graph.module_unique_name_dict[id(new_conv2d)] = f'rewritten_conv2d_bn2d_conv2d_{idx}'
-                    graph.module_original_name_dict[id(new_conv2d)] = f'rewritten_conv2d_bn2d_conv2d_{idx}'
+            assert len(names) == 2, 'the rewrite nodes list length != 2'
 
-                    new_bn2d = torch.nn.BatchNorm2d(
-                        mod_bn.num_features,
-                        mod_bn.eps,
-                        mod_bn.momentum,
-                        affine=mod_bn.affine,
-                        track_running_stats=mod_bn.track_running_stats,
-                    )
-                    new_bn2d.load_state_dict(mod_bn.state_dict())
-                    graph.module_unique_name_dict[id(new_bn2d)] = f'rewritten_conv2d_bn2d_bn2d_{idx}'
-                    graph.module_original_name_dict[id(new_bn2d)] = f'rewritten_conv2d_bn2d_bn2d_{idx}'
+            node_fc = graph.nodes_map[names[0]]
+            node_bn1d = graph.nodes_map[names[1]]
+            mod_fc = node_fc.module
+            mod_bn = node_bn1d.module
 
-                    # replace new node, then insert reshape before new_conv2d and after new_bn2d
-                    with override_current_trace_graph(graph):
-                        graph.replace_node_module(node_fc, new_conv2d)
-                        graph.replace_node_module(node_bn1d, new_bn2d)
+            assert type(mod_fc) == nn.Linear and type(mod_bn) == nn.BatchNorm1d, "the rewrite struct is\'t [fc-bn1d]"
 
-                        prev_tensor_shape = node_fc.prev_tensors[0].shape
-                        prev_func = TraceFunction('torch.reshape').parse_args(
-                            node_fc.prev_tensors[0], [prev_tensor_shape[0], prev_tensor_shape[1], 1, 1]
-                        )
-                        next_tensor_shape = node_bn1d.next_tensors[0].shape
-                        next_func = TraceFunction('torch.reshape').parse_args(
-                            node_bn1d.next_tensors[0], [next_tensor_shape[0], next_tensor_shape[1]]
-                        )
-                    # expand the tensor shape between fc new_conv2d and new_bn2d
-                    node_fc.next_tensors[0].unsqueeze_(2).unsqueeze_(2)
-                    node_bn1d.prev_tensors[0].unsqueeze_(2).unsqueeze_(2)
-                    node_bn1d.next_tensors[0].unsqueeze_(2).unsqueeze_(2)
+            if len(node_fc.prev_tensors[0].shape) != 2:
+                log.debug('the [fc-bn]\'s input dimension != 2')
+                continue
+            # for fc-bn1d, rewrite [fc-bn1d] to [conv2d-bn2d]
+            new_conv2d = torch.nn.Conv2d(
+                in_channels=mod_fc.in_features,
+                out_channels=mod_fc.out_features,
+                kernel_size=[1, 1],
+                bias=mod_fc.bias is not None,
+            )
+            fc_weight = mod_fc.weight
+            new_conv2d.weight = nn.Parameter(torch.reshape(fc_weight, [fc_weight.shape[0], fc_weight.shape[1], 1, 1]))
+            if mod_fc.bias is not None:
+                new_conv2d.bias = mod_fc.bias
+            graph.module_unique_name_dict[id(new_conv2d)] = f'rewritten_conv2d_bn2d_conv2d_{idx}'
+            graph.module_original_name_dict[id(new_conv2d)] = f'rewritten_conv2d_bn2d_conv2d_{idx}'
 
-                    prev_out = torch.reshape(
-                        node_fc.prev_tensors[0],
-                        [node_fc.prev_tensors[0].shape[0], node_fc.prev_tensors[0].shape[1], 1, 1],
-                    )
-                    graph.insert_between(node_fc.prev_nodes[0], node_fc, prev_func, [prev_out])
-                    next_out = torch.reshape(
-                        node_bn1d.next_tensors[0],
-                        [node_bn1d.next_tensors[0].shape[0], node_bn1d.prev_tensors[0].shape[1]],
-                    )
-                    graph.insert_after(node_bn1d, next_func, [next_out])
-                else:
-                    log.debug('the rewrite nodes don\'t fit mode [fc-bn1d]')
-            else:
-                log.debug('the rewrite nodes list length mismatch')
+            new_bn2d = torch.nn.BatchNorm2d(
+                mod_bn.num_features,
+                mod_bn.eps,
+                mod_bn.momentum,
+                affine=mod_bn.affine,
+                track_running_stats=mod_bn.track_running_stats,
+            )
+            new_bn2d.load_state_dict(mod_bn.state_dict())
+            graph.module_unique_name_dict[id(new_bn2d)] = f'rewritten_conv2d_bn2d_bn2d_{idx}'
+            graph.module_original_name_dict[id(new_bn2d)] = f'rewritten_conv2d_bn2d_bn2d_{idx}'
+
+            # replace new node, then insert reshape before new_conv2d and after new_bn2d
+            with override_current_trace_graph(graph):
+                graph.replace_node_module(node_fc, new_conv2d)
+                graph.replace_node_module(node_bn1d, new_bn2d)
+
+                prev_tensor_shape = node_fc.prev_tensors[0].shape
+                prev_func = TraceFunction('torch.reshape').parse_args(
+                    node_fc.prev_tensors[0], [prev_tensor_shape[0], prev_tensor_shape[1], 1, 1]
+                )
+                next_tensor_shape = node_bn1d.next_tensors[0].shape
+                next_func = TraceFunction('torch.reshape').parse_args(
+                    node_bn1d.next_tensors[0], [next_tensor_shape[0], next_tensor_shape[1]]
+                )
+            # expand the tensor shape between fc new_conv2d and new_bn2d
+            node_fc.next_tensors[0].unsqueeze_(2).unsqueeze_(2)
+            node_bn1d.prev_tensors[0].unsqueeze_(2).unsqueeze_(2)
+            node_bn1d.next_tensors[0].unsqueeze_(2).unsqueeze_(2)
+
+            prev_out = torch.reshape(
+                node_fc.prev_tensors[0],
+                [node_fc.prev_tensors[0].shape[0], node_fc.prev_tensors[0].shape[1], 1, 1],
+            )
+            graph.insert_between(node_fc.prev_nodes[0], node_fc, prev_func, [prev_out])
+            next_out = torch.reshape(
+                node_bn1d.next_tensors[0],
+                [node_bn1d.next_tensors[0].shape[0], node_bn1d.prev_tensors[0].shape[1]],
+            )
+            graph.insert_after(node_bn1d, next_func, [next_out])
 
         # Rewrite BatchNorm1d to BatchNorm2d
         def _is_batch_norm_1d(node, custom_data):
