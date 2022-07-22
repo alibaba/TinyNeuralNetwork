@@ -784,6 +784,40 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_fc_bn_rewrite(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.fc = nn.Linear(3072, 10)
+                self.bn = nn.BatchNorm1d(10)
+
+            def forward(self, x):
+                s_0 = x.view(x.shape[0], -1)
+                s_1 = self.fc(s_0)
+                return self.bn(s_1)
+
+        model = Model()
+        inputs = torch.randn(2, 3, 32, 32)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_fc_without_bias_bn_rewrite(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.fc = nn.Linear(3072, 10, bias=False)
+                self.bn = nn.BatchNorm1d(10)
+
+            def forward(self, x):
+                s_0 = x.view(x.shape[0], -1)
+                s_1 = self.fc(s_0)
+                return self.bn(s_1)
+
+        model = Model()
+        inputs = torch.randn(2, 3, 32, 32)
+
+        check_quantize_rewrite(model, inputs)
+
 
 if __name__ == '__main__':
     unittest.main()

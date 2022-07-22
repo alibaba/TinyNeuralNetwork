@@ -76,6 +76,10 @@ FUSE_RULE_LIST_EXTRA = {
     ('add', 'relu6'),
 }
 
+REWRITE_TO_FUSE_RULE_LIST = {
+    (torch.nn.Linear, torch.nn.BatchNorm1d),
+}
+
 KNOWN_QSTATS = {
     nn.Softmax: (0, 256.0),
     'softmax': (0, 256.0),
@@ -90,6 +94,9 @@ processed_extra_qat_rules = {}
 
 # Constant func names
 creation_func_names = []
+
+# Processed rewrite rules for fusing
+processed_rewrite_to_fuse_rules = {}
 
 log = get_logger(__name__, 'WARNING')
 
@@ -1306,6 +1313,86 @@ class QATQuantizer(object):
 
                 graph.replace_node_module(node, new_func)
 
+        # Rewrite Linear-BatchNorm1d structure to Conv2d-BatchNorm2d
+        is_rewrite_to_fuse = functools.partial(
+            self.is_fusable,
+            current_rules=load_processed_rewrite_to_fuse_rules(),
+            check_node_quantized=False,
+            graph=graph,
+        )
+        custom_data = ([], set())
+        graph.filter_forward_nodes(is_rewrite_to_fuse, custom_data, reverse=True)
+        rewrite_fuse_names_list = custom_data[0]
+        log.debug(f'found names_list that need to rewrite for fusing: {rewrite_fuse_names_list}')
+
+        for idx, names in enumerate(reversed(rewrite_fuse_names_list)):
+            # case fc-bn1d
+            assert len(names) == 2, 'the rewrite nodes list length != 2'
+
+            node_fc = graph.nodes_map[names[0]]
+            node_bn1d = graph.nodes_map[names[1]]
+            mod_fc = node_fc.module
+            mod_bn = node_bn1d.module
+
+            assert type(mod_fc) == nn.Linear and type(mod_bn) == nn.BatchNorm1d, "the rewrite struct is\'t [fc-bn1d]"
+
+            if len(node_fc.prev_tensors[0].shape) != 2:
+                log.debug('the [fc-bn]\'s input dimension != 2')
+                continue
+            # for fc-bn1d, rewrite [fc-bn1d] to [conv2d-bn2d]
+            new_conv2d = torch.nn.Conv2d(
+                in_channels=mod_fc.in_features,
+                out_channels=mod_fc.out_features,
+                kernel_size=[1, 1],
+                bias=mod_fc.bias is not None,
+            )
+            fc_weight = mod_fc.weight
+            new_conv2d.weight = nn.Parameter(torch.reshape(fc_weight, [fc_weight.shape[0], fc_weight.shape[1], 1, 1]))
+            if mod_fc.bias is not None:
+                new_conv2d.bias = mod_fc.bias
+            graph.module_unique_name_dict[id(new_conv2d)] = f'rewritten_conv2d_bn2d_conv2d_{idx}'
+            graph.module_original_name_dict[id(new_conv2d)] = f'rewritten_conv2d_bn2d_conv2d_{idx}'
+
+            new_bn2d = torch.nn.BatchNorm2d(
+                mod_bn.num_features,
+                mod_bn.eps,
+                mod_bn.momentum,
+                affine=mod_bn.affine,
+                track_running_stats=mod_bn.track_running_stats,
+            )
+            new_bn2d.load_state_dict(mod_bn.state_dict())
+            graph.module_unique_name_dict[id(new_bn2d)] = f'rewritten_conv2d_bn2d_bn2d_{idx}'
+            graph.module_original_name_dict[id(new_bn2d)] = f'rewritten_conv2d_bn2d_bn2d_{idx}'
+
+            # replace new node, then insert reshape before new_conv2d and after new_bn2d
+            with override_current_trace_graph(graph):
+                graph.replace_node_module(node_fc, new_conv2d)
+                graph.replace_node_module(node_bn1d, new_bn2d)
+
+                prev_tensor_shape = node_fc.prev_tensors[0].shape
+                prev_func = TraceFunction('torch.reshape').parse_args(
+                    node_fc.prev_tensors[0], [prev_tensor_shape[0], prev_tensor_shape[1], 1, 1]
+                )
+                next_tensor_shape = node_bn1d.next_tensors[0].shape
+                next_func = TraceFunction('torch.reshape').parse_args(
+                    node_bn1d.next_tensors[0], [next_tensor_shape[0], next_tensor_shape[1]]
+                )
+            # expand the tensor shape between fc new_conv2d and new_bn2d
+            node_fc.next_tensors[0].unsqueeze_(2).unsqueeze_(2)
+            node_bn1d.prev_tensors[0].unsqueeze_(2).unsqueeze_(2)
+            node_bn1d.next_tensors[0].unsqueeze_(2).unsqueeze_(2)
+
+            prev_out = torch.reshape(
+                node_fc.prev_tensors[0],
+                [node_fc.prev_tensors[0].shape[0], node_fc.prev_tensors[0].shape[1], 1, 1],
+            )
+            graph.insert_between(node_fc.prev_nodes[0], node_fc, prev_func, [prev_out])
+            next_out = torch.reshape(
+                node_bn1d.next_tensors[0],
+                [node_bn1d.next_tensors[0].shape[0], node_bn1d.prev_tensors[0].shape[1]],
+            )
+            graph.insert_after(node_bn1d, next_func, [next_out])
+
         # Rewrite BatchNorm1d to BatchNorm2d
         def _is_batch_norm_1d(node, custom_data):
             cur_module = node.module
@@ -1955,19 +2042,24 @@ def load_creation_func_names():
     return creation_func_names
 
 
+def get_dict_from_rules(rules):
+    rule_dict = {}
+    for rule in rules:
+        base_rule_dict = rule_dict
+        for module_cls in reversed(rule):
+            # Node properties (has_key, child_nodes)
+            base_rule_dict.setdefault(module_cls, [False, {}])
+            base_rule_pair = base_rule_dict[module_cls]
+            base_rule_dict = base_rule_pair[1]
+        base_rule_pair[0] = True
+    return rule_dict
+
+
 def load_processed_qat_rules():
     if len(processed_qat_rules) == 0:
         # Constructor a prefix tree for the QAT rules
         fuse_rules = sorted(FUSE_RULE_LIST, key=lambda x: len(x), reverse=True)
-        rule_dict = {}
-        for fuse_rule in fuse_rules:
-            base_rule_dict = rule_dict
-            for module_cls in reversed(fuse_rule):
-                # Node properties (has_key, child_nodes)
-                base_rule_dict.setdefault(module_cls, [False, {}])
-                base_rule_pair = base_rule_dict[module_cls]
-                base_rule_dict = base_rule_pair[1]
-            base_rule_pair[0] = True
+        rule_dict = get_dict_from_rules(fuse_rules)
         processed_qat_rules.update(rule_dict)
     return processed_qat_rules
 
@@ -1980,15 +2072,7 @@ def load_processed_ptq_rules():
         }
         ptq_rules = set(FUSE_RULE_LIST).union(set(filtered_ptq_rules))
         fuse_rules = sorted(ptq_rules, key=lambda x: len(x), reverse=True)
-        rule_dict = {}
-        for fuse_rule in fuse_rules:
-            base_rule_dict = rule_dict
-            for module_cls in reversed(fuse_rule):
-                # Node properties (has_key, child_nodes)
-                base_rule_dict.setdefault(module_cls, [False, {}])
-                base_rule_pair = base_rule_dict[module_cls]
-                base_rule_dict = base_rule_pair[1]
-            base_rule_pair[0] = True
+        rule_dict = get_dict_from_rules(fuse_rules)
         processed_ptq_rules.update(rule_dict)
     return processed_ptq_rules
 
@@ -1997,14 +2081,15 @@ def load_processed_extra_qat_rules():
     if len(processed_extra_qat_rules) == 0:
         # Constructor a prefix tree for the QAT rules
         fuse_rules = sorted(FUSE_RULE_LIST_EXTRA, key=lambda x: len(x), reverse=True)
-        rule_dict = {}
-        for fuse_rule in fuse_rules:
-            base_rule_dict = rule_dict
-            for module_cls in reversed(fuse_rule):
-                # Node properties (has_key, child_nodes)
-                base_rule_dict.setdefault(module_cls, [False, {}])
-                base_rule_pair = base_rule_dict[module_cls]
-                base_rule_dict = base_rule_pair[1]
-            base_rule_pair[0] = True
+        rule_dict = get_dict_from_rules(fuse_rules)
         processed_extra_qat_rules.update(rule_dict)
     return processed_extra_qat_rules
+
+
+def load_processed_rewrite_to_fuse_rules():
+    if len(processed_rewrite_to_fuse_rules) == 0:
+        # Constructor a prefix tree for the rewrite rules
+        fuse_rules = sorted(REWRITE_TO_FUSE_RULE_LIST, key=lambda x: len(x), reverse=True)
+        rule_dict = get_dict_from_rules(fuse_rules)
+        processed_rewrite_to_fuse_rules.update(rule_dict)
+    return processed_rewrite_to_fuse_rules
