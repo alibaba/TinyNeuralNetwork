@@ -1995,6 +1995,27 @@ class ModifierTester(unittest.TestCase):
 
         new_module(torch.rand((1, 3, 6, 6)))
 
+    def test_prelu(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv0 = nn.Conv2d(3, 16, (1, 1), (1, 1))
+                self.prelu0 = nn.PReLU(16)
+                self.conv1 = nn.Conv2d(16, 32, (1, 1), (1, 1))
+
+            def forward(self, x):
+                conv_0 = self.conv0(x)
+                prelu_0 = self.prelu0(conv_0)
+                conv_1 = self.conv1(prelu_0)
+                return conv_1
+
+        model = TestModel()
+
+        pruner = OneShotChannelPruner(model, torch.rand((1, 3, 9, 9)), {"sparsity": 0.5, "metrics": "l2_norm"})
+
+        pruner.prune()
+        model(torch.rand((1, 3, 9, 9)))
+
 
 if __name__ == '__main__':
     unittest.main()

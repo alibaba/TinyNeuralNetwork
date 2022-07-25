@@ -1070,6 +1070,31 @@ class PoolingModifier(Modifier):
             m.dim_change_forward(center, tensor_o, dim_changes_i, dim_transform, None)
 
 
+class PReLUChannelModifier(Modifier):
+    def register_mask(self, modifiers, importance, sparsity):
+        pruned_idx, sparsity = self.get_pruned_idx(modifiers)
+        self.dim_changes_info.pruned_idx_i = pruned_idx
+        self.dim_changes_info.pruned_idx_o = pruned_idx
+
+        if len(pruned_idx) > 0:
+            remove_idx = self.dim_changes_info.pruned_idx_i
+            self.masker().set_in_remove_idx(remove_idx)
+            self.masker().set_ot_remove_idx(remove_idx)
+
+            self.weight_mask["weight"][remove_idx] = 0
+
+            self.masker().register_mask("weight", self.weight_mask["weight"])
+
+    def modify_input(self, remove_idx):
+        bn = self.node.module
+        preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[0])], remove_idx)
+
+        if bn.weight.shape[0] != len(preserve_idx):
+            log.info(f'[PRELU] {self.unique_name()}: channel {bn.num_parameters} -> {len(preserve_idx)}')
+            bn.weight = torch.nn.Parameter(bn.weight[preserve_idx])
+            bn.num_parameters = len(preserve_idx)
+
+
 class BatchNormChannelModifier(Modifier):
     def __init__(self, node: TraceNode):
         super(BatchNormChannelModifier, self).__init__(node)
@@ -2249,6 +2274,7 @@ CHANNEL_MODIFIERS = {
     nn.Upsample: PoolingModifier,
     nn.UpsamplingBilinear2d: PoolingModifier,
     nn.UpsamplingNearest2d: PoolingModifier,
+    nn.PReLU: PReLUChannelModifier,
     nn.BatchNorm2d: BatchNormChannelModifier,
     nn.BatchNorm1d: BatchNormChannelModifier,
     'matmul': MatMulModifier,
