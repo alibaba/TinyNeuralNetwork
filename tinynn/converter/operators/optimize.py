@@ -1258,9 +1258,13 @@ class GraphOptimizer(object):
         self.graph.graph.delete_vertices(remove_vertices)
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.BRANCH_OPTIMIZE, 0)
-    def elementwise_op_transpose_passthrough_pass(self) -> int:
+    def elementwise_op_transpose_passthrough_pass(self, quantizable_ops_only: bool = False) -> int:
         edges = self.graph.graph.es.select(
-            functools.partial(is_transpose_elementwise_op_edge, graph_converter=self.graph.graph)
+            functools.partial(
+                is_transpose_elementwise_op_edge,
+                graph_converter=self.graph.graph,
+                quantizable_ops_only=quantizable_ops_only,
+            )
         )
         pairs = ((self.graph.graph.vs[edge.source], self.graph.graph.vs[edge.target]) for edge in edges)
         filtered_nodes = (k[0] if k[0]['node_type'] != ExtendedOperator.TRANSPOSE else k[1] for k in pairs)
@@ -2661,7 +2665,8 @@ class GraphOptimizer(object):
             self.fold_reshape_buffer()
             self.fold_transpose_buffer()
 
-        self.elementwise_op_transpose_passthrough_pass()
+        # Move `transpose` ops for the rewrite quantizable pass
+        self.elementwise_op_transpose_passthrough_pass(quantizable_ops_only=True)
         self.branch_transpose_expand_pass()
         self.fuse_simple_transpose_pass()
 
@@ -2941,22 +2946,30 @@ def is_transpose_reshape_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
     ) and target_vertex['op'].inputs[0].name in source_vertex['outputs']
 
 
-def is_transpose_elementwise_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
+def is_transpose_elementwise_op_edge(edge: ig.Edge, graph_converter: ig.Graph, quantizable_ops_only: bool):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
+
+    if quantizable_ops_only:
+        is_unary = is_elementwise_unary_quantizable_op
+        is_binary = is_elementwise_binary_quantizable_op
+    else:
+        is_unary = is_elementwise_unary_op
+        is_binary = is_elementwise_binary_op
+
     return (
         (
             source_vertex['node_type'] == ExtendedOperator.TRANSPOSE
             and (
-                is_elementwise_unary_op(target_vertex['node_type'], target_vertex['op'])
-                or is_elementwise_binary_op(target_vertex['node_type'], target_vertex['op'])
+                is_unary(target_vertex['node_type'], target_vertex['op'])
+                or is_binary(target_vertex['node_type'], target_vertex['op'])
             )
         )
         or (
             target_vertex['node_type'] == ExtendedOperator.TRANSPOSE
             and (
-                is_elementwise_unary_op(source_vertex['node_type'], source_vertex['op'])
-                or is_elementwise_binary_op(source_vertex['node_type'], source_vertex['op'])
+                is_unary(source_vertex['node_type'], source_vertex['op'])
+                or is_binary(source_vertex['node_type'], source_vertex['op'])
             )
         )
     ) and (
@@ -3015,6 +3028,17 @@ def is_elementwise_reduce_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
             )
         )
     )
+
+
+def is_elementwise_unary_quantizable_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
+    return op_code in (
+        ExtendedOperator.SOFTMAX,
+        ExtendedOperator.LOG_SOFTMAX,
+    )
+
+
+def is_elementwise_binary_quantizable_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
+    return False
 
 
 def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
