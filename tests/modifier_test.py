@@ -496,7 +496,9 @@ class ModifierForwardTester(unittest.TestCase):
 
         model_generate(model, dummy_input)
 
-        pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm"})
+        pruner = OneShotChannelPruner(
+            model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm", "skip_last_fc": False}
+        )
         graph_modifier = pruner.graph_modifier
         pruner.register_mask()
 

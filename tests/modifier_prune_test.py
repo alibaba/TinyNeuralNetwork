@@ -1683,7 +1683,7 @@ class ModifierTester(unittest.TestCase):
         model = TestModel()
 
         pruner = OneShotChannelPruner(
-            model, torch.rand((197, 768)), {"sparsity": 0.5, "metrics": "l2_norm", "skip_last_fc": False}
+            model, torch.rand((197, 768)), {"sparsity": 0.5, "metrics": "l2_norm", "skip_last_fc": True}
         )
         pruner.prune()
 
