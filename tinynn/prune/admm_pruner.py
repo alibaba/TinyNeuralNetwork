@@ -98,6 +98,9 @@ class ADMMPruner(OneShotChannelPruner):
         def criterion_func(output, target):
             loss = old_criterion(output, target)
             for n in self.center_nodes:
+                if n.unique_name not in self.Z or n.unique_name not in self.U:
+                    continue
+
                 loss += (
                     0.5
                     * self.rho
@@ -110,36 +113,39 @@ class ADMMPruner(OneShotChannelPruner):
     def register_mask(self):
         super().register_mask()
 
-        for m in self.graph_modifier.get_all_modifier():
+        for m in self.graph_modifier.modifiers.values():
             # Disable mask here so that we will use them to update U and Z.
             # They won't be applied so that the training process won't be affected.
             m.disable_mask()
-            if m.node in self.center_nodes and m.output_modify_:
+            if m.node in self.center_nodes and m.dim_changes_info.pruned_idx_o:
                 device = m.module().weight.data.device
                 self.Z[m.unique_name()] = m.module().weight.detach() * m.masker().get_mask('weight').to(device=device)
                 self.U[m.unique_name()] = torch.zeros_like(self.Z[m.unique_name()], device=device)
 
     def admm_params_update(self):
         self.graph_modifier.reset_masker()
-
-        for sub_graph in self.graph_modifier.sub_graphs:
-            importance = {}
-
-            for m in sub_graph:
-                if m.node in self.center_nodes and m.output_modify_:
+        importance = {}
+        for sub_graph in self.graph_modifier.sub_graphs.values():
+            for m in sub_graph.modifiers:
+                if m.node in self.center_nodes and m in sub_graph.dependent_centers:
+                    if m.unique_name() not in self.U:
+                        continue
                     self.Z[m.unique_name()] = (m.module().weight + self.U[m.unique_name()]).detach()
                     importance[m.unique_name()] = self.metric_func(self.Z[m.unique_name()], m.module())
 
-            modifier.register_sub_masker(sub_graph, importance, self.sparsity)
+            sub_graph.calc_prune_idx(importance, self.sparsity)
+            log.info(f"subgraph [{sub_graph.center}] compute over")
 
-            for m in sub_graph:
-                # Disable mask here so that we will use them to update U and Z.
-                # They won't be applied so that the training process won't be affected.
-                m.disable_mask()
-                if m.node in self.center_nodes and m.output_modify_:
-                    weight = m.module().weight
-                    self.Z[m.unique_name()] = self.Z[m.unique_name()] * m.masker().get_mask('weight')
-                    self.U[m.unique_name()] = weight - self.Z[m.unique_name()] + self.U[m.unique_name()]
+        for m in self.graph_modifier.modifiers.values():
+            m.register_mask(self.graph_modifier.modifiers, importance, self.sparsity)
+
+            # Disable mask here so that we will use them to update U and Z.
+            # They won't be applied so that the training process won't be affected.
+            m.disable_mask()
+            if m.node in self.center_nodes and m.dim_changes_info.pruned_idx_o:
+                weight = m.module().weight
+                self.Z[m.unique_name()] = self.Z[m.unique_name()] * m.masker().get_mask('weight')
+                self.U[m.unique_name()] = weight - self.Z[m.unique_name()] + self.U[m.unique_name()]
 
         # Sync ADMM parameters
         if dist.is_available() and dist.is_initialized():

@@ -2313,6 +2313,9 @@ class SubGraph(object):
         Calculate the dependence of index in the process of pruning. For convolutional pruning, it is the dependence
         between channels. For more complex unstructured/semi-structured pruning, it may have a finer granularity.
         """
+        if self.center not in sparsity or sparsity[self.center] == 0.0:
+            return
+
         center_constraint = {}
         leaf_prune_dim = {}
         leaf_constraint = {}
