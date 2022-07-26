@@ -946,8 +946,8 @@ class GraphOptimizer(object):
             if len(l_shape) == 0 or len(r_shape) == 0:
                 continue
             l_map, r_map, _, _ = reshape_mapping(l_shape, r_shape)
-
             mode = None
+            need_chain = False
             for l_val, r_val in zip(l_map, r_map):
                 if len(l_val) > 1 and len(r_val) == 1:
                     if mode in (None, 'up'):
@@ -962,8 +962,12 @@ class GraphOptimizer(object):
                         mode = '?'
                         break
                 elif len(r_val) > 1 and len(l_val) > 1:
-                    mode = '?'
-                    break
+                    if len(r_val) != len(l_val) or r_val != l_val:
+                        # TODO: Support this case
+                        mode = '?'
+                        break
+                    else:
+                        need_chain = True
 
             if mode is None:
                 mode = 'down'
@@ -971,6 +975,27 @@ class GraphOptimizer(object):
             # TODO: Support multi-multi mappings
             if mode == '?':
                 continue
+
+            check_consecutive_indices = []
+            if need_chain:
+                new_l_map = []
+                new_r_map = []
+                for l_val, r_val in zip(l_map, r_map):
+                    if len(l_val) > 1 and len(r_val) > 1:
+                        if mode == 'down':
+                            check_consecutive_indices.append(l_val)
+                        else:
+                            check_consecutive_indices.append(r_val)
+                        for l_item in l_val:
+                            new_l_map.append([l_item])
+                        for r_item in r_val:
+                            new_r_map.append([r_item])
+                    else:
+                        new_l_map.append(l_val)
+                        new_r_map.append(r_val)
+
+                l_map = new_l_map
+                r_map = new_r_map
 
             prev_nodes = []
             cand_perms = dict()
@@ -1023,6 +1048,25 @@ class GraphOptimizer(object):
             if len(next_nodes) == 0 or new_transpose_size >= cur_transpose_size:
                 continue
 
+            perm = max(cand_perms.items(), key=lambda x: x[1])[0]
+            perm_arr = np.array(perm, dtype='int32')
+
+            skip = False
+            for check_idx in check_consecutive_indices:
+                if mode == 'down':
+                    target_idx = perm_arr[check_idx]
+                elif mode == 'up':
+                    perm_sorter = perm_arr.argsort()
+                    target_idx = perm_sorter[np.searchsorted(perm_arr, check_idx, sorter=perm_sorter)]
+                normalized_src = [x - check_idx[0] for x in check_idx]
+                normalized_tgt = [x - target_idx[0] for x in target_idx]
+                if normalized_src != normalized_tgt:
+                    skip = True
+                    break
+
+            if skip:
+                continue
+
             num_actions += 1
 
             remove_edges.extend([x.index for x in next_edges])
@@ -1032,8 +1076,6 @@ class GraphOptimizer(object):
                 del self.graph.tensor_map[n['outputs'][0]]
                 del self.graph.tensor_node_map[n['outputs'][0]]
 
-            perm = max(cand_perms.items(), key=lambda x: x[1])[0]
-            perm_arr = np.array(perm, dtype='int32')
             if mode == 'down':
                 inv_perm_arr = np.argsort(perm_arr).astype('int32')
                 l_dict = dict(zip([x[0] for x in l_map], r_map))
