@@ -443,6 +443,7 @@ class GenericTransposeConvOperator(TransformableOperator):
     def transform(self, graph_converter, mapping):
         input_tensor = self.inputs[0]
         weight_tensor = self.inputs[1]
+        output_tensor = self.outputs[0]
 
         input_dim = len(input_tensor.shape)
         weight_dim = len(weight_tensor.shape)
@@ -509,6 +510,13 @@ class GenericTransposeConvOperator(TransformableOperator):
             weight_tensor = self.inputs[1]
         elif weight_dim not in (4, 5):
             assert False, "Only Conv[Transpose]1d/2d/3d is supported"
+
+        if output_tensor.shape[1] != weight_tensor.shape[1]:
+            warnings.warn(
+                'Group transposed conv is not supported if official tflite interpreter is used. If that is the case'
+                ' for you, plese pass in `group_conv_rewrite=True`. If you want to run the model with TFLite micro,'
+                ' then you may also need to pass in `tflite_micro_rewrite=True`'
+            )
 
         if weight_dim in (3, 4):
             assert all((x == 1 for x in self.dilation)), "Only dilation=1 is supported for conv_transpose2d"
