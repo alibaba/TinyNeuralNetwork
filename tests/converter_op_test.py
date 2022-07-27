@@ -2621,6 +2621,50 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    def test_bilstm_multi_layer_as_lstm(self):
+        dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lstm = nn.LSTM(10, 20, 2, bidirectional=True)
+
+            def forward(self, x):
+                return self.lstm(x)[0]
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, map_bilstm_to_lstm=True)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_bilstm_multi_layer_no_bias_as_lstm(self):
+        dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lstm = nn.LSTM(10, 20, 2, bidirectional=True, bias=False)
+
+            def forward(self, x):
+                return self.lstm(x)[0]
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, map_bilstm_to_lstm=True)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_sigmoid_(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
@@ -5900,6 +5944,82 @@ class ConverterQuantizedOPTester(unittest.TestCase):
 
         model_path = get_model_path()
         converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8')
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    def test_bilstm_dynamic_as_lstm(self):
+        dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lstm = torch.nn.quantized.dynamic.LSTM(10, 20, bidirectional=True)
+
+            def forward(self, x):
+                return self.lstm(x)[0]
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(
+            model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8', map_bilstm_to_lstm=True
+        )
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    def test_bilstm_dynamic_batch_first_as_lstm(self):
+        raise unittest.SkipTest('TFLite hybrid LSTM kernel with batch_first=True is broken')
+        dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lstm = torch.nn.quantized.dynamic.LSTM(10, 20, batch_first=True, bidirectional=True)
+
+            def forward(self, x):
+                return self.lstm(x)[0]
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(
+            model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8', map_bilstm_to_lstm=True
+        )
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, check_stride=False, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    def test_bilstm_dynamic_multi_layer_as_lstm(self):
+        dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lstm = torch.nn.quantized.dynamic.LSTM(10, 20, 2, bidirectional=True)
+
+            def forward(self, x):
+                return self.lstm(x)[0]
+
+        model = Model()
+        model.eval()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(
+            model, dummy_input, model_path, nchw_transpose=False, quantize_target_type='int8', map_bilstm_to_lstm=True
+        )
         converter.convert()
 
         dummy_output = model(dummy_input)

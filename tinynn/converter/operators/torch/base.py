@@ -18,7 +18,9 @@ log = get_logger(__name__, 'INFO')
 
 
 class OperatorConverter(ABC):
-    def __init__(self, node, tensor_map, asymmetric=True, q_type=np.uint8, hybrid_q_type=np.int8) -> None:
+    def __init__(
+        self, node, tensor_map, asymmetric=True, q_type=np.uint8, hybrid_q_type=np.int8, map_bilstm_to_lstm=False
+    ) -> None:
         self.input_names = self.get_input_names(node)
         self.output_names = self.get_output_names(node)
         self.input_tensors = self.get_input_tensors(tensor_map)
@@ -30,6 +32,7 @@ class OperatorConverter(ABC):
         self.asymmetric = asymmetric
         self.q_type = q_type
         self.hybrid_q_type = hybrid_q_type
+        self.map_bilstm_to_lstm = map_bilstm_to_lstm
 
     @abstractmethod
     def parse(self, node, attrs, args, graph_converter):

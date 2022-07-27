@@ -163,6 +163,9 @@ export_converter_files(model, dummy_input, export_dir, export_name)
 #### 为何有分组(反)卷积的模型转换出来无法运行？
 由于TFLite官方无分组(反)卷积的支持，我们在内部基于`CONV_2D`和`TRANSPOSE_CONV`算子拓展了分组(反)卷积的实现。如需生成标准的TFLite模型，可以在定义TFLiteConverter时加上`group_conv_rewrite=True`这个参数。
 
+#### 如果我的部署平台只支持`UnidirectionalLSTM`，不支持`BidirectionalLSTM`怎么办？
+可以在定义TFLiteConverter时加上`map_bilstm_to_lstm=True`这个参数。
+
 #### 如何转换带LSTM的模型？
 由于我们转换的目标为TFLite，因此需要先了解一下在PyTorch和Tensorflow中LSTM分别是如何运行的。
 

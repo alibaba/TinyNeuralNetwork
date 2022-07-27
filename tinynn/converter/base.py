@@ -43,6 +43,7 @@ class TFLiteConverter(object):
         group_conv_rewrite: bool = False,
         rewrite_quantizable: bool = False,
         tflite_micro_rewrite: bool = False,
+        map_bilstm_to_lstm: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -76,6 +77,8 @@ class TFLiteConverter(object):
             rewrite_quantizable (bool): Rewriting quantizable ops (e.g. BATCH_MATMUL, SOFTMAX, LOG_SOFTMAX) \
                 to use quantized kernels. Defaults to False
             tflite_micro_rewrite (bool): Rewriting for running on TFLite-micro. Defaults to False
+            map_bilstm_to_lstm (bool): Translating bidirectional LSTM to TFLite ops with `UnidirectionalLSTM`. \
+                Defaults to False
         """
 
         self.model = model
@@ -115,6 +118,7 @@ class TFLiteConverter(object):
         self.group_conv_rewrite = group_conv_rewrite
         self.rewrite_quantizable = rewrite_quantizable
         self.tflite_micro_rewrite = tflite_micro_rewrite
+        self.map_bilstm_to_lstm = map_bilstm_to_lstm
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -333,7 +337,12 @@ class TFLiteConverter(object):
 
             converter_type = OPERATOR_CONVERTER_DICT.get(k, NoTrackOperator)
             converter = converter_type(
-                node, self.tensor_map, not self.strict_symmetric_check, self.q_type, self.hybrid_q_type
+                node,
+                self.tensor_map,
+                not self.strict_symmetric_check,
+                self.q_type,
+                self.hybrid_q_type,
+                self.map_bilstm_to_lstm,
             )
             # Don't track the operator if all the input nodes are not tracked unless it has custom implementation
             # (e.g prim::* ops)

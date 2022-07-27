@@ -143,15 +143,68 @@ class ATenLstmOperator(ATenLstmSchema):
             outputs = [layer_output]
 
             if bidirectional:
-                ops.append(
-                    tfl.BidirectionalSequenceLstmOperator(
-                        inputs,
-                        outputs,
-                        fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
-                        timeMajor=not batch_first,
-                        mergeOutputs=True,
+                if not self.map_bilstm_to_lstm:
+                    ops.append(
+                        tfl.BidirectionalSequenceLstmOperator(
+                            inputs,
+                            outputs,
+                            fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
+                            timeMajor=not batch_first,
+                            mergeOutputs=True,
+                        )
                     )
-                )
+                else:
+                    fw_i_end = input_start_indices[-1]
+                    fw_s_start = state_start_index
+                    fw_s_end = state_start_index + len(state_kinds)
+                    fw_pad = num_input_tensors // 2 - fw_s_end
+                    fw_lstm_inputs = (
+                        inputs[:fw_i_end] + inputs[fw_s_start:fw_s_end] + [tfl.OptionalTensorInstance] * fw_pad
+                    )
+                    fw_out, bw_out = [
+                        self.create_transform_tensor(t, quantization=outputs[0].quantization)
+                        for t in np.split(outputs[0].tensor, 2, -1)
+                    ]
+
+                    ops.append(
+                        tfl.UnidirectionalSequenceLstmOperator(
+                            fw_lstm_inputs,
+                            [fw_out],
+                            fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
+                            timeMajor=not batch_first,
+                        )
+                    )
+
+                    time_dim = 1 if batch_first else 0
+                    bw_in = self.create_transform_tensor(np.flip(current_input.tensor, time_dim))
+                    bw_dim = self.create_attr_tensor(np.array([time_dim], dtype='int32'))
+                    ops.append(tfl.ReverseV2Operator([current_input, bw_dim], [bw_in]))
+
+                    bw_raw_out = self.create_transform_tensor(np.flip(bw_out.tensor, time_dim))
+                    bw_o_start = input_start_indices[-1]
+                    bw_o_end = state_start_index
+                    bw_s_start = state_start_index + len(state_kinds)
+                    bw_s_end = state_start_index + len(state_kinds) * num_directions
+                    bw_pad = num_input_tensors // 2 - bw_s_end
+                    bw_lstm_inputs = (
+                        [bw_in]
+                        + inputs[bw_o_start:bw_o_end]
+                        + inputs[bw_s_start:bw_s_end]
+                        + [tfl.OptionalTensorInstance] * bw_pad
+                    )
+
+                    ops.append(
+                        tfl.UnidirectionalSequenceLstmOperator(
+                            bw_lstm_inputs,
+                            [bw_raw_out],
+                            fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
+                            timeMajor=not batch_first,
+                        )
+                    )
+
+                    ops.append(tfl.ReverseV2Operator([bw_raw_out, bw_dim], [bw_out]))
+
+                    ops.append(tfl.ConcatenationOperator([fw_out, bw_out], outputs, axis=2))
             else:
                 ops.append(
                     tfl.UnidirectionalSequenceLstmOperator(
