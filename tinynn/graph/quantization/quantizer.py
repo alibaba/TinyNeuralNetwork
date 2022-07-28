@@ -1794,6 +1794,36 @@ class QATQuantizer(object):
 
         model.train()
 
+    def restore_to_original(q_model: nn.Module):
+        """Restores a QAT/PTQ-prepared model to original state
+
+        Args:
+            qat_model: The QAT/PTQ-prepared model
+
+        """
+
+        revert_mods = []
+        for n, m in q_model.named_children():
+            if hasattr(m, 'to_float'):
+                revert_mods.append((n, m))
+
+        for n, m in revert_mods:
+            setattr(q_model, n, m.to_float())
+
+        for n, m in q_model.named_children():
+            if hasattr(m, "_forward_hooks"):
+                if len(m._forward_hooks) > 0:
+                    m._forward_hooks.popitem()
+
+            if hasattr(m, "qconfig"):
+                delattr(m, "qconfig")
+
+            if hasattr(m, "activation_post_process"):
+                if isinstance(m, torch.nn.quantized.FloatFunctional):
+                    setattr(m, "activation_post_process", torch.nn.Identity())
+                else:
+                    delattr(m, "activation_post_process")
+
 
 class BF16Quantizer(QATQuantizer):
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
