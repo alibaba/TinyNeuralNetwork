@@ -1804,8 +1804,12 @@ class QATQuantizer(object):
 
         revert_mods = []
         for n, m in q_model.named_children():
-            if hasattr(m, 'to_float'):
-                revert_mods.append((n, m))
+            if LooseVersion(torch.__version__) >= LooseVersion('1.10.0'):
+                if hasattr(m, 'to_float'):
+                    revert_mods.append((n, m))
+            else:
+                if hasattr(m, 'weight_fake_quant'):
+                    setattr(m, 'weight_fake_quant', nn.Identity())
 
         for n, m in revert_mods:
             setattr(q_model, n, m.to_float())
