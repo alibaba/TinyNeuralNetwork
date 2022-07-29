@@ -1794,7 +1794,7 @@ class QATQuantizer(object):
 
         model.train()
 
-    def restore_to_original(q_model: nn.Module):
+    def restore_to_original(self, q_model: nn.Module):
         """Restores a QAT/PTQ-prepared model to original state
 
         Args:
