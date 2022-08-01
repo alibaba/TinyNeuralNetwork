@@ -513,6 +513,8 @@ class QATQuantizer(object):
                             observer.quant_min = -127
                             observer.quant_max = 127
 
+        self.extra_qat_fusion_postprocess(graph)
+
         if self.disable_requantization_for_cat:
             self.disable_requantization_for_cat_pass(graph)
 
@@ -528,6 +530,30 @@ class QATQuantizer(object):
             self.prepare_quantized_ops_pass(graph)
 
         return graph.module
+
+    def extra_qat_fusion_postprocess(self, graph):
+        # Process additional fusable nodes
+        processed_extra_qat_rules = load_processed_extra_qat_rules()
+        is_extra_fusable = functools.partial(
+            self.is_fusable,
+            current_rules=processed_extra_qat_rules,
+            graph=graph,
+        )
+
+        custom_data = ([], set())
+        graph.filter_forward_nodes(is_extra_fusable, custom_data, reverse=True)
+        quant_list = custom_data[0]
+
+        log.debug(f'Extra qat postprocess for nodes: {quant_list}')
+
+        for quant_nodes in quant_list:
+            for orig_name in quant_nodes:
+                if orig_name in graph.module_original_name_dict.values():
+                    new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name)
+                    acp = getattr(new_mod, 'activation_post_process', None)
+                    if acp is not None:
+                        torch.quantization.disable_fake_quant(acp)
+                        torch.quantization.disable_observer(acp)
 
     def disable_requantization_for_cat_pass(self, graph):
         def _find_quantized_cat_nodes(node: TraceNode, custom_node):
