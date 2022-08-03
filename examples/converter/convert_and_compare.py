@@ -56,11 +56,12 @@ def main_worker():
 
     # Get input and output tensors from the TFLite interpreter
     input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
 
     if layerwise:
         details = interpreter.get_tensor_details()
     else:
-        details = interpreter.get_output_details()
+        details = output_details
 
     tfl_tensor_idx_map = {t['name']: t['index'] for t in details}
 
@@ -68,6 +69,13 @@ def main_worker():
     tfl_inputs = converter.inputs_for_tflite()
     for i, t in enumerate(tfl_inputs):
         interpreter.set_tensor(input_details[i]['index'], t)
+
+    transpose_names = set()
+    io_details = list(input_details) + list(output_details)
+    io_transpose = list(converter.common_graph.input_transpose) + list(converter.common_graph.output_transpose)
+    for d, t in zip(io_details, io_transpose):
+        if t:
+            transpose_names.add(d['name'])
 
     # Inference
     interpreter.invoke()
@@ -94,7 +102,7 @@ def main_worker():
             torch_v = torch_v.numpy()
 
         # Align shapes and dtypes of the tensors
-        if torch_v.shape != tfl_v.shape:
+        if n in transpose_names:
             torch_v = np.transpose(torch_v, (0, 2, 3, 1))
 
         if torch_v.dtype != tfl_v.dtype:
