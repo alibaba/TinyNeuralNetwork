@@ -2263,9 +2263,59 @@ class Conv2dChannelModifier(Modifier):
                     m.dim_change_forward(center, self.next_tensors()[0], dim_changes_o, transform, None)
 
 
+class TransConvChannelModifier(Conv2dChannelModifier):
+    def register_mask(self, modifiers, importance, sparsity):
+        if self.dim_changes_info.pruned_idx_i:
+            remove_idx = self.dim_changes_info.pruned_idx_i
+            self.weight_mask["weight"][
+                remove_idx,
+                :,
+            ] = 0
+            self.masker().set_in_remove_idx(remove_idx)
+        if self.dim_changes_info.pruned_idx_o:
+            remove_idx = self.dim_changes_info.pruned_idx_o
+            self.weight_mask["weight"][
+                :,
+                remove_idx,
+            ] = 0
+            self.masker().set_ot_remove_idx(remove_idx)
+
+            # 普通conv中bias仅在output改变时改变
+            bias_mask = self.bias_mask.get("bias", None)
+            if bias_mask is not None:
+                bias_mask[remove_idx] = 0
+                self.masker().register_mask("bias", bias_mask)
+
+        self.masker().register_mask("weight", self.weight_mask["weight"])
+
+    def modify_input(self, remove_idx):
+        conv = self.node.module
+        preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[0])], remove_idx)
+
+        if conv.in_channels != len(preserve_idx):
+            log.info(f'[TRANS_CONV2D] {self.unique_name()}: input {conv.in_channels} -> {len(preserve_idx)}')
+            conv.weight = torch.nn.Parameter(conv.weight[preserve_idx, :])
+            conv.in_channels = len(preserve_idx)
+
+    def modify_output(self, remove_idx):
+        conv = self.node.module
+        preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[1])], remove_idx)
+
+        if conv.out_channels != len(preserve_idx):
+            log.info(f'[TRANS_CONV2D] {self.unique_name()}: output {conv.out_channels} -> {len(preserve_idx)}')
+            conv.weight = torch.nn.Parameter(conv.weight[:, preserve_idx])
+            conv.out_channels = len(preserve_idx)
+
+            if conv.bias is not None:
+                log.info(f'[TRANS_CONV2D] {self.unique_name()}: bias {conv.bias.shape[0]} -> {len(preserve_idx)}')
+                conv.bias = torch.nn.Parameter(conv.bias[preserve_idx])
+
+
 CHANNEL_MODIFIERS = {
     nn.Conv2d: Conv2dChannelModifier,
     nn.Linear: LinearChannelModifier,
+    nn.ConvTranspose2d: TransConvChannelModifier,
+    nn.ConvTranspose1d: TransConvChannelModifier,
     nn.AvgPool2d: PoolingModifier,
     nn.AdaptiveAvgPool2d: PoolingModifier,
     nn.MaxPool2d: PoolingModifier,
