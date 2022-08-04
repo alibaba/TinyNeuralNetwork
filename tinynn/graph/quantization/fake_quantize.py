@@ -28,6 +28,33 @@ class FakeQuantizeBFloat16(Module):
     with_args = classmethod(_with_args)
 
 
+class FakeQuantizeTFLite(torch.quantization.FakeQuantize):
+    def forward(self, X):
+        observer_enabled = self.observer_enabled[0] == 1
+        fake_quant_enabled = self.fake_quant_enabled[0] == 1
+
+        if observer_enabled:
+            if fake_quant_enabled:
+                torch.quantization.disable_fake_quant(self)
+
+            X = super().forward(X)
+
+            if fake_quant_enabled:
+                torch.quantization.enable_fake_quant(self)
+
+        if fake_quant_enabled:
+            if observer_enabled:
+                torch.quantization.disable_observer(self)
+
+            X = X + self.scale * 1e-6 * torch.sign(X.detach())
+            X = super().forward(X)
+
+            if observer_enabled:
+                torch.quantization.enable_observer(self)
+
+        return X
+
+
 def disable_fake_quant(mod):
     """
     Disable fake quantization for this module, if applicable. Example usage::

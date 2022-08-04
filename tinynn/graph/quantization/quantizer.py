@@ -21,7 +21,7 @@ import torch.quantization as torch_q
 from torch.nn.parallel.data_parallel import DataParallel
 from torch.nn.parallel.distributed import DistributedDataParallel
 
-from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16
+from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16, FakeQuantizeTFLite
 from tinynn.graph.quantization.modules import QPReLU
 from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver
 from tinynn.graph.tracer import (
@@ -114,6 +114,7 @@ class QATQuantizer(object):
     per_tensor: bool
     disable_requantization_for_cat: bool
     dynamic_lstm_quant: bool
+    rounding_mode: str
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new QATQuantizer object
@@ -174,6 +175,7 @@ class QATQuantizer(object):
             'dynamic_lstm_quant': False,
             'quantized_op_stats': None,
             'set_quantizable_op_stats': False,
+            'rounding_mode': 'pytorch',
         }
 
         if config is None:
@@ -354,6 +356,10 @@ class QATQuantizer(object):
         log.info('setting qat backend and call prepare_qat')
         qconfig = torch_q.get_default_qat_qconfig(backend)
         qconfig_c = None
+        if self.rounding_mode == 'tflite':
+            q_a = FakeQuantizeTFLite.with_args(*qconfig.activation.p.args, **qconfig.activation.p.keywords)
+            q_w = FakeQuantizeTFLite.with_args(*qconfig.weight.p.args, **qconfig.weight.p.keywords)
+            qconfig = torch_q.QConfig(q_a, q_w)
         if self.backend == 'qnnpack':
             if not self.asymmetric:
                 sym_fq = qconfig.activation.with_args(
