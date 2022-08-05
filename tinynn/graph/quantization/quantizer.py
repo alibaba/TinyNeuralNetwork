@@ -1861,7 +1861,7 @@ class QATQuantizer(object):
                 sub_list.append((n, conv))
             elif isinstance(m, torch.nn.quantized.QFunctional):
                 sub_list.append((n, nn.quantized.FloatFunctional()))
-            elif isinstance(m, torch.nn.quantized.ReLU):
+            elif hasattr(torch.nn.quantized, 'ReLU') and isinstance(m, torch.nn.quantized.ReLU):
                 sub_list.append((n, nn.ReLU()))
             elif isinstance(m, torch.nn.quantized.ReLU6):
                 sub_list.append((n, nn.ReLU6()))
