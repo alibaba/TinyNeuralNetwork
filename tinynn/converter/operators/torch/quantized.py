@@ -58,6 +58,10 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
         params, _ = self.unpack_params(self.input_tensors[1])
         weight, bias = params['weight'], params['bias']
 
+        if transpose and bias is not None:
+            if not all((torch.is_nonzero(b) for b in bias)):
+                bias = None
+
         weight_dim = weight.dim()
         output_padding = [0] * (weight_dim - 2)
 
