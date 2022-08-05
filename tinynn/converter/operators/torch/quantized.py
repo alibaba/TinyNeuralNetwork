@@ -59,7 +59,7 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
         weight, bias = params['weight'], params['bias']
 
         if transpose and bias is not None:
-            if not all((torch.is_nonzero(b) for b in bias)):
+            if not any((torch.is_nonzero(b) for b in bias)):
                 bias = None
 
         weight_dim = weight.dim()
