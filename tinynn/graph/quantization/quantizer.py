@@ -1827,38 +1827,51 @@ class QATQuantizer(object):
         model.train()
 
     def restore_to_original(self, q_model: nn.Module):
-        """Restores a QAT/PTQ-prepared model to original state
+        """Restores a QAT/PTQ-converted model to original state
 
         Args:
-            qat_model: The QAT/PTQ-prepared model
+            qat_model: The QAT/PTQ-converted model
 
         """
 
-        revert_mods = []
+        sub_list = []
         for n, m in q_model.named_children():
-            if LooseVersion(torch.__version__) >= LooseVersion('1.10.0'):
-                if hasattr(m, 'to_float'):
-                    revert_mods.append((n, m))
+            print(n, type(m).__name__, type(m).__module__)
+            if isinstance(m, (torch.nn.quantized.Quantize, torch.nn.quantized.DeQuantize)):
+                sub_list.append((n, nn.Identity()))
+            elif isinstance(m, torch.nn.quantized.Linear):
+                fc = nn.Linear(m.in_features, m.out_features, m.bias is not None)
+                fc.weight = torch.nn.Parameter(m.weight().dequantize())
+                fc.bias = torch.nn.Parameter(m.bias())
+                sub_list.append((n, fc))
+            elif isinstance(m, torch.nn.quantized.Conv2d):
+                conv = nn.Conv2d(
+                    m.in_channels,
+                    m.out_channels,
+                    m.kernel_size,
+                    m.stride,
+                    m.padding,
+                    m.dilation,
+                    m.groups,
+                    m.bias is not None,
+                    m.padding_mode,
+                )
+                conv.weight = torch.nn.Parameter(m.weight().dequantize())
+                conv.bias = torch.nn.Parameter(m.bias())
+                sub_list.append((n, conv))
+            elif isinstance(m, torch.nn.quantized.QFunctional):
+                sub_list.append((n, nn.quantized.FloatFunctional()))
+            elif isinstance(m, torch.nn.quantized.ReLU):
+                sub_list.append((n, nn.ReLU()))
+            elif isinstance(m, torch.nn.quantized.ReLU6):
+                sub_list.append((n, nn.ReLU6()))
+            elif type(m).__module__.startswith('torch.nn.modules'):
+                continue
             else:
-                if hasattr(m, 'weight_fake_quant'):
-                    setattr(m, 'weight_fake_quant', nn.Identity())
+                assert False, f"unsupported type: {type(m).__name__}"
 
-        for n, m in revert_mods:
-            setattr(q_model, n, m.to_float())
-
-        for n, m in q_model.named_children():
-            if hasattr(m, "_forward_hooks"):
-                if len(m._forward_hooks) > 0:
-                    m._forward_hooks.popitem()
-
-            if hasattr(m, "qconfig"):
-                delattr(m, "qconfig")
-
-            if hasattr(m, "activation_post_process"):
-                if isinstance(m, torch.nn.quantized.FloatFunctional):
-                    setattr(m, "activation_post_process", torch.nn.Identity())
-                else:
-                    delattr(m, "activation_post_process")
+        for n, m in sub_list:
+            setattr(q_model, n, m)
 
 
 class BF16Quantizer(QATQuantizer):
