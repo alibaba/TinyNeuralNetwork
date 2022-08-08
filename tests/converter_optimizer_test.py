@@ -1418,6 +1418,48 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
+    def test_fuse_quant_dequant_with_indices(self):
+        class TestModel(nn.Module):
+            def forward(self, x, y):
+                x = torch.quantize_per_tensor(x, 0.05, 128, torch.quint8)
+                x = F.relu(x)
+                x = torch.dequantize(x)
+                y = torch.quantize_per_tensor(y, 0.05, 128, torch.quint8)
+                y = F.relu(y)
+                y = torch.dequantize(y)
+                return x, y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = (torch.randn(1, 3, 224, 224), torch.randn(1, 3, 224, 224))
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(
+            model,
+            dummy_input,
+            model_path,
+            nchw_transpose=False,
+            fuse_quant_dequant=True,
+            fuse_input_indices=[0],
+            fuse_output_indices=[0],
+        )
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 4)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 4)
+        for i in range(4):
+            self.assertIn(
+                tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(i).OpcodeIndex()).DeprecatedBuiltinCode(),
+                (tflite.BuiltinOperator.RELU, tflite.BuiltinOperator.QUANTIZE, tflite.BuiltinOperator.DEQUANTIZE),
+            )
+            self.assertEqual(tfl_model.Subgraphs(0).Operators(i).InputsLength(), 1)
+            self.assertEqual(tfl_model.Subgraphs(0).Operators(i).OutputsLength(), 1)
+
     def test_fuse_quant_dequant_with_type(self):
         class TestModel(nn.Module):
             def forward(self, x):
@@ -1463,6 +1505,50 @@ class ConverterOptimizerTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 3)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+    def test_fuse_quant_dequant_with_type_and_indices(self):
+        class TestModel(nn.Module):
+            def forward(self, x, y):
+                x = torch.quantize_per_tensor(x, 0.05, 128, torch.quint8)
+                x = F.relu(x)
+                x = torch.dequantize(x)
+                y = torch.quantize_per_tensor(y, 0.05, 128, torch.quint8)
+                y = F.relu(y)
+                y = torch.dequantize(y)
+                return x, y
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = (torch.randn(1, 3, 224, 224), torch.randn(1, 3, 224, 224))
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(
+            model,
+            dummy_input,
+            model_path,
+            nchw_transpose=False,
+            fuse_quant_dequant=True,
+            quantize_input_output_type='uint8',
+            quantize_target_type='int8',
+            fuse_input_indices=[0],
+            fuse_output_indices=[0],
+        )
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 6)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 2)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 6)
+        for i in range(4):
+            self.assertIn(
+                tfl_model.OperatorCodes(tfl_model.Subgraphs(0).Operators(i).OpcodeIndex()).DeprecatedBuiltinCode(),
+                (tflite.BuiltinOperator.RELU, tflite.BuiltinOperator.QUANTIZE, tflite.BuiltinOperator.DEQUANTIZE),
+            )
+            self.assertEqual(tfl_model.Subgraphs(0).Operators(i).InputsLength(), 1)
+            self.assertEqual(tfl_model.Subgraphs(0).Operators(i).OutputsLength(), 1)
 
     def test_branch_expand_transpose(self):
         class TestModel(nn.Module):

@@ -39,6 +39,8 @@ class TFLiteConverter(object):
         hybrid_asymmetric_inputs: bool = True,
         hybrid_quantize_weight_type: typing.Optional[str] = None,
         fuse_quant_dequant: bool = False,
+        fuse_input_indices: typing.Optional[typing.List[int]] = None,
+        fuse_output_indices: typing.Optional[typing.List[int]] = None,
         gc_when_reload: bool = False,
         group_conv_rewrite: bool = False,
         rewrite_quantizable: bool = False,
@@ -72,6 +74,10 @@ class TFLiteConverter(object):
             hybrid_quantize_weight_type (typing.Optional[str]): Quantized weight type for hybrid quantization. \
                 If it is unset, then the value of `quantize_target_type` will be used. Defaults to None
             fuse_quant_dequant (bool): Remove quant and dequant nodes directly connected to i/o nodes. Defaults to False
+            fuse_input_indices (typing.Optional[typing.List[int]]): Used together with `fuse_quant_dequant`. Indices \
+                of input nodes to fuse with `Quantize`. Defaults to None (which fuses all inputs available)
+            fuse_output_indices (typing.Optional[typing.List[int]]): Used together with `fuse_quant_dequant`. Indices \
+                of output nodes to fuse with `Dequantize`. Defaults to None (which fuses all outputs available)
             gc_when_reload (bool): Apply GC when reloading the torchscript into memory
             group_conv_rewrite (bool): Rewriting for group [de]convolution. Defaults to False
             rewrite_quantizable (bool): Rewriting quantizable ops (e.g. BATCH_MATMUL, SOFTMAX, LOG_SOFTMAX) \
@@ -114,6 +120,8 @@ class TFLiteConverter(object):
         self.hybrid_per_channel = hybrid_per_channel
         self.hybrid_asymmetric_inputs = hybrid_asymmetric_inputs
         self.fuse_quant_dequant = fuse_quant_dequant
+        self.fuse_input_indices = fuse_input_indices
+        self.fuse_output_indices = fuse_output_indices
         self.gc_when_reload = gc_when_reload
         self.group_conv_rewrite = group_conv_rewrite
         self.rewrite_quantizable = rewrite_quantizable
@@ -425,6 +433,8 @@ class TFLiteConverter(object):
                 self.rewrite_quantizable,
                 self.tflite_micro_rewrite,
                 self.quantize_input_output_type,
+                self.fuse_input_indices,
+                self.fuse_output_indices,
             )
             optimizer.optimize()
 

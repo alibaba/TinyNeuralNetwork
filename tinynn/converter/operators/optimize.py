@@ -45,6 +45,8 @@ class GraphOptimizer(object):
         rewrite_quantizable: bool,
         tflite_micro_rewrite: bool,
         quantize_input_output_type: typing.Optional[str],
+        fuse_input_indices: typing.Optional[typing.List[int]] = None,
+        fuse_output_indices: typing.Optional[typing.List[int]] = None,
     ) -> None:
         self.graph = graph
         self.fuse_tensor_count = 0
@@ -55,6 +57,8 @@ class GraphOptimizer(object):
         self.rewrite_quantizable = rewrite_quantizable
         self.tflite_micro_rewrite = tflite_micro_rewrite
         self.quantize_input_output_type = quantize_input_output_type
+        self.fuse_input_indices = fuse_input_indices
+        self.fuse_output_indices = fuse_output_indices
 
     def create_attr_tensor(
         self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
@@ -2274,7 +2278,11 @@ class GraphOptimizer(object):
     def quantize_input_output_type_pass(self):
         remove_edges = []
         remove_vertices = []
-        for name in self.graph.inputs:
+        for i, name in enumerate(self.graph.inputs):
+            if self.fuse_input_indices is not None:
+                if i not in self.fuse_input_indices:
+                    continue
+
             node_name = self.graph.tensor_node_map[name]
             node = self.graph.graph.vs.find(name=node_name)
             assert node['node_type'] == ExtendedOperator.INPUT_NODE
@@ -2320,7 +2328,11 @@ class GraphOptimizer(object):
                     remove_edges.append(edge.index)
 
         output_mapping = {}
-        for name in self.graph.outputs:
+        for i, name in enumerate(self.graph.outputs):
+            if self.fuse_output_indices is not None:
+                if i not in self.fuse_output_indices:
+                    continue
+
             output_tensor = self.graph.tensor_map[name]
             output_type = str(output_tensor.dtype)
             if output_type == self.quantize_input_output_type:
@@ -2644,21 +2656,29 @@ class GraphOptimizer(object):
         output_mapping = {}
         for prev, next in filtered_pairs:
             if prev['node_type'] == ExtendedOperator.INPUT_NODE:
+                input_name = prev['outputs'][0]
+                if self.fuse_input_indices is not None:
+                    input_idx = self.graph.inputs.index(input_name)
+                    if input_idx not in self.fuse_input_indices:
+                        continue
                 remove_vertices.append(prev)
                 next['node_type'] = prev['node_type']
                 next['op'] = None
-                input_name = prev['outputs'][0]
                 input_mapping.setdefault(input_name, [])
                 input_mapping[input_name].extend(next['outputs'])
             else:
-                remove_vertices.append(next)
                 if prev['op'] is not None:
-                    prev['node_type'] = next['node_type']
                     prev_name = prev['op'].outputs[0].name
+                    if self.fuse_output_indices is not None:
+                        output_idx = self.graph.outputs.index(prev_name)
+                        if output_idx not in self.fuse_output_indices:
+                            continue
+                    prev['node_type'] = next['node_type']
                     new_name = prev['op'].inputs[0].name
                     prev['op'] = None
                     output_mapping.setdefault(prev_name, [])
                     output_mapping[prev_name].append(new_name)
+                remove_vertices.append(next)
 
         self.graph.graph.delete_vertices(remove_vertices)
 
