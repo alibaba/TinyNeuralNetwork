@@ -1819,7 +1819,19 @@ class RNNChannelModifier(Modifier):
         self.masker().register_mask('weight_ih_l0', self.weight_mask['weight_ih_l0'])
 
     def modify_input(self, remove_idx):
-        pass
+        rnn = self.node.module
+        assert len(self.node.prev_tensors) == 1, 'RNNs with hidden state inputs are not supported'
+        preserve_idx = complementary_list([i for i in range(self.weight_mask['weight_ih_l0'].shape[1])], remove_idx)
+
+        if rnn.weight_ih_l0.shape[1] != len(preserve_idx):
+            log.info(f'[RNN] {self.unique_name()}: input {rnn.input_size} -> {len(preserve_idx)}')
+
+            rnn.weight_ih_l0 = torch.nn.Parameter(rnn.weight_ih_l0[:, preserve_idx])
+
+            if rnn.bidirectional:
+                rnn.weight_ih_l0_reverse = torch.nn.Parameter(rnn.weight_ih_l0_reverse[:, preserve_idx])
+
+            rnn.input_size = len(preserve_idx)
 
     def modify_output(self, remove_idx):
         rnn = self.node.module
@@ -2402,7 +2414,7 @@ class SubGraph(object):
 
         for leaf in self.leaf:
             # After all subgraph dependencies are resolved, each operator will only be pruned in a single dimension
-            assert len(leaf.dim_changes_info.constraints_i) == 1
+            assert len(leaf.dim_changes_info.constraints_i) == 1, leaf.unique_name()
             leaf_prune_dim[leaf.unique_name()] = list(leaf.dim_changes_info.constraints_i.keys())[0]
             leaf_constraint[leaf.unique_name()] = list(leaf.dim_changes_info.constraints_i.values())[0]
 
