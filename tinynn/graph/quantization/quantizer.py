@@ -1006,7 +1006,7 @@ class QATQuantizer(object):
                 with override_current_trace_graph(graph):
                     trace_func = TraceFunction('torch.unsqueeze', prefix='fuse_').parse_args(shared_tensors[0], dim)
                 next_tensors = [torch.unsqueeze(x, dim) for x in shared_tensors]
-                graph.insert_between(n, node, trace_func, next_tensors)
+                graph.insert_between(n, node, trace_func, next_tensors, move_idx=True)
 
             node.module.func_type = 'cat'
             node.module.kind = 'cat'
