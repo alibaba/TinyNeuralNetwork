@@ -605,7 +605,8 @@ class DimensionChangeInfo(object):
                 merge = [set() for i in constraints[0]]
                 for constraint in constraints:
                     for i in range(len(constraint)):
-                        merge[i].update(constraint[i])
+                        if constraint[i] != {-1}:
+                            merge[i].update(constraint[i])
                 constraints[:] = [merge]
 
         self.constraints_i = constraint_i_new
@@ -1051,6 +1052,8 @@ class Modifier(object):
 
 class PoolingModifier(Modifier):
     def dim_change_forward(self, center, tensor, dim_changes_i, dim_transform, tensor_constraint):
+        assert dim_changes_i == [1], "Pooling2D only support change channel dimension."
+
         if isinstance(self.node.module, nn.Module):
             output = self.node.module(self.pre_tensors()[0])
             tensor_o = self.next_tensors()[0]
@@ -1059,15 +1062,22 @@ class PoolingModifier(Modifier):
             changes = self.calc_dim_changes()
             tensor_o = changes[0][1]
 
-        # TODO：If the dimension of pooling is not in dim_changes,
-        #  the input constraint can be reused to reduce the amount of computation
         self.dim_changes_info.update_i(
             center, tensor, dim_changes_i, dim_transform, tensor_constraint=tensor_constraint
         )
+
         self.dim_changes_info.update_o(center, tensor_o, dim_changes_i)
 
+        # padding will change index info
+        fill_tensor_by_dim_changes(self.next_tensors()[0], dim_changes_i)
+
+        constraint_i = self.dim_changes_info.constraints_i[dim_changes_i[0]][center.unique_name()][0]
+        transform = OrderedDict()
+        for i in range(len(constraint_i)):
+            transform[i] = constraint_i[i]
+
         for m in self.next_modifiers(tensor_o):
-            m.dim_change_forward(center, tensor_o, dim_changes_i, dim_transform, None)
+            m.dim_change_forward(center, tensor_o, dim_changes_i, transform, None)
 
 
 class PReLUChannelModifier(Modifier):
