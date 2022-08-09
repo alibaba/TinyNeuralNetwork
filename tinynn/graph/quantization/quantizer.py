@@ -157,6 +157,8 @@ class QATQuantizer(object):
             else:
                 self.disable_requantization_for_cat = False
 
+        self.extra_qparams_mappings = []
+
         assert (
             self.per_tensor or self.disable_requantization_for_cat
         ), "`disable_requantization_for_cat=True` is required for per-channel quantization"
@@ -552,14 +554,32 @@ class QATQuantizer(object):
 
         log.debug(f'Extra qat postprocess for nodes: {quant_list}')
 
+        rev_dict = dict((v, k) for k, v in graph.module_original_name_dict.items())
         for quant_nodes in quant_list:
             for orig_name in quant_nodes:
-                if orig_name in graph.module_original_name_dict.values():
+                if orig_name in rev_dict:
                     new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name)
                     acp = getattr(new_mod, 'activation_post_process', None)
                     if acp is not None:
                         torch.quantization.disable_fake_quant(acp)
                         torch.quantization.disable_observer(acp)
+
+                        unique_name = graph.module_unique_name_dict[rev_dict[quant_nodes[-1]]]
+                        node = graph.nodes_map[unique_name]
+
+                        post_dq = node.next_nodes[0].module
+                        post_q = node.next_nodes[0].next_nodes[0].module
+
+                        assert isinstance(post_dq, torch_q.DeQuantStub)
+                        assert isinstance(post_q, torch_q.QuantStub)
+
+                        dq_name = graph.module_original_name_dict[id(post_dq)]
+                        q_name = graph.module_original_name_dict[id(post_q)]
+
+                        post_acp = getattr(post_q, 'activation_post_process', None)
+                        assert post_acp is not None
+
+                        self.extra_qparams_mappings.append([acp, post_acp, dq_name, q_name])
 
     def disable_requantization_for_cat_pass(self, graph):
         def _find_quantized_cat_nodes(node: TraceNode, custom_node):
@@ -1872,6 +1892,29 @@ class QATQuantizer(object):
 
         for n, m in sub_list:
             setattr(q_model, n, m)
+
+    def convert(self, q_model: nn.Module) -> nn.Module:
+        """Converts a QAT/PTQ-prepared model to an actual quantized model
+
+        Args:
+            q_model (nn.Module): The QAT/PTQ-prepared model
+
+        Returns:
+            nn.Module: The QAT/PTQ-converted model
+        """
+
+        for acp, post_acp, dq_name, q_name in self.extra_qparams_mappings:
+            acp.scale = post_acp.scale
+            acp.zero_point = post_acp.zero_point
+            acp.activation_post_process.min_val = post_acp.activation_post_process.min_val
+            acp.activation_post_process.max_val = post_acp.activation_post_process.max_val
+
+            setattr(q_model, dq_name, nn.Identity())
+            setattr(q_model, q_name, nn.Identity())
+
+        q_model = torch.quantization.convert(q_model)
+
+        return q_model
 
 
 class BF16Quantizer(QATQuantizer):
