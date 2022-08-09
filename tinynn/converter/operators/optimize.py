@@ -317,20 +317,35 @@ class GraphOptimizer(object):
 
         remove_ids = []
         for pre_activ, activ, tensor in filtered_pairs:
-            # Find out the output of the batch-norm nodes
-            new_output = activ['outputs'][0]
-            assert new_output in self.graph.tensor_map
+            if pre_activ.outdegree() > 1:
+                # Find out the output of the first node in the sequence
+                output_name = activ['op'].inputs[0].name
+                output_idx = pre_activ['outputs'].index(output_name)
+                new_output = pre_activ['outputs'][output_idx]
+                assert new_output in self.graph.tensor_map
 
-            # For each node that is next of the activation node, we connect it with the previous node
-            self.graph.connect_next_tensors(activ, pre_activ, new_output)
+                # For each node that is next of the last node, we connect it with the first node
+                # Also, the replace the tensors when needed
+                self.graph.replace_next_tensors(activ, pre_activ, new_output)
 
-            # Update graph, prepare to drop the output tensor of the conv node and use the output tensor of the
-            # batch-norm instead
-            pre_activ['outputs'][0] = new_output
-            pre_activ['op'].outputs[0] = self.graph.tensor_map[new_output]
-            self.graph.tensor_node_map[new_output] = pre_activ['name']
-            tensor['name'] = activ['outputs'][0]
-            tensor['label'] = activ['outputs'][0]
+                new_tensor = pre_activ['op'].outputs[0]
+                old_tensor = activ['op'].outputs[0]
+                new_tensor.quantization = old_tensor.quantization
+            else:
+                # Find out the output of the batch-norm nodes
+                new_output = activ['outputs'][0]
+                assert new_output in self.graph.tensor_map
+
+                # For each node that is next of the activation node, we connect it with the previous node
+                self.graph.connect_next_tensors(activ, pre_activ, new_output)
+
+                # Update graph, prepare to drop the output tensor of the conv node and use the output tensor of the
+                # batch-norm instead
+                pre_activ['outputs'][0] = new_output
+                pre_activ['op'].outputs[0] = self.graph.tensor_map[new_output]
+                self.graph.tensor_node_map[new_output] = pre_activ['name']
+                tensor['name'] = activ['outputs'][0]
+                tensor['label'] = activ['outputs'][0]
 
             remove_ids.append(activ.index)
 
@@ -2911,7 +2926,6 @@ def is_requantize_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
         )
         and source_vertex['op'].outputs[0].quantization is not None
         and target_vertex['node_type'] == ExtendedOperator.QUANTIZE
-        and source_vertex.outdegree() == 1
     )
 
 
