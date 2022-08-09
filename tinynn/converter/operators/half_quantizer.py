@@ -61,12 +61,18 @@ class HalfQuantizer(object):
             op = tfl.DequantizeOperator([c], [new_t])
             self.graph.add_operator(op)
 
+            next_ops = set()
+            node_map = {}
             for out_edge in node.out_edges():
                 next_node = self.graph.graph.vs[out_edge.target]
+                next_op = next_node['op']
+                if next_op not in next_ops:
+                    next_ops.add(next_op)
+                    node_map[next_op] = next_node
 
-                op = next_node['op']
-
-                for i, inp in enumerate(op.inputs):
+            for next_op in next_ops:
+                next_node = node_map[next_op]
+                for i, inp in enumerate(next_op.inputs):
                     if inp.name == tn:
                         actions.append((self.graph.replace_operator_input, (next_node, i, new_t)))
 
