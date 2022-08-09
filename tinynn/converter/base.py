@@ -6,7 +6,7 @@ import torch
 
 import numpy as np
 
-from .operators import CommonGraph, ExtendedOperator, GraphOptimizer, HybridQuantizer
+from .operators import CommonGraph, ExtendedOperator, GraphOptimizer, HybridQuantizer, HalfQuantizer
 from .operators.op_version import OPVersioner
 from .operators.tflite import Tensor
 from .operators.torch import OPERATOR_CONVERTER_DICT
@@ -46,6 +46,7 @@ class TFLiteConverter(object):
         rewrite_quantizable: bool = False,
         tflite_micro_rewrite: bool = False,
         map_bilstm_to_lstm: bool = False,
+        float16_quantization: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -85,6 +86,7 @@ class TFLiteConverter(object):
             tflite_micro_rewrite (bool): Rewriting for running on TFLite-micro. Defaults to False
             map_bilstm_to_lstm (bool): Translating bidirectional LSTM to TFLite ops with `UnidirectionalLSTM`. \
                 Defaults to False
+            float16_quantization (bool): Quantize constants with float32 dtype to floa16 dtype. Defaults to False
         """
 
         self.model = model
@@ -127,6 +129,7 @@ class TFLiteConverter(object):
         self.rewrite_quantizable = rewrite_quantizable
         self.tflite_micro_rewrite = tflite_micro_rewrite
         self.map_bilstm_to_lstm = map_bilstm_to_lstm
+        self.float16_quantization = float16_quantization
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -444,6 +447,11 @@ class TFLiteConverter(object):
                 quantizer = HybridQuantizer(
                     self.common_graph, self.hybrid_asymmetric_inputs, self.hybrid_q_type, self.hybrid_per_channel
                 )
+                quantizer.quantize()
+                optimizer.cleanup_dead_nodes()
+
+            if self.float16_quantization:
+                quantizer = HalfQuantizer(self.common_graph)
                 quantizer.quantize()
                 optimizer.cleanup_dead_nodes()
 
