@@ -564,7 +564,8 @@ class QATQuantizer(object):
                         torch.quantization.disable_fake_quant(acp)
                         torch.quantization.disable_observer(acp)
 
-                        unique_name = graph.module_unique_name_dict[rev_dict[quant_nodes[-1]]]
+                        activ_name = quant_nodes[-1]
+                        unique_name = graph.module_unique_name_dict[rev_dict[activ_name]]
                         node = graph.nodes_map[unique_name]
 
                         post_dq = node.next_nodes[0].module
@@ -579,7 +580,7 @@ class QATQuantizer(object):
                         post_acp = getattr(post_q, 'activation_post_process', None)
                         assert post_acp is not None
 
-                        self.extra_qparams_mappings.append([acp, post_acp, dq_name, q_name])
+                        self.extra_qparams_mappings.append([acp, post_acp, dq_name, q_name, activ_name])
 
     def disable_requantization_for_cat_pass(self, graph):
         def _find_quantized_cat_nodes(node: TraceNode, custom_node):
@@ -1900,10 +1901,10 @@ class QATQuantizer(object):
             q_model (nn.Module): The QAT/PTQ-prepared model
 
         Returns:
-            nn.Module: The QAT/PTQ-converted model
+            nn.Module: The QAT/PTQ-converted model, which is used for validation in PyTorch only.
         """
 
-        for acp, post_acp, dq_name, q_name in self.extra_qparams_mappings:
+        for acp, post_acp, dq_name, q_name, activ_name in self.extra_qparams_mappings:
             acp.scale = post_acp.scale
             acp.zero_point = post_acp.zero_point
             acp.activation_post_process.min_val = post_acp.activation_post_process.min_val
@@ -1911,6 +1912,7 @@ class QATQuantizer(object):
 
             setattr(q_model, dq_name, nn.Identity())
             setattr(q_model, q_name, nn.Identity())
+            setattr(q_model, activ_name, nn.Identity())
 
         q_model = torch.quantization.convert(q_model)
 
