@@ -1243,10 +1243,15 @@ def gen_module_constrctor_line(module, mod_cache=None):
                             f'Argument "{prop_name}" of the constructor of {name} is not a known constant, skipping'
                         )
                         continue
-                prop_value = getattr(module, prop_name)
                 if p.default is p.empty:
+                    prop_value = getattr(module, prop_name)
                     args.append(f'{prop_value}')
                 else:
+                    # If loading from legacy model, then the property can be missing.
+                    # Thus, we should skip it so as to use the default value.
+                    if not hasattr(module, prop_name):
+                        continue
+                    prop_value = getattr(module, prop_name)
                     # Appending keyword args
                     default_value = p.default
                     # Skip the arg if it has the same value with the default one
