@@ -450,6 +450,7 @@ numpy_tflite_dtype_mappings = {
     'int64': tflite.TensorType.INT64,
     'int8': tflite.TensorType.INT8,
     'uint8': tflite.TensorType.UINT8,
+    'float16': tflite.TensorType.FLOAT16,
     'float32': tflite.TensorType.FLOAT32,
     'float64': tflite.TensorType.FLOAT64,
 }
@@ -461,6 +462,7 @@ torch_tflite_dtype_mappings = {
     torch.int64: tflite.TensorType.INT64,
     torch.qint8: tflite.TensorType.INT8,
     torch.quint8: tflite.TensorType.UINT8,
+    torch.float16: tflite.TensorType.FLOAT16,
     torch.float32: tflite.TensorType.FLOAT32,
     torch.float64: tflite.TensorType.FLOAT64,
 }
