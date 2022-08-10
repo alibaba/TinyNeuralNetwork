@@ -1349,6 +1349,14 @@ class CatModifier(Modifier):
                 self.dim = 0
 
     def dim_change_forward(self, center, tensor, dim_changes_i, dim_transform, tensor_constraint):
+        offset = 0
+
+        for t in self.pre_tensors():
+            if id(t) != id(tensor):
+                offset += t.shape[dim_changes_i[0]]
+            else:
+                break
+
         # In the case of batch cat, there will be dependencies between multiple input tensors
         if self.dim not in dim_changes_i:
             for t in self.pre_tensors():
@@ -1367,8 +1375,15 @@ class CatModifier(Modifier):
         )
         self.dim_changes_info.update_o(center, tensor_o, dim_changes_o)
 
+        if offset == 0 or dim_transform is None:
+            new_dim_transform = dim_transform
+        else:
+            new_dim_transform = {}
+            for key, value in dim_transform.items():
+                new_dim_transform[key + offset] = value
+
         for m in self.next_modifiers(tensor_o):
-            m.dim_change_forward(center, tensor_o, dim_changes_o, dim_transform, None)
+            m.dim_change_forward(center, tensor_o, dim_changes_o, new_dim_transform, None)
 
 
 class MatMulModifier(Modifier):
