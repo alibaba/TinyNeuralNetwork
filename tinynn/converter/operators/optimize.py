@@ -318,6 +318,29 @@ class GraphOptimizer(object):
         remove_ids = []
         for pre_activ, activ, tensor in filtered_pairs:
             if pre_activ.outdegree() > 1:
+                skip = False
+                pre_quantize = None
+                for out_edge in pre_activ.out_edges():
+                    next_node = self.graph.graph.vs[out_edge.target]
+                    if next_node['node_type'] == ExtendedOperator.QUANTIZE:
+                        if pre_quantize is None:
+                            pre_quantize = next_node['op'].outputs[0].quantization
+                        else:
+                            cur_quantize = next_node['op'].outputs[0].quantization
+                            if (
+                                pre_quantize.scale != cur_quantize.scale
+                                or pre_quantize.zero_point != cur_quantize.zero_point
+                                or pre_quantize.dim != cur_quantize.dim
+                            ):
+                                skip = True
+                                break
+                    elif next_node['node_type'] != ExtendedOperator.DEQUANTIZE:
+                        skip = True
+                        break
+
+                if skip:
+                    continue
+
                 # Find out the output of the first node in the sequence
                 output_name = activ['op'].inputs[0].name
                 output_idx = pre_activ['outputs'].index(output_name)
