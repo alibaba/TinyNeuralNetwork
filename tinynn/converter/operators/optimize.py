@@ -1043,6 +1043,8 @@ class GraphOptimizer(object):
             cand_perms = dict()
             cand_rev_perms = dict()
             prev_output_indices = []
+            num_constant_nodes = 0
+            prev_hints = set()
             for i in input_indices:
                 prev_node_name = op.inputs[i].name
                 prev_node = self.graph.graph.vs.find(name=self.graph.tensor_node_map[prev_node_name])
@@ -1058,10 +1060,19 @@ class GraphOptimizer(object):
                         perm = tuple(np.argsort(prev_node['op'].inputs[1].tensor).tolist())
                         cand_rev_perms.setdefault(perm, 0)
                         cand_rev_perms[perm] += 1
+                    if 'direction' in prev_node['op'].extra_hints:
+                        prev_hints.add(prev_node['op'].extra_hints['direction'])
+
+                if prev_node['node_type'] == ExtendedOperator.CONSTANT_NODE:
+                    num_constant_nodes += 1
+
+            if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED and 'up' in prev_hints:
+                continue
 
             next_nodes = []
             next_edges = []
             out_nodes = []
+            next_hints = set()
             for edge in node.out_edges():
                 if edge.index in remove_edges:
                     continue
@@ -1082,13 +1093,23 @@ class GraphOptimizer(object):
                         perm = tuple(next_node['op'].inputs[1].tensor.tolist())
                         cand_perms.setdefault(perm, 0)
                         cand_perms[perm] += 1
+                    if 'direction' in next_node['op'].extra_hints:
+                        next_hints.add(next_node['op'].extra_hints['direction'])
+
+            if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED and 'down' in next_hints:
+                continue
 
             cur_transpose_size = sum(cand_perms.values()) + sum(cand_rev_perms.values())
-            new_transpose_size = len(prev_nodes) + len(next_nodes) - sum(cand_perms.values())
+            new_transpose_size = len(prev_nodes) + len(next_nodes) - sum(cand_perms.values()) - num_constant_nodes
 
             # Skip if the number of transpose nodes is not decreasing
-            if len(next_nodes) == 0 or new_transpose_size >= cur_transpose_size:
+            if len(next_nodes) == 0 or new_transpose_size > cur_transpose_size:
                 continue
+            elif new_transpose_size == cur_transpose_size:
+                skip = True
+                if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED:
+                    if 'down' in prev_hints or 'up' in next_hints:
+                        skip = False
 
             perm = max(cand_perms.items(), key=lambda x: x[1])[0]
             perm_arr = np.array(perm, dtype='int32')
@@ -1142,7 +1163,9 @@ class GraphOptimizer(object):
                 prev_new_out = self.create_transform_tensor(
                     np.transpose(prev_out.tensor, inv_perm_arr), quantization=prev_out.quantization
                 )
-                self.graph.add_operator(tfl.TransposeOperator([prev_out, perm_tensor], [prev_new_out]))
+                transpose_op = tfl.TransposeOperator([prev_out, perm_tensor], [prev_new_out])
+                transpose_op.extra_hints['direction'] = 'up'
+                self.graph.add_operator(transpose_op)
                 actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
 
             tensor_node_dict = {}
@@ -1160,7 +1183,9 @@ class GraphOptimizer(object):
                 node['outputs'][i] = new_out.name
                 op.outputs[i] = new_out
 
-                self.graph.add_operator(tfl.TransposeOperator([new_out, perm_tensor], [op_out]))
+                transpose_op = tfl.TransposeOperator([new_out, perm_tensor], [op_out])
+                transpose_op.extra_hints['direction'] = 'down'
+                self.graph.add_operator(transpose_op)
 
                 tensor_node_dict[op_out.name] = self.graph.graph.vs.find(name=self.graph.tensor_node_map[op_out.name])
 
