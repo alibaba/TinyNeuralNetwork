@@ -322,20 +322,32 @@ class GraphOptimizer(object):
                 pre_quantize = None
                 for out_edge in pre_activ.out_edges():
                     next_node = self.graph.graph.vs[out_edge.target]
-                    if next_node['node_type'] == ExtendedOperator.QUANTIZE:
-                        if pre_quantize is None:
-                            pre_quantize = next_node['op'].outputs[0].quantization
-                        else:
-                            cur_quantize = next_node['op'].outputs[0].quantization
-                            if (
-                                pre_quantize.scale != cur_quantize.scale
-                                or pre_quantize.zero_point != cur_quantize.zero_point
-                                or pre_quantize.dim != cur_quantize.dim
-                            ):
+                    while True:
+                        if next_node['node_type'] == ExtendedOperator.QUANTIZE:
+                            if pre_quantize is None:
+                                pre_quantize = next_node['op'].outputs[0].quantization
+                            else:
+                                cur_quantize = next_node['op'].outputs[0].quantization
+                                if (
+                                    pre_quantize.scale != cur_quantize.scale
+                                    or pre_quantize.zero_point != cur_quantize.zero_point
+                                    or pre_quantize.dim != cur_quantize.dim
+                                ):
+                                    skip = True
+                            break
+                        elif next_node['node_type'] == ExtendedOperator.DEQUANTIZE:
+                            break
+                        elif next_node['node_type'] in (ExtendedOperator.RESHAPE, ExtendedOperator.TRANSPOSE):
+                            if next_node.outdegree() > 1:
                                 skip = True
                                 break
-                    elif next_node['node_type'] != ExtendedOperator.DEQUANTIZE:
-                        skip = True
+                            else:
+                                next_node = self.graph.graph.vs[next_node.out_edges()[0].target]
+                        else:
+                            skip = True
+                            break
+
+                    if skip:
                         break
 
                 if skip:
@@ -1103,7 +1115,7 @@ class GraphOptimizer(object):
             new_transpose_size = len(prev_nodes) + len(next_nodes) - sum(cand_perms.values()) - num_constant_nodes
 
             # Skip if the number of transpose nodes is not decreasing
-            if len(next_nodes) == 0 or new_transpose_size > cur_transpose_size:
+            if len(cand_perms) == 0 or len(next_nodes) == 0 or new_transpose_size > cur_transpose_size:
                 continue
             elif new_transpose_size == cur_transpose_size:
                 skip = True
