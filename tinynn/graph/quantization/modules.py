@@ -49,7 +49,7 @@ class QPReLU(nn.Module):
 
 
 class QSiLU(nn.Module):
-    def __init__(self, _: nn.SiLU) -> None:
+    def __init__(self, _: 'nn.SiLU') -> None:
         super().__init__()
 
         self.act = nn.Sigmoid()

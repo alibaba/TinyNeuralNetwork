@@ -48,6 +48,7 @@ class QATModuleTester(unittest.TestCase):
 
                 self.assertTrue(False)
 
+    @unittest.skipIf(not hasattr(nn, 'SiLU'), 'nn.SiLU is not available')
     def test_silu(self):
         for i in range(100):
             orig = nn.SiLU()

@@ -334,13 +334,15 @@ class QATQuantizer(object):
         quantized_prelu_nodes = graph.filter_forward_nodes(_find_quantized_prelu_nodes)
         graph.update_submodule_in_nodes_from_predicate(quantized_prelu_nodes, QPReLU)
 
-        def _find_quantized_silu_nodes(node: TraceNode, custom_node):
-            # Find quantized PReLU nodes
-            return node.type() == nn.SiLU and node.quantized
+        if LooseVersion(torch.__version__) >= LooseVersion('1.7.0'):
 
-        # Replace SiLU nodes with our custom variants
-        quantized_silu_nodes = graph.filter_forward_nodes(_find_quantized_silu_nodes)
-        graph.update_submodule_in_nodes_from_predicate(quantized_silu_nodes, QSiLU)
+            def _find_quantized_silu_nodes(node: TraceNode, custom_node):
+                # Find quantized SiLU nodes
+                return node.type() == nn.SiLU and node.quantized
+
+            # Replace SiLU nodes with our custom variants
+            quantized_silu_nodes = graph.filter_forward_nodes(_find_quantized_silu_nodes)
+            graph.update_submodule_in_nodes_from_predicate(quantized_silu_nodes, QSiLU)
 
         custom_data = ([], set())
         graph.filter_forward_nodes(is_fusable, custom_data, reverse=True)
