@@ -1387,8 +1387,25 @@ class GraphOptimizer(object):
                 quantizable_ops_only=quantizable_ops_only,
             )
         )
+
         pairs = ((self.graph.graph.vs[edge.source], self.graph.graph.vs[edge.target]) for edge in edges)
-        filtered_nodes = (k[0] if k[0]['node_type'] != ExtendedOperator.TRANSPOSE else k[1] for k in pairs)
+        if quantizable_ops_only:
+            filtered_nodes = []
+            for s, e in pairs:
+                if s['node_type'] == ExtendedOperator.TRANSPOSE:
+                    for pe in s.in_edges():
+                        pn = self.graph.graph.vs[pe.source]
+                        if pn['outputs'][0] == s['op'].inputs[0].name:
+                            filtered_nodes.append(pn)
+                            break
+                else:
+                    for pe in e.out_edges():
+                        pn = self.graph.graph.vs[pe.target]
+                        if pn['op'] is not None and e['outputs'][0] == pn['op'].inputs[0].name:
+                            filtered_nodes.append(pn)
+                            break
+        else:
+            filtered_nodes = (k[0] if k[0]['node_type'] != ExtendedOperator.TRANSPOSE else k[1] for k in pairs)
         unique_nodes = list(set(filtered_nodes))
 
         actions = []
