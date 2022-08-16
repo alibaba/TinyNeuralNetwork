@@ -22,7 +22,7 @@ from torch.nn.parallel.data_parallel import DataParallel
 from torch.nn.parallel.distributed import DistributedDataParallel
 
 from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16, FakeQuantizeTFLite
-from tinynn.graph.quantization.modules import QPReLU
+from tinynn.graph.quantization.modules import QPReLU, QSiLU
 from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver
 from tinynn.graph.tracer import (
     ConstantNode,
@@ -333,6 +333,16 @@ class QATQuantizer(object):
         # Replace PReLU nodes with our custom variants
         quantized_prelu_nodes = graph.filter_forward_nodes(_find_quantized_prelu_nodes)
         graph.update_submodule_in_nodes_from_predicate(quantized_prelu_nodes, QPReLU)
+
+        if LooseVersion(torch.__version__) >= LooseVersion('1.7.0'):
+
+            def _find_quantized_silu_nodes(node: TraceNode, custom_node):
+                # Find quantized SiLU nodes
+                return node.type() == nn.SiLU and node.quantized
+
+            # Replace SiLU nodes with our custom variants
+            quantized_silu_nodes = graph.filter_forward_nodes(_find_quantized_silu_nodes)
+            graph.update_submodule_in_nodes_from_predicate(quantized_silu_nodes, QSiLU)
 
         custom_data = ([], set())
         graph.filter_forward_nodes(is_fusable, custom_data, reverse=True)
@@ -1535,9 +1545,6 @@ class QATQuantizer(object):
                             nn.ZeroPad2d,
                         ),
                     ):
-                        return True
-                else:
-                    if isinstance(cur_module, nn.SiLU):
                         return True
                 return isinstance(
                     cur_module,

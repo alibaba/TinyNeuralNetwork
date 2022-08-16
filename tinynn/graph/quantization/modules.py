@@ -46,3 +46,14 @@ class QPReLU(nn.Module):
 
         x = self.f_add.add(x1, x2)
         return x
+
+
+class QSiLU(nn.Module):
+    def __init__(self, _: 'nn.SiLU') -> None:
+        super().__init__()
+
+        self.act = nn.Sigmoid()
+        self.f_mul = nnq.FloatFunctional()
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        return self.f_mul.mul(input, self.act(input))
