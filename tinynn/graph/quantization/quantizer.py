@@ -667,25 +667,26 @@ class QATQuantizer(object):
                             props.append('activation_post_process')
                         new_fq_count += 1
 
-                if new_fq_count < 2:
-                    if mode in ('both', 'down'):
-                        fq_up = fq_count
-                        fq_down = new_fq_count
-                    elif mode == 'up':
-                        fq_up = new_fq_count
-                        fq_down = fq_count
+                if mode in ('both', 'down'):
+                    fq_up = fq_count
+                    fq_down = new_fq_count
+                elif mode == 'up':
+                    fq_up = new_fq_count
+                    fq_down = fq_count
 
-                    if mode == 'up' and len(n.next_nodes) > 1:
-                        mode = 'both'
+                if mode == 'up' and len(n.next_nodes) > 1:
+                    mode = 'both'
+                    fq_down += 1
 
-                    if mode in ('both', 'up'):
-                        for i, node in enumerate(n.prev_nodes):
-                            if is_prev_float_functional and i == 0:
-                                continue
-
+                if mode in ('both', 'up'):
+                    for i, node in enumerate(n.prev_nodes):
+                        if is_prev_float_functional and i == 0:
+                            continue
+                        if fq_up < 2:
                             q.put((node, 'up', fq_up))
-                    if mode in ('both', 'down'):
-                        for node in n.next_nodes:
+                if mode in ('both', 'down'):
+                    for node in n.next_nodes:
+                        if fq_down < 2:
                             q.put((node, 'down', fq_down))
 
             if len(names) > 1:
