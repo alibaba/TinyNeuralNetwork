@@ -1390,20 +1390,33 @@ class GraphOptimizer(object):
 
         pairs = ((self.graph.graph.vs[edge.source], self.graph.graph.vs[edge.target]) for edge in edges)
         if quantizable_ops_only:
+            all_edges = self.graph.graph.es.select(
+                functools.partial(
+                    is_transpose_elementwise_op_edge,
+                    graph_converter=self.graph.graph,
+                    quantizable_ops_only=False,
+                )
+            )
+
+            all_pairs = ((self.graph.graph.vs[edge.source], self.graph.graph.vs[edge.target]) for edge in all_edges)
+
+            forward_d = dict(all_pairs)
+            backward_d = {v: k for k, v in forward_d.items()}
+
             filtered_nodes = []
             for s, e in pairs:
                 if s['node_type'] == ExtendedOperator.TRANSPOSE:
-                    for pe in s.in_edges():
-                        pn = self.graph.graph.vs[pe.source]
-                        if pn['outputs'][0] == s['op'].inputs[0].name:
-                            filtered_nodes.append(pn)
-                            break
+                    pn = backward_d.get(s, None)
+                    if pn is not None:
+                        filtered_nodes.append(pn)
+                    else:
+                        log.warning('Cannot passthrough transpose upward around requantizable ops')
                 else:
-                    for pe in e.out_edges():
-                        pn = self.graph.graph.vs[pe.target]
-                        if pn['op'] is not None and e['outputs'][0] == pn['op'].inputs[0].name:
-                            filtered_nodes.append(pn)
-                            break
+                    pn = forward_d.get(e, None)
+                    if pn is not None:
+                        filtered_nodes.append(pn)
+                    else:
+                        log.warning('Cannot passthrough transpose downward around requantizable ops')
         else:
             filtered_nodes = (k[0] if k[0]['node_type'] != ExtendedOperator.TRANSPOSE else k[1] for k in pairs)
         unique_nodes = list(set(filtered_nodes))
