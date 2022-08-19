@@ -1,4 +1,6 @@
 from .generated_ops import CustomOperator
+from .base import create_byte_array
+from ...schemas.tflite import schema_generated as tflite
 
 HAS_FLEXBUFFER = False
 try:
@@ -50,10 +52,10 @@ class TFLiteDetectionPostprocessOperator(CustomOperator):
             fbb.Int('max_classes_per_detection', self.max_classes_per_detection)
             fbb.Float('nms_score_threshold', self.nms_score_threshold)
             fbb.Float('nms_iou_threshold', self.nms_iou_threshold)
-            fbb.Int('num_classes', self.nms_iou_threshold)
+            fbb.Int('num_classes', self.num_classes)
             fbb.Float('y_scale', self.y_scale)
-            fbb.Float('y_scale', self.x_scale)
-            fbb.Float('y_scale', self.h_scale)
-            fbb.Float('y_scale', self.w_scale)
+            fbb.Float('x_scale', self.x_scale)
+            fbb.Float('h_scale', self.h_scale)
+            fbb.Float('w_scale', self.w_scale)
         self.custom_options = fbb.Finish()
         return super().build(builder)

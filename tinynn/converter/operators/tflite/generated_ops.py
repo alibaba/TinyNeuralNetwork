@@ -1,7 +1,7 @@
 import flatbuffers
 
 from ...schemas.tflite import schema_generated as tflite
-from . import BaseOperator, Offset, create_numpy_array
+from . import BaseOperator, Offset, create_byte_array, create_numpy_array
 
 
 class AddOperator(BaseOperator):
@@ -813,6 +813,9 @@ class CustomOperator(BaseOperator):
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
 
+        if self.custom_options is not None:
+            custom_options = create_byte_array(builder, tflite.Operator.CustomOptions, self.custom_options)
+
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
@@ -822,7 +825,7 @@ class CustomOperator(BaseOperator):
 
         if self.custom_options is not None:
             tflite.OperatorAddCustomOptionsFormat(builder, tflite.CustomOptionsFormat.FLEXBUFFERS)
-            tflite.OperatorAddCustomOptions(builder, self.custom_options)
+            tflite.OperatorAddCustomOptions(builder, custom_options)
 
         self.tfl_op = tflite.OperatorEnd(builder)
 
