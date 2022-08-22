@@ -1905,11 +1905,11 @@ class GraphOptimizer(object):
                 old_dim = next_shape.index(-1)
 
                 new_start = np.zeros(len(prev_shape), dtype='int32')
-                new_start[new_dim] = op.inputs[1][old_dim]
+                new_start[new_dim] = op.inputs[1].tensor[old_dim]
                 new_start_t = self.create_attr_tensor(new_start)
 
                 new_size = np.array(prev_shape, dtype='int32')
-                new_size[new_dim] = op.inputs[2][old_dim]
+                new_size[new_dim] = op.inputs[2].tensor[old_dim]
                 new_size_t = self.create_attr_tensor(new_size)
 
                 actions.append((self.graph.replace_operator_input, (node, 1, new_start_t, True)))
