@@ -2976,6 +2976,16 @@ class SubGraphDivider(object):
                     sub_graphs[main_center].update(sub_graphs[redundant_center])
                     del sub_graphs[redundant_center]
                     center_mapping[redundant_center] = main_center
+                else:
+                    redirect_center = redundant_center
+
+                    while redirect_center not in sub_graphs:
+                        redirect_center = center_mapping[redirect_center]
+
+                    if redirect_center in sub_graphs and redirect_center != main_center:
+                        sub_graphs[main_center].update(sub_graphs[redirect_center])
+                        del sub_graphs[redirect_center]
+                        center_mapping[redirect_center] = main_center
 
         for center_name, modifiers in sub_graphs.items():
             self.sub_graphs[center_name] = SubGraph(center_name, modifiers).build()
