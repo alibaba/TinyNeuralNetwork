@@ -59,3 +59,36 @@ class TFLiteDetectionPostprocessOperator(CustomOperator):
             fbb.Float('w_scale', self.w_scale)
         self.custom_options = fbb.Finish()
         return super().build(builder)
+
+class MTK_TRANSPOSE_CONVOperator(CustomOperator):
+    def __init__(self,
+                 inputs,
+                 outputs,
+                 activation: int,
+                 depth_multiplier: int,
+                 dilation_height_factor: int,
+                 dilation_width_factor: int,
+                 PaddingType: int,
+                 stride_height: int,
+                 stride_width: int)-> None:
+        super().__init__(inputs, outputs)
+        self.op.custom_code = "MTK_TRANSPOSE_CONV"
+        self.activation = activation
+        self.depth_multiplier = depth_multiplier
+        self.dilation_height_factor = dilation_height_factor
+        self.dilation_width_factor = dilation_width_factor
+        self.PaddingType = PaddingType
+        self.stride_height = stride_height
+        self.stride_width = stride_width
+
+    def build(self, builder):
+        fbb = flexbuffers.Builder()
+        fbb.MapFromElements({'activation': self.activation,
+            'depth_multiplier': self.depth_multiplier,
+            'dilation_height_factor': self.dilation_height_factor,
+            'dilation_width_factor': self.dilation_width_factor,
+            'PaddingType': self.PaddingType,
+            'stride_height': self.stride_height,
+            'stride_width': self.stride_width})
+        self.custom_options = fbb.Finish()
+        return super().build(builder)

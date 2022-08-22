@@ -1,11 +1,11 @@
 from abc import abstractmethod
 
-from .base import BaseOperator, QuantizationParameters, Tensor
+from .base import BaseOperator, QuantizationParameters, Tensor, OptionalTensorInstance
 from . import generated_ops as tfl_ops
 
 from ..base import ExtendedOperator
 from ...schemas.tflite import schema_generated as tflite
-
+from .custom import MTK_TRANSPOSE_CONVOperator
 import typing
 import torch
 import warnings
@@ -42,7 +42,7 @@ class TransformableOperator(BaseOperator):
         return Tensor(tensor, name, has_buffer=False, quantization=quantization)
 
     def wrap_ops_with_nhwc_nchw_transposes(
-        self, ops: typing.List[tfl_ops.BaseOperator], input_idx: int = 0, output_idx: int = 0
+            self, ops: typing.List[tfl_ops.BaseOperator], input_idx: int = 0, output_idx: int = 0
     ) -> typing.List[tfl_ops.BaseOperator]:
         orig_input = ops[0].inputs[input_idx]
         orig_output = ops[-1].outputs[output_idx]
@@ -88,12 +88,12 @@ class BatchNormOperator(TransformableOperator):
     output_index = 0
 
     def __init__(
-        self,
-        inputs: typing.List['Tensor'],
-        outputs: typing.List['Tensor'],
-        eps: float,
-        quantization: typing.Optional[QuantizationParameters] = None,
-        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+            self,
+            inputs: typing.List['Tensor'],
+            outputs: typing.List['Tensor'],
+            eps: float,
+            quantization: typing.Optional[QuantizationParameters] = None,
+            fusedActivationFunction=tflite.ActivationFunctionType.NONE,
     ):
         super().__init__(ExtendedOperator.BATCH_NORM, inputs, outputs, 1)
         self.eps = eps
@@ -163,15 +163,15 @@ class GenericConvOperator(TransformableOperator):
     fusedActivationFunction: tflite.ActivationFunctionType
 
     def __init__(
-        self,
-        inputs: typing.List['Tensor'],
-        outputs: typing.List['Tensor'],
-        stride: typing.List[int],
-        padding: typing.List[int],
-        dialation: typing.List[int],
-        output_padding: typing.List[int],
-        groups: int,
-        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
+            self,
+            inputs: typing.List['Tensor'],
+            outputs: typing.List['Tensor'],
+            stride: typing.List[int],
+            padding: typing.List[int],
+            dialation: typing.List[int],
+            output_padding: typing.List[int],
+            groups: int,
+            fusedActivationFunction=tflite.ActivationFunctionType.NONE,
     ):
         super().__init__(ExtendedOperator.GENERIC_CONV, inputs, outputs, 1)
         self.stride = stride
@@ -424,14 +424,14 @@ class GenericTransposeConvOperator(TransformableOperator):
     groups: int
 
     def __init__(
-        self,
-        inputs: typing.List['Tensor'],
-        outputs: typing.List['Tensor'],
-        stride: typing.List[int],
-        padding: typing.List[int],
-        dilation: typing.List[int],
-        output_padding: typing.List[int],
-        groups: int,
+            self,
+            inputs: typing.List['Tensor'],
+            outputs: typing.List['Tensor'],
+            stride: typing.List[int],
+            padding: typing.List[int],
+            dilation: typing.List[int],
+            output_padding: typing.List[int],
+            groups: int,
     ):
         super().__init__(ExtendedOperator.GENERIC_DECONV, inputs, outputs, 1)
         self.stride = stride
@@ -520,12 +520,16 @@ class GenericTransposeConvOperator(TransformableOperator):
 
         if weight_dim in (3, 4):
             assert all((x == 1 for x in self.dilation)), "Only dilation=1 is supported for conv_transpose2d"
-            conv_op = tfl_ops.TransposeConvOperator(
+            conv_op = MTK_TRANSPOSE_CONVOperator(
                 self.inputs[:2][::-1],
                 self.outputs,
-                strideH=self.stride[0],
-                strideW=self.stride[1],
-                padding=tflite.Padding.VALID,
+                activation=0,
+                depth_multiplier=1,
+                dilation_height_factor=1,
+                dilation_width_factor=1,
+                PaddingType=0,
+                stride_height=self.stride[0],
+                stride_width=self.stride[1],
             )
         else:
             conv_op = tfl_ops.Conv3dTransposeOperator(
@@ -594,17 +598,34 @@ class GenericTransposeConvOperator(TransformableOperator):
         ops.insert(1, reorder_op)
 
         # Bias handling
-        if len(self.inputs) > 2 and self.inputs[2] is not None:
-            bias_tensor = self.inputs[2]
-            add_out = ops[-2].outputs[0]
-            bias_transform = self.create_transform_tensor(
-                add_out.tensor.copy(), quantization=self.outputs[0].quantization
-            )
-            ops[-2].outputs[0] = bias_transform
-            ops.insert(len(ops) - 1, tfl_ops.AddOperator([bias_transform, bias_tensor], [add_out]))
+        kernel_num = self.inputs[1].shape[0]
+        if len(conv_op.inputs) == 2 or conv_op.inputs[2] is None:
+            if conv_op.inputs[0].dtype == np.dtype('float32'):
+                bias = np.zeros((kernel_num,), dtype='float32')
+                q_args = None
+            else:
+                bias = np.zeros((kernel_num,), dtype='int32')
+                per_tensor = weight_tensor.quantization.dim is None
+                # Bias handling
+                if per_tensor:
+                    bias_scale = input_tensor.quantization.scale * weight_tensor.quantization.scale
+                    bias_zero_point = 0
+                    bias_dim = None
+                else:
+                    bias_scale = [input_tensor.quantization.scale * s for s in weight_tensor.quantization.scale]
+                    bias_zero_point = [0] * len(bias_scale)
+                    bias_dim = 0
+                q_args = QuantizationParameters(bias_scale, bias_zero_point, bias_dim)
+            conv_op.inputs.append(self.create_attr_tensor(bias, quantization=q_args))
 
+        elif conv_op.inputs[2].shape[0] != kernel_num and conv_op.inputs[2].shape[0] == 1:
+            if conv_op.inputs[0].dtype == np.float32:
+                bias = torch.tensor([conv_op.inputs[2][0]] * kernel_num, dtype='float32')
+            else:
+                bias = torch.tensor([conv_op.inputs[2][0]] * kernel_num, dtype='int32')
+
+            conv_op.inputs[2] = self.create_attr_tensor(bias)
         ops = prev_ops + ops + next_ops
-
         for op in ops:
             graph_converter.add_operator(op)
 
