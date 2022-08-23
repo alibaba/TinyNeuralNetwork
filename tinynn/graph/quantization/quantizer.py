@@ -1926,6 +1926,23 @@ class QATQuantizer(object):
 
         return q_model
 
+    def optimize_conv_bn_fusion(self, q_model, eps=1e-5):
+        def _pre_hook_func(indices):
+            def _pre_hook(mod, input):
+                max_val = input[0][~indices].max()
+                min_val = input[0][~indices].min()
+                input[0].clamp_(min_val, max_val)
+                return input
+
+            return _pre_hook
+
+        for m in q_model.modules():
+            if type(m).__name__ in ('ConvBnReLU2d', 'ConvBn2d'):
+                if m.in_channels == m.out_channels and m.out_channels == m.groups and m.groups > 1:
+                    indices = m.bn.running_var < eps
+                    if torch.any(indices):
+                        m.weight_fake_quant.register_forward_pre_hook(_pre_hook_func(indices))
+
 
 class BF16Quantizer(QATQuantizer):
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
