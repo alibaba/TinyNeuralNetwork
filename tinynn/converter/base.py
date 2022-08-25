@@ -47,6 +47,7 @@ class TFLiteConverter(object):
         tflite_micro_rewrite: bool = False,
         map_bilstm_to_lstm: bool = False,
         float16_quantization: bool = False,
+        enable_mtk_ops: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -87,6 +88,7 @@ class TFLiteConverter(object):
             map_bilstm_to_lstm (bool): Translating bidirectional LSTM to TFLite ops with `UnidirectionalLSTM`. \
                 Defaults to False
             float16_quantization (bool): Quantize constants with float32 dtype to floa16 dtype. Defaults to False
+            enable_mtk_ops (bool): Translating with custom MTK operators. Defaults to False
         """
 
         self.model = model
@@ -130,6 +132,7 @@ class TFLiteConverter(object):
         self.tflite_micro_rewrite = tflite_micro_rewrite
         self.map_bilstm_to_lstm = map_bilstm_to_lstm
         self.float16_quantization = float16_quantization
+        self.enable_mtk_ops = enable_mtk_ops
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -354,6 +357,7 @@ class TFLiteConverter(object):
                 self.q_type,
                 self.hybrid_q_type,
                 self.map_bilstm_to_lstm,
+                self.enable_mtk_ops,
             )
             # Don't track the operator if all the input nodes are not tracked unless it has custom implementation
             # (e.g prim::* ops)

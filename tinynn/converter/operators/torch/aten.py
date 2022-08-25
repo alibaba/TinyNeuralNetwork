@@ -1091,7 +1091,9 @@ class ATenConvolutionOperator(ATenConvolutionSchema):
             )
         else:
             graph_converter.add_operator(
-                tfl.GenericTransposeConvOperator(inputs, outputs, stride, padding, dilation, output_padding, groups)
+                tfl.GenericTransposeConvOperator(
+                    inputs, outputs, stride, padding, dilation, output_padding, groups, self.enable_mtk_ops
+                )
             )
 
 
