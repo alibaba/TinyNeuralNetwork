@@ -526,7 +526,7 @@ class GenericTransposeConvOperator(TransformableOperator):
         if weight_dim in (3, 4):
             assert all((x == 1 for x in self.dilation)), "Only dilation=1 is supported for conv_transpose2d"
             if self.enable_mtk_ops:
-                conv_op = tfl_ops.TransposeConvOperator(
+                conv_op = MTKTransposeConvOperator(
                     self.inputs[:2][::-1],
                     depth_multiplier=1,
                     dilation_height_factor=self.dilation[0],
