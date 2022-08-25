@@ -23,7 +23,7 @@ from torch.nn.parallel.distributed import DistributedDataParallel
 
 from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16, FakeQuantizeTFLite
 from tinynn.graph.quantization.modules import QPReLU, QSiLU
-from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserver_KL
+from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserverKL
 from tinynn.graph.tracer import (
     ConstantNode,
     TraceFunction,
@@ -2044,11 +2044,11 @@ class PostQuantizer(QATQuantizer):
         if self.algorithm != 'l2':
             if self.algorithm == 'kl':
                 if self.backend == 'qnnpack':
-                    alg_sym_fq = HistogramObserver_KL.with_args(qscheme=torch.per_tensor_symmetric, reduce_range=False)
-                    alg_asym_fq = HistogramObserver_KL.with_args(reduce_range=False)
+                    alg_sym_fq = HistogramObserverKL.with_args(qscheme=torch.per_tensor_symmetric, reduce_range=False)
+                    alg_asym_fq = HistogramObserverKL.with_args(reduce_range=False)
                 elif self.backend == 'fbgemm':
-                    alg_sym_fq = HistogramObserver_KL.with_args(qscheme=torch.per_tensor_symmetric, reduce_range=True)
-                    alg_asym_fq = HistogramObserver_KL.with_args(reduce_range=True)
+                    alg_sym_fq = HistogramObserverKL.with_args(qscheme=torch.per_tensor_symmetric, reduce_range=True)
+                    alg_asym_fq = HistogramObserverKL.with_args(reduce_range=True)
                 else:
                     alg_sym_fq = qconfig.activation
                     alg_asym_fq = qconfig.activation

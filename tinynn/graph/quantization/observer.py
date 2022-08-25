@@ -34,10 +34,7 @@ class MovingAveragePerChannelMinMaxObserver(torch_q.MovingAveragePerChannelMinMa
         self.quant_max = 127
 
 
-class HistogramObserver_KL(torch_q.HistogramObserver):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
+class HistogramObserverKL(torch_q.HistogramObserver):
     def _compute_threshold(self, distribution: np.ndarray, m_bin_number=2048) -> int:
         """Compute the quantization error using Kullback-Leibler divergence.
         We filter out outliers in input distribution by searching the threshold for minimizing KL-Divergence.
@@ -122,7 +119,6 @@ class HistogramObserver_KL(torch_q.HistogramObserver):
             expanded_dis = torch.from_numpy(expanded_dis)
             candidate_dis = torch.from_numpy(candidate_dis)
             curKL = F.kl_div(expanded_dis.log(), candidate_dis, reduction='sum')
-            # print(f'======>KL:{i}  ==>{curKL}')
             if curKL < min_kl_divergence and curKL != 1.0:
                 min_kl_divergence = curKL
                 threshold = i
@@ -132,7 +128,6 @@ class HistogramObserver_KL(torch_q.HistogramObserver):
     def _non_linear_param_search(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """Search for optimal cutoff range for asymmetric quantization.
         First, search for right_threshold, then search from right to left for left_threshold by minimizing the KL-d.
-
         """
         bins = self.histogram.clone()
         bins[0] = bins[1]
@@ -150,6 +145,5 @@ class HistogramObserver_KL(torch_q.HistogramObserver):
         left_threshold = right_threshold - left_threshold_
         new_min = self.min_val + bin_width * left_threshold
         new_max = self.min_val + bin_width * right_threshold
-        # print(f'origin:[{self.min_val},{self.max_val}] --> new:[{new_min},{new_max}]')
 
         return new_min, new_max
