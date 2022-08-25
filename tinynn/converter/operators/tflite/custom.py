@@ -70,7 +70,7 @@ class MTKTransposeConvOperator(CustomOperator):
         depth_multiplier: int = 0,
         dilation_height_factor: int = 0,
         dilation_width_factor: int = 0,
-        PaddingType: int = tflite.Padding.SAME,
+        padding_type: int = tflite.Padding.SAME,
         stride_height: int = 0,
         stride_width: int = 0,
     ) -> None:
@@ -80,7 +80,7 @@ class MTKTransposeConvOperator(CustomOperator):
         self.depth_multiplier = depth_multiplier
         self.dilation_height_factor = dilation_height_factor
         self.dilation_width_factor = dilation_width_factor
-        self.PaddingType = PaddingType
+        self.padding_type = padding_type
         self.stride_height = stride_height
         self.stride_width = stride_width
 
@@ -92,7 +92,7 @@ class MTKTransposeConvOperator(CustomOperator):
                 'depth_multiplier': self.depth_multiplier,
                 'dilation_height_factor': self.dilation_height_factor,
                 'dilation_width_factor': self.dilation_width_factor,
-                'PaddingType': self.PaddingType,
+                'PaddingType': self.padding_type,
                 'stride_height': self.stride_height,
                 'stride_width': self.stride_width,
             }
