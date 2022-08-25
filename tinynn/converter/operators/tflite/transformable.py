@@ -531,7 +531,7 @@ class GenericTransposeConvOperator(TransformableOperator):
                     depth_multiplier=1,
                     dilation_height_factor=self.dilation[0],
                     dilation_width_factor=self.dilation[1],
-                    PaddingType=tflite.Padding.VALID,
+                    padding_type=tflite.Padding.VALID,
                     stride_height=self.stride[0],
                     stride_width=self.stride[1],
                 )
