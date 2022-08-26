@@ -566,7 +566,7 @@ class OperatorConverter(ABC):
         else:
             if keep_dim:
                 output_tensor = outputs[0]
-                transform = self.create_transform_tensor(np.squeeze(output_tensor.tensor, dim))
+                transform = self.create_transform_tensor(np.squeeze(output_tensor.tensor, tuple(dims)))
                 ops.append(converter_class(inputs, [transform], *args, **kwargs))
 
                 shape_tensor = self.create_attr_tensor(np.array(output_tensor.shape, dtype='int32'))
