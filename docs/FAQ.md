@@ -111,6 +111,19 @@ Except for the Resize process, `ToTensor` converts the data to floating point an
 
 P.S. For inputs of the `int8` type , you may need to perform the `uint8` to `int8` conversion yourself before feeding to the model as input (subtract 128 manually)
 
+#### The accuracy of PyTorch's post-quantization algorithm is seriously degraded. Are there other post-quantization algorithms?
+At present, PyTorch officially uses L2_norm as the post-quantization algorithm, and TinyNeuralNetwork supports the KL divergence-based post-quantization algorithm on the basis of PyTorch. When instantiating `PostQuantizer`, set the corresponding `algorithm` in config. The default algorithm option is `l2`, and the optional options are `l2`, `kl`.
+```py
+ with model_tracer():
+    model = Mobilenet()
+    model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
+    dummy_input = torch.rand((1, 3, 224, 224))
+
+    # Set the algorithm options you need, the default option is l2.
+    quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'algorithm':'kl'})
+    ptq_model = quantizer.quantize()
+```
+
 ## Model conversion
 
 #### What should I do if the operator is not supported?
