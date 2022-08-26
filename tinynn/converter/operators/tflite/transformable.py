@@ -528,6 +528,7 @@ class GenericTransposeConvOperator(TransformableOperator):
             if self.enable_mtk_ops:
                 conv_op = MTKTransposeConvOperator(
                     self.inputs[:2][::-1],
+                    self.outputs,
                     depth_multiplier=1,
                     dilation_height_factor=self.dilation[0],
                     dilation_width_factor=self.dilation[1],
