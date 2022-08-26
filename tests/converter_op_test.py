@@ -3916,6 +3916,102 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    @unittest.skipIf(not hasattr(torch, 'norm'), "Norm is not supported")
+    def test_norm_p1(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.norm(x, p=1)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch, 'norm'), "Norm is not supported")
+    def test_norm_p1_with_dim(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.norm(x, p=1, dim=0)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch, 'norm'), "Norm is not supported")
+    def test_norm_p1_with_dim_keepdim(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.norm(x, p=1, dim=0, keepdim=True)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch, 'norm'), "Norm is not supported")
+    def test_norm_p2(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.norm(x, p=2)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input).view(1)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch, 'norm'), "Norm is not supported")
+    def test_norm_p2_with_dim(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.norm(x, p=2, dim=0)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
+    @unittest.skipIf(not hasattr(torch, 'norm'), "Norm is not supported")
+    def test_norm_p2_with_dim_keepdim(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.norm(x, p=2, dim=0, keepdim=True)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
 
 class ConverterQuantizedOPTester(unittest.TestCase):
     backend: str
