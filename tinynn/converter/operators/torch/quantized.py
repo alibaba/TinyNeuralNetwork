@@ -94,7 +94,7 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
 
         inputs = [input_tensor, weight_tensor]
         if bias is not None:
-            if transpose:
+            if transpose and not self.enable_mtk_ops:
                 if self.q_type == np.uint8:
                     bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.uint8)
                 elif self.q_type == np.int8:
@@ -113,7 +113,9 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
         if transpose:
             assert fusedActivation == tfl_schema.ActivationFunctionType.NONE
             graph_converter.add_operator(
-                tfl.GenericTransposeConvOperator(inputs, outputs, stride, padding, dilation, output_padding, groups)
+                tfl.GenericTransposeConvOperator(
+                    inputs, outputs, stride, padding, dilation, output_padding, groups, self.enable_mtk_ops
+                )
             )
         else:
             graph_converter.add_operator(
