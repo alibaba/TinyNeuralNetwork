@@ -111,6 +111,23 @@ transforms = transforms.Compose(
 
 P.S. 对于 `int8` 类型的输入，你可能需要在模型输入前自行完成 `uint8` 到 `int8` 的转换 （手工减128）
 
+#### 如何选择不同的后量化算法？
+
+Q：如何使用基于KL散度的后量化算法？
+
+A：目前pytorch官方使用L2 norm作为后量化算法，TinyNeuralNetwork在Pytorch的基础上支持了基于KL散度的后量化算法。在实例化`PostQuantizer`时，在config中设置对应的`algorithm`，目前默认的algorithm参数为`l2`，可选的参数为`l2/kl`。
+```py
+ with model_tracer():
+    model = Mobilenet()
+    model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
+    dummy_input = torch.rand((1, 3, 224, 224))
+
+    # 设置你需要的algorithm参数，默认为l2。
+    quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'algorithm':'kl'})
+    ptq_model = quantizer.quantize()
+```
+
+
 ## 模型转换
 
 #### 算子不支持如何处理？
