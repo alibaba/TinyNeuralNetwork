@@ -23,7 +23,7 @@ from torch.nn.parallel.distributed import DistributedDataParallel
 
 from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16, FakeQuantizeTFLite
 from tinynn.graph.quantization.modules import QPReLU, QSiLU
-from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver
+from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserverKL
 from tinynn.graph.tracer import (
     ConstantNode,
     TraceFunction,
@@ -178,6 +178,7 @@ class QATQuantizer(object):
             'quantized_op_stats': None,
             'set_quantizable_op_stats': False,
             'rounding_mode': 'pytorch',
+            'algorithm': 'l2',
         }
 
         if config is None:
@@ -1987,6 +1988,7 @@ class PostQuantizer(QATQuantizer):
     per_tensor: bool
     disable_requantization_for_cat: bool
     dynamic_lstm_quant: bool
+    algorithm: str
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new PostQuantizer object
@@ -2000,6 +2002,12 @@ class PostQuantizer(QATQuantizer):
         """
 
         super().__init__(model, dummy_input, work_dir, config)
+
+    def parse_config(self, config: typing.Optional[dict]):
+        if config and 'algorithm' not in config.keys():
+            config['algorithm'] = 'l2'
+
+        super().parse_config(config)
 
     def prepare_qconfig(self, graph: TraceGraph, backend: str):
         """Prepare qconfig for various configurations.
@@ -2032,6 +2040,22 @@ class PostQuantizer(QATQuantizer):
             qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
         else:
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
+
+        if self.algorithm != 'l2':
+            if self.algorithm == 'kl':
+                if self.backend == 'qnnpack':
+                    alg_sym_fq = HistogramObserverKL.with_args(qscheme=torch.per_tensor_symmetric, reduce_range=False)
+                    alg_asym_fq = HistogramObserverKL.with_args(reduce_range=False)
+                elif self.backend == 'fbgemm':
+                    alg_sym_fq = HistogramObserverKL.with_args(qscheme=torch.per_tensor_symmetric, reduce_range=True)
+                    alg_asym_fq = HistogramObserverKL.with_args(reduce_range=True)
+                else:
+                    alg_sym_fq = qconfig.activation
+                    alg_asym_fq = qconfig.activation
+                if not self.asymmetric:
+                    qconfig = torch_q.QConfig(alg_sym_fq, qconfig.weight)
+                else:
+                    qconfig = torch_q.QConfig(alg_asym_fq, qconfig.weight)
 
         torch.backends.quantized.engine = backend
         graph.module.qconfig = qconfig
