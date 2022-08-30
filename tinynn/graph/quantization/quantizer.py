@@ -1700,7 +1700,7 @@ class QATQuantizer(object):
                 cur_class = cur_module.kind
             prev_nodes = cur_node.prev_nodes
             log.debug(f'cur: {cur_class}')
-            if cur_class in current_rules:
+            if cur_class in current_rules or cur_class == nn.Identity:
                 if use_original_name:
                     cur_name = graph.module_original_name_dict[id(cur_module)]
                 else:
@@ -1708,15 +1708,16 @@ class QATQuantizer(object):
                 if cur_name in custom_data[1]:
                     log.debug('found existing nodes, skipping')
                     break
-                current_state, current_rules = current_rules[cur_class]
-                log.debug('dict: ', current_rules, current_state)
                 if len(prev_nodes) == 0:
                     break
-                names.append(cur_name)
-                if current_state is True:
-                    log.debug(f'update best: {names}')
-                    final_names.clear()
-                    final_names.extend(names)
+                if cur_class in current_rules:
+                    current_state, current_rules = current_rules[cur_class]
+                    log.debug('dict: ', current_rules, current_state)
+                    names.append(cur_name)
+                    if current_state is True:
+                        log.debug(f'update best: {names}')
+                        final_names.clear()
+                        final_names.extend(names)
                 if len(cur_node.prev_nodes) != 1:
                     break
                 cur_node = cur_node.prev_nodes[0]
