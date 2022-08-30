@@ -47,6 +47,7 @@ class GraphOptimizer(object):
         quantize_input_output_type: typing.Optional[str],
         fuse_input_indices: typing.Optional[typing.List[int]] = None,
         fuse_output_indices: typing.Optional[typing.List[int]] = None,
+        max_transpose_dims: int = -1,
     ) -> None:
         self.graph = graph
         self.fuse_tensor_count = 0
@@ -59,6 +60,7 @@ class GraphOptimizer(object):
         self.quantize_input_output_type = quantize_input_output_type
         self.fuse_input_indices = fuse_input_indices
         self.fuse_output_indices = fuse_output_indices
+        self.max_transpose_dims = max_transpose_dims
 
     def create_attr_tensor(
         self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
@@ -2055,6 +2057,104 @@ class GraphOptimizer(object):
 
             self.graph.try_restore_edges(mapping)
 
+    @class_conditional(lambda self: self.max_transpose_dims > 0)
+    def lower_transpose_dim_pass(self):
+        vertices = self.graph.graph.vs.select(
+            functools.partial(
+                is_high_dim_transpose_node, graph_converter=self.graph.graph, max_transpose_dims=self.max_transpose_dims
+            )
+        )
+
+        remove_ids = []
+        ops = []
+        restore_mapping = []
+        for trans in vertices:
+            restore_nodes = []
+            # For each node that is next of a transformable node,
+            #  a. if it is an output node, remove it anyway since it will always be reconstructed
+            #  b. otherwise, record the info of the edge so that we may restore it after reconstruction
+            for out_edge in trans.out_edges():
+                next_node = self.graph.graph.vs[out_edge.target]
+                if next_node['node_type'] == ExtendedOperator.OUTPUT_NODE:
+                    remove_ids.append(next_node.index)
+                    del self.graph.tensor_map[next_node['outputs'][0]]
+                    del self.graph.tensor_node_map[next_node['outputs'][0]]
+                else:
+                    restore_nodes.append((out_edge['name'], next_node['name']))
+
+            # Remove the mapping since they are going to be removed
+            for output_name in trans['outputs']:
+                del self.graph.tensor_map[output_name]
+                del self.graph.tensor_node_map[output_name]
+
+            restore_mapping.append(restore_nodes)
+            remove_ids.append(trans.index)
+
+        # Make sure the nodes are topologically sorted
+        sorted_ops = [node['op'] for node in sorted(vertices, key=lambda x: int(re.search(r'\d+', x['name'])[0]))]
+
+        # Delete nodes before transformation in the graph
+        self.graph.graph.delete_vertices(remove_ids)
+
+        for trans, mapping in zip(sorted_ops, restore_mapping):
+            input_tensor = trans.inputs[0]
+            perm_tensor = trans.inputs[1]
+            output_tensor = trans.outputs[0]
+
+            input_shape = input_tensor.shape
+            perm = perm_tensor.tensor
+            output_shape = output_tensor.shape
+
+            last_perm = None
+            last_dim = None
+            cum_dim = None
+            new_shape = []
+            new_perm = []
+            for d, p in zip(input_shape, perm):
+                if last_dim is None and last_perm is None:
+                    cum_dim = d
+                else:
+                    if p - last_perm == 1 or d == 1 or cum_dim == 1:
+                        cum_dim *= d
+                    else:
+                        new_shape.append(cum_dim)
+                        new_perm.append(last_perm)
+                        cum_dim = d
+
+                last_dim = d
+                last_perm = p
+
+            new_shape.append(cum_dim)
+            new_perm.append(last_perm)
+
+            new_perm_arr = np.argsort(new_perm).astype('int32')
+
+            assert (
+                len(new_shape) <= self.max_transpose_dims
+            ), f"Don't know how to reduce the number of dims of transpose with input shape {input_shape}, perm {perm}"
+
+            ops = []
+
+            input_reduced = self.create_transform_tensor(
+                np.reshape(input_tensor.tensor, new_shape), quantization=input_tensor.quantization
+            )
+            reduced_shape = self.create_attr_tensor(np.array(new_shape, dtype='int32'))
+            ops.append(tfl.ReshapeOperator([input_tensor, reduced_shape], [input_reduced], new_shape))
+
+            transposed = self.create_transform_tensor(
+                np.transpose(input_reduced.tensor, new_perm_arr), quantization=input_tensor.quantization
+            )
+            new_perm_tensor = self.create_attr_tensor(np.array(new_perm_arr, dtype='int32'))
+            ops.append(tfl.TransposeOperator([input_reduced, new_perm_tensor], [transposed]))
+
+            output_shape_tensor = self.create_attr_tensor(np.array(output_shape, dtype='int32'))
+            ops.append(tfl.ReshapeOperator([transposed, output_shape_tensor], [output_tensor], output_shape))
+
+            for op in ops:
+                self.graph.add_operator(op, transform=True)
+
+            self.graph.try_restore_edges(mapping)
+
     @class_conditional(lambda self: self.group_conv_rewrite)
     def group_conv_rewrite_pass(self):
         vertices = self.graph.graph.vs.select(functools.partial(is_group_conv_node, graph_converter=self.graph.graph))
@@ -2896,6 +2996,8 @@ class GraphOptimizer(object):
             self.fuse_simple_reshape_pass()
             self.fuse_simple_transpose_pass()
 
+        self.lower_transpose_dim_pass()
+
         # Some advanced fusion logic
         self.fuse_conv2d_gather()
 
@@ -3050,6 +3152,10 @@ def is_requantize_node(vertex: ig.Vertex, graph_converter: ig.Graph):
 
 def is_large_cat_node(vertex: ig.Vertex, graph_converter: ig.Graph):
     return vertex['node_type'] == ExtendedOperator.CONCATENATION and len(vertex['op'].inputs) > 10
+
+
+def is_high_dim_transpose_node(vertex: ig.Vertex, graph_converter: ig.Graph, max_transpose_dims: int):
+    return vertex['node_type'] == ExtendedOperator.TRANSPOSE and vertex['op'].inputs[1].tensor.size > max_transpose_dims
 
 
 def is_group_conv_node(vertex: ig.Vertex, graph_converter: ig.Graph):
