@@ -608,16 +608,20 @@ class QATQuantizer(object):
             parents = []
             names = []
             props = []
-            visited_other = set()
+            visited_other = dict()
             while not q.empty():
                 n, mode, fq_count = q.get()
-                if n.kind() in ('shape', 'size') or n.unique_name in visited_center or n.unique_name in visited_other:
+                if (
+                    n.kind() in ('shape', 'size')
+                    or n.unique_name in visited_center
+                    or visited_other.get(n.unique_name, 2) <= fq_count
+                ):
                     continue
 
                 if n.type() == 'cat':
                     visited_center.add(n.unique_name)
                 else:
-                    visited_other.add(n.unique_name)
+                    visited_other[n.unique_name] = fq_count
 
                 new_fq_count = fq_count
 
