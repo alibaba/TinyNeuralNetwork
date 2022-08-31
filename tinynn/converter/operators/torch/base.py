@@ -27,6 +27,7 @@ class OperatorConverter(ABC):
         hybrid_q_type=np.int8,
         map_bilstm_to_lstm=False,
         enable_mtk_ops=False,
+        hybrid_asymmetric_inputs=False,
     ) -> None:
         self.input_names = self.get_input_names(node)
         self.output_names = self.get_output_names(node)
@@ -41,6 +42,7 @@ class OperatorConverter(ABC):
         self.hybrid_q_type = hybrid_q_type
         self.map_bilstm_to_lstm = map_bilstm_to_lstm
         self.enable_mtk_ops = enable_mtk_ops
+        self.hybrid_asymmetric_inputs = hybrid_asymmetric_inputs
 
     @abstractmethod
     def parse(self, node, attrs, args, graph_converter):

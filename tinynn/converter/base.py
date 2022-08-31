@@ -361,6 +361,7 @@ class TFLiteConverter(object):
                 self.hybrid_q_type,
                 self.map_bilstm_to_lstm,
                 self.enable_mtk_ops,
+                self.hybrid_asymmetric_inputs,
             )
             # Don't track the operator if all the input nodes are not tracked unless it has custom implementation
             # (e.g prim::* ops)

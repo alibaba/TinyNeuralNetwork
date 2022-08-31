@@ -367,7 +367,13 @@ class QuantizedLinearDynamicOperator(QuantizedLinearDynamicSchema):
         keep_dims = len(output_tensor.shape) > 2
 
         graph_converter.add_operator(
-            tfl.FullyConnectedOperator(inputs, outputs, fusedActivationFunction=fusedActivation, keepNumDims=keep_dims)
+            tfl.FullyConnectedOperator(
+                inputs,
+                outputs,
+                fusedActivationFunction=fusedActivation,
+                keepNumDims=keep_dims,
+                asymmetricQuantizeInputs=self.hybrid_asymmetric_inputs,
+            )
         )
 
 

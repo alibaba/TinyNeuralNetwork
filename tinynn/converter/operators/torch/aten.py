@@ -151,6 +151,7 @@ class ATenLstmOperator(ATenLstmSchema):
                             fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
                             timeMajor=not batch_first,
                             mergeOutputs=True,
+                            asymmetricQuantizeInputs=self.hybrid_asymmetric_inputs,
                         )
                     )
                 else:
@@ -172,6 +173,7 @@ class ATenLstmOperator(ATenLstmSchema):
                             [fw_out],
                             fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
                             timeMajor=not batch_first,
+                            asymmetricQuantizeInputs=self.hybrid_asymmetric_inputs,
                         )
                     )
 
@@ -199,6 +201,7 @@ class ATenLstmOperator(ATenLstmSchema):
                             [bw_raw_out],
                             fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
                             timeMajor=not batch_first,
+                            asymmetricQuantizeInputs=self.hybrid_asymmetric_inputs,
                         )
                     )
 
@@ -212,6 +215,7 @@ class ATenLstmOperator(ATenLstmSchema):
                         outputs,
                         fusedActivationFunction=tfl_schema.ActivationFunctionType.TANH,
                         timeMajor=not batch_first,
+                        asymmetricQuantizeInputs=self.hybrid_asymmetric_inputs,
                     )
                 )
 
