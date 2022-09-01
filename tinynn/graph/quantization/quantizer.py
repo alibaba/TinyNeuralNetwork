@@ -1218,7 +1218,7 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind in ('relu', 'relu6', 'elu')
+                return cur_module.kind in ('relu', 'relu6', 'elu', 'leaky_relu')
 
         func_nodes_to_rewrite = graph.filter_forward_nodes(_is_functional_rewrite_node)
         log.info(f'rewriting functional to module for {[node.unique_name for node in func_nodes_to_rewrite]}')
@@ -1229,17 +1229,23 @@ class QATQuantizer(object):
                 new_func = nn.ReLU(inplace=inplace)
             elif node.module.kind == 'relu6':
                 new_func = nn.ReLU6(inplace=inplace)
-            elif node.module.kind == 'elu':
+            elif node.module.kind in ('elu', 'leaky_relu'):
                 if hasattr(node.module, 'args_string_no_self'):
 
                     def _parse_args(alpha=1.0, *args, **kwargs):
                         return alpha
 
                     alpha = eval(f'_parse_args({node.module.args_string_no_self})')
-                    new_func = nn.ELU(alpha, inplace=inplace)
+                    if node.module.kind == 'leaky_relu':
+                        new_func = nn.LeakyReLU(alpha, inplace=inplace)
+                    else:
+                        new_func = nn.ELU(alpha, inplace=inplace)
                 else:
                     alpha = None
-                    new_func = nn.ELU()
+                    if node.module.kind == 'leaky_relu':
+                        new_func = nn.LeakyReLU(alpha, inplace=inplace)
+                    else:
+                        new_func = nn.ELU()
 
             graph.module_unique_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
             graph.module_original_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
@@ -1250,7 +1256,7 @@ class QATQuantizer(object):
             else:
                 arg_str = ''
 
-            if node.module.kind == 'elu' and alpha is not None:
+            if node.module.kind in ('elu', 'leaky_relu') and alpha is not None:
                 if arg_str:
                     arg_str = f'{alpha}, {arg_str}'
                 else:
