@@ -23,6 +23,7 @@ from torch.nn.parallel.distributed import DistributedDataParallel
 
 from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16, FakeQuantizeTFLite
 from tinynn.graph.quantization.modules import QPReLU, QSiLU
+from tinynn.graph.quantization.qat_modules import Conv1d, ConvTranspose1d
 from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserverKL
 from tinynn.graph.tracer import (
     ConstantNode,
@@ -75,6 +76,8 @@ FUSE_RULE_LIST_EXTRA = {
     ('add', torch.nn.ReLU6),
     ('add', 'relu6'),
 }
+
+FUSE_QAT_MODULES = {nn.Conv1d: Conv1d, nn.ConvTranspose1d: ConvTranspose1d}
 
 REWRITE_TO_FUSE_RULE_LIST = {
     (torch.nn.Linear, torch.nn.BatchNorm1d),
@@ -150,6 +153,10 @@ class QATQuantizer(object):
             assert (
                 not self.per_tensor
             ), "Per-tensor quantizaton for FBGEMM not supported, please use per-channel quantization instead"
+
+        if self.backend == 'onnx':
+            if self.asymmetric:
+                log.warning('Asymmetric quantizaton for TensorRT not supported')
 
         if self.disable_requantization_for_cat is None:
             if not self.per_tensor:
@@ -367,13 +374,16 @@ class QATQuantizer(object):
         """
 
         log.info('setting qat backend and call prepare_qat')
-        qconfig = torch_q.get_default_qat_qconfig(backend)
+        actual_backend = backend
+        if backend == 'onnx':
+            actual_backend = 'qnnpack'
+        qconfig = torch_q.get_default_qat_qconfig(actual_backend)
         qconfig_c = None
         if self.rounding_mode == 'tflite':
             q_a = FakeQuantizeTFLite.with_args(*qconfig.activation.p.args, **qconfig.activation.p.keywords)
             q_w = FakeQuantizeTFLite.with_args(*qconfig.weight.p.args, **qconfig.weight.p.keywords)
             qconfig = torch_q.QConfig(q_a, q_w)
-        if self.backend == 'qnnpack':
+        if backend == 'qnnpack':
             if not self.asymmetric:
                 sym_fq = qconfig.activation.with_args(
                     observer=torch_q.MovingAverageMinMaxObserver,
@@ -395,7 +405,7 @@ class QATQuantizer(object):
                     ch_axis=0,
                 )
                 qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
-        elif self.backend == 'fbgemm':
+        elif backend == 'fbgemm':
             fq_type = qconfig.weight.p.func
             sym_fq = fq_type.with_args(
                 observer=torch_q.MovingAverageMinMaxObserver,
@@ -406,10 +416,32 @@ class QATQuantizer(object):
                 reduce_range=False,
             )
             qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
+        elif backend == 'onnx':
+            if not self.asymmetric:
+                sym_fq = qconfig.activation.with_args(
+                    observer=torch_q.MovingAverageMinMaxObserver,
+                    quant_min=-128,
+                    quant_max=127,
+                    dtype=torch.qint8,
+                    qscheme=torch.per_tensor_symmetric,
+                    reduce_range=False,
+                )
+                qconfig = torch_q.QConfig(sym_fq, qconfig.weight)
+            if not self.per_tensor:
+                sym_fq = qconfig.weight.with_args(
+                    observer=torch_q.MovingAveragePerChannelMinMaxObserver,
+                    quant_min=-128,
+                    quant_max=127,
+                    dtype=torch.qint8,
+                    qscheme=torch.per_channel_symmetric,
+                    reduce_range=False,
+                    ch_axis=0,
+                )
+                qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
         else:
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
 
-        torch.backends.quantized.engine = backend
+        torch.backends.quantized.engine = actual_backend
         graph.module.qconfig = qconfig
         if self.backend == 'qnnpack':
             if qconfig_c is not None:
@@ -418,7 +450,15 @@ class QATQuantizer(object):
 
                 while not q.empty():
                     m = q.get()
-                    if type(m).__name__ in ('Conv2d', 'ConvBnReLU2d', 'ConvBn2d', 'ConvReLU2d'):
+                    if type(m).__name__ in (
+                        'Conv2d',
+                        'ConvBnReLU2d',
+                        'ConvBn2d',
+                        'ConvReLU2d',
+                        'Conv1d',
+                        'ConvBnReLU1d',
+                        'ConvBn1d',
+                    ):
                         m.qconfig = qconfig_c
                     else:
                         for c in m.children():
@@ -486,6 +526,8 @@ class QATQuantizer(object):
         if self.dynamic_lstm_quant:
             mapping = dict(mapping)
             mapping.update({nn.LSTM: nnqd.LSTM})
+
+        mapping.update(FUSE_QAT_MODULES)
 
         if LooseVersion(torch.__version__) < LooseVersion("1.7.0"):
             model = torch_q.prepare(graph.module, inplace=True)
@@ -1939,6 +1981,16 @@ class QATQuantizer(object):
         return q_model
 
     def optimize_conv_bn_fusion(self, q_model, eps=1e-5):
+        """Optimizes the Conv-BatchNorm fusion pattern.
+           Sometimes, the running_var of the BatchNorm could be near to zero. If the weights of those channels happen
+           to be large, then it may lead to large quantization losses. We choose to ignore those channels when
+           `bn.running_var.abs() < eps`.
+
+        Args:
+            q_model (nn.Module): The QAT/PTQ-prepared model
+
+        """
+
         def _pre_hook_func(indices):
             def _pre_hook(mod, input):
                 max_val = input[0][~indices].max()
@@ -1954,6 +2006,22 @@ class QATQuantizer(object):
                     indices = m.bn.running_var < eps
                     if torch.any(indices):
                         m.weight_fake_quant.register_forward_pre_hook(_pre_hook_func(indices))
+
+    def prepare_onnx_export(self, q_model):
+        """Prepares for ONNX model export
+
+        Args:
+            q_model (nn.Module): The QAT/PTQ-prepared model
+
+        """
+
+        fused_fq_cls = hasattr(torch_q, 'FusedMovingAvgObsFakeQuantize', None)
+        if fused_fq_cls is not None:
+            for m in q_model.modules():
+                if isinstance(m, fused_fq_cls):
+                    m.forward = torch_q.FakeQuantize.forward
+
+        q_model.apply(torch_q.disable_observer)
 
 
 class BF16Quantizer(QATQuantizer):
@@ -2049,6 +2117,21 @@ class PostQuantizer(QATQuantizer):
         elif self.backend == 'fbgemm':
             sym_fq = torch_q.MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric)
             qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
+        elif self.backend == 'onnx':
+            if not self.asymmetric:
+                sym_fq = torch_q.HistogramObserver.with_args(
+                    dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False
+                )
+                qconfig = torch_q.QConfig(sym_fq, qconfig.weight)
+            if not self.per_tensor:
+                sym_fq = torch_q.MinMaxObserver.with_args(
+                    dtype=torch.qint8, qscheme=torch.per_tensor_symmetric, reduce_range=False
+                )
+                qconfig = torch_q.QConfig(qconfig.activation, sym_fq)
+                sym_fq = torch_q.PerChannelMinMaxObserver.with_args(
+                    dtype=torch.qint8, qscheme=torch.per_channel_symmetric, reduce_range=False, ch_axis=0
+                )
+                qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
         else:
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
 
@@ -2077,7 +2160,15 @@ class PostQuantizer(QATQuantizer):
 
                 while not q.empty():
                     m = q.get()
-                    if type(m).__name__ in ('Conv2d', 'ConvBnReLU2d', 'ConvBn2d', 'ConvReLU2d'):
+                    if type(m).__name__ in (
+                        'Conv2d',
+                        'ConvBnReLU2d',
+                        'ConvBn2d',
+                        'ConvReLU2d',
+                        'Conv1d',
+                        'ConvBnReLU1d',
+                        'ConvBn1d',
+                    ):
                         m.qconfig = qconfig_c
                     else:
                         for c in m.children():
