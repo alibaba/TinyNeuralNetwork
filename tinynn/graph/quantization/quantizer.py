@@ -145,7 +145,7 @@ class QATQuantizer(object):
         if sys.platform == 'win32' and self.backend == 'qnnpack':
             log.error('Quantization backend qnnpack is likely unsupported on Windows. Please use fbgemm instead.')
 
-        if self.backend not in ('fbgemm', 'qnnpack'):
+        if self.backend not in ('fbgemm', 'qnnpack', 'onnx'):
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
 
         if self.backend == 'fbgemm':
@@ -2015,11 +2015,18 @@ class QATQuantizer(object):
 
         """
 
-        fused_fq_cls = hasattr(torch_q, 'FusedMovingAvgObsFakeQuantize', None)
+        fused_fq_cls = getattr(torch_q, 'FusedMovingAvgObsFakeQuantize', None)
         if fused_fq_cls is not None:
             for m in q_model.modules():
                 if isinstance(m, fused_fq_cls):
-                    m.forward = torch_q.FakeQuantize.forward
+
+                    def get_wrapper(mod):
+                        def wrapper(*args, **kwargs):
+                            return torch_q.FakeQuantize.forward(mod, *args, **kwargs)
+
+                        return wrapper
+
+                    m.forward = get_wrapper(m)
 
         q_model.apply(torch_q.disable_observer)
 
