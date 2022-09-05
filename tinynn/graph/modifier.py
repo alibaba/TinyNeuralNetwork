@@ -833,10 +833,10 @@ class Modifier(object):
                 continue
 
             try:
-                tensor_o.copy_(tensor)
+                tensor_o.copy_(tensor.clone())
             except Exception as e:
                 log.error(
-                    f"error modifier = {self.unique_name()}, type = {type(self.module())}, kind = {self.node.kind}"
+                    f"error modifier = {self.unique_name()}, type = {type(self.module())}, kind = {self.node.kind()}"
                 )
                 raise e
 
@@ -1048,6 +1048,28 @@ class Modifier(object):
             assert False
 
         return tensor_choices
+
+
+class PaddingModifier(Modifier):
+    def dim_change_forward(self, center, tensor, dim_changes_i, dim_transform, tensor_constraint):
+        args_split = self.module().args_template.split(",")
+        args_split[-1] = "-1"
+        args_template = ",".join(args_split)
+        self.module().args_template = args_template
+
+        changes = self.calc_dim_changes()
+
+        self.dim_changes_info.update_i(
+            center, tensor, dim_changes_i, dim_transform, tensor_constraint=tensor_constraint
+        )
+
+        for change in changes:
+            dim_change_o, tensor_o = change
+
+            if dim_change_o:
+                self.dim_changes_info.update_o(center, tensor_o, dim_change_o)
+                for m in self.next_modifiers(tensor_o):
+                    m.dim_change_forward(center, tensor_o, dim_change_o, dim_transform, None)
 
 
 class PoolingModifier(Modifier):
@@ -2358,6 +2380,7 @@ CHANNEL_MODIFIERS = {
     nn.MaxPool2d: PoolingModifier,
     'adaptive_avg_pool2d': PoolingModifier,
     'max_pool2d': PoolingModifier,
+    'pad': PaddingModifier,
     nn.Upsample: PoolingModifier,
     nn.UpsamplingBilinear2d: PoolingModifier,
     nn.UpsamplingNearest2d: PoolingModifier,
