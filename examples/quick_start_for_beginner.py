@@ -39,6 +39,7 @@ def main_worker(args):
 
     print("\n###### Start pruning the model ######")
     # If you need to set the sparsity of a single operator, then you may refer to the examples in `examples/pruner`.
+    # Use {"bn_compensation":True} can improve accuracy in some cases.
     pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.25, "metrics": "l2_norm"})
 
     st_flops = pruner.calc_flops()

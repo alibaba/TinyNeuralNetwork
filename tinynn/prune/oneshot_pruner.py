@@ -24,6 +24,7 @@ class OneShotChannelPruner(BasePruner):
     default_sparsity: float
     metric_func: typing.Callable[[torch.Tensor, torch.nn.Module], float]
     skip_last_fc: bool
+    bn_compensation: bool
     exclude_ops: list
 
     def __init__(self, model, dummy_input, config):
@@ -42,6 +43,7 @@ class OneShotChannelPruner(BasePruner):
 
         self.center_nodes = []
         self.sparsity = {}
+        self.bn_compensation = False
         self.parse_config()
 
         for n in self.graph.forward_nodes:
@@ -67,7 +69,7 @@ class OneShotChannelPruner(BasePruner):
             if self.sparsity[last_center_node.unique_name] == self.default_sparsity:
                 self.sparsity[last_center_node.unique_name] = 0.0
 
-        self.graph_modifier = modifier.GraphChannelModifier(self.graph, self.center_nodes)
+        self.graph_modifier = modifier.GraphChannelModifier(self.graph, self.center_nodes, self.bn_compensation)
 
         for sub_graph in self.graph_modifier.sub_graphs.values():
             exclude = False
@@ -90,12 +92,13 @@ class OneShotChannelPruner(BasePruner):
 
         all_param_keys = list(self.required_params) + list(self.default_values.keys())
         for param_key in all_param_keys:
-            if param_key not in ['sparsity', 'metrics', 'skip_last_fc', 'exclude_ops']:
+            if param_key not in ['sparsity', 'metrics', 'skip_last_fc', 'exclude_ops', "bn_compensation"]:
                 setattr(self, param_key, self.config[param_key])
 
         sparsity = self.config['sparsity']
         metrics = self.config['metrics']
         self.skip_last_fc = self.config.get('skip_last_fc', True)
+        self.bn_compensation = self.config.get('bn_compensation', self.bn_compensation)
         self.exclude_ops = self.config.get('exclude_ops', [])
 
         if isinstance(sparsity, float):
@@ -183,4 +186,4 @@ class OneShotChannelPruner(BasePruner):
                 if n.unique_name not in self.sparsity:
                     self.sparsity[n.unique_name] = self.default_sparsity
 
-        self.graph_modifier = modifier.GraphChannelModifier(self.graph, self.center_nodes)
+        self.graph_modifier = modifier.GraphChannelModifier(self.graph, self.center_nodes, self.bn_compensation)

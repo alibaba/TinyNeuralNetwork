@@ -2016,6 +2016,42 @@ class ModifierTester(unittest.TestCase):
         pruner.prune()
         model(torch.rand((1, 3, 9, 9)))
 
+    def test_bn_compensation(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.bn = nn.BatchNorm2d(3)
+                self.bn.register_buffer('running_mean', torch.Tensor([0, 0, 0]))
+                self.bn.register_buffer('running_var', torch.Tensor([0, 0, 0]))
+                self.bn.weight = torch.nn.Parameter(self.bn.weight * 0)
+                self.bn.bias = torch.nn.Parameter(torch.Tensor([1, 1, 1]))
+                self.conv0 = nn.Conv2d(3, 6, (1, 1), (1, 1), bias=True)
+                self.conv0.bias = torch.nn.Parameter(torch.zeros_like(self.conv0.bias))
+
+            def forward(self, x):
+                bn = self.bn(x)
+                conv0 = self.conv0(bn)
+                return conv0
+
+        model = TestModel()
+
+        dummy_input = torch.zeros((1, 3, 5, 5))
+
+        output1 = model(dummy_input)
+        print(output1)
+
+        remove_idx = [1, 2]
+        bn_bias = model.conv0.weight * model.bn.bias
+        bn_bias = bn_bias[:, [True if i in remove_idx else False for i in range(bn_bias.shape[1])]]
+        bn_bias = torch.sum(bn_bias, dim=[1, 2, 3])
+        model.conv0.bias = torch.nn.Parameter(model.conv0.bias + bn_bias)
+        model.bn.bias = torch.nn.Parameter(torch.Tensor([1, 0, 0]))
+
+        output2 = model(dummy_input)
+        print(output2)
+
+        print(torch.allclose(output1, output2))
+
 
 if __name__ == '__main__':
     unittest.main()

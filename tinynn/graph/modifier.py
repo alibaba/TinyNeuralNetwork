@@ -620,6 +620,7 @@ class DimensionChangeInfo(object):
 
 
 class Modifier(object):
+    graph_modifier: "GraphChannelModifier"
     node: TraceNode
     dim_changes_info: DimensionChangeInfo
     forward_dim_mapping: typing.Dict[int, typing.Dict[int, typing.Dict[int, typing.Set]]]
@@ -629,6 +630,7 @@ class Modifier(object):
     bias_mask: typing.Dict[str, torch.Tensor]
 
     def __init__(self, node: TraceNode):
+        self.graph_modifier = None
         self.node = node
 
         # Tensor change dependencies between this operator and other operators
@@ -1130,6 +1132,7 @@ class PReLUChannelModifier(Modifier):
 class BatchNormChannelModifier(Modifier):
     def __init__(self, node: TraceNode):
         super(BatchNormChannelModifier, self).__init__(node)
+        self.prunable = True
 
     def register_mask(self, modifiers, importance, sparsity):
         pruned_idx, sparsity = self.get_pruned_idx(modifiers)
@@ -1152,6 +1155,63 @@ class BatchNormChannelModifier(Modifier):
         preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[0])], remove_idx)
 
         if bn.weight.shape[0] != len(preserve_idx):
+            while self.graph_modifier.bn_compensation:
+                if len(self.next_modifiers()) != 1:
+                    break
+
+                if len(self.next_modifiers()[0].next_modifiers()) != 1:
+                    break
+
+                act = self.next_modifiers()[0].module()
+                conv = self.next_modifiers()[0].next_modifiers()[0].module()
+
+                if isinstance(act, nn.Module):
+                    if type(act) not in [
+                        nn.ReLU,
+                        nn.ReLU6,
+                        nn.LeakyReLU,
+                        nn.Sigmoid,
+                        nn.Tanh,
+                        nn.Hardsigmoid,
+                        nn.Hardtanh,
+                        nn.Hardswish,
+                        nn.LogSigmoid,
+                    ]:
+                        log.debug(f"unsupported activation for bn compensation: {type(act)}")
+                        break
+
+                if isinstance(act, TraceNode):
+                    if self.next_modifiers()[0].node.kind() not in [
+                        'relu',
+                        'relu6',
+                        'leaky_relu',
+                        'sigmoid',
+                        'tanh',
+                        'hardsigmoid',
+                        'hardtanh',
+                        'hardswish',
+                        'logsigmoid',
+                    ]:
+                        log.debug(f"unsupported activation for bn compensation: {self.next_modifiers()[0].node.kind()}")
+                        break
+
+                if type(conv) is not torch.nn.Conv2d:
+                    break
+
+                if conv.groups == 1:
+                    with torch.no_grad():
+                        bias = torch.tensor(bn.bias)
+                        activation_bias = act(bias)
+                        fuse_weight = torch.sum(conv.weight, dim=[2, 3])
+                        bn_bias = fuse_weight * activation_bias
+                        bn_bias = bn_bias[:, [True if i in remove_idx else False for i in range(bn_bias.shape[1])]]
+                        bn_bias = torch.sum(bn_bias, dim=[1])
+                        if conv.bias is None:
+                            conv.bias = torch.nn.Parameter(bn_bias)
+                        else:
+                            conv.bias = torch.nn.Parameter(conv.bias + bn_bias)
+                break
+
             log.info(f'[BN] {self.unique_name()}: channel {bn.num_features} -> {len(preserve_idx)}')
             bn.weight = torch.nn.Parameter(bn.weight[preserve_idx])
             bn.bias = torch.nn.Parameter(bn.bias[preserve_idx])
@@ -2197,6 +2257,8 @@ class Conv2dChannelModifier(Modifier):
     def modify_input(self, remove_idx):
         conv = self.node.module
 
+        log.debug(f'[CONV] {self.unique_name()}: remove_idx = {remove_idx}')
+
         if is_dw_conv(self.module()):
             preserve_idx = complementary_list([i for i in range(self.weight_mask["weight"].shape[0])], remove_idx)
 
@@ -2444,6 +2506,304 @@ class SubGraph(object):
 
         return result
 
+    def calc_prune_idx_by_bn_variance(
+        self, center_list, center_to_leaf_all, leaf_to_center_all, importance, center_to_center_all, sparsity
+    ):
+        pruned_leaf_constraint_all = {}
+        pruned_center_constraint_all = {}
+
+        invalid_bn_idxes = {}
+
+        invalid_center_idxes = {}
+        ignored_bn = set()
+
+        for leaf in self.leaf:
+            if type(leaf.module()) != nn.BatchNorm2d:
+                continue
+
+            while True:
+                if len(leaf.pre_modifiers()) == 1:
+                    leaf = leaf.pre_modifiers()[0]
+                else:
+                    break
+
+                if leaf in self.leaf:
+                    if type(leaf.module()) != nn.BatchNorm2d:
+                        continue
+
+                    ignored_bn.add(leaf)
+
+        for leaf in self.leaf:
+            if leaf in ignored_bn:
+                continue
+            if type(leaf.module()) != nn.BatchNorm2d:
+                continue
+
+            is_real_leaf = True
+            for leaf_center_name in leaf.dim_changes_info.centers.keys():
+                # All centers of a valid leaf must be in this subgraph
+                if leaf_center_name not in self.modifiers_dict.keys():
+                    is_real_leaf = False
+
+            if not is_real_leaf:
+                continue
+
+            center_to_leaf = center_to_leaf_all[leaf.unique_name()]
+            leaf_to_center = leaf_to_center_all[leaf.unique_name()]
+
+            invalid_bn = (leaf.module().running_var < 1e-8).tolist()
+            invalid_bn_dict = {}
+            for i in range(len(invalid_bn)):
+                if invalid_bn[i]:
+                    invalid_bn_dict[i] = True
+                else:
+                    invalid_bn_dict[i] = False
+
+            invalid_bn_idxes[leaf.unique_name()] = invalid_bn_dict
+
+            for idx, state in invalid_bn_dict.items():
+                for center_name, idx_mapping in leaf_to_center.items():
+                    center_idxes = list(idx_mapping[idx])
+                    if set(center_idxes) == {-1}:
+                        continue
+
+                    for center_idx in center_idxes:
+                        if center_name not in invalid_center_idxes:
+                            invalid_center_idxes[center_name] = {leaf.unique_name(): {}}
+
+                        if leaf.unique_name() not in invalid_center_idxes[center_name]:
+                            invalid_center_idxes[center_name][leaf.unique_name()] = {}
+
+                        invalid_center_idxes[center_name][leaf.unique_name()][center_idx] = state
+
+                        center_to_center = center_to_center_all[center_name]
+                        for depend_center_name in center_to_center[center_idx].keys():
+                            if depend_center_name not in invalid_center_idxes:
+                                invalid_center_idxes[depend_center_name] = {leaf.unique_name(): {}}
+
+                            if leaf.unique_name() not in invalid_center_idxes[depend_center_name]:
+                                invalid_center_idxes[depend_center_name][leaf.unique_name()] = {}
+
+                            depend_center_idxes = list(center_to_center[center_idx][depend_center_name])
+                            for depend_center_idx in depend_center_idxes:
+                                invalid_center_idxes[depend_center_name][leaf.unique_name()][depend_center_idx] = state
+
+        for center_name, leaf_info in invalid_center_idxes.items():
+            invalid_center_idx_dict = {}
+
+            for leaf_name, invalid_center_idx in leaf_info.items():
+                for idx, state in invalid_center_idx.items():
+                    if idx not in invalid_center_idx_dict:
+                        invalid_center_idx_dict[idx] = state
+                    else:
+                        invalid_center_idx_dict[idx] &= state
+
+            invalid_center_idx_set = set()
+            for idx, state in invalid_center_idx_dict.items():
+                if state:
+                    invalid_center_idx_set.add(idx)
+
+            pruned_center_constraint_all[center_name] = invalid_center_idx_set
+
+            for leaf in self.leaf:
+                center_to_leaf = center_to_leaf_all[leaf.unique_name()]
+                leaf_to_center = leaf_to_center_all[leaf.unique_name()]
+
+                if center_name not in center_to_leaf.keys():
+                    continue
+
+                is_real_leaf = True
+                for leaf_center_name in leaf.dim_changes_info.centers.keys():
+                    # All centers of a valid leaf must be in this subgraph
+                    if leaf_center_name not in self.modifiers_dict.keys():
+                        is_real_leaf = False
+
+                if not is_real_leaf:
+                    continue
+
+                for idx in invalid_center_idx_set:
+                    leaf_idx = self.constraint_mapping([idx], center_to_leaf[center_name])
+
+                    if leaf_idx != {-1}:
+                        if leaf.unique_name() not in pruned_leaf_constraint_all:
+                            pruned_leaf_constraint_all[leaf.unique_name()] = []
+                        pruned_leaf_constraint_all[leaf.unique_name()].append(leaf_idx)
+
+        return pruned_center_constraint_all, pruned_leaf_constraint_all
+
+    def calc_prune_idx_by_center_importance(
+        self, center_list, center_to_leaf_all, leaf_to_center_all, importance, center_to_center_all, sparsity
+    ):
+        leaf_delta_idx = {}
+        pruned_leaf_constraint_all = {}
+        pruned_center_constraint_all = {}
+        calculated_center_constraint_all = {}
+
+        for center in center_list:
+            calculated_constraint = calculated_center_constraint_all.get(center.unique_name(), set())
+            constraint_need_prune = []
+
+            for i in self.center_constraint[center.unique_name()]:
+                if not i.issubset(calculated_constraint):
+                    constraint_need_prune.append(i)
+
+            for leaf in self.leaf:
+                center_to_leaf = center_to_leaf_all[leaf.unique_name()]
+                leaf_to_center = leaf_to_center_all[leaf.unique_name()]
+
+                if center.unique_name() not in center_to_leaf.keys():
+                    continue
+
+                is_real_leaf = True
+                for leaf_center_name in leaf.dim_changes_info.centers.keys():
+                    # All centers of a valid leaf must be in this subgraph
+                    if leaf_center_name not in self.modifiers_dict.keys():
+                        is_real_leaf = False
+
+                if not is_real_leaf:
+                    continue
+
+                log.debug(f"calc leaf prune idx: {center.unique_name()}, {leaf.unique_name()}")
+
+                leaf_constraint_need_prune = []
+                for constraint in constraint_need_prune:
+                    constraint_set = set()
+                    for center_idxes in constraint:
+                        if center_idxes in center_to_leaf[center.unique_name()]:
+                            constraint_set.update(center_to_leaf[center.unique_name()][center_idxes])
+                    leaf_constraint_need_prune.append(constraint_set)
+
+                leaf_constraint_all = []
+                calculated_leaf_constraint_all = []
+                pruned_leaf_constraint = []
+                for center_name, constraints in self.center_constraint.items():
+                    if center_name not in center_to_leaf.keys():
+                        continue
+
+                    calculated_constraint = calculated_center_constraint_all.get(center_name, set())
+                    pruned_constraint = pruned_center_constraint_all.get(center_name, set())
+
+                    for constraint in constraints:
+                        leaf_idx_constraint = set()
+                        for center_idxes in constraint:
+                            if center_idxes in center_to_leaf[center_name]:
+                                leaf_idx_constraint.update(center_to_leaf[center_name][center_idxes])
+
+                        if constraint.issubset(calculated_constraint):
+                            calculated_leaf_constraint_all.append(leaf_idx_constraint)
+                            if len(leaf_idx_constraint) > 0 and constraint.issubset(pruned_constraint):
+                                # When a center has been pruned, the corresponding leaf directly
+                                # reuses the pruning result of the center
+                                pruned_leaf_constraint.append(leaf_idx_constraint)
+                        else:
+                            leaf_constraint_all.append(leaf_idx_constraint)
+
+                # All center idx corresponding to leaf have been calculated
+                if len(leaf_constraint_all) == 0:
+                    pruned_leaf_constraint_all[leaf.unique_name()] = pruned_leaf_constraint
+                    continue
+
+                merge_constraint(leaf_constraint_all)
+                merge_constraint(calculated_leaf_constraint_all)
+
+                constraint = []
+                for i in leaf_constraint_all:
+                    if i in leaf_constraint_need_prune and i not in calculated_leaf_constraint_all:
+                        constraint.append(i)
+
+                leaf_constraint_all = constraint
+
+                leaf_importance = []
+                for constraint in leaf_constraint_all:
+                    importance_ = 0
+                    for leaf_idxes in constraint:
+                        for center_name, idx_mapping in leaf_to_center.items():
+                            center_idxes = list(idx_mapping[leaf_idxes])
+                            if set(center_idxes) == {-1}:
+                                continue
+
+                            if max(center_idxes) >= len(importance[center_name]):
+                                assert False
+
+                            importance_ += float(sum(importance[center_name][center_idxes]))
+                            center_to_center = center_to_center_all[center_name]
+                            for center_idx in center_idxes:
+                                for depend_center_name in center_to_center[center_idx].keys():
+                                    depend_center_idxes = list(center_to_center[center_idx][depend_center_name])
+                                    importance_ += float(sum(importance[depend_center_name][depend_center_idxes]))
+
+                    leaf_importance.append((constraint, importance_))
+
+                for group in self.leaf_group[leaf.unique_name()]:
+                    valid_importance = []
+                    for i in leaf_importance:
+                        constraint = i[0]
+                        if len(constraint & group) > 0:
+                            assert constraint.issubset(group)
+                            valid_importance.append(i)
+
+                    if len(valid_importance) == 0:
+                        continue
+
+                    valid_importance = sorted(valid_importance, key=lambda x: x[1])
+                    current_sparsity = 0
+                    total_idx = sum([len(i[0]) for i in valid_importance])
+                    target_idx = total_idx * sparsity[center.unique_name()]
+
+                    pruned_leaf_idx = set()
+                    while current_sparsity < sparsity[center.unique_name()]:
+                        if len(valid_importance) == 0:
+                            break
+                        unimportance_idx = valid_importance.pop(0)
+                        constraint = unimportance_idx[0]
+
+                        if center.unique_name() in pruned_center_constraint_all:
+                            center_constraint_len = len(self.center_constraint[center.unique_name()])
+                            center_pruned_constraint_len = len(pruned_center_constraint_all[center.unique_name()])
+                            center_constraint = self.constraint_mapping(
+                                constraint, leaf_to_center[center.unique_name()]
+                            )
+
+                            global_center_sparsity = (
+                                center_pruned_constraint_len + len(pruned_leaf_idx) + len(center_constraint)
+                            ) / center_constraint_len
+                            if global_center_sparsity > sparsity[center.unique_name()]:
+                                break
+
+                        current_sparsity = (
+                            len(pruned_leaf_idx) + len(constraint) + leaf_delta_idx.get(leaf.unique_name(), 0)
+                        ) / total_idx
+
+                        pruned_leaf_idx.update(constraint)
+                        pruned_leaf_constraint.append(constraint)
+
+                        calculated_leaf_constraint_all.append(constraint)
+
+                    delta_idx = len(pruned_leaf_idx) - target_idx
+                    leaf_delta_idx[leaf.unique_name()] = leaf_delta_idx.get(leaf.unique_name(), 0)
+                    leaf_delta_idx[leaf.unique_name()] = leaf_delta_idx[leaf.unique_name()] + delta_idx
+
+                pruned_leaf_constraint_all[leaf.unique_name()] = pruned_leaf_constraint
+
+                for center_name in leaf_to_center.keys():
+                    calculated_center_constraint_all[center_name] = calculated_center_constraint_all.get(
+                        center_name, set()
+                    )
+                    pruned_center_constraint_all[center_name] = pruned_center_constraint_all.get(center_name, set())
+
+                    # Sync leaf's pruning idx to all centers
+                    for constraint in leaf_constraint_all:
+                        center_constraint = self.constraint_mapping(constraint, leaf_to_center[center_name])
+                        if center_constraint != -1:
+                            calculated_center_constraint_all[center_name].update(center_constraint)
+
+                    for constraint in pruned_leaf_constraint:
+                        center_constraint = self.constraint_mapping(constraint, leaf_to_center[center_name])
+                        if center_constraint != {-1}:
+                            pruned_center_constraint_all[center_name].update(center_constraint)
+
+        return pruned_center_constraint_all, pruned_leaf_constraint_all
+
     def calc_prune_idx(self, importance, sparsity):
         """
         Calculate the dependence of index in the process of pruning. For convolutional pruning, it is the dependence
@@ -2645,10 +3005,6 @@ class SubGraph(object):
         center_list = sorted(center_list, key=lambda x: x[0])
         center_list = [i[1] for i in center_list]
 
-        calculated_center_constraint_all = {}
-        pruned_center_constraint_all = {}
-        pruned_leaf_constraint_all = {}
-
         center_to_center_all = {}
 
         for center in center_list:
@@ -2685,170 +3041,14 @@ class SubGraph(object):
                                     center_to_center[center_idxes][depend_center_name] = set()
                                 center_to_center[center_idxes][depend_center_name].update(depend_center_idxes)
 
-        leaf_delta_idx = {}
-
-        for center in center_list:
-            calculated_constraint = calculated_center_constraint_all.get(center.unique_name(), set())
-            constraint_need_prune = []
-
-            for i in self.center_constraint[center.unique_name()]:
-                if not i.issubset(calculated_constraint):
-                    constraint_need_prune.append(i)
-
-            for leaf in self.leaf:
-                center_to_leaf = center_to_leaf_all[leaf.unique_name()]
-                leaf_to_center = leaf_to_center_all[leaf.unique_name()]
-
-                if center.unique_name() not in center_to_leaf.keys():
-                    continue
-
-                is_real_leaf = True
-                for leaf_center_name in leaf.dim_changes_info.centers.keys():
-                    # All centers of a valid leaf must be in this subgraph
-                    if leaf_center_name not in self.modifiers_dict.keys():
-                        is_real_leaf = False
-
-                if not is_real_leaf:
-                    continue
-
-                log.debug(f"calc leaf prune idx: {center.unique_name()}, {leaf.unique_name()}")
-
-                leaf_constraint_need_prune = []
-                for constraint in constraint_need_prune:
-                    constraint_set = set()
-                    for center_idxes in constraint:
-                        if center_idxes in center_to_leaf[center.unique_name()]:
-                            constraint_set.update(center_to_leaf[center.unique_name()][center_idxes])
-                    leaf_constraint_need_prune.append(constraint_set)
-
-                leaf_constraint_all = []
-                calculated_leaf_constraint_all = []
-                pruned_leaf_constraint = []
-                for center_name, constraints in self.center_constraint.items():
-                    if center_name not in center_to_leaf.keys():
-                        continue
-
-                    calculated_constraint = calculated_center_constraint_all.get(center_name, set())
-                    pruned_constraint = pruned_center_constraint_all.get(center_name, set())
-
-                    for constraint in constraints:
-                        leaf_idx_constraint = set()
-                        for center_idxes in constraint:
-                            if center_idxes in center_to_leaf[center_name]:
-                                leaf_idx_constraint.update(center_to_leaf[center_name][center_idxes])
-
-                        if constraint.issubset(calculated_constraint):
-                            calculated_leaf_constraint_all.append(leaf_idx_constraint)
-                            if len(leaf_idx_constraint) > 0 and constraint.issubset(pruned_constraint):
-                                # When a center has been pruned, the corresponding leaf directly
-                                # reuses the pruning result of the center
-                                pruned_leaf_constraint.append(leaf_idx_constraint)
-                        else:
-                            leaf_constraint_all.append(leaf_idx_constraint)
-
-                # All center idx corresponding to leaf have been calculated
-                if len(leaf_constraint_all) == 0:
-                    pruned_leaf_constraint_all[leaf.unique_name()] = pruned_leaf_constraint
-                    continue
-
-                merge_constraint(leaf_constraint_all)
-                merge_constraint(calculated_leaf_constraint_all)
-
-                constraint = []
-                for i in leaf_constraint_all:
-                    if i in leaf_constraint_need_prune and i not in calculated_leaf_constraint_all:
-                        constraint.append(i)
-
-                leaf_constraint_all = constraint
-
-                leaf_importance = []
-                for constraint in leaf_constraint_all:
-                    importance_ = 0
-                    for leaf_idxes in constraint:
-                        for center_name, idx_mapping in leaf_to_center.items():
-                            center_idxes = list(idx_mapping[leaf_idxes])
-                            if set(center_idxes) == {-1}:
-                                continue
-
-                            if max(center_idxes) >= len(importance[center_name]):
-                                assert False
-
-                            importance_ += float(sum(importance[center_name][center_idxes]))
-                            center_to_center = center_to_center_all[center_name]
-                            for center_idx in center_idxes:
-                                for depend_center_name in center_to_center[center_idx].keys():
-                                    depend_center_idxes = list(center_to_center[center_idx][depend_center_name])
-                                    importance_ += float(sum(importance[depend_center_name][depend_center_idxes]))
-
-                    leaf_importance.append((constraint, importance_))
-
-                for group in self.leaf_group[leaf.unique_name()]:
-                    valid_importance = []
-                    for i in leaf_importance:
-                        constraint = i[0]
-                        if len(constraint & group) > 0:
-                            assert constraint.issubset(group)
-                            valid_importance.append(i)
-
-                    if len(valid_importance) == 0:
-                        continue
-
-                    valid_importance = sorted(valid_importance, key=lambda x: x[1])
-                    current_sparsity = 0
-                    total_idx = sum([len(i[0]) for i in valid_importance])
-                    target_idx = total_idx * sparsity[center.unique_name()]
-
-                    pruned_leaf_idx = set()
-                    while current_sparsity < sparsity[center.unique_name()]:
-                        if len(valid_importance) == 0:
-                            break
-                        unimportance_idx = valid_importance.pop(0)
-                        constraint = unimportance_idx[0]
-
-                        if center.unique_name() in pruned_center_constraint_all:
-                            center_constraint_len = len(self.center_constraint[center.unique_name()])
-                            center_pruned_constraint_len = len(pruned_center_constraint_all[center.unique_name()])
-                            center_constraint = self.constraint_mapping(
-                                constraint, leaf_to_center[center.unique_name()]
-                            )
-
-                            global_center_sparsity = (
-                                center_pruned_constraint_len + len(pruned_leaf_idx) + len(center_constraint)
-                            ) / center_constraint_len
-                            if global_center_sparsity > sparsity[center.unique_name()]:
-                                break
-
-                        current_sparsity = (
-                            len(pruned_leaf_idx) + len(constraint) + leaf_delta_idx.get(leaf.unique_name(), 0)
-                        ) / total_idx
-
-                        pruned_leaf_idx.update(constraint)
-                        pruned_leaf_constraint.append(constraint)
-
-                        calculated_leaf_constraint_all.append(constraint)
-
-                    delta_idx = len(pruned_leaf_idx) - target_idx
-                    leaf_delta_idx[leaf.unique_name()] = leaf_delta_idx.get(leaf.unique_name(), 0)
-                    leaf_delta_idx[leaf.unique_name()] = leaf_delta_idx[leaf.unique_name()] + delta_idx
-
-                pruned_leaf_constraint_all[leaf.unique_name()] = pruned_leaf_constraint
-
-                for center_name in leaf_to_center.keys():
-                    calculated_center_constraint_all[center_name] = calculated_center_constraint_all.get(
-                        center_name, set()
-                    )
-                    pruned_center_constraint_all[center_name] = pruned_center_constraint_all.get(center_name, set())
-
-                    # Sync leaf's pruning idx to all centers
-                    for constraint in leaf_constraint_all:
-                        center_constraint = self.constraint_mapping(constraint, leaf_to_center[center_name])
-                        if center_constraint != -1:
-                            calculated_center_constraint_all[center_name].update(center_constraint)
-
-                    for constraint in pruned_leaf_constraint:
-                        center_constraint = self.constraint_mapping(constraint, leaf_to_center[center_name])
-                        if center_constraint != {-1}:
-                            pruned_center_constraint_all[center_name].update(center_constraint)
+        if importance is not None:
+            pruned_center_constraint_all, pruned_leaf_constraint_all = self.calc_prune_idx_by_center_importance(
+                center_list, center_to_leaf_all, leaf_to_center_all, importance, center_to_center_all, sparsity
+            )
+        else:
+            pruned_center_constraint_all, pruned_leaf_constraint_all = self.calc_prune_idx_by_bn_variance(
+                center_list, center_to_leaf_all, leaf_to_center_all, importance, center_to_center_all, sparsity
+            )
 
         for center_name, constraint in pruned_center_constraint_all.items():
             calculated_constraint = constraint
@@ -3034,7 +3234,7 @@ class GraphChannelModifier(object):
     center_nodes: typing.List[TraceNode]
     sub_graphs: typing.Dict[str, SubGraph]
 
-    def __init__(self, graph: TraceGraph, center_nodes):
+    def __init__(self, graph: TraceGraph, center_nodes, bn_compensation=False):
         """Initialize a channel modifier for a calculation graph
 
         Args:
@@ -3045,6 +3245,9 @@ class GraphChannelModifier(object):
 
         self.graph = graph
         self.center_nodes = center_nodes
+        self.bn_compensation = bn_compensation
+        if self.bn_compensation:
+            log.info("open bn compensation")
         self.modifiers = self.register_modifier()
         with torch.no_grad():
             self.sub_graphs = SubGraphDivider(self.graph, self.modifiers).divide()
@@ -3075,6 +3278,7 @@ class GraphChannelModifier(object):
         modifiers = OrderedDict()
         for n in self.graph.all_nodes():
             modifier = create_channel_modifier(n)
+            modifier.graph_modifier = self
             modifiers[n.unique_name] = modifier
             setattr(n, "modifier", modifier)
         return modifiers
