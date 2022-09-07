@@ -1770,20 +1770,31 @@ class TraceGraph(object):
             self.module.load_state_dict(original_state_dict)
 
             if self.eliminate_dead_graph:
-                for n in self.input_nodes + self.forward_nodes + self.output_nodes:
-                    n.active = False
+                self.eliminate_dead_graph_pass()
 
-                for i in self.output_nodes:
-                    self.__active_detection(i)
-
-            active_input_nodes = [i for i in self.input_nodes if i.active]
-            active_forward_nodes = [i for i in self.forward_nodes if i.active]
-
-            self.input_nodes = active_input_nodes
-            self.forward_nodes = active_forward_nodes
             self.recompute_forward_order()
-
         self.inited = True
+
+    def eliminate_dead_graph_pass(self):
+        for n in self.input_nodes + self.forward_nodes + self.output_nodes:
+            n.active = False
+
+        for i in self.output_nodes:
+            self.__active_detection(i)
+
+        active_input_nodes = [i for i in self.input_nodes if i.active]
+        active_forward_nodes = [i for i in self.forward_nodes if i.active]
+
+        active_constant_nodes = set()
+        for n in self.forward_nodes + self.output_nodes:
+            if n.active:
+                for pn in n.prev_nodes:
+                    if isinstance(pn.module, ConstantNode):
+                        active_constant_nodes.add(pn.module)
+
+        self.input_nodes = active_input_nodes
+        self.forward_nodes = active_forward_nodes
+        self.constant_nodes = list(active_constant_nodes)
 
     @contextlib.contextmanager
     def __numbering_context(self):
