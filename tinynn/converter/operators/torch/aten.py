@@ -780,12 +780,49 @@ class ATenDropoutOperator(ATenDropoutSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
 
+        self.run(node)
+
         train = self.input_tensors[args['train']]
         if train not in (0, False):
-            log.warning('aten::dropout with train=True found. Please check your model.')
+            log.warning('aten::dropout with train=True found and will add randomness to the model.')
 
-        self.run(node)
-        self.passthrough(graph_converter)
+            input_tensor = self.find_or_create_input(0, graph_converter)
+            assert len(input_tensor.shape) == 2, "Only supports dropout with 2d input for training mode"
+            assert input_tensor.quantization is None, "Only supports dropout with floating input for training mode"
+
+            p = self.input_tensors[args['p']]
+
+            ops = []
+
+            batch_size = input_tensor.shape[0]
+            num_samples = input_tensor.shape[1]
+
+            logits = self.create_attr_tensor(np.log(np.array([[p, 1 - p]] * batch_size, dtype='float32')))
+            num_samples_tensor = self.create_attr_tensor(np.array(num_samples, dtype='int32'))
+            multinomial_out = self.create_transform_tensor(np.empty_like(input_tensor.tensor, dtype='int32'))
+            ops.append(tfl.MultinomialOperator([logits, num_samples_tensor], [multinomial_out]))
+
+            casted = self.create_transform_tensor(np.empty_like(input_tensor.tensor, dtype='float32'))
+            ops.append(
+                tfl.CastOperator(
+                    [multinomial_out],
+                    [casted],
+                    tfl.numpy_tflite_dtype_mappings[str(multinomial_out.dtype)],
+                    tfl.numpy_tflite_dtype_mappings[str(casted.dtype)],
+                )
+            )
+
+            scale = self.create_attr_tensor(np.array([1.0 / (1.0 - p)], dtype='float32'))
+            scaled = self.create_transform_tensor(np.empty_like(input_tensor.tensor, dtype='float32'))
+            ops.append(tfl.MulOperator([casted, scale], [scaled]))
+
+            outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+            ops.append(tfl.MulOperator([input_tensor, scaled], outputs))
+
+            for op in ops:
+                graph_converter.add_operator(op)
+        else:
+            self.passthrough(graph_converter)
 
 
 class ATenFeatureDropoutOperator(ATenFeatureDropoutSchema):
