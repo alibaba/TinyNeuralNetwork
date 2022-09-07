@@ -787,22 +787,26 @@ class ATenDropoutOperator(ATenDropoutSchema):
             log.warning('aten::dropout with train=True found and will add randomness to the model.')
 
             input_tensor = self.find_or_create_input(0, graph_converter)
-            assert len(input_tensor.shape) == 2, "Only supports dropout with 2d input for training mode"
+            assert len(input_tensor.shape) in (2, 3), "Only supports dropout with 2d input for training mode"
             assert input_tensor.quantization is None, "Only supports dropout with floating input for training mode"
 
             p = self.input_tensors[args['p']]
 
             ops = []
 
-            batch_size = input_tensor.shape[0]
-            num_samples = input_tensor.shape[1]
+            if len(input_tensor.shape) == 3:
+                assert (
+                    input_tensor.shape[0] == 1
+                ), "Only supports dropout with 3d input with batch_size=1 for training mode"
+            batch_size = input_tensor.shape[-2]
+            num_samples = input_tensor.shape[-1]
 
             logits = self.create_attr_tensor(np.log(np.array([[p, 1 - p]] * batch_size, dtype='float32')))
             num_samples_tensor = self.create_attr_tensor(np.array(num_samples, dtype='int32'))
-            multinomial_out = self.create_transform_tensor(np.empty_like(input_tensor.tensor, dtype='int32'))
+            multinomial_out = self.create_transform_tensor(np.empty((batch_size, num_samples), dtype='int32'))
             ops.append(tfl.MultinomialOperator([logits, num_samples_tensor], [multinomial_out]))
 
-            casted = self.create_transform_tensor(np.empty_like(input_tensor.tensor, dtype='float32'))
+            casted = self.create_transform_tensor(np.empty((batch_size, num_samples), dtype='float32'))
             ops.append(
                 tfl.CastOperator(
                     [multinomial_out],
@@ -813,7 +817,7 @@ class ATenDropoutOperator(ATenDropoutSchema):
             )
 
             scale = self.create_attr_tensor(np.array([1.0 / (1.0 - p)], dtype='float32'))
-            scaled = self.create_transform_tensor(np.empty_like(input_tensor.tensor, dtype='float32'))
+            scaled = self.create_transform_tensor(np.empty((batch_size, num_samples), dtype='float32'))
             ops.append(tfl.MulOperator([casted, scale], [scaled]))
 
             outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)

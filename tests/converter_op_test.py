@@ -1044,6 +1044,25 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
 
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.8.0'), 'multinomial is not supported')
+    def test_dropout_3d_with_training_mode(self):
+        dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def forward(self, x):
+                return F.dropout(x, 0.2, True)
+
+        model = Model()
+        model.train()
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
+
     def test_float_unary_ops(self):
         random_val = torch.randn(1, 3, 224, 224, dtype=torch.float32)
         min_val = torch.tensor(0.1, dtype=torch.float32)
