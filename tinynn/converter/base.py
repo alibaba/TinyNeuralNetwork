@@ -409,10 +409,11 @@ class TFLiteConverter(object):
                     self.tensor_map_copies[name] = t.detach().clone()
 
     def __try_infer_type(self, params):
-        inferred = torch._C._jit_try_infer_type(params)
-        if hasattr(inferred, 'type'):
-            return inferred.type().annotation_str
-        else:
+        try:
+            inferred = torch._C._jit_try_infer_type(params)
+            if hasattr(inferred, 'type'):
+                return inferred.type().annotation_str
+        finally:
             return str(inferred)
 
     def __unpack_params(self, params):
