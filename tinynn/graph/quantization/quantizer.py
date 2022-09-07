@@ -1187,6 +1187,7 @@ class QATQuantizer(object):
         def _is_add_relu_fusable_node(node: TraceNode, custom_data) -> bool:
             cur_module = node.module
             cur_class = type(cur_module)
+            visited_nodes = [node]
             if cur_class == TraceFunction:
                 # The intermediate result cannot be used if fused.
                 # So we don't fuse the nodes under such circumstances.
@@ -1204,6 +1205,15 @@ class QATQuantizer(object):
                 if next_class == TraceFunction:
                     fuse = next_module.kind == 'relu'
                 else:
+                    while next_class == nn.Identity:
+                        cur_node = next_node
+                        visited_nodes.append(cur_node)
+                        if len(cur_node.next_nodes) != 1:
+                            return False
+                        next_node = cur_node.next_nodes[0]
+                        next_module = next_node.module
+                        next_class = type(next_module)
+
                     fuse = next_class.__name__ == 'ReLU'
 
                 if not fuse:
@@ -1242,11 +1252,15 @@ class QATQuantizer(object):
             kind = 'add_relu'
             func_type = kind
             is_class = False
+            nodes_to_fuse = [node, next_node]
+            while next_node.type() == nn.Identity:
+                next_node = next_node.next_nodes[0]
+                nodes_to_fuse.append(next_node)
             if type(next_node.module) == TraceFunction:
                 inplace = next_node.module.func_type == 'relu_' or 'True' in next_node.module.args_string
             else:
                 inplace = next_node.module.inplace
-            graph.fuse_nodes_to_func([node, node.next_nodes[0]], full_name, kind, func_type, is_class)
+            graph.fuse_nodes_to_func(nodes_to_fuse, full_name, kind, func_type, is_class)
             # Propagate aliases for inplace nodes
             if inplace:
                 aliases = node.module.get_aliases()
