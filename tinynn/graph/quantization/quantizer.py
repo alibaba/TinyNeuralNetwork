@@ -1933,7 +1933,6 @@ class QATQuantizer(object):
 
         sub_list = []
         for n, m in q_model.named_children():
-            print(n, type(m).__name__, type(m).__module__)
             if isinstance(m, (torch.nn.quantized.Quantize, torch.nn.quantized.DeQuantize)):
                 sub_list.append((n, nn.Identity()))
             elif isinstance(m, torch.nn.quantized.Linear):
@@ -2029,18 +2028,65 @@ class QATQuantizer(object):
 
         """
 
-        fused_fq_cls = getattr(torch_q, 'FusedMovingAvgObsFakeQuantize', None)
-        if fused_fq_cls is not None:
-            for m in q_model.modules():
-                if isinstance(m, fused_fq_cls):
+        if LooseVersion(torch.__version__) >= LooseVersion('1.12.0'):
 
-                    def get_wrapper(mod):
-                        def wrapper(*args, **kwargs):
-                            return torch_q.FakeQuantize.forward(mod, *args, **kwargs)
+            def get_wrapper(mod):
+                def wrapper(*args, **kwargs):
+                    return torch_q.FakeQuantize.forward(mod, *args, **kwargs)
 
-                        return wrapper
+                return wrapper
 
-                    m.forward = get_wrapper(m)
+            fused_fq_cls = getattr(torch_q, 'FusedMovingAvgObsFakeQuantize', None)
+            if fused_fq_cls is not None:
+                for m in q_model.modules():
+                    if isinstance(m, fused_fq_cls):
+                        m.forward = get_wrapper(m)
+        elif LooseVersion(torch.__version__) >= LooseVersion('1.10.0'):
+            mod_dict = {}
+            for n, m in q_model.named_modules():
+                mod_dict[n] = m
+
+            class _FakeQuantize(nn.Module):
+                def __init__(self, fq: torch_q.FakeQuantize) -> None:
+                    super().__init__()
+                    self.fake_quant_enabled = fq.fake_quant_enabled
+                    self.scale = fq.scale
+                    self.zero_point = fq.zero_point
+                    self.quant_min = fq.quant_min
+                    self.quant_max = fq.quant_max
+                    self.is_per_channel = fq.is_per_channel
+                    self.ch_axis = fq.ch_axis
+
+                def forward(self, X):
+                    if self.fake_quant_enabled[0] == 1:
+                        if self.is_per_channel:
+                            X = torch.fake_quantize_per_channel_affine(
+                                X, self.scale, self.zero_point, self.ch_axis, self.quant_min, self.quant_max
+                            )
+                        else:
+                            X = torch.fake_quantize_per_tensor_affine(
+                                X, self.scale, self.zero_point, self.quant_min, self.quant_max
+                            )
+                    return X
+
+            action_list = []
+            for n, m in q_model.named_modules():
+                if isinstance(m, torch_q.FakeQuantize):
+                    if '.' in n:
+                        n_split = n.split('.')
+                        prop = n_split[-1]
+                        pm_name = '.'.join(n_split[:-1])
+                        pm = mod_dict[pm_name]
+                    else:
+                        prop = n
+                        pm = q_model
+
+                    new_m = _FakeQuantize(m)
+
+                    action_list.append((pm, prop, new_m))
+
+            for parent, prop, new_mod in action_list:
+                setattr(parent, prop, new_mod)
 
         q_model.apply(torch_q.disable_observer)
 
@@ -2141,7 +2187,7 @@ class PostQuantizer(QATQuantizer):
         elif self.backend == 'onnx':
             if not self.asymmetric:
                 sym_fq = torch_q.HistogramObserver.with_args(
-                    dtype=torch.quint8, qscheme=torch.per_tensor_symmetric, reduce_range=False
+                    dtype=torch.qint8, qscheme=torch.per_tensor_symmetric, reduce_range=False
                 )
                 qconfig = torch_q.QConfig(sym_fq, qconfig.weight)
             if not self.per_tensor:
