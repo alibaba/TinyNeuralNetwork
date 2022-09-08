@@ -441,9 +441,15 @@ class DimensionChangeInfo(object):
                 if dim_transform:
                     for dim, constraint in constraint_i.items():
                         for i in range(len(constraint)):
-                            if i in dim_transform.keys():
-                                transformed_idx = dim_transform[i]
-                                constraint[i] = transformed_idx
+                            new_constraint = set()
+
+                            for c in constraint[i]:
+                                if c in dim_transform.keys():
+                                    transformed_idx = dim_transform[c]
+                                    new_constraint.update(transformed_idx)
+
+                            if len(new_constraint) > 0:
+                                constraint[i] = new_constraint
 
             for dim, constraint in constraint_i.items():
                 if dim not in self.constraints_i:
