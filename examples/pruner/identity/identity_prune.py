@@ -56,10 +56,6 @@ def main_worker(args):
 
     pruner = IdentityChannelPruner(model, torch.ones(1, 3, 224, 224))
 
-    # (Optional) A new config file with layer-level sparsity will be generated inplace
-    # If you want to customize those generated content, you may do that before calling `.prune`
-    pruner.generate_config(args.config)
-
     st_flops = pruner.calc_flops()
     pruner.prune()  # Get the pruned model
 
