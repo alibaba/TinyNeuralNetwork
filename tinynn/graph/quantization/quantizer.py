@@ -118,6 +118,8 @@ class QATQuantizer(object):
     disable_requantization_for_cat: bool
     dynamic_lstm_quant: bool
     rounding_mode: str
+    leaf_nodes: typing.Optional[typing.List[nn.Module]]
+    swap_nodes: typing.Optional[typing.List[typing.Tuple[nn.Module, nn.Module]]]
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new QATQuantizer object
@@ -169,6 +171,9 @@ class QATQuantizer(object):
         assert (
             self.per_tensor or self.disable_requantization_for_cat
         ), "`disable_requantization_for_cat=True` is required for per-channel quantization"
+
+        self.leaf_nodes = None
+        self.swap_nodes = None
 
     def parse_config(self, config: typing.Optional[dict]):
         default_values = {
@@ -589,6 +594,88 @@ class QATQuantizer(object):
 
         if self.quantized_op_stats is not None:
             self.prepare_quantized_ops_pass(graph)
+
+        if self.backend == 'onnx':
+            self.leaf_nodes = []
+            self.swap_nodes = []
+
+            q = queue.Queue()
+            for node in graph.output_nodes:
+                for prev_node in node.prev_nodes:
+                    q.put((prev_node, False))
+
+            while not q.empty():
+                n, state = q.get()
+                if isinstance(n.module, nn.Module):
+                    orig_name = graph.module_original_name_dict.get(id(n.module))
+                    new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name)
+                    if isinstance(new_mod, torch_q.DeQuantStub):
+                        state = True
+                    else:
+                        if state:
+                            if isinstance(new_mod, torch_q.QuantStub):
+                                state = False
+                            elif isinstance(new_mod, nn.Module) and hasattr(new_mod, 'activation_post_process'):
+                                self.leaf_nodes.append(new_mod)
+                                state = False
+                            elif (
+                                isinstance(new_mod, nn.Sequential)
+                                and type(new_mod).__module__.startswith(nni.__name__)
+                                and len(new_mod) > 0
+                                and hasattr(new_mod[-1], 'activation_post_process')
+                            ):
+                                self.leaf_nodes.append(new_mod[-1])
+                                state = False
+                    for pn in n.prev_nodes:
+                        q.put((pn, state))
+
+            q = queue.Queue()
+            visited = set()
+            for node in graph.input_nodes:
+                q.put((node, None, False, 0))
+
+            while not q.empty():
+                n, prev_q_mod, state, idx = q.get()
+                key = f'{n.unique_name}:{idx}'
+                if key in visited:
+                    continue
+                else:
+                    visited.add(key)
+
+                q_mod = prev_q_mod
+                if n.quantized:
+                    if isinstance(n.module, nn.Module):
+                        orig_name = graph.module_original_name_dict.get(id(n.module))
+                        new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name)
+                        if isinstance(new_mod, nn.Module) and hasattr(new_mod, 'activation_post_process'):
+                            q_mod = new_mod
+                        elif (
+                            isinstance(new_mod, nn.Sequential)
+                            and type(new_mod).__module__.startswith(nni.__name__)
+                            and len(new_mod) > 0
+                            and hasattr(new_mod[-1], 'activation_post_process')
+                        ):
+                            q_mod = new_mod[-1]
+                        elif isinstance(new_mod, torch_q.DeQuantStub):
+                            q_mod = new_mod
+                        elif type(new_mod) != nn.Identity:
+                            state = True
+                    else:
+                        is_prev_float_functional = (
+                            len(n.prev_nodes) > 1 and n.prev_nodes[0].type() == torch.nn.quantized.FloatFunctional
+                        )
+                        if is_prev_float_functional:
+                            q_mod = getattr(n.prev_nodes[0].module, n.kind())
+                        else:
+                            state = True
+
+                    if state and prev_q_mod is not None and q_mod != prev_q_mod:
+                        self.swap_nodes.append((prev_q_mod, q_mod, idx))
+                        state = False
+
+                for next_n in n.next_nodes:
+                    idx = next_n.prev_nodes.index(n)
+                    q.put((next_n, q_mod, state, idx))
 
         return graph.module
 
@@ -2028,6 +2115,14 @@ class QATQuantizer(object):
 
         """
 
+        for mod in self.leaf_nodes:
+            torch.quantization.disable_fake_quant(mod.activation_post_process)
+
+        for n, m in q_model.named_modules():
+            if isinstance(m, torch_q.FakeQuantize):
+                if m.qscheme in (torch.per_channel_symmetric, torch.per_tensor_symmetric):
+                    m.zero_point.fill_(0)
+
         if LooseVersion(torch.__version__) >= LooseVersion('1.12.0'):
 
             def get_wrapper(mod):
@@ -2087,6 +2182,51 @@ class QATQuantizer(object):
 
             for parent, prop, new_mod in action_list:
                 setattr(parent, prop, new_mod)
+
+        for n, m in q_model.named_modules():
+
+            def conv_fused_wrapper(mod, scale_factor):
+                type_name = type(mod).__name__
+
+                def new_wrapper(input):
+                    weight_shape = [1] * len(mod.weight.shape)
+                    weight_shape[0] = -1
+                    y = type(mod)._conv_forward(
+                        mod, input, mod.weight_fake_quant(mod.weight * scale_factor.reshape(weight_shape)), mod.bias
+                    )
+                    if 'Bn' in type_name:
+                        y = mod.bn(y)
+                    if 'ReLU' in type_name:
+                        y = torch.nn.functional.relu(y)
+                    return y
+
+                return new_wrapper
+
+            type_name = type(m).__name__
+            if type_name in ('ConvBn1d', 'ConvBnReLU1d', 'ConvBn2d', 'ConvBnReLU2d', 'ConvBn3d', 'ConvBnReLU3d'):
+                running_std = torch.sqrt(m.bn.running_var + m.bn.eps)
+                scale_factor = m.bn.weight / running_std
+                if m.bias is not None:
+                    m.bn.running_mean -= m.bias
+                    m.bias = None
+                m.bn.running_mean *= scale_factor
+                m.bn.weight /= scale_factor
+                m.forward = conv_fused_wrapper(m, scale_factor)
+
+        def get_pre_hook(acp, idx):
+            def pre_hook(module, input):
+                new_input = list(input)
+                new_input[idx] = acp(new_input[idx])
+                return tuple(new_input)
+
+            return pre_hook
+
+        for start_mod, end_mod, idx in self.swap_nodes:
+            acp = start_mod.activation_post_process
+
+            assert isinstance(end_mod, nn.Module), "Only end nodes with `nn.Module` are supported duing module swapping"
+
+            end_mod.register_forward_pre_hook(get_pre_hook(acp, idx))
 
         q_model.apply(torch_q.disable_observer)
 
