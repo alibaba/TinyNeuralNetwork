@@ -1453,8 +1453,13 @@ class CatModifier(Modifier):
                         t.data.copy_(tensor.clone().data)
                     else:
                         # Different shapes between tensors
-                        t_ = torch.index_select(tensor, self.dim, torch.tensor(t.shape[self.dim]))
-                        t.data.copy_(t_.data)
+                        if tensor.shape[self.dim] >= t.shape[self.dim]:
+                            idx_tensor = torch.tensor([idx for idx in range(t.shape[self.dim])])
+                            select_tensor = torch.index_select(tensor, self.dim, idx_tensor)
+                            t.data.copy_(select_tensor.data)
+                        else:
+                            idx_tensor = torch.tensor([idx for idx in range(tensor.shape[self.dim])])
+                            t.data.index_copy_(self.dim, idx_tensor, tensor)
 
         dim_changes_o, tensor_o = self.calc_dim_changes()[0]
 
