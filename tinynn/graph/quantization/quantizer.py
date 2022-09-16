@@ -1776,6 +1776,11 @@ class QATQuantizer(object):
                     next_type = next_node.type()
                     if next_type in (torch_q.QuantStub, torch_q.DeQuantStub):
                         if cur_type != next_type:
+                            if cur_type == torch_q.QuantStub and self.set_quantizable_op_stats:
+                                if (len(node.prev_nodes) == 1 and node.prev_nodes[0].kind() in KNOWN_QSTATS) or (
+                                    len(next_node.next_nodes) == 1 and next_node.next_nodes[0].kind() in KNOWN_QSTATS
+                                ):
+                                    return False
                             custom_data.append((node, next_node))
                             return True
             return False
