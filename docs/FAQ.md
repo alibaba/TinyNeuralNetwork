@@ -204,3 +204,9 @@ When using Tensorflow Lite's Interpreter, you only need to read or write these s
 Note: These state variables are all two-dimensional with the shape of `[batch_size, hidden_size or input_size]`. So in the streaming scenario, you only need to split these variables according to the first dimension.
 
 Usually, when the number of hidden layers is large enough (128+), the LSTM OP will be time-consuming in the TFLite backend. In this case, consider using dynamic range quantization to optimize its performance, see [dynamic.py](../examples/quantization/dynamic.py).
+
+## Quantized model conversion
+
+##### How to convert ops including `SOFTMAX`, `LOG_SOFTMAX` and `BATCH_MATMUL` to quantized kernels?
+First, you need to add the parameter `rewrite_quantizable=True` when defining TFLiteConverter.
+Second, for ops including `SOFTMAX` and `LOG_SOFTMAX`, you need to add the parameter `set_quantizable_op_stats=True` when defining QATQuantizer or PostQuantizer.
