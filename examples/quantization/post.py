@@ -54,7 +54,7 @@ def main_worker(args):
         #   d. Symmetric uint8. config={'asymmetric': False, 'per_tensor': True}
         #      The is same to (a) with no offsets. But it is rarely used, which just serves as a placeholder here.
         # In addition, we support additional ptq algorithms including kl-divergence, the usage is shown as below:
-        #       quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'algorithm':alg})
+        #       quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'algorithm': alg})
 
         quantizer = PostQuantizer(model, dummy_input, work_dir='out')
         ptq_model = quantizer.quantize()
