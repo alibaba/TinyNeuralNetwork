@@ -191,6 +191,7 @@ class QATQuantizer(object):
             'set_quantizable_op_stats': False,
             'rounding_mode': 'pytorch',
             'algorithm': 'l2',
+            'fuse_only': False,
         }
 
         if config is None:
@@ -257,7 +258,7 @@ class QATQuantizer(object):
         # Fuse the modules (e.g conv, bn, relu) in the computation graph according to the fuse rules.
         # By default, we assume all input tensors are of floating type.
         # If you want to use quantized/integral inputs, then you may need to pass in `is_input_quantized`.
-        qat_model = self.prepare_qat(rewritten_graph, self.is_input_quantized, self.backend)
+        qat_model = self.prepare_qat(rewritten_graph, self.is_input_quantized, self.backend, self.fuse_only)
 
         return qat_model
 
@@ -495,6 +496,7 @@ class QATQuantizer(object):
         graph: TraceGraph,
         is_input_quantized: typing.Optional[typing.Tuple[bool]] = None,
         backend: str = 'qnnpack',
+        fuse_only: bool = False,
     ) -> torch.nn.Module:
         """Prepare model for QAT training
 
@@ -503,6 +505,7 @@ class QATQuantizer(object):
             is_input_quantized (typing.Union[typing.Tuple[bool]], optional): Whether the input tensor(s) is (are) \
                 quantized. Defaults to None.
             backend (str, optional): The backend of quantization. Defaults to 'qnnpack'.
+            fuse_only (bool, optional): Whether the returned model is only fused in PostQuantizer. Defaults to False.
 
         Returns:
             torch.nn.Module: The QAT-ready model
@@ -2412,6 +2415,7 @@ class PostQuantizer(QATQuantizer):
         graph: TraceGraph,
         is_input_quantized: typing.Optional[typing.Tuple[bool]] = None,
         backend: str = 'qnnpack',
+        fuse_only: bool = False,
     ) -> torch.nn.Module:
         """Prepare model for QAT training
 
@@ -2420,6 +2424,7 @@ class PostQuantizer(QATQuantizer):
             is_input_quantized (typing.Union[typing.Tuple[bool]], optional): Whether the input tensor(s) is (are) \
                 quantized. Defaults to None.
             backend (str, optional): The backend of quantization. Defaults to 'qnnpack'.
+            fuse_only (bool, optional): Whether the returned model is only fused in PostQuantizer. Defaults to False.
 
         Returns:
             torch.nn.Module: The QAT-ready model
@@ -2428,6 +2433,8 @@ class PostQuantizer(QATQuantizer):
         graph.module.eval()
 
         self.prepare_qat_prep(graph, is_input_quantized, backend)
+        if fuse_only:
+            return graph.module
 
         # Unfornately, the suggested way below will try to fuse all the modules
         # even if some of the nodes are not in a quantized computation graph.
