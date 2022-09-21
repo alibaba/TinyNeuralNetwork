@@ -245,7 +245,7 @@ class QATQuantizer(object):
 
         # Fuse the modules (e.g conv, bn, relu) in the computation graph according to the fuse rules.
         # By default, we assume all input tensors are of floating type.
-        # If you want to use quantized/integral inputs, then you may need to pass in `is_input_quantized`xx.
+        # If you want to use quantized/integral inputs, then you may need to pass in `is_input_quantized`.
         qat_model = self.prepare_qat(rewritten_graph, self.is_input_quantized, self.backend, self.fuse_only)
 
         return qat_model
