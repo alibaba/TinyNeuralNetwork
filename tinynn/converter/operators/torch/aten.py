@@ -2242,7 +2242,7 @@ class ATenScatterOperator(ATenScatterSchema):
             val_slices = []
             for i in indices_tensor.shape:
                 val_slices.append(slice(i))
-            val_slices = val_slices[: len(val_tensor.shape)]
+            val_slices = tuple(val_slices[: len(val_tensor.shape)])
 
             val_sliced = val_tensor.tensor.__getitem__(val_slices)
 
