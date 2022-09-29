@@ -2173,6 +2173,102 @@ class ATenGatherOperator(ATenGatherSchema):
         graph_converter.add_operator(tfl.GatherNdOperator([input_tensor, indices_tensor], [output_tensor]))
 
 
+class ATenScatterOperator(ATenScatterSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        assert not torch.is_nonzero(
+            torch.count_nonzero(self.input_tensors[0])
+        ), "aten::scatter with non-zero input is not supported"
+
+        # torch.scatter requires index tensor of type `torch.int64`
+        orig_type = self.input_tensors[2].dtype
+        self.input_tensors[2] = self.input_tensors[2].to(dtype=torch.int64)
+        self.run(node)
+
+        assert 'reduce' not in args, "aten::scatter with reduction is not supported"
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        assert input_tensor.buffer is not None, "aten::scatter with variable input is not supported"
+        output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
+        dim, index = self.input_tensors[1:3]
+        if dim < 0:
+            dim += input_tensor.tensor.ndim
+
+        fake_input = torch.arange(input_tensor.tensor.size).reshape(input_tensor.shape)
+        fake_output = torch.gather(fake_input, dim, index)
+
+        indices = torch.nonzero(fake_input >= 0)[fake_output].to(dtype=torch.int32)
+
+        self.input_tensors[2] = self.input_tensors[2].to(dtype=orig_type)
+        index_tensor = self.find_or_create_input(2, graph_converter)
+        if index_tensor.buffer is None:
+            indices_per_dim = torch.split(indices, 1, dim=-1)
+            indices_tensors = [self.create_attr_tensor(t) for t in indices_per_dim]
+
+            index_shape = list(index_tensor.shape) + [1]
+            axis = len(index_shape) - 1
+            shape_tensor = self.create_attr_tensor(np.array(index_shape, dtype='int32'))
+            index_reshaped = self.create_transform_tensor(np.reshape(index_tensor.tensor, index_shape))
+            reshape_op = tfl.ReshapeOperator([index_tensor, shape_tensor], [index_reshaped], index_shape)
+            reshape_op.extra_hints['direction'] = 'up'
+            graph_converter.add_operator(reshape_op)
+
+            if str(index_reshaped.dtype) != 'int32':
+                index_casted = self.create_transform_tensor(index_reshaped.tensor.astype('int32'))
+                graph_converter.add_operator(
+                    tfl.CastOperator(
+                        [index_reshaped],
+                        [index_casted],
+                        tfl.numpy_tflite_dtype_mappings[str(index_reshaped.dtype)],
+                        tfl.numpy_tflite_dtype_mappings[str(index_casted.dtype)],
+                    )
+                )
+                index_reshaped = index_casted
+
+            indices_tensors[dim] = index_reshaped
+            indices_tensor = self.create_transform_tensor(np.concatenate([x.tensor for x in indices_tensors], axis=-1))
+            graph_converter.add_operator(tfl.ConcatenationOperator(indices_tensors, [indices_tensor], axis=axis))
+        else:
+            indices_tensor = self.create_attr_tensor(indices)
+
+        if isinstance(self.input_tensors[3], (int, float)):
+            fill_arr = np.squeeze(indices_tensor.tensor.copy().astype(input_tensor.dtype), -1)
+            fill_arr.fill(self.input_tensors[3])
+            fill_tensor = self.create_attr_tensor(fill_arr)
+        else:
+            val_tensor = self.find_or_create_input(3, graph_converter)
+
+            val_slices = []
+            for i in indices_tensor.shape:
+                val_slices.append(slice(i))
+            val_slices = val_slices[: len(val_tensor.shape)]
+
+            val_sliced = val_tensor.tensor.__getitem__(val_slices)
+
+            if val_tensor.buffer is None:
+                if val_tensor.shape != indices_tensor.shape:
+                    sizes = np.array(indices_tensor.tensor.shape[:-1], dtype='int32')
+                    starts = np.zeros(indices_tensor.tensor.ndim - 1, dtype='int32')
+
+                    size_tensor = self.create_attr_tensor(sizes)
+                    start_tensor = self.create_attr_tensor(starts)
+
+                    fill_tensor = self.create_transform_tensor(val_sliced)
+
+                    graph_converter.add_operator(
+                        tfl.SliceOperator([val_tensor, start_tensor, size_tensor], [fill_tensor])
+                    )
+            else:
+                fill_tensor = self.create_attr_tensor(val_sliced)
+
+        shape_tensor = self.create_attr_tensor(np.array(input_tensor.shape, dtype='int32'))
+
+        graph_converter.add_operator(
+            tfl.ScatterNdOperator([indices_tensor, fill_tensor, shape_tensor], [output_tensor])
+        )
+
+
 class ATenGeluOperator(ATenGeluSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
