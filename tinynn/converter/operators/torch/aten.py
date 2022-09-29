@@ -2177,8 +2177,8 @@ class ATenScatterOperator(ATenScatterSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
 
-        assert not torch.is_nonzero(
-            torch.count_nonzero(self.input_tensors[0])
+        assert not any(
+            (torch.is_nonzero(v) for v in self.input_tensors[0].flatten())
         ), "aten::scatter with non-zero input is not supported"
 
         # torch.scatter requires index tensor of type `torch.int64`
