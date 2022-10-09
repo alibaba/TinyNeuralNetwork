@@ -2457,6 +2457,7 @@ CHANNEL_MODIFIERS = {
     nn.Upsample: PoolingModifier,
     nn.UpsamplingBilinear2d: PoolingModifier,
     nn.UpsamplingNearest2d: PoolingModifier,
+    "interpolate": PoolingModifier,
     nn.PReLU: PReLUChannelModifier,
     nn.BatchNorm2d: BatchNormChannelModifier,
     nn.BatchNorm1d: BatchNormChannelModifier,
