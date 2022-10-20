@@ -828,6 +828,34 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_embedding(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.word_bank = torch.randn(10, 3)
+
+            def forward(self, x):
+                return F.embedding(x, self.word_bank)
+
+        model = Model()
+        inputs = torch.tensor([[1, 2, 4, 5], [4, 3, 2, 9]])
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_float_cast(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.c = torch.arange(3)
+
+            def forward(self, x):
+                return x * self.c.reshape(1, -1, 1, 1).float()
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1882,6 +1882,8 @@ class TraceGraph(object):
             lines.append(line)
 
             for pn in {pn.unique_name: pn for pn in node.prev_nodes}.values():
+                if isinstance(pn.module, ConstantNode):
+                    continue
                 if node.forward_order == max([n.forward_order for n in pn.next_nodes]):
                     lines.append(f"        {pn.unique_name} = None")
 
