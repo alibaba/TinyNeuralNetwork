@@ -968,6 +968,8 @@ class QATQuantizer(object):
 
             if len(node.prev_nodes) == 1 and len(node.next_nodes) == 1:
                 if len(node.prev_tensors) == 1 and len(node.next_tensors) == 1:
+                    if node.prev_nodes[0].kind() == 'shape' and node.prev_nodes[0].module.is_property:
+                        return False
                     if (
                         node.prev_tensors[0].dtype in (torch.int32, torch.int64)
                         and node.next_tensors[0].dtype == torch.float32
@@ -1001,7 +1003,7 @@ class QATQuantizer(object):
             if node.rev_index:
                 modules = []
                 for rev_idx in range(len(node.prev_nodes)):
-                    if node.prev_tensors[idx][rev_idx].dtype in (torch.int32, torch.int64):
+                    if node.prev_tensors[rev_idx].dtype in (torch.int32, torch.int64):
                         fake_dequant = nn.Identity()
                     else:
                         fake_dequant = fake_dequant_cls()
