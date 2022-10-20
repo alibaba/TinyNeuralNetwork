@@ -1690,6 +1690,7 @@ class QATQuantizer(object):
                     'mm',
                     'matmul',
                     'bmm',
+                    'abs',
                 )
             else:
                 if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
