@@ -1275,7 +1275,7 @@ class GraphOptimizer(object):
                     name = next_node['op'].inputs[0].name
                     q_tensor = next_node['op'].outputs[0]
                     assert q_tensor.quantization is not None
-                    if node['node_type'] == ExtendedOperator.BATCH_MATMUL:
+                    if node['node_type'] in (ExtendedOperator.BATCH_MATMUL, ExtendedOperator.ABS):
                         if q_tensor.dtype not in (np.dtype('int8'), np.dtype('int16')):
                             skip = True
                     if node['node_type'] == ExtendedOperator.SOFTMAX:
@@ -3343,6 +3343,7 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.STRIDED_SLICE,
         ExtendedOperator.TILE,
         ExtendedOperator.GATHER,
+        ExtendedOperator.ABS,
     ) or is_elementwise_reduce_op(op_code, op)
 
 
@@ -3351,6 +3352,7 @@ def is_quantizable_rewrite_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.BATCH_MATMUL,
         ExtendedOperator.SOFTMAX,
         ExtendedOperator.LOG_SOFTMAX,
+        ExtendedOperator.ABS,
     )
 
 

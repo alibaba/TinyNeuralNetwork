@@ -3005,3 +3005,11 @@ class ATenNormOperator(ATenNormSchema):
 
         for op in ops:
             graph_converter.add_operator(op)
+
+
+class ATenAbsOperator(ATenAbsSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.elementwise_unary(tfl.AbsOperator, graph_converter)
