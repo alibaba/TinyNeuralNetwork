@@ -1,3 +1,5 @@
+from http.client import UNPROCESSABLE_ENTITY
+from struct import unpack
 import warnings
 
 import numpy as np
@@ -753,6 +755,150 @@ class ATenMatmulOperator(ATenMatmulSchema):
                 keep_dims = len(outputs[0].shape) > 2
                 graph_converter.add_operator(tfl.FullyConnectedOperator(inputs, outputs, keepNumDims=keep_dims))
             elif weight_tensor.tensor.ndim >= 2 and weight_tensor.tensor.ndim <= 5:
+                # new_input_shape = input_tensor.shape[1:]
+                # shape_input_tensor = self.create_attr_tensor(np.array(new_input_shape, dtype='int32'))
+                # new_input_tensor = self.create_transform_tensor(np.reshape(input_tensor.tensor, new_input_shape))
+                # graph_converter.add_operator(tfl.ReshapeOperator([input_tensor, shape_input_tensor], [new_input_tensor], new_input_shape))
+                
+                # new_weight_shape = weight_tensor.shape[1:]
+                # shape_weight_tensor = self.create_attr_tensor(np.array(new_weight_shape, dtype='int32'))
+                # new_weight_tensor = self.create_transform_tensor(np.reshape(weight_tensor.tensor, new_weight_shape))
+                # graph_converter.add_operator(tfl.ReshapeOperator([weight_tensor, shape_weight_tensor], [new_weight_tensor], new_weight_shape))
+                
+                
+                # new_inputs = np.array(new_input_tensor.tensor)
+                # new_input0 = new_inputs[0, :, :]
+                # new_input_tensor0 = self.create_transform_tensor(np.array(new_input0))
+                # new_input1 = new_inputs[1, :, :]
+                # new_input_tensor1 = self.create_transform_tensor(np.array(new_input1))
+                # new_input2 = new_inputs[2, :, :]
+                # new_input_tensor2 = self.create_transform_tensor(np.array(new_input2))
+                
+                # new_weights = np.array(new_weight_tensor.tensor)
+                # new_weight0 = new_weights[0, :, :]
+                # new_weight_tensor0 = self.create_transform_tensor(np.array(new_weight0))
+                # new_weight1 = new_weights[1, :, :]
+                # new_weight_tensor1 = self.create_transform_tensor(np.array(new_weight1))
+                # new_weight2 = new_weights[2, :, :]
+                # new_weight_tensor2 = self.create_transform_tensor(np.array(new_weight2))
+
+                # dim = 0
+                # chunks = new_input_tensor.shape[dim]
+                
+                # new_input_tensors = [new_input_tensor0, new_input_tensor1, new_input_tensor2]
+                # graph_converter.add_operator(tfl.UnpackOperator([new_input_tensor], new_input_tensors,  chunks, dim))
+
+                # new_weight_tensors = [new_weight_tensor0, new_weight_tensor1, new_weight_tensor2]
+                # graph_converter.add_operator(tfl.UnpackOperator([new_weight_tensor], new_weight_tensors,  chunks, dim))
+
+                
+                # new_weight_array0 = np.array(new_weight_tensor0.tensor)
+                # weight_array0 = np.array([new_weight_array0])
+                # weight_shape0 = weight_array0.shape
+                # shape_weight_tensor0 = self.create_attr_tensor(np.array(weight_shape0, dtype='int8'))
+                # new_weighttensor = self.create_transform_tensor(np.reshape(new_weight_tensor0.tensor, weight_shape0))
+                # graph_converter.add_operator(tfl.ReshapeOperator([new_weight_tensor0, shape_weight_tensor0], [new_weighttensor], weight_shape0))
+                
+                # perm = [0, 2, 1]
+                # perm_tensor0 = self.create_attr_tensor(np.array(perm, dtype='int8'))
+                # weight_transformed0 = self.create_transform_tensor(np.transpose(new_weighttensor.tensor, perm))
+                # graph_converter.add_operator(tfl.TransposeOperator([new_weighttensor, perm_tensor0], [weight_transformed0]))
+                
+                # new_weight_transformed_shape0 = weight_transformed0.shape[1:]
+                # shape_new_weight_transformed0 = self.create_attr_tensor(np.array(new_weight_transformed_shape0, dtype='int8'))
+                # new_weight_transformed0 = self.create_transform_tensor(np.reshape(weight_transformed0.tensor, new_weight_transformed_shape0))
+                # graph_converter.add_operator(tfl.ReshapeOperator([weight_transformed0, shape_new_weight_transformed0], [new_weight_transformed0], new_weight_transformed_shape0))
+                
+                # bias_tensor0 = self.create_attr_tensor(np.zeros(new_weight_tensor0.shape[1], dtype='int8'))
+                # input0 = [new_input_tensor0, new_weight_transformed0, bias_tensor0]
+                # output0 = self.create_transform_tensor(np.matmul(new_input_tensor0.tensor, new_weight_tensor0.tensor))
+                # keep_dims = len(output0.shape) > 2
+                # graph_converter.add_operator(tfl.FullyConnectedOperator(input0, [output0], keepNumDims=keep_dims))
+
+                # output_arry0 = np.array(output0.tensor)
+                # new_output_array0 = np.array([output_arry0])
+                # output_shape0 = new_output_array0.shape
+                # shape_output0 = self.create_attr_tensor(np.array(output_shape0, dtype='int8'))
+                # new_output0 = self.create_transform_tensor(np.reshape(output0.tensor, output_shape0))
+                # graph_converter.add_operator(tfl.ReshapeOperator([output0, shape_output0], [new_output0], output_shape0))
+
+
+                # new_weight_array1 = np.array(new_weight_tensor1.tensor)
+                # weight_array1 = np.array([new_weight_array1])
+                # weight_shape1 = weight_array1.shape
+                # shape_weight_tensor1 = self.create_attr_tensor(np.array(weight_shape1, dtype='int32'))
+                # new_weighttensor = self.create_transform_tensor(np.reshape(new_weight_tensor1.tensor, weight_shape1))
+                # graph_converter.add_operator(tfl.ReshapeOperator([new_weight_tensor1, shape_weight_tensor1], [new_weighttensor], weight_shape1))
+                
+                # perm = [0, 2, 1]
+                # perm_tensor1 = self.create_attr_tensor(np.array(perm, dtype='int32'))
+                # weight_transformed1 = self.create_transform_tensor(np.transpose(new_weighttensor.tensor, perm))
+                # graph_converter.add_operator(tfl.TransposeOperator([new_weighttensor, perm_tensor1], [weight_transformed1]))
+                
+                # new_weight_transformed_shape1 = weight_transformed1.shape[1:]
+                # shape_new_weight_transformed1 = self.create_attr_tensor(np.array(new_weight_transformed_shape1, dtype='int32'))
+                # new_weight_transformed1 = self.create_transform_tensor(np.reshape(weight_transformed1.tensor, new_weight_transformed_shape1))
+                # graph_converter.add_operator(tfl.ReshapeOperator([weight_transformed1, shape_new_weight_transformed1], [new_weight_transformed1], new_weight_transformed_shape1))
+                
+                # bias_tensor1 = self.create_attr_tensor(np.zeros(new_weight_tensor1.shape[1], dtype='float32'))
+                # input1 = [new_input_tensor1, new_weight_transformed1, bias_tensor1]
+                # output1 = self.create_transform_tensor(np.matmul(new_input_tensor1.tensor, new_weight_tensor1.tensor))
+                # keep_dims = len(output1.shape) > 2
+                # graph_converter.add_operator(tfl.FullyConnectedOperator(input1, [output1], keepNumDims=keep_dims))
+
+                # output_arry1 = np.array(output1.tensor)
+                # new_output_array1 = np.array([output_arry1])
+                # output_shape1 = new_output_array1.shape
+                # shape_output1 = self.create_attr_tensor(np.array(output_shape1, dtype='int32'))
+                # new_output1 = self.create_transform_tensor(np.reshape(output1.tensor, output_shape1))
+                # graph_converter.add_operator(tfl.ReshapeOperator([output1, shape_output1], [new_output1], output_shape1))
+
+
+                # new_weight_array2 = np.array(new_weight_tensor2.tensor)
+                # weight_array2 = np.array([new_weight_array2])
+                # weight_shape2 = weight_array2.shape
+                # shape_weight_tensor2 = self.create_attr_tensor(np.array(weight_shape2, dtype='int32'))
+                # new_weighttensor = self.create_transform_tensor(np.reshape(new_weight_tensor2.tensor, weight_shape2))
+                # graph_converter.add_operator(tfl.ReshapeOperator([new_weight_tensor2, shape_weight_tensor2], [new_weighttensor], weight_shape2))
+                
+                # perm = [0, 2, 1]
+                # perm_tensor2 = self.create_attr_tensor(np.array(perm, dtype='int32'))
+                # weight_transformed2 = self.create_transform_tensor(np.transpose(new_weighttensor.tensor, perm))
+                # graph_converter.add_operator(tfl.TransposeOperator([new_weighttensor, perm_tensor2], [weight_transformed2]))
+                
+                # new_weight_transformed_shape2 = weight_transformed2.shape[1:]
+                # shape_new_weight_transformed2 = self.create_attr_tensor(np.array(new_weight_transformed_shape2, dtype='int32'))
+                # new_weight_transformed2 = self.create_transform_tensor(np.reshape(weight_transformed2.tensor, new_weight_transformed_shape2))
+                # graph_converter.add_operator(tfl.ReshapeOperator([weight_transformed2, shape_new_weight_transformed2], [new_weight_transformed2], new_weight_transformed_shape2))
+                
+                # bias_tensor2 = self.create_attr_tensor(np.zeros(new_weight_tensor2.shape[1], dtype='float32'))
+                # input2 = [new_input_tensor2, new_weight_transformed2, bias_tensor2]
+                # output2 = self.create_transform_tensor(np.matmul(new_input_tensor2.tensor, new_weight_tensor2.tensor))
+                # keep_dims = len(output2.shape) > 2
+                # graph_converter.add_operator(tfl.FullyConnectedOperator(input2, [output2], keepNumDims=keep_dims))
+                
+                # output_arry2 = np.array(output2.tensor)
+                # new_output_array2 = np.array([output_arry2])
+                # output_shape2 = new_output_array2.shape
+                # shape_output2 = self.create_attr_tensor(np.array(output_shape2, dtype='int32'))
+                # new_output2 = self.create_transform_tensor(np.reshape(output2.tensor, output_shape2))
+                # graph_converter.add_operator(tfl.ReshapeOperator([output2, shape_output2], [new_output2], output_shape2))
+                
+                # out_put_tensor0 = np.array(new_output0.tensor)
+                # out_put_tensor1 = np.array(new_output1.tensor)
+                # out_put_tensor2 = np.array(new_output2.tensor)
+                
+                # pre_output = self.create_transform_tensor(np.concatenate((out_put_tensor0, out_put_tensor1, out_put_tensor2), axis=0))
+                # graph_converter.add_operator(tfl.ConcatenationOperator([new_output0, new_output1, new_output2], [pre_output], axis=0))
+                
+
+                # pre_output_array = np.array(pre_output.tensor)
+                # output_array = np.array([pre_output_array])
+                # output_shape = output_array.shape
+                # shape_output_tensor = self.create_attr_tensor(np.array(output_shape, dtype='int32'))
+                # outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+                # graph_converter.add_operator(tfl.ReshapeOperator([pre_output, shape_output_tensor], outputs, output_shape))
+
                 self.elementwise_binary(tfl.BatchMatmulOperator, graph_converter, False)
         else:
             self.unimplemented(node, attrs, args)
@@ -2136,27 +2282,63 @@ class ATenGeluOperator(ATenGeluSchema):
 
         ops = []
 
+        # input_tensor = self.find_or_create_input(0, graph_converter)
+        # input_tensor2 = self.create_transform_tensor(np.multiply(input_tensor.tensor, input_tensor.tensor))
+        # graph_converter.add_operator(tfl.MulOperator([input_tensor, input_tensor], [input_tensor2]))
+        # input_tensor3 = self.create_transform_tensor(np.multiply(input_tensor2.tensor, input_tensor.tensor))
+        # graph_converter.add_operator(tfl.MulOperator([input_tensor, input_tensor2], [input_tensor3]))
+        
+        # constant1_tensor = self.create_attr_tensor(np.array([0.0455399], dtype='float32'))
+        # tanh1_tensor = self.create_transform_tensor(input_tensor3.tensor * constant1_tensor.tensor)
+        # graph_converter.add_operator(tfl.MulOperator([input_tensor3, constant1_tensor], [tanh1_tensor]))
+        # tanh2_tensor = self.create_transform_tensor(np.add(tanh1_tensor.tensor , input_tensor.tensor))
+        # graph_converter.add_operator(tfl.AddOperator([tanh1_tensor, input_tensor], [tanh2_tensor]))
+
+        # constant2_tensor = self.create_attr_tensor(np.array([np.sqrt(2/np.pi)], dtype='float32'))
+        # tanh3_tensor = self.create_transform_tensor(tanh2_tensor.tensor * constant2_tensor.tensor)
+        # graph_converter.add_operator(tfl.MulOperator([tanh2_tensor, constant2_tensor], [tanh3_tensor]))
+        # tanh0_tensor = self.create_transform_tensor(np.tanh(tanh3_tensor.tensor))
+        # graph_converter.add_operator(tfl.TanhOperator([tanh3_tensor], [tanh0_tensor]))
+
+        # one_tensor = self.create_attr_tensor(np.ones(tanh0_tensor.shape, dtype='float32'))
+        # tanh_tensor = self.create_transform_tensor(np.add(tanh0_tensor.tensor, one_tensor.tensor))
+        # graph_converter.add_operator(tfl.AddOperator([tanh0_tensor, one_tensor], [tanh_tensor]))
+
+        # constant0_tensor = self.create_attr_tensor(np.array([0.5], dtype='float32'))
+        # input1_tensor = self.create_transform_tensor(input_tensor.tensor * constant0_tensor.tensor)
+        # graph_converter.add_operator(tfl.MulOperator([input_tensor, constant0_tensor], [input1_tensor]))
+        # output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        # graph_converter.add_operator(tfl.MulOperator([input1_tensor, tanh_tensor], output_tensor))
+        # print(output_tensor[0].tensor)
+        
+        
         input_tensor = self.find_or_create_input(0, graph_converter)
-        constant_tensor = self.create_attr_tensor(np.array([1.702], dtype='float32'))
-        sigmoid_in = self.create_transform_tensor(input_tensor.tensor * constant_tensor.tensor)
+        constant0_tensor = self.create_attr_tensor(np.array([-1.702], dtype='float32'))
+        exp_in = self.create_transform_tensor(input_tensor.tensor * constant0_tensor.tensor)
+        ops.append(tfl.MulOperator([input_tensor, constant0_tensor], [exp_in]))
+        exp_out = self.create_transform_tensor(np.exp(exp_in.tensor))
+        ops.append(tfl.ExpOperator([exp_in], [exp_out]))
+        constant1_tensor = self.create_attr_tensor(np.array([1], dtype='float32'))
+        inverse_in = self.create_transform_tensor(np.add(constant1_tensor.tensor, exp_out.tensor))
+        ops.append(tfl.AddOperator([constant1_tensor, exp_out], [inverse_in]))
+        inverse_out = self.create_transform_tensor(np.reciprocal(inverse_in.tensor))
+        ops.append(tfl.DivOperator([inverse_in], [inverse_out]))
 
         actual_input = input_tensor
         output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
-        if input_tensor.quantization is not None:
-            actual_input = self.create_transform_tensor(actual_input.tensor.astype('float32'))
-            ops.append(tfl.DequantizeOperator([input_tensor], [actual_input]))
+        # if input_tensor.quantization is not None:
+        #     actual_input = self.create_transform_tensor(actual_input.tensor.astype('float32'))
+        #     ops.append(tfl.DequantizeOperator([input_tensor], [actual_input]))
+        #     ops.append(tfl.MulOperator([actual_input, constant0_tensor], [inverse_out]))
+        # sigmoid_out = self.create_transform_tensor(torch.sigmoid(torch.from_numpy(input_tensor.tensor)).numpy())
+        # ops.append(tfl.LogisticOperator([inverse_out], [sigmoid_out]))
 
-        ops.append(tfl.MulOperator([actual_input, constant_tensor], [sigmoid_in]))
-
-        sigmoid_out = self.create_transform_tensor(torch.sigmoid(torch.from_numpy(input_tensor.tensor)).numpy())
-        ops.append(tfl.LogisticOperator([sigmoid_in], [sigmoid_out]))
-
-        if input_tensor.quantization is not None:
-            actual_output = self.create_transform_tensor(output_tensor.tensor.astype('float32'))
-            ops.append(tfl.MulOperator([sigmoid_out, actual_input], [actual_output]))
-            ops.append(tfl.QuantizeOperator([actual_output], [output_tensor]))
-        else:
-            ops.append(tfl.MulOperator([sigmoid_out, actual_input], [output_tensor]))
+        # if input_tensor.quantization is not None:
+        #     actual_output = self.create_transform_tensor(output_tensor.tensor.astype('float32'))
+        #     ops.append(tfl.MulOperator([sigmoid_out, actual_input], [actual_output]))
+        #     ops.append(tfl.QuantizeOperator([actual_output], [output_tensor]))
+        # else:
+        ops.append(tfl.MulOperator([inverse_out, actual_input], [output_tensor]))
 
         for op in ops:
             graph_converter.add_operator(op)

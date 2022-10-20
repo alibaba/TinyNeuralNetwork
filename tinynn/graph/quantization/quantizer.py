@@ -22,7 +22,7 @@ from torch.nn.parallel.data_parallel import DataParallel
 from torch.nn.parallel.distributed import DistributedDataParallel
 
 from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16, FakeQuantizeTFLite
-from tinynn.graph.quantization.modules import QPReLU, QSiLU
+from tinynn.graph.quantization.modules import QPReLU, QSiLU, QLayerNorm
 from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserverKL
 from tinynn.graph.tracer import (
     ConstantNode,
@@ -334,6 +334,14 @@ class QATQuantizer(object):
         # Replace PReLU nodes with our custom variants
         quantized_prelu_nodes = graph.filter_forward_nodes(_find_quantized_prelu_nodes)
         graph.update_submodule_in_nodes_from_predicate(quantized_prelu_nodes, QPReLU)
+
+        def _find_quantized_layernorm_node(node: TraceNode, custom_node):
+            # Find quantized LayerNorm nodes
+            return node.type() == nn.LayerNorm and node.quantized
+
+        # Replace LayerNorm nodes with our custom variants
+        quantized_layernorm_nodes = graph.filter_forward_nodes(_find_quantized_layernorm_node)
+        graph.update_submodule_in_nodes_from_predicate(quantized_layernorm_nodes, QLayerNorm)
 
         if LooseVersion(torch.__version__) >= LooseVersion('1.7.0'):
 

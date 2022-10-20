@@ -48,6 +48,7 @@ class TFLiteConverter(object):
         map_bilstm_to_lstm: bool = False,
         float16_quantization: bool = False,
         enable_mtk_ops: bool = False,
+        bmm_write: bool = True,
         max_transpose_dims: int = -1,
     ) -> None:
         """ The TFLiteConverter class
@@ -136,6 +137,7 @@ class TFLiteConverter(object):
         self.float16_quantization = float16_quantization
         self.enable_mtk_ops = enable_mtk_ops
         self.max_transpose_dims = max_transpose_dims
+        self.bmm_write = bmm_write
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -446,6 +448,7 @@ class TFLiteConverter(object):
                 self.fuse_input_indices,
                 self.fuse_output_indices,
                 self.max_transpose_dims,
+                self.bmm_write
             )
             optimizer.optimize()
 

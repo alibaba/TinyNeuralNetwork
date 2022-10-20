@@ -25,6 +25,7 @@ class GraphOptimizer(object):
     fuse_quant: bool
     group_conv_rewrite: bool
     tflite_micro_rewrite: bool
+    bmm_rewrite: bool
     quantize_input_output_type: typing.Optional[str]
 
     # Optimization levels
@@ -42,6 +43,7 @@ class GraphOptimizer(object):
         level: int,
         fuse_quant: bool,
         group_conv_rewrite: bool,
+        bmm_rewrite: bool,
         rewrite_quantizable: bool,
         tflite_micro_rewrite: bool,
         quantize_input_output_type: typing.Optional[str],
@@ -61,6 +63,7 @@ class GraphOptimizer(object):
         self.fuse_input_indices = fuse_input_indices
         self.fuse_output_indices = fuse_output_indices
         self.max_transpose_dims = max_transpose_dims
+        self.bmm_rewrite = bmm_rewrite
 
     def create_attr_tensor(
         self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
@@ -2422,6 +2425,197 @@ class GraphOptimizer(object):
 
             self.graph.try_restore_edges(mapping)
 
+    @class_conditional(lambda self: self.bmm_rewrite)
+    def bmm_rewrite_pass(self):
+        vertices = self.graph.graph.vs.select(functools.partial(is_bmm_node, graph_converter=self.graph.graph, bmm_rewrite=self.bmm_rewrite))
+
+
+        remove_ids = []
+        ops = []
+        restore_mapping = []
+        for bmm in vertices:
+            restore_nodes = []
+            # For each node that is next of a transformable node,
+            #  a. if it is an output node, remove it anyway since it will always be reconstructed
+            #  b. otherwise, record the info of the edge so that we may restore it after reconstruction
+            for out_edge in bmm.out_edges():
+                next_node = self.graph.graph.vs[out_edge.target]
+                if next_node['node_type'] == ExtendedOperator.OUTPUT_NODE:
+                    remove_ids.append(next_node.index)
+                    del self.graph.tensor_map[next_node['outputs'][0]]
+                    del self.graph.tensor_node_map[next_node['outputs'][0]]
+                else:
+                    restore_nodes.append((out_edge['name'], next_node['name']))
+
+            # Remove the mapping since they are going to be removed
+            for output_name in bmm['outputs']:
+                del self.graph.tensor_map[output_name]
+                del self.graph.tensor_node_map[output_name]
+
+            restore_mapping.append(restore_nodes)
+            remove_ids.append(bmm.index)
+
+        # Make sure the nodes are topologically sorted
+        sorted_ops = [node['op'] for node in sorted(vertices, key=lambda x: int(re.search(r'\d+', x['name'])[0]))]
+
+        # Delete nodes before transformation in the graph
+        self.graph.graph.delete_vertices(remove_ids)
+
+        for bmm, mapping in zip(sorted_ops, restore_mapping):
+            input_tensor = bmm.inputs[0]
+            weight_tensor = bmm.inputs[1]
+
+            ops = []
+
+            new_input_shape = input_tensor.shape[1:]
+            shape_input_tensor = self.create_attr_tensor(np.array(new_input_shape, dtype='int8'))
+            new_input_tensor = self.create_transform_tensor(np.reshape(input_tensor.tensor, new_input_shape), quantization=input_tensor.quantization)
+            ops.append(tfl.ReshapeOperator([input_tensor, shape_input_tensor], [new_input_tensor], new_input_shape))
+            
+            new_weight_shape = weight_tensor.shape[1:]
+            shape_weight_tensor = self.create_attr_tensor(np.array(new_weight_shape, dtype='int8'))
+            new_weight_tensor = self.create_transform_tensor(np.reshape(weight_tensor.tensor, new_weight_shape, quantization=weight_tensor.quantization))
+            ops.append(tfl.ReshapeOperator([weight_tensor, shape_weight_tensor], [new_weight_tensor], new_weight_shape))
+            
+            
+            new_inputs = np.array(new_input_tensor.tensor)
+            new_input0 = new_inputs[0, :, :]
+            new_input_tensor0 = self.create_transform_tensor(np.array(new_input0))
+            new_input1 = new_inputs[1, :, :]
+            new_input_tensor1 = self.create_transform_tensor(np.array(new_input1))
+            new_input2 = new_inputs[2, :, :]
+            new_input_tensor2 = self.create_transform_tensor(np.array(new_input2))
+            
+            new_weights = np.array(new_weight_tensor.tensor)
+            new_weight0 = new_weights[0, :, :]
+            new_weight_tensor0 = self.create_transform_tensor(np.array(new_weight0))
+            new_weight1 = new_weights[1, :, :]
+            new_weight_tensor1 = self.create_transform_tensor(np.array(new_weight1))
+            new_weight2 = new_weights[2, :, :]
+            new_weight_tensor2 = self.create_transform_tensor(np.array(new_weight2))
+
+            dim = 0
+            chunks = new_input_tensor.shape[dim]
+            
+            new_input_tensors = [new_input_tensor0, new_input_tensor1, new_input_tensor2]
+            ops.append(tfl.UnpackOperator([new_input_tensor], new_input_tensors,  chunks, dim))
+
+            new_weight_tensors = [new_weight_tensor0, new_weight_tensor1, new_weight_tensor2]
+            ops.append(tfl.UnpackOperator([new_weight_tensor], new_weight_tensors,  chunks, dim))
+
+            
+            new_weight_array0 = np.array(new_weight_tensor0.tensor)
+            weight_array0 = np.array([new_weight_array0])
+            weight_shape0 = weight_array0.shape
+            shape_weight_tensor0 = self.create_attr_tensor(np.array(weight_shape0, dtype='int8'))
+            new_weighttensor0 = self.create_transform_tensor(np.reshape(new_weight_tensor0.tensor, weight_shape0), quantization=new_weight_tensor0.quantization)
+            ops.append(tfl.ReshapeOperator([new_weight_tensor0, shape_weight_tensor0], [new_weighttensor0], weight_shape0))
+            
+            perm = [0, 2, 1]
+            perm_tensor0 = self.create_attr_tensor(np.array(perm, dtype='int8'))
+            weight_transformed0 = self.create_transform_tensor(np.transpose(new_weighttensor0.tensor, perm), quantization=new_weighttensor0.quantization)
+            ops.append(tfl.TransposeOperator([new_weighttensor0, perm_tensor0], [weight_transformed0]))
+            
+            new_weight_transformed_shape0 = weight_transformed0.shape[1:]
+            shape_new_weight_transformed0 = self.create_attr_tensor(np.array(new_weight_transformed_shape0, dtype='int8'))
+            new_weight_transformed0 = self.create_transform_tensor(np.reshape(weight_transformed0.tensor, new_weight_transformed_shape0), quantization=weight_transformed0.quantization)
+            ops.append(tfl.ReshapeOperator([weight_transformed0, shape_new_weight_transformed0], [new_weight_transformed0], new_weight_transformed_shape0))
+            
+            bias_tensor0 = self.create_attr_tensor(np.zeros(new_weight_tensor0.shape[1], dtype='int8'))
+            input0 = [new_input_tensor0, new_weight_transformed0, bias_tensor0]
+            output0 = self.create_transform_tensor(np.matmul(new_input_tensor0.tensor, new_weight_tensor0.tensor), quantization=new_input_tensor0.quantization)
+            keep_dims = len(output0.shape) > 2
+            ops.append(tfl.FullyConnectedOperator(input0, [output0], keepNumDims=keep_dims))
+
+            output_arry0 = np.array(output0.tensor)
+            new_output_array0 = np.array([output_arry0])
+            output_shape0 = new_output_array0.shape
+            shape_output0 = self.create_attr_tensor(np.array(output_shape0, dtype='int8'))
+            new_output0 = self.create_transform_tensor(np.reshape(output0.tensor, output_shape0), quantization=output0.quantization)
+            ops.append(tfl.ReshapeOperator([output0, shape_output0], [new_output0], output_shape0))
+
+
+            new_weight_array1 = np.array(new_weight_tensor1.tensor)
+            weight_array1 = np.array([new_weight_array1])
+            weight_shape1 = weight_array1.shape
+            shape_weight_tensor1 = self.create_attr_tensor(np.array(weight_shape1, dtype='int8'))
+            new_weighttensor1 = self.create_transform_tensor(np.reshape(new_weight_tensor1.tensor, weight_shape1), quantization=new_weight_tensor1.quantization)
+            ops.append(tfl.ReshapeOperator([new_weight_tensor1, shape_weight_tensor1], [new_weighttensor1], weight_shape1))
+            
+            perm = [0, 2, 1]
+            perm_tensor1 = self.create_attr_tensor(np.array(perm, dtype='int8'))
+            weight_transformed1 = self.create_transform_tensor(np.transpose(new_weighttensor1.tensor, perm), quantization=new_weighttensor1.quantization)
+            ops.append(tfl.TransposeOperator([new_weighttensor1, perm_tensor1], [weight_transformed1]))
+            
+            new_weight_transformed_shape1 = weight_transformed1.shape[1:]
+            shape_new_weight_transformed1 = self.create_attr_tensor(np.array(new_weight_transformed_shape1, dtype='int32'))
+            new_weight_transformed1 = self.create_transform_tensor(np.reshape(weight_transformed1.tensor, new_weight_transformed_shape1), quantization=weight_transformed1.quantization)
+            ops.append(tfl.ReshapeOperator([weight_transformed1, shape_new_weight_transformed1], [new_weight_transformed1], new_weight_transformed_shape1))
+            
+            bias_tensor1 = self.create_attr_tensor(np.zeros(new_weight_tensor1.shape[1], dtype='int8'))
+            input1 = [new_input_tensor1, new_weight_transformed1, bias_tensor1]
+            output1 = self.create_transform_tensor(np.matmul(new_input_tensor1.tensor, new_weight_tensor1.tensor), quantization=new_input_tensor1.quantization)
+            keep_dims = len(output1.shape) > 2
+            ops.append(tfl.FullyConnectedOperator(input1, [output1], keepNumDims=keep_dims))
+
+            output_arry1 = np.array(output1.tensor)
+            new_output_array1 = np.array([output_arry1])
+            output_shape1 = new_output_array1.shape
+            shape_output1 = self.create_attr_tensor(np.array(output_shape1, dtype='int8'))
+            new_output1 = self.create_transform_tensor(np.reshape(output1.tensor, output_shape1), quantization=output1.quantization)
+            ops.append(tfl.ReshapeOperator([output1, shape_output1], [new_output1], output_shape1))
+
+
+            new_weight_array2 = np.array(new_weight_tensor2.tensor)
+            weight_array2 = np.array([new_weight_array2])
+            weight_shape2 = weight_array2.shape
+            shape_weight_tensor2 = self.create_attr_tensor(np.array(weight_shape2, dtype='int8'))
+            new_weighttensor2 = self.create_transform_tensor(np.reshape(new_weight_tensor2.tensor, weight_shape2), quantization=new_weight_tensor2.quantization)
+            ops.append(tfl.ReshapeOperator([new_weight_tensor2, shape_weight_tensor2], [new_weighttensor2], weight_shape2))
+            
+            perm = [0, 2, 1]
+            perm_tensor2 = self.create_attr_tensor(np.array(perm, dtype='int8'))
+            weight_transformed2 = self.create_transform_tensor(np.transpose(new_weighttensor2.tensor, perm), quantization=new_weighttensor2.quantization)
+            ops.append(tfl.TransposeOperator([new_weighttensor2, perm_tensor2], [weight_transformed2]))
+            
+            new_weight_transformed_shape2 = weight_transformed2.shape[1:]
+            shape_new_weight_transformed2 = self.create_attr_tensor(np.array(new_weight_transformed_shape2, dtype='int8'))
+            new_weight_transformed2 = self.create_transform_tensor(np.reshape(weight_transformed2.tensor, new_weight_transformed_shape2), quantization=weight_transformed2.quantization)
+            ops.append(tfl.ReshapeOperator([weight_transformed2, shape_new_weight_transformed2], [new_weight_transformed2], new_weight_transformed_shape2))
+            
+            bias_tensor2 = self.create_attr_tensor(np.zeros(new_weight_tensor2.shape[1], dtype='int8'))
+            input2 = [new_input_tensor2, new_weight_transformed2, bias_tensor2]
+            output2 = self.create_transform_tensor(np.matmul(new_input_tensor2.tensor, new_weight_tensor2.tensor), quantization=new_input_tensor2.quantization)
+            keep_dims = len(output2.shape) > 2
+            ops.append(tfl.FullyConnectedOperator(input2, [output2], keepNumDims=keep_dims))
+            
+            output_arry2 = np.array(output2.tensor)
+            new_output_array2 = np.array([output_arry2])
+            output_shape2 = new_output_array2.shape
+            shape_output2 = self.create_attr_tensor(np.array(output_shape2, dtype='int8'))
+            new_output2 = self.create_transform_tensor(np.reshape(output2.tensor, output_shape2), quantization=output2.quantization)
+            ops.append(tfl.ReshapeOperator([output2, shape_output2], [new_output2], output_shape2))
+            
+            out_put_tensor0 = np.array(new_output0.tensor)
+            out_put_tensor1 = np.array(new_output1.tensor)
+            out_put_tensor2 = np.array(new_output2.tensor)
+            
+            pre_output = self.create_transform_tensor(np.concatenate((out_put_tensor0, out_put_tensor1, out_put_tensor2), axis=0))
+            ops.append(tfl.ConcatenationOperator([new_output0, new_output1, new_output2], [pre_output], axis=0))
+            
+
+            pre_output_array = np.array(pre_output.tensor)
+            output_array = np.array([pre_output_array])
+            output_shape = output_array.shape
+            shape_output_tensor = self.create_attr_tensor(np.array(output_shape, dtype='int8'))
+            outputs = bmm.outputs[0]
+            ops.append(tfl.ReshapeOperator([pre_output, shape_output_tensor], outputs, output_shape), quantization=pre_output.quantization)
+            print("########")
+            for op in ops:
+                self.graph.add_operator(op, transform=True)
+
+            self.graph.try_restore_edges(mapping)
+
     def input_transpose_pass(self):
         nhwc2nchw_perm = np.array([0, 3, 1, 2], dtype='int32')
         nchw2nhwc_perm = np.array([0, 2, 3, 1], dtype='int32')
@@ -2940,6 +3134,9 @@ class GraphOptimizer(object):
         # Map quantizable ops to quantized kernels
         self.elementwise_op_quantize_passthrough_pass()
 
+        # Rewrite bmm op to make easily quantize
+        self.bmm_rewrite_pass()
+
         # Remove consecutive dequantize and quantize nodes
         self.fuse_dequant_quant_pass(q_first=False)
 
@@ -3152,6 +3349,11 @@ def is_requantize_node(vertex: ig.Vertex, graph_converter: ig.Graph):
 
 def is_large_cat_node(vertex: ig.Vertex, graph_converter: ig.Graph):
     return vertex['node_type'] == ExtendedOperator.CONCATENATION and len(vertex['op'].inputs) > 10
+
+def is_bmm_node(vertex: ig.Vertex, graph_converter: ig.Graph, bmm_rewrite: bool):
+    return (
+        vertex['node_type'] == ExtendedOperator.BATCH_MATMUL
+    )
 
 
 def is_high_dim_transpose_node(vertex: ig.Vertex, graph_converter: ig.Graph, max_transpose_dims: int):
