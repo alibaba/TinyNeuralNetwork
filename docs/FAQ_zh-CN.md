@@ -209,6 +209,6 @@ Note: 这些状态变量都是二维的，维度为`[batch_size, hidden_size或�
 
 ## 量化模型转换
 
-#### 怎么把`SOFTMAX`、`LOG_SOFTMAX`和`BATCH_MATMUL`算子转换成定点？
+#### 怎么把`ABS`、`SOFTMAX`、`LOG_SOFTMAX`和`BATCH_MATMUL`算子转换成定点？
 首先，在定义`TFLiteConverter`时加上`rewrite_quantizable=True`这个参数。
 其次，对于`SOFTMAX`、`LOG_SOFTMAX`，需要在定义`QATQuantizer`或者`PostQuantizer`时加上`set_quantizable_op_stats=True`这个参数。
