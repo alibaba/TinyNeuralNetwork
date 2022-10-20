@@ -828,6 +828,7 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    @unittest.skipIf(LooseVersion(torch.__version__) < "1.10.0", "Quantization for F.embedding is not supported")
     def test_embedding(self):
         class Model(nn.Module):
             def __init__(self) -> None:
@@ -836,6 +837,20 @@ class QuantizerTester(unittest.TestCase):
 
             def forward(self, x):
                 return F.embedding(x, self.word_bank)
+
+        model = Model()
+        inputs = torch.tensor([[1, 2, 4, 5], [4, 3, 2, 9]])
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_embedding_module(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.embed = nn.Embedding(10, 3)
+
+            def forward(self, x):
+                return self.embed(x)
 
         model = Model()
         inputs = torch.tensor([[1, 2, 4, 5], [4, 3, 2, 9]])
@@ -852,7 +867,7 @@ class QuantizerTester(unittest.TestCase):
                 return x * self.c.reshape(1, -1, 1, 1).float()
 
         model = Model()
-        inputs = torch.randn(1, 3, 224, 224)
+        inputs = torch.randn(1, 3, 1, 1)
 
         check_quantize_rewrite(model, inputs)
 
