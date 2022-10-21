@@ -962,8 +962,31 @@ class QATQuantizer(object):
 
         extra_constant_nodes = graph.filter_forward_nodes(_is_extra_constant_nodes)
 
+        def _is_int_to_float_nodes(node, custom_data):
+            if node.full_name() in creation_func_names:
+                return False
+
+            if len(node.prev_nodes) == 1 and len(node.next_nodes) == 1:
+                if len(node.prev_tensors) == 1 and len(node.next_tensors) == 1:
+                    if node.prev_nodes[0].kind() == 'shape' and node.prev_nodes[0].module.is_property:
+                        return False
+                    if (
+                        node.prev_tensors[0].dtype in (torch.int32, torch.int64)
+                        and node.next_tensors[0].dtype == torch.float32
+                    ):
+                        return True
+            else:
+                return False
+
+        int_to_float_nodes = graph.filter_forward_nodes(_is_int_to_float_nodes)
+
         # First, we insert the QuantStub nodes for every input/constant node
-        for idx, node in reversed(list(enumerate(graph.input_nodes + graph.constant_nodes + extra_constant_nodes))):
+        for idx, node in reversed(
+            list(enumerate(graph.input_nodes + graph.constant_nodes + extra_constant_nodes + int_to_float_nodes))
+        ):
+            if node.next_tensors[0].dtype in (torch.int32, torch.int64):
+                continue
+
             fake_quant = torch_q.QuantStub()
 
             graph.module_unique_name_dict[id(fake_quant)] = f'fake_quant_{idx}'
@@ -980,7 +1003,10 @@ class QATQuantizer(object):
             if node.rev_index:
                 modules = []
                 for rev_idx in range(len(node.prev_nodes)):
-                    fake_dequant = fake_dequant_cls()
+                    if node.prev_tensors[rev_idx].dtype in (torch.int32, torch.int64):
+                        fake_dequant = nn.Identity()
+                    else:
+                        fake_dequant = fake_dequant_cls()
 
                     graph.module_unique_name_dict[id(fake_dequant)] = f'fake_dequant_{idx}_{rev_idx}'
                     graph.module_original_name_dict[id(fake_dequant)] = f'fake_dequant_{idx}_{rev_idx}'
@@ -990,6 +1016,9 @@ class QATQuantizer(object):
 
                 graph.insert_before(node, modules, move_idx=True)
             else:
+                if node.prev_tensors[0].dtype in (torch.int32, torch.int64):
+                    continue
+
                 fake_dequant = fake_dequant_cls()
 
                 graph.module_unique_name_dict[id(fake_dequant)] = f'fake_dequant_{idx}'
