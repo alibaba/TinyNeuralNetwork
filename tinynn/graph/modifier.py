@@ -1282,6 +1282,7 @@ class SplitModifier(ReIndexModifier):
         # Input parameters also need to be regenerated after pruning
         remove_idx = self.dim_changes_info.pruned_idx_i
         args_parsed = self.node.module.args_parsed_origin
+
         if len(args_parsed) > 1:
             if type(args_parsed[1]) == list:
                 ch = [int(i) for i in args_parsed[1]]
@@ -2708,7 +2709,8 @@ class SubGraph(object):
                                 # reuses the pruning result of the center
                                 pruned_leaf_constraint.append(leaf_idx_constraint)
                         else:
-                            leaf_constraint_all.append(leaf_idx_constraint)
+                            if len(leaf_idx_constraint) > 0:
+                                leaf_constraint_all.append(leaf_idx_constraint)
 
                 # All center idx corresponding to leaf have been calculated
                 if len(leaf_constraint_all) == 0:
@@ -2804,7 +2806,7 @@ class SubGraph(object):
                     pruned_center_constraint_all[center_name] = pruned_center_constraint_all.get(center_name, set())
 
                     # Sync leaf's pruning idx to all centers
-                    for constraint in leaf_constraint_all:
+                    for constraint in calculated_leaf_constraint_all + leaf_constraint_all:
                         center_constraint = self.constraint_mapping(constraint, leaf_to_center[center_name])
                         if center_constraint != -1:
                             calculated_center_constraint_all[center_name].update(center_constraint)
@@ -3207,6 +3209,9 @@ class SubGraphDivider(object):
                 main_center = center_mapping[main_center]
 
             for redundant_center in center_names[1:]:
+                if redundant_center == main_center:
+                    continue
+
                 if redundant_center in sub_graphs:
                     sub_graphs[main_center].update(sub_graphs[redundant_center])
                     del sub_graphs[redundant_center]
