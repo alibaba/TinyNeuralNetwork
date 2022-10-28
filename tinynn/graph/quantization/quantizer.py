@@ -1747,11 +1747,7 @@ class QATQuantizer(object):
                 if LooseVersion(torch.__version__) >= LooseVersion('1.13.0'):
                     if isinstance(
                         cur_module,
-                        (
-                            nn.LSTM,
-                            nn.RNN,
-                            nn.GRU,
-                        ),
+                        nn.LSTM,
                     ):
                         return False
                 elif LooseVersion(torch.__version__) < LooseVersion('1.7.0'):

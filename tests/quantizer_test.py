@@ -37,7 +37,7 @@ def show_source(model, title, reload_cache=True):
     print(source)
 
 
-def check_quantize_rewrite(model, inputs, show_rewritten=True):
+def check_quantize_rewrite(model, inputs, show_rewritten=True, skip_train=False):
     with model_tracer():
         config = {'remove_weights_after_load': True}
         if sys.platform == 'win32':
@@ -49,11 +49,12 @@ def check_quantize_rewrite(model, inputs, show_rewritten=True):
         if show_rewritten:
             show_source(qat_model, 'Rewritten:')
 
-        for _ in range(3):
-            if isinstance(inputs, (list, tuple)):
-                qat_model(*inputs)
-            else:
-                qat_model(inputs)
+        if not skip_train:
+            for _ in range(3):
+                if isinstance(inputs, (list, tuple)):
+                    qat_model(*inputs)
+                else:
+                    qat_model(inputs)
 
         with torch.no_grad():
             qat_model.eval()
@@ -376,7 +377,11 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224)
 
-        check_quantize_rewrite(model, inputs)
+        skip_train = False
+        if LooseVersion(torch.__version__) >= LooseVersion('1.13.0'):
+            skip_train = True
+
+        check_quantize_rewrite(model, inputs, skip_train=skip_train)
 
     def test_not_quantizable_gru_module(self):
         class Model(nn.Module):
