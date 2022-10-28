@@ -914,21 +914,43 @@ class ATenStackOperator(ATenStackSchema):
         orig_inputs = self.to_tfl_tensors(
             names, self.input_tensors[0], graph_converter=graph_converter, non_existent_as_buffer=True
         )
-        inputs = [
-            self.create_transform_tensor(np.expand_dims(orig_inputs[i].tensor, dim)) for i in range(len(orig_inputs))
-        ]
-        attrs = [self.create_attr_tensor(np.array(t.shape, dtype='int32')) for t in inputs]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
-        ops = [
-            tfl.ReshapeOperator([orig, attr], [new], new.tensor.shape)
-            for orig, new, attr in zip(orig_inputs, inputs, attrs)
-        ]
+        as_unpack = True
+        for it in orig_inputs:
+            if it.quantization is not None and outputs[0].quantization is not None:
+                if (
+                    it.quantization.scale != outputs[0].quantization.scale
+                    or it.quantization.zero_point != outputs[0].quantization.zero_point
+                    or it.quantization.dim != outputs[0].quantization.dim
+                ):
+                    as_unpack = False
+                    break
+            elif it.quantization is not None or outputs[0].quantization is not None:
+                as_unpack = False
+                break
 
-        for op in ops:
-            op.extra_hints['direction'] = 'up'
+        ops = []
+        if as_unpack:
+            ops.append(tfl.PackOperator(orig_inputs, outputs, len(orig_inputs), dim))
+        else:
+            inputs = [
+                self.create_transform_tensor(np.expand_dims(orig_inputs[i].tensor, dim))
+                for i in range(len(orig_inputs))
+            ]
+            attrs = [self.create_attr_tensor(np.array(t.shape, dtype='int32')) for t in inputs]
 
-        ops.append(tfl.ConcatenationOperator(inputs, outputs, dim))
+            ops.extend(
+                [
+                    tfl.ReshapeOperator([orig, attr], [new], new.tensor.shape)
+                    for orig, new, attr in zip(orig_inputs, inputs, attrs)
+                ]
+            )
+
+            for op in ops:
+                op.extra_hints['direction'] = 'up'
+
+            ops.append(tfl.ConcatenationOperator(inputs, outputs, dim))
 
         for op in ops:
             graph_converter.add_operator(op)

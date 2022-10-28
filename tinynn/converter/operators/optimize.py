@@ -1445,6 +1445,12 @@ class GraphOptimizer(object):
 
                 if prev_node['node_type'] == ExtendedOperator.TRANSPOSE:
                     perm = tuple(prev_node['op'].inputs[1].tensor.tolist())
+
+                    if node['node_type'] == ExtendedOperator.PACK:
+                        perm = [i if i < op.axis else i + 1 for i in perm]
+                        perm.insert(op.axis, op.axis)
+                        perm = tuple(perm)
+
                     cand_perms.setdefault(perm, 0)
                     cand_perms[perm] += 1
                     if 'direction' in prev_node['op'].extra_hints:
@@ -1484,6 +1490,12 @@ class GraphOptimizer(object):
 
                 if next_node['node_type'] == ExtendedOperator.TRANSPOSE:
                     perm = tuple(np.argsort(next_node['op'].inputs[1].tensor).tolist())
+
+                    if node['node_type'] == ExtendedOperator.UNPACK:
+                        perm = [i if i < op.axis else i + 1 for i in perm]
+                        perm.insert(op.axis, op.axis)
+                        perm = tuple(perm)
+
                     cand_perms.setdefault(perm, 0)
                     cand_perms[perm] += 1
                     if 'direction' in next_node['op'].extra_hints:
@@ -1528,6 +1540,23 @@ class GraphOptimizer(object):
             perm_arr = np.array(perm, dtype='int32')
             inv_perm_arr = np.argsort(perm_arr).astype('int32')
 
+            if node['node_type'] == ExtendedOperator.UNPACK:
+                inv_perm_arr_post = inv_perm_arr[inv_perm_arr != op.axis]
+                inv_perm_arr_post[inv_perm_arr_post > op.axis] -= 1
+
+                perm_arr_post = np.argsort(inv_perm_arr_post).astype('int32')
+            elif node['node_type'] == ExtendedOperator.PACK:
+                perm_arr_post = perm_arr
+                inv_perm_arr_post = inv_perm_arr
+
+                perm_arr = perm_arr_post[perm_arr_post != op.axis]
+                perm_arr[perm_arr > op.axis] -= 1
+
+                inv_perm_arr = np.argsort(perm_arr).astype('int32')
+            else:
+                perm_arr_post = perm_arr
+                inv_perm_arr_post = inv_perm_arr
+
             tensor_node_dict = {}
             for prev_node, prev_idx, next_idx in zip(prev_nodes, input_indices, prev_output_indices):
                 if prev_node['op'] is None:
@@ -1569,9 +1598,9 @@ class GraphOptimizer(object):
                     op_out.shape = tuple(new_shape.tolist())
                     continue
 
-                perm_tensor = self.create_attr_tensor(perm_arr)
+                perm_tensor = self.create_attr_tensor(perm_arr_post)
                 new_out = self.create_transform_tensor(
-                    np.transpose(op_out.tensor, inv_perm_arr), quantization=op_out.quantization
+                    np.transpose(op_out.tensor, inv_perm_arr_post), quantization=op_out.quantization
                 )
 
                 # Update relations
@@ -1705,19 +1734,45 @@ class GraphOptimizer(object):
                     new_dim = None
                     if dim_indice is not None:
                         rev_mapping = {v: k for k, v in mapping.items()}
-                        if dim_indice not in rev_mapping:
-                            continue
-                        new_dim = rev_mapping[dim_indice]
+                        if node['node_type'] == ExtendedOperator.PACK:
+                            if dim_indice in rev_mapping:
+                                tmp_new_dim = rev_mapping[dim_indice]
+                            else:
+                                if dim_indice - 1 in rev_mapping:
+                                    tmp_new_dim = rev_mapping[dim_indice - 1] + 1
+                                elif dim_indice + 1 in rev_mapping:
+                                    tmp_new_dim = rev_mapping[dim_indice + 1] - 1
+                                else:
+                                    # TODO: Figure out the rev index
+                                    tmp_new_dim = -1
+                            tmp_dim_indice = dim_indice
+                            new_dim = -1
+                            dim_indice = -1
+                        else:
+                            if dim_indice not in rev_mapping:
+                                continue
+                            new_dim = rev_mapping[dim_indice]
 
                     shape = tuple(prev_node['op'].inputs[0].shape)
                     shape = tuple(x if i != new_dim else -1 for i, x in enumerate(shape))
+                    if node['node_type'] == ExtendedOperator.PACK and tmp_new_dim >= 0:
+                        shape = list(shape)
+                        shape.insert(tmp_new_dim, -1)
+                        shape = tuple(shape)
                     cand_shapes.setdefault(shape, 0)
                     cand_shapes[shape] += 1
 
                     next_shape = tuple(prev_node['op'].outputs[0].shape)
                     next_shape = tuple(x if i != dim_indice else -1 for i, x in enumerate(next_shape))
+                    if node['node_type'] == ExtendedOperator.PACK:
+                        next_shape = list(next_shape)
+                        next_shape.insert(tmp_dim_indice, -1)
+                        next_shape = tuple(next_shape)
                     cand_next_shapes.setdefault(next_shape, 0)
                     cand_next_shapes[next_shape] += 1
+
+                    if node['node_type'] == ExtendedOperator.PACK:
+                        dim_indice = tmp_dim_indice
 
                     if 'direction' in prev_node['op'].extra_hints:
                         prev_hints.add(prev_node['op'].extra_hints['direction'])
@@ -1752,19 +1807,45 @@ class GraphOptimizer(object):
 
                     new_dim = None
                     if dim_indice is not None:
-                        if dim_indice not in mapping:
-                            continue
-                        new_dim = mapping[dim_indice]
+                        if node['node_type'] == ExtendedOperator.UNPACK:
+                            if dim_indice in mapping:
+                                tmp_new_dim = mapping[dim_indice]
+                            else:
+                                if dim_indice - 1 in mapping:
+                                    tmp_new_dim = mapping[dim_indice - 1] + 1
+                                elif dim_indice + 1 in mapping:
+                                    tmp_new_dim = mapping[dim_indice + 1] - 1
+                                else:
+                                    # TODO: Figure out the rev index
+                                    tmp_new_dim = -1
+                            tmp_dim_indice = dim_indice
+                            new_dim = -1
+                            dim_indice = -1
+                        else:
+                            if dim_indice not in mapping:
+                                continue
+                            new_dim = mapping[dim_indice]
 
                     shape = tuple(next_node['op'].outputs[0].shape)
                     shape = tuple(x if i != new_dim else -1 for i, x in enumerate(shape))
+                    if node['node_type'] == ExtendedOperator.UNPACK and tmp_new_dim >= 0:
+                        shape = list(shape)
+                        shape.insert(tmp_new_dim, -1)
+                        shape = tuple(shape)
                     cand_shapes.setdefault(shape, 0)
                     cand_shapes[shape] += 1
 
                     next_shape = tuple(next_node['op'].inputs[0].shape)
                     next_shape = tuple(x if i != dim_indice else -1 for i, x in enumerate(next_shape))
+                    if node['node_type'] == ExtendedOperator.UNPACK:
+                        next_shape = list(next_shape)
+                        next_shape.insert(tmp_dim_indice, -1)
+                        next_shape = tuple(next_shape)
                     cand_next_shapes.setdefault(next_shape, 0)
                     cand_next_shapes[next_shape] += 1
+
+                    if node['node_type'] == ExtendedOperator.UNPACK:
+                        dim_indice = tmp_dim_indice
 
                     if 'direction' in next_node['op'].extra_hints:
                         next_hints.add(next_node['op'].extra_hints['direction'])
@@ -1821,6 +1902,9 @@ class GraphOptimizer(object):
                     skip += 1
                     tensor_node_dict[prev_out.name] = (prev_new_out, skip)
                 else:
+                    if node['node_type'] == ExtendedOperator.PACK:
+                        tmp_prev_shape = prev_shape
+                        prev_shape = [i for i in prev_shape if i != -1]
                     prev_shape_aligned = prev_shape
                     if np.prod(prev_out.shape) != np.prod(prev_shape):
                         new_prev_shape = prev_out.shape
@@ -1844,12 +1928,23 @@ class GraphOptimizer(object):
                     self.graph.add_operator(reshape_op)
                     actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
 
+                    if node['node_type'] == ExtendedOperator.PACK:
+                        prev_shape = tmp_prev_shape
+
             tensor_node_dict = {}
             for i, op_out in enumerate(op.outputs):
+                if node['node_type'] == ExtendedOperator.UNPACK:
+                    tmp_prev_shape = prev_shape
+                    prev_shape = [i for i in prev_shape if i != -1]
+
                 # For unused tensors, we perform inplace shape updates
                 if op_out.name in skip_names:
                     new_shape = np.reshape(op_out.tensor, prev_shape).shape
                     op_out.shape = tuple(new_shape)
+
+                    if node['node_type'] == ExtendedOperator.UNPACK:
+                        prev_shape = tmp_prev_shape
+
                     continue
 
                 new_out = self.create_transform_tensor(
@@ -1871,8 +1966,16 @@ class GraphOptimizer(object):
 
                 tensor_node_dict[op_out.name] = self.graph.graph.vs.find(name=self.graph.tensor_node_map[op_out.name])
 
+                if node['node_type'] == ExtendedOperator.UNPACK:
+                    prev_shape = tmp_prev_shape
+
             # OP specific dim handling logic
-            if node['node_type'] in (ExtendedOperator.CONCATENATION, ExtendedOperator.GATHER):
+            if node['node_type'] in (
+                ExtendedOperator.CONCATENATION,
+                ExtendedOperator.GATHER,
+                ExtendedOperator.UNPACK,
+                ExtendedOperator.PACK,
+            ):
                 new_axis = prev_shape.index(-1)
                 op.axis = new_axis
             elif node['node_type'] == ExtendedOperator.SPLIT_V:
@@ -3336,6 +3439,7 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.LEAKY_RELU,
         ExtendedOperator.SPLIT,
         ExtendedOperator.SPLIT_V,
+        ExtendedOperator.UNPACK,
         ExtendedOperator.PAD,
         ExtendedOperator.PADV2,
         ExtendedOperator.MIRROR_PAD,
@@ -3361,6 +3465,7 @@ def is_elementwise_binary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         op_code
         in (
             ExtendedOperator.CONCATENATION,
+            ExtendedOperator.PACK,
             ExtendedOperator.ADD,
             ExtendedOperator.SUB,
             ExtendedOperator.MUL,
@@ -3627,7 +3732,7 @@ def is_conv2d_gather_edge(edge: ig.Edge, graph_converter: ig.Graph):
 def op_input_dims(op: tfl.BaseOperator):
     dim_indices = None
 
-    if isinstance(op, (tfl.ConcatenationOperator, tfl.GatherOperator)):
+    if isinstance(op, (tfl.ConcatenationOperator, tfl.GatherOperator, tfl.PackOperator, tfl.UnpackOperator)):
         dim_indices = op.axis
     elif isinstance(op, tfl.SplitOperator):
         dim_indices = op.inputs[0].tensor[0]
@@ -3671,7 +3776,7 @@ def op_input_dims(op: tfl.BaseOperator):
 
 
 def op_input_indices(op: tfl.BaseOperator):
-    if isinstance(op, tfl.ConcatenationOperator):
+    if isinstance(op, (tfl.ConcatenationOperator, tfl.PackOperator)):
         input_indices = range(len(op.inputs))
     elif isinstance(op, tfl.SplitOperator):
         input_indices = (1,)
