@@ -560,7 +560,28 @@ class QATQuantizer(object):
             if self.dynamic_lstm_quant:
                 mapping.pop(nn.LSTM)
 
-            torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
+            if LooseVersion(torch.__version__) >= LooseVersion("1.13.0"):
+                torch.quantization.propagate_qconfig_(model, qconfig_dict=None)
+
+                for n in graph.forward_nodes:
+                    if not n.quantized:
+                        if hasattr(n.module, "qconfig"):
+                            delattr(n.module, "qconfig")
+
+                prepare_custom_config_dict = torch.ao.quantization.get_default_custom_config_dict()
+                custom_module_class_mapping = prepare_custom_config_dict.get(
+                    "float_to_observed_custom_module_class", {}
+                )
+                qconfig_propagation_list = torch.quantization.get_default_qconfig_propagation_list()
+
+                torch.quantization.add_observer_(
+                    model,
+                    qconfig_propagation_list,
+                    set(mapping.values()),
+                    custom_module_class_mapping=custom_module_class_mapping,
+                )
+            else:
+                torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
             for n in graph.forward_nodes:
                 if not n.quantized:
                     if hasattr(n.module, "qconfig"):
@@ -2495,7 +2516,27 @@ class PostQuantizer(QATQuantizer):
                 if not n.quantized:
                     if hasattr(n.module, "qconfig"):
                         delattr(n.module, "qconfig")
-            torch_q.add_observer_(graph.module, qconfig_propagation_list=whitelist)
+
+            if LooseVersion(torch.__version__) >= LooseVersion("1.8.0"):
+                if LooseVersion(torch.__version__) >= LooseVersion("1.13.0"):
+                    prepare_custom_config_dict = torch.ao.quantization.get_default_custom_config_dict()
+                else:
+                    prepare_custom_config_dict = {}
+
+                custom_module_class_mapping = prepare_custom_config_dict.get(
+                    "float_to_observed_custom_module_class", {}
+                )
+
+                torch_q.add_observer_(
+                    graph.module,
+                    qconfig_propagation_list=whitelist,
+                    custom_module_class_mapping=custom_module_class_mapping,
+                )
+            else:
+                torch_q.add_observer_(
+                    graph.module,
+                    qconfig_propagation_list=whitelist,
+                )
 
         if self.dynamic_lstm_quant:
             mapping = {nn.LSTM: nnqd.LSTM}
