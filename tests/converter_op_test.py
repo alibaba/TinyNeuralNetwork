@@ -2369,6 +2369,10 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    @unittest.skipIf(
+        LooseVersion(torch.__version__) >= '1.13.0',
+        "Tracking with https://github.com/alibaba/TinyNeuralNetwork/issues/128",
+    )
     def test_upsample_bilinear_align_corners(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
