@@ -363,6 +363,10 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    @unittest.skipIf(
+        LooseVersion(torch.__version__) >= '1.13.0',
+        "Tracking with https://github.com/alibaba/TinyNeuralNetwork/issues/127",
+    )
     def test_not_quantizable_lstm_module(self):
         class Model(nn.Module):
             def __init__(self) -> None:
@@ -701,6 +705,16 @@ class QuantizerTester(unittest.TestCase):
 
         model = Model()
         inputs = [torch.randn(1, 3, 224, 224), torch.randn(1, 3, 224, 224)]
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_sum(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                return x.sum(1)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224)
 
         check_quantize_rewrite(model, inputs)
 
