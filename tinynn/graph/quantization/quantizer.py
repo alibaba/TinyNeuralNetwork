@@ -561,7 +561,7 @@ class QATQuantizer(object):
                 mapping.pop(nn.LSTM)
 
             if LooseVersion(torch.__version__) >= LooseVersion("1.13.0"):
-                torch.quantization.propagate_qconfig_(model, qconfig_dict=None)
+                torch_q.propagate_qconfig_(model, qconfig_dict=None)
 
                 for n in graph.forward_nodes:
                     if not n.quantized:
@@ -572,9 +572,9 @@ class QATQuantizer(object):
                 custom_module_class_mapping = prepare_custom_config_dict.get(
                     "float_to_observed_custom_module_class", {}
                 )
-                qconfig_propagation_list = torch.quantization.get_default_qconfig_propagation_list()
+                qconfig_propagation_list = torch_q.get_default_qconfig_propagation_list()
 
-                torch.quantization.add_observer_(
+                torch_q.add_observer_(
                     model,
                     qconfig_propagation_list,
                     set(mapping.values()),
