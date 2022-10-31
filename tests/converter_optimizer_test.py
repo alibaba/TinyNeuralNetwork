@@ -8,14 +8,7 @@ from common_utils import IS_CI
 
 from tinynn.converter import TFLiteConverter
 from tinynn.converter.schemas.tflite import schema_generated as tflite
-
-
-def parse_model(path):
-    with open(path, 'rb') as f:
-        buf = f.read()
-
-    model = tflite.Model.GetRootAsModel(buf, 0)
-    return model
+from tinynn.converter.utils.tflite import parse_model
 
 
 def get_model_path():
