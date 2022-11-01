@@ -824,6 +824,7 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    @unittest.skipIf(sys.platform == 'win32', "nnq.ConvTranspose1d is not available for FBGEMM")
     @unittest.skipIf(not hasattr(nn.quantized, 'ConvTranspose1d'), "nnq.ConvTranspose1d is not available")
     def test_conv_transpose1d(self):
         class Model(nn.Module):
