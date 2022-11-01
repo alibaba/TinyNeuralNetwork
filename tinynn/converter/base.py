@@ -293,7 +293,10 @@ class TFLiteConverter(object):
             input_transpose = [input_transpose] * len(self.dummy_input)
         for i, t in enumerate(self.dummy_input):
             if input_transpose[i] is None:
-                input_transpose[i] = t.dim() == 4
+                if isinstance(t, torch.Tensor):
+                    input_transpose[i] = t.dim() == 4
+                else:
+                    input_transpose[i] = False
         self.input_transpose = input_transpose
 
     def init_common_graph(self):
