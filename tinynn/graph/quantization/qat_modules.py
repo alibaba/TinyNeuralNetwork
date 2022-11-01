@@ -1,3 +1,5 @@
+from distutils.version import LooseVersion
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -36,7 +38,10 @@ class Conv1d(nn.Conv1d):
         device=None,
         dtype=None,
     ) -> None:
-        factory_kwargs = {'device': device, 'dtype': dtype}
+        if LooseVersion(torch.__version__) >= LooseVersion('1.9.0'):
+            factory_kwargs = {'device': device, 'dtype': dtype}
+        else:
+            factory_kwargs = {}
         super().__init__(
             in_channels,
             out_channels,
@@ -138,7 +143,10 @@ class ConvTranspose1d(nn.ConvTranspose1d):
         device=None,
         dtype=None,
     ) -> None:
-        factory_kwargs = {'device': device, 'dtype': dtype}
+        if LooseVersion(torch.__version__) >= LooseVersion('1.9.0'):
+            factory_kwargs = {'device': device, 'dtype': dtype}
+        else:
+            factory_kwargs = {}
         super(ConvTranspose1d, self).__init__(
             in_channels,
             out_channels,
