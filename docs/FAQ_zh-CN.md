@@ -205,7 +205,7 @@ export_converter_files(model, dummy_input, export_dir, export_name)
 
 Note: 这些状态变量都是二维的，维度为`[batch_size, hidden_size或者input_size]`。所以在流式场景下，你只需要根据第一个维度对这些变量做拆分就可以了。
 
-通常情况下，当隐层数量较大时（如128及以上）LSTM的模型在TFLite中会比较耗时。这种情况下，可以考虑使用动态范围量化来优化其性能，参见[dynamic.py](../examples/qat/dynamic.py)。
+通常情况下，当隐层数量较大时（如128及以上）LSTM的模型在TFLite中会比较耗时。这种情况下，可以考虑使用动态范围量化来优化其性能，参见[dynamic.py](../examples/quantization/dynamic.py)。
 
 ## 量化模型转换
 
