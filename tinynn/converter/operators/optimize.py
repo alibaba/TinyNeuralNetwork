@@ -3457,6 +3457,7 @@ def is_quantizable_rewrite_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.SOFTMAX,
         ExtendedOperator.LOG_SOFTMAX,
         ExtendedOperator.ABS,
+        ExtendedOperator.SUM,
     )
 
 
