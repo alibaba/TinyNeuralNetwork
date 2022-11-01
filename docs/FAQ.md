@@ -207,6 +207,6 @@ Usually, when the number of hidden layers is large enough (128+), the LSTM OP wi
 
 ## Quantized model conversion
 
-##### How to convert ops including `ABS`, `SOFTMAX`, `LOG_SOFTMAX` and `BATCH_MATMUL` to quantized kernels?
+##### How to convert ops including `ABS`, `SUM`, `SOFTMAX`, `LOG_SOFTMAX` and `BATCH_MATMUL` to quantized kernels?
 First, you need to add the parameter `rewrite_quantizable=True` when defining TFLiteConverter.
 Second, for ops including `SOFTMAX` and `LOG_SOFTMAX`, you need to add the parameter `set_quantizable_op_stats=True` when defining QATQuantizer or PostQuantizer.
