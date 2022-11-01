@@ -61,6 +61,22 @@ class Conv1d(nn.Conv1d):
         else:
             self.weight_fake_quant = qconfig.weight()
 
+    def _conv_forward(self, input, weight, bias):
+        if LooseVersion(torch.__version__) < '1.8.0':
+            if self.padding_mode != 'zeros':
+                return F.conv1d(
+                    F.pad(input, self._reversed_padding_repeated_twice, mode=self.padding_mode),
+                    weight,
+                    bias,
+                    self.stride,
+                    torch.nn.utils._single(0),
+                    self.dilation,
+                    self.groups,
+                )
+            return F.conv1d(input, weight, bias, self.stride, self.padding, self.dilation, self.groups)
+        else:
+            super()._conv_forward(input, weight, bias)
+
     def forward(self, input):
         return self._conv_forward(input, self.weight_fake_quant(self.weight), self.bias)
 
