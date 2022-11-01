@@ -87,7 +87,7 @@ def main_worker(args):
         qat_model.cpu()
 
         # The step below converts the model to an actual quantized model, which uses the quantized kernels.
-        qat_model = torch.quantization.convert(qat_model)
+        qat_model = quantizer.convert(qat_model)
 
         # When converting quantized models, please ensure the quantization backend is set.
         torch.backends.quantized.engine = quantizer.backend

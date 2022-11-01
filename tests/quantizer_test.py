@@ -59,7 +59,7 @@ def check_quantize_rewrite(model, inputs, show_rewritten=True, skip_train=False)
         with torch.no_grad():
             qat_model.eval()
 
-            qat_model = torch.quantization.convert(qat_model)
+            qat_model = quantizer.convert(qat_model)
 
             torch.jit.trace(qat_model, inputs)
 
@@ -806,6 +806,37 @@ class QuantizerTester(unittest.TestCase):
 
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_conv1d(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.Conv1d(3, 3, 1)
+
+            def forward(self, x):
+                s = self.conv(x)
+                return s
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    @unittest.skipIf(not hasattr(nn.quantized, 'ConvTranspose1d'), "nnq.ConvTranspose1d is not available")
+    def test_conv_transpose1d(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.ConvTranspose1d(3, 3, 1)
+
+            def forward(self, x):
+                s = self.conv(x)
+                return s
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224)
 
         check_quantize_rewrite(model, inputs)
 

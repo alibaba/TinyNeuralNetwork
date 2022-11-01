@@ -79,6 +79,10 @@ FUSE_RULE_LIST_EXTRA = {
 
 FUSE_QAT_MODULES = {nn.Conv1d: Conv1d, nn.ConvTranspose1d: ConvTranspose1d}
 
+FUSE_QAT_MODULES_CVT = {Conv1d: nnq.Conv1d}
+if hasattr(nnq, 'ConvTranspose1d'):
+    FUSE_QAT_MODULES_CVT.update({ConvTranspose1d: nnq.ConvTranspose1d})
+
 REWRITE_TO_FUSE_RULE_LIST = {
     (torch.nn.Linear, torch.nn.BatchNorm1d),
 }
@@ -527,9 +531,9 @@ class QATQuantizer(object):
         if hasattr(torch_q, 'get_default_qat_module_mappings'):
             mapping = torch_q.get_default_qat_module_mappings()
         elif hasattr(torch_q, 'get_qat_module_mappings'):
-            mapping = torch_q.get_qat_module_mappings()
+            mapping = copy.deepcopy(torch_q.get_qat_module_mappings())
         else:
-            mapping = torch_q.DEFAULT_QAT_MODULE_MAPPING
+            mapping = copy.deepcopy(torch_q.DEFAULT_QAT_MODULE_MAPPING)
 
         if self.dynamic_lstm_quant:
             mapping = dict(mapping)
@@ -2122,27 +2126,52 @@ class QATQuantizer(object):
         for n, m in sub_list:
             setattr(q_model, n, m)
 
-    def convert(self, q_model: nn.Module) -> nn.Module:
+    def convert(self, q_model: nn.Module, backend: str = 'tflite') -> nn.Module:
         """Converts a QAT/PTQ-prepared model to an actual quantized model
 
         Args:
             q_model (nn.Module): The QAT/PTQ-prepared model
+            backend (str): The backend to translate for, including `pytorch` and `tflite`. Defaults to `tflite`
 
         Returns:
-            nn.Module: The QAT/PTQ-converted model, which is used for validation in PyTorch only.
+            nn.Module: The QAT/PTQ-converted model. When the backend is set to `pytorch`, it is used for validation \
+                in PyTorch only.
         """
 
-        for acp, post_acp, dq_name, q_name, activ_name in self.extra_qparams_mappings:
-            acp.scale = post_acp.scale
-            acp.zero_point = post_acp.zero_point
-            acp.activation_post_process.min_val = post_acp.activation_post_process.min_val
-            acp.activation_post_process.max_val = post_acp.activation_post_process.max_val
+        if backend == 'pytorch':
+            for acp, post_acp, dq_name, q_name, activ_name in self.extra_qparams_mappings:
+                acp.scale = post_acp.scale
+                acp.zero_point = post_acp.zero_point
+                acp.activation_post_process.min_val = post_acp.activation_post_process.min_val
+                acp.activation_post_process.max_val = post_acp.activation_post_process.max_val
 
-            setattr(q_model, dq_name, nn.Identity())
-            setattr(q_model, q_name, nn.Identity())
-            setattr(q_model, activ_name, nn.Identity())
+                setattr(q_model, dq_name, nn.Identity())
+                setattr(q_model, q_name, nn.Identity())
+                setattr(q_model, activ_name, nn.Identity())
 
-        q_model = torch.quantization.convert(q_model)
+        if hasattr(torch_q, 'get_default_static_quant_module_mappings'):
+            mapping = torch_q.get_default_static_quant_module_mappings()
+        elif hasattr(torch_q, 'get_static_quant_module_mappings'):
+            mapping = copy.deepcopy(torch_q.get_static_quant_module_mappings())
+        else:
+            mapping = copy.deepcopy(torch_q.DEFAULT_MODULE_MAPPING)
+
+        mapping.update(FUSE_QAT_MODULES_CVT)
+
+        float_mods = {}
+
+        for qat_t, q_t in FUSE_QAT_MODULES_CVT.items():
+            float_mod = getattr(q_t, '_FLOAT_MODULE', None)
+            if float_mod is not None:
+                float_mods[q_t] = float_mod
+                setattr(q_t, '_FLOAT_MODULE', qat_t)
+
+        q_model = torch.quantization.convert(q_model, mapping)
+
+        for q_t, orig_t in float_mods.items():
+            setattr(q_t, '_FLOAT_MODULE', orig_t)
+
+        float_mods.clear()
 
         return q_model
 

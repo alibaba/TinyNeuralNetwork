@@ -88,7 +88,7 @@ def main_worker(args):
         qat_model.cpu()
 
         # The step below converts the model to an actual quantized model, which uses the quantized kernels.
-        qat_model = torch.quantization.convert(qat_model)
+        qat_model = quantizer.convert(qat_model)
 
         # When converting quantized models to TFLite, please ensure the quantization backend is QNNPACK.
         torch.backends.quantized.engine = 'qnnpack'
