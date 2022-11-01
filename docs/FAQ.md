@@ -195,7 +195,7 @@ In this case, we just need to set the state inputs to 0. Fortunately, Tensorflow
 So, we only need to call `reset_all_variables` before each call to `invoke`.
 
 ##### Streaming scenarios
-In this case, it's somehow more complicated because we need to read and write state variables. We can use Netron to open the generated model, locate all LSTM nodes, and view the input whose name contains state. For example, for the states in a unidirectional LSTM node, the attributes are named `output_state_in` and `cell_state_in`, you can expand and see that their kind is `Variable`. Record their locations (i.e. the `location` property).
+In this case, it's somehow more complicated because we need to read and write state variables. We can use Netron to open the generated model, locate all LSTM nodes, and view the input whose name contains state. For example, for the states in a unidirectional LSTM node, the attributes are named `output_state_in` and `cell_state_in`, you can expand and see that their kind is `Variable`. Record their locations (i.e. the `location` property). You may use `tinynn.converter.utils.tflite.parse_lstm_states(tflite_path)` for collecting the indices of the state tensors in the TFLite model.
 
 ![image](https://user-images.githubusercontent.com/9998726/150492819-5f7d4f43-347e-4c1f-a700-72e77d95e9e9.png)
 

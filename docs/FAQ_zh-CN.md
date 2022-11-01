@@ -197,7 +197,7 @@ export_converter_files(model, dummy_input, export_dir, export_name)
 所以，我们只需要在每次调用`invoke`之前，调用一次`reset_all_variables`即可。
 
 ##### 流式场景下
-这种情况下，会稍许复杂一些，因为我们需要读写状态变量。我们可以使用Netron来打开生成的模型，定位到所有LSTM节点中，查看其中名称包含state的输入，例如对于单向LSTM状态量的属性名为`output_state_in`和`cell_state_in`，你可以展开后看到他们的kind为`Variable`。记住他们的位置（即`location`属性）。
+这种情况下，会稍许复杂一些，因为我们需要读写状态变量。我们可以使用Netron来打开生成的模型，定位到所有LSTM节点中，查看其中名称包含state的输入，例如对于单向LSTM状态量的属性名为`output_state_in`和`cell_state_in`，你可以展开后看到他们的kind为`Variable`。记住他们的位置（即`location`属性）。可以使用`tinynn.converter.utils.tflite.parse_lstm_states(tflite_path)`来获得模型中所有状态量的位置。
 
 ![image](https://user-images.githubusercontent.com/9998726/150492819-5f7d4f43-347e-4c1f-a700-72e77d95e9e9.png)
 
