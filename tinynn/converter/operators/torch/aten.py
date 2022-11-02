@@ -3060,10 +3060,39 @@ class ATenIm2colOperator(ATenIm2colSchema):
         )
         graph_converter.add_operator(tfl.PadOperator([input_tensor, pad_tensor], [inter_tensor]))
 
-        fake_input = torch.arange(0., inter_tensor.tensor.size).reshape(inter_tensor.shape)
+        fake_input = torch.arange(0.0, inter_tensor.tensor.size).reshape(inter_tensor.shape)
         fake_output = torch.nn.functional.unfold(
             fake_input, (kernel_h, kernel_w), (dilation_h, dilation_w), (0, 0), (stride_h, stride_w)
         ).to(dtype=torch.int64)
         indices = torch.nonzero(fake_input >= 0)[fake_output].to(dtype=torch.int32)
         indices_tensor = self.create_attr_tensor(indices)
         graph_converter.add_operator(tfl.GatherNdOperator([inter_tensor, indices_tensor], output_tensors))
+
+
+class ATenMishOperator(ATenMishSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        ops = []
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        exp_out = self.create_transform_tensor(np.exp(input_tensor.tensor))
+        ops.append(tfl.ExpOperator([input_tensor], [exp_out]))
+
+        one_tensor = self.create_attr_tensor(np.ones((1,), dtype=exp_out.dtype))
+        add_out = self.create_transform_tensor(exp_out.tensor + one_tensor.tensor)
+        ops.append(tfl.AddOperator([exp_out, one_tensor], [add_out]))
+
+        softplus_out = self.create_transform_tensor(np.log(add_out.tensor))
+        ops.append(tfl.LogOperator([add_out], [softplus_out]))
+
+        tanh_out = self.create_transform_tensor(np.tanh(softplus_out.tensor))
+        ops.append(tfl.TanhOperator([softplus_out], [tanh_out]))
+
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        ops.append(tfl.MulOperator([input_tensor, tanh_out], outputs))
+
+        for op in ops:
+            graph_converter.add_operator(op)

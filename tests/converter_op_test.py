@@ -724,6 +724,7 @@ class ConverterOPTester(unittest.TestCase):
             (F, 'softplus'),
             (F, 'elu'),
             (F, 'leaky_relu'),
+            (F, 'mish'),
         ]
 
         funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
