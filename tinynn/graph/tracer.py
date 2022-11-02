@@ -296,6 +296,8 @@ class ConstantNode(object):
         self.func_type = 'tensor'
         self.full_name = 'torch.tensor'
         self.is_class = False
+        self.convert_to_parameter = False
+        self.data_str = None
 
         # Numbering of the name of the node
         if current_graph().global_functions.get(self.kind, None) is None:
@@ -319,10 +321,9 @@ class ConstantNode(object):
             elif type(content) == str:
                 return f'"{content}"'
 
-        # If `convert_to_parameter` is `True`, we set `module_constructor_line` for this node.
-        # So that the content of the data will not be written inline.
-        if not convert_to_parameter:
-            module_constructor_lines[id(self)] = f'torch.tensor({_stringify_list(self.data)}, dtype={self.dtype})'
+        # If `convert_to_parameter` is `True`, the content of the data will not be written inline.
+        self.convert_to_parameter = convert_to_parameter
+        self.data_str = f'{_stringify_list(self.data)}'
 
         return self
 
@@ -1824,10 +1825,16 @@ class TraceGraph(object):
             elif type(node.module) == ConstantNode:
                 # Parameter generation
                 self.used_namespaces.add('torch')
-                line = (
-                    f'        self.register_parameter("{node.unique_name}",'
-                    f' torch.nn.Parameter(torch.empty({node.module.shape}, dtype={node.module.dtype})))'
-                )
+                if node.module.convert_to_parameter:
+                    line = (
+                        f'        self.register_parameter("{node.unique_name}",'
+                        f' torch.nn.Parameter(torch.empty({node.module.shape}, dtype={node.module.dtype})))'
+                    )
+                else:
+                    line = (
+                        f'        self.register_buffer("{node.unique_name}",'
+                        f' torch.tensor({node.module.data_str}, dtype={node.module.dtype}), persistent=False)'
+                    )
                 lines.append(line)
             elif type(node.module) != TraceFunction:
                 # Generate the module even if the constructor is not caught
@@ -1953,7 +1960,7 @@ class TraceGraph(object):
             setattr(dummy_model, node.unique_name, node.module)
 
         for node in self.constant_nodes:
-            if id(node.module) not in module_constructor_lines:
+            if node.module.convert_to_parameter:
                 dtype = getattr(torch, node.module.dtype.split('.')[-1])
                 new_tensor = torch.tensor(node.module.data, dtype=dtype)
                 if torch.is_floating_point(new_tensor):
