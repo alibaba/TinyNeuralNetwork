@@ -34,6 +34,7 @@ class CommonGraph(object):
         self.input_transpose = []
         self.output_transpose = None
         self.node_op_counter = 0
+        self.q_mapping = {}
 
     def add_iterable_pair(
         self, input_names: typing.List[str], output_names: typing.List[str], key: typing.Optional[str] = None

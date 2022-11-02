@@ -1247,6 +1247,7 @@ class GraphOptimizer(object):
             prev_nodes = []
             q_tensors = dict()
             prev_output_indices = []
+            skip_names = []
             for i in input_indices:
                 prev_node_name = op.inputs[i].name
                 prev_node = self.graph.graph.vs.find(name=self.graph.tensor_node_map[prev_node_name])
@@ -1255,6 +1256,9 @@ class GraphOptimizer(object):
 
                 if prev_node['node_type'] == ExtendedOperator.DEQUANTIZE:
                     q_tensors[prev_node_name] = prev_node['op'].inputs[0]
+
+                if prev_node['node_type'] == ExtendedOperator.CONSTANT_NODE and prev_node_name in self.graph.q_mapping:
+                    skip_names.append(prev_node_name)
 
             next_nodes = []
             next_edges = []
@@ -1315,7 +1319,7 @@ class GraphOptimizer(object):
                         q_tensors[name] = q_tensor
 
             cur_transpose_size = len(q_tensors)
-            new_transpose_size = len(prev_nodes) + len(next_nodes)
+            new_transpose_size = len(prev_nodes) + len(next_nodes) - len(skip_names)
 
             # Skip if the number of [de]quantize nodes is not decreasing
             if len(next_nodes) == 0 or new_transpose_size > cur_transpose_size:
@@ -1330,20 +1334,28 @@ class GraphOptimizer(object):
 
             tensor_node_dict = {}
             for prev_node, prev_idx, next_idx in zip(prev_nodes, input_indices, prev_output_indices):
-                prev_op = prev_node['op']
-                prev_out = prev_op.outputs[next_idx]
+                if prev_node['op'] is None:
+                    prev_out = self.graph.tensor_map[prev_node['outputs'][0]]
+                else:
+                    prev_out = prev_node['op'].outputs[next_idx]
                 if prev_out.name in tensor_node_dict:
                     prev_new_out, skip = tensor_node_dict[prev_out.name]
                     actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True, skip)))
                     skip += 1
                     tensor_node_dict[prev_out.name] = (prev_new_out, skip)
                 else:
-                    prev_new_out = self.create_transform_tensor(
-                        q_tensors[prev_out.name].tensor, quantization=q_tensors[prev_out.name].quantization
-                    )
-                    tensor_node_dict[prev_out.name] = (prev_new_out, 1)
-                    self.graph.add_operator(tfl.QuantizeOperator([prev_out], [prev_new_out]))
-                    actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
+                    if prev_out.name in skip_names:
+                        prev_new_out = self.graph.q_mapping[prev_out.name]
+                        self.graph.add_nodes([prev_new_out])
+                        tensor_node_dict[prev_out.name] = (prev_new_out, 1)
+                        actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
+                    else:
+                        prev_new_out = self.create_transform_tensor(
+                            q_tensors[prev_out.name].tensor, quantization=q_tensors[prev_out.name].quantization
+                        )
+                        tensor_node_dict[prev_out.name] = (prev_new_out, 1)
+                        self.graph.add_operator(tfl.QuantizeOperator([prev_out], [prev_new_out]))
+                        actions.append((self.graph.replace_operator_input, (node, prev_idx, prev_new_out, True)))
 
             tensor_node_dict = {}
             for i, op_out in enumerate(op.outputs):

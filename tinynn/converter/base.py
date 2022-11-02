@@ -10,7 +10,8 @@ from .operators import CommonGraph, ExtendedOperator, GraphOptimizer, HybridQuan
 from .operators.op_version import OPVersioner
 from .operators.tflite import Tensor
 from .operators.torch import OPERATOR_CONVERTER_DICT
-from .operators.torch.base import NoTrackOperator
+from .operators.torch.base import NoTrackOperator, TrackQParamsOperator
+from .operators.torch.aten import ATenDequantizeOperator
 from ..util.converter_util import generate_converter_config
 from ..util.util import get_logger
 
@@ -381,14 +382,17 @@ class TFLiteConverter(object):
                         no_track_flag = False
                         break
                 if no_track_flag:
-                    converter_type = NoTrackOperator
+                    if converter_type == ATenDequantizeOperator:
+                        converter_type = TrackQParamsOperator
+                    else:
+                        converter_type = NoTrackOperator
                     converter = converter_type(
                         node, self.tensor_map, not self.strict_symmetric_check, self.q_type, self.hybrid_q_type
                     )
             if k != 'prim::Constant':
                 log.debug(f'{k} {converter.input_names} -> {converter.output_names} {converter_type.__name__}')
             # Don't fetch attrs and schemas for non-tracking nodes
-            if converter_type != NoTrackOperator:
+            if converter_type not in (NoTrackOperator, TrackQParamsOperator):
                 try:
                     attrs = converter.fetch_all_attrs(node)
                 except StopIteration:
