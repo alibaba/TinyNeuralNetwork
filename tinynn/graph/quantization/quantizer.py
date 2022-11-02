@@ -1836,14 +1836,17 @@ class QATQuantizer(object):
         # Remove consecutive dequant quant nodes
         def _is_consecutive_dequant_quant_nodes(node, custom_data):
             cur_type = node.type()
+            skip_types = set(['bmm', 'matmul'])
+            if self.set_quantizable_op_stats:
+                skip_types |= set(KNOWN_QSTATS.keys())
             if cur_type in (torch_q.QuantStub, torch_q.DeQuantStub):
                 for next_node in node.next_nodes:
                     next_type = next_node.type()
                     if next_type in (torch_q.QuantStub, torch_q.DeQuantStub):
                         if cur_type != next_type:
-                            if cur_type == torch_q.QuantStub and self.set_quantizable_op_stats:
-                                if (len(node.prev_nodes) == 1 and node.prev_nodes[0].kind() in KNOWN_QSTATS) or (
-                                    len(next_node.next_nodes) == 1 and next_node.next_nodes[0].kind() in KNOWN_QSTATS
+                            if cur_type == torch_q.QuantStub:
+                                if (len(node.prev_nodes) == 1 and node.prev_nodes[0].kind() in skip_types) or (
+                                    len(next_node.next_nodes) == 1 and next_node.next_nodes[0].kind() in skip_types
                                 ):
                                     return False
                             custom_data.append((node, next_node))
