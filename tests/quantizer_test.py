@@ -918,6 +918,34 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_bmm_constant(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.c = torch.arange(3, dtype=torch.float32).view(1, 1, -1)
+
+            def forward(self, x):
+                return torch.bmm(x, self.c)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 1)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_matmul_constant(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.c = torch.arange(3, dtype=torch.float32).view(1, 1, -1)
+
+            def forward(self, x):
+                return torch.bmm(x, self.c)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 1)
+
+        check_quantize_rewrite(model, inputs)
+
 
 if __name__ == '__main__':
     unittest.main()
