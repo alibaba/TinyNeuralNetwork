@@ -3634,6 +3634,27 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(tfl_output, dummy_output, check_dtype=False)
 
+    def test_im2col(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.unfold = nn.Unfold(3, 2, 1, 2)
+
+            def forward(self, x):
+                return self.unfold(x)
+
+        model_path = get_model_path()
+
+        model = Model()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.4.0'), 'cumsum is not supported')
     def test_cumsum(self):
         def model(x):

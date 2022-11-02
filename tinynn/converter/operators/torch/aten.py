@@ -3035,3 +3035,35 @@ class ATenAbsOperator(ATenAbsSchema):
 
         self.run(node)
         self.elementwise_unary(tfl.AbsOperator, graph_converter)
+
+
+class ATenIm2colOperator(ATenIm2colSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        assert input_tensor.tensor.ndim == 4, "only 4-D input tensors (batched image-like tensors) are supported"
+        output_tensors = self.to_tfl_tensors(self.output_names, self.output_tensors)
+
+        kernel_h, kernel_w = self.input_tensors[1]
+        dilation_h, dilation_w = self.input_tensors[2]
+        padding_h, padding_w = self.input_tensors[3]
+        stride_h, stride_w = self.input_tensors[4]
+
+        orig_pad = np.array([padding_h, padding_h, padding_w, padding_w], dtype='int32').reshape(-1, 2)
+        pad_fill = np.zeros((input_tensor.tensor.ndim - orig_pad.shape[0], 2), dtype='int32')
+        pad_arr = np.flip(np.concatenate((orig_pad, pad_fill)), 0)
+        pad_tensor = self.create_attr_tensor(pad_arr)
+        inter_tensor = self.create_transform_tensor(
+            np.pad(input_tensor.tensor, ((0, 0), (0, 0), (padding_h, padding_h), (padding_w, padding_w)))
+        )
+        graph_converter.add_operator(tfl.PadOperator([input_tensor, pad_tensor], [inter_tensor]))
+
+        fake_input = torch.arange(0., inter_tensor.tensor.size).reshape(inter_tensor.shape)
+        fake_output = torch.nn.functional.unfold(
+            fake_input, (kernel_h, kernel_w), (dilation_h, dilation_w), (0, 0), (stride_h, stride_w)
+        ).to(dtype=torch.int64)
+        indices = torch.nonzero(fake_input >= 0)[fake_output].to(dtype=torch.int32)
+        indices_tensor = self.create_attr_tensor(indices)
+        graph_converter.add_operator(tfl.GatherNdOperator([inter_tensor, indices_tensor], output_tensors))
