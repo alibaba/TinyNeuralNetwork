@@ -56,6 +56,8 @@ class Conv1d(nn.Conv1d):
         )
         assert qconfig, 'qconfig must be provided for QAT module'
         self.qconfig = qconfig
+        if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
+            self.activation_post_process = qconfig.activation()
         if LooseVersion(torch.__version__) >= LooseVersion('1.9.0'):
             self.weight_fake_quant = qconfig.weight(factory_kwargs=factory_kwargs)
         else:
@@ -75,7 +77,7 @@ class Conv1d(nn.Conv1d):
                 )
             return F.conv1d(input, weight, bias, self.stride, self.padding, self.dilation, self.groups)
         else:
-            super()._conv_forward(input, weight, bias)
+            return super()._conv_forward(input, weight, bias)
 
     def forward(self, input):
         return self._conv_forward(input, self.weight_fake_quant(self.weight), self.bias)
@@ -181,6 +183,8 @@ class ConvTranspose1d(nn.ConvTranspose1d):
         )
         assert qconfig, 'qconfig must be provided for QAT module'
         self.qconfig = qconfig
+        if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
+            self.activation_post_process = qconfig.activation()
         if LooseVersion(torch.__version__) >= LooseVersion('1.9.0'):
             self.weight_fake_quant = qconfig.weight(factory_kwargs=factory_kwargs)
         else:
