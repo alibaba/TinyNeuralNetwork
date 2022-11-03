@@ -2156,7 +2156,6 @@ class TraceGraph(object):
             for i, n in enumerate(next_node.prev_nodes):
                 if n == node:
                     next_node.prev_nodes[i] = new_node
-                    break
 
             # Make sure the data is writable
             if isinstance(next_node.prev_tensors, tuple):

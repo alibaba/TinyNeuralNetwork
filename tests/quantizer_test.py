@@ -946,6 +946,16 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_matmul_self(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                return torch.matmul(x, x)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 3, 3)
+
+        check_quantize_rewrite(model, inputs)
+
 
 if __name__ == '__main__':
     unittest.main()
