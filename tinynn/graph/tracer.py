@@ -296,7 +296,9 @@ class ConstantNode(object):
         self.func_type = 'tensor'
         self.full_name = 'torch.tensor'
         self.is_class = False
-        self.convert_to_parameter = False
+        self.is_parameter = False
+        self.is_persistent = False
+        self.requires_grad = False
         self.data_str = None
 
         # Numbering of the name of the node
@@ -307,7 +309,7 @@ class ConstantNode(object):
 
         self.unique_name = "_".join([self.kind, str(current_graph().global_functions[self.kind])])
 
-    def parse(self, convert_to_parameter: bool = False):
+    def parse(self, convert_to_parameter: bool = False, persistent: bool = False, requires_grad: bool = False):
         def _stringify_list(content) -> str:
             """Convert a list of objects to a string"""
             if isinstance(content, (list, tuple)):
@@ -322,8 +324,11 @@ class ConstantNode(object):
                 return f'"{content}"'
 
         # If `convert_to_parameter` is `True`, the content of the data will not be written inline.
-        self.convert_to_parameter = convert_to_parameter
-        self.data_str = f'{_stringify_list(self.data)}'
+        self.is_parameter = convert_to_parameter
+        self.is_persistent = persistent
+        self.requires_grad = requires_grad
+        if not persistent:
+            self.data_str = f'{_stringify_list(self.data)}'
 
         return self
 
@@ -482,13 +487,18 @@ class TraceFunction(object):
                 else:
                     # Constant generation
                     log.warning('Constant generation is experimental and may yield error')
+                    convert_to_parameter = False
+                    persistent = False
+                    requires_grad = a.requires_grad
                     if isinstance(a, torch.nn.Parameter):
                         convert_to_parameter = True
-                    if a.numel() > 50 and a.is_floating_point():
-                        convert_to_parameter = True
+                    if a.numel() > 50:
+                        persistent = True
                     raw_data = a.tolist()
                     with no_catch():
-                        constant_node = ConstantNode(raw_data, a.dtype, a.shape).parse(convert_to_parameter)
+                        constant_node = ConstantNode(raw_data, a.dtype, a.shape).parse(
+                            convert_to_parameter, persistent, requires_grad
+                        )
                     trace_node = TraceNode(constant_node)
                     add_constant_node(trace_node, a)
                     ns = 'self.'
@@ -1402,13 +1412,17 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
                 # constant tensor generation
                 log.warning('Constant generation is experimental and may yield error')
                 convert_to_parameter = False
+                persistent = False
+                requires_grad = t.requires_grad
                 if isinstance(t, torch.nn.Parameter):
                     convert_to_parameter = True
-                if t.numel() > 50 and t.is_floating_point():
-                    convert_to_parameter = True
+                if t.numel() > 50:
+                    persistent = True
                 raw_data = t.tolist()
                 with no_catch():
-                    constant_node = ConstantNode(raw_data, t.dtype, t.shape).parse(convert_to_parameter)
+                    constant_node = ConstantNode(raw_data, t.dtype, t.shape).parse(
+                        convert_to_parameter, persistent, requires_grad
+                    )
                 trace_node = TraceNode(constant_node)
                 add_constant_node(trace_node, t)
         pre_node_name = current_graph().tensor_pre_node_dict[id(t)]
@@ -1825,15 +1839,26 @@ class TraceGraph(object):
             elif type(node.module) == ConstantNode:
                 # Parameter generation
                 self.used_namespaces.add('torch')
-                if node.module.convert_to_parameter:
+
+                requires_grad_prop = ''
+                if node.module.is_parameter != node.module.requires_grad:
+                    requires_grad_prop = f', requires_grad={node.module.requires_grad}'
+
+                if node.module.is_parameter:
                     line = (
                         f'        self.register_parameter("{node.unique_name}",'
-                        f' torch.nn.Parameter(torch.empty({node.module.shape}, dtype={node.module.dtype})))'
+                        f' torch.nn.Parameter(torch.empty({node.module.shape}, dtype={node.module.dtype})'
+                        f'{requires_grad_prop}))'
+                    )
+                elif node.module.is_persistent:
+                    line = (
+                        f'        self.register_buffer("{node.unique_name}", torch.empty({node.module.shape},'
+                        f' dtype={node.module.dtype}{requires_grad_prop}))'
                     )
                 else:
                     line = (
-                        f'        self.register_buffer("{node.unique_name}",'
-                        f' torch.tensor({node.module.data_str}, dtype={node.module.dtype}), persistent=False)'
+                        f'        self.register_buffer("{node.unique_name}", torch.tensor({node.module.data_str},'
+                        f' dtype={node.module.dtype}{requires_grad_prop}), persistent=False)'
                     )
                 lines.append(line)
             elif type(node.module) != TraceFunction:
@@ -1890,7 +1915,8 @@ class TraceGraph(object):
 
             for pn in {pn.unique_name: pn for pn in node.prev_nodes}.values():
                 if node.forward_order == max([n.forward_order for n in pn.next_nodes]):
-                    lines.append(f"        {pn.unique_name} = None")
+                    if not pn.type() in (ConstantNode, torch.nn.quantized.FloatFunctional):
+                        lines.append(f"        {pn.unique_name} = None")
 
         def _gen_output_node(node):
             if node.rev_index:
@@ -1960,12 +1986,14 @@ class TraceGraph(object):
             setattr(dummy_model, node.unique_name, node.module)
 
         for node in self.constant_nodes:
-            if node.module.convert_to_parameter:
+            if node.module.is_parameter or node.module.is_persistent:
                 dtype = getattr(torch, node.module.dtype.split('.')[-1])
                 new_tensor = torch.tensor(node.module.data, dtype=dtype)
-                if torch.is_floating_point(new_tensor):
+                if node.module.is_parameter:
                     weight = torch.nn.Parameter(new_tensor)
                     dummy_model.register_parameter(node.unique_name, weight)
+                else:
+                    dummy_model.register_buffer(node.unique_name, new_tensor)
 
         if output_weight_path:
             torch.save(dummy_model.state_dict(), output_weight_path)
