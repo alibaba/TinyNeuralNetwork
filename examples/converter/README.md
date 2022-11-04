@@ -28,6 +28,8 @@ You may either perform conversion from models directly, or from the json configu
 
 For the former one, you may refer to `convert.py`. And, for the latter one, you may refer to `convert_from_json.py`.
 
+For dynamic quantization, you may refer to `dynamic.py`.
+
 ## Deployment options
 a. NNAPI for CPU/GPU/NPU/XNNPACK (Android 8.1+, for quantized computational graphs, Android 10 and above is required)
 

@@ -21,7 +21,7 @@ as the backend for quantization and focuses on optimizing its usability (**Pleas
 ## Suppored quantization methods
 - [Quantization-aware training](qat.py)
 - [Post training quantization](post.py)
-- [Dynamic quantization](dynamic.py)
+- Dynamic quantization [via TFLiteConverter (Recommended)](../converter/dynamic.py) / [via DynamicQuantizer (Not recommended)](dynamic.py)
 - [BFloat16 quantization](bf16.py)
 
 ## Frequently Asked Questions

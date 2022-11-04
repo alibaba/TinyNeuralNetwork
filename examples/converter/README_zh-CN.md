@@ -29,6 +29,8 @@
 
 对于前者，可以参考`convert.py`，对于后者，可以参考`convert_from_json.py`。
 
+对于动态量化，可以参考`dynamic.py`。
+
 ## 后续部署方案
 a. NNAPI for CPU/GPU/NPU/XNNPACK (Android 8.1以上，对于量化计算图，需要Android 10及以上)
 

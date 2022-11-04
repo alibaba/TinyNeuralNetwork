@@ -22,7 +22,7 @@ TinyNeuralNetwork采用PyTorch的量化（[PyTorch 量化教程](https://pytorch
 ## 支持的量化方法
 - [训练时量化](qat.py)
 - [训练后量化](post.py)
-- [动态量化](dynamic.py)
+- 动态量化 [使用 TFLiteConverter (推荐)](../converter/dynamic.py) / [使用 DynamicQuantizer (不推荐)](dynamic.py)
 - [BFloat16量化](bf16.py)
 
 ## 常见问题

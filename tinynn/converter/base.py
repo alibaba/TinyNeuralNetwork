@@ -50,6 +50,7 @@ class TFLiteConverter(object):
         float16_quantization: bool = False,
         enable_mtk_ops: bool = False,
         max_transpose_dims: int = -1,
+        hybrid_conv: bool = True,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -91,7 +92,8 @@ class TFLiteConverter(object):
                 Defaults to False
             float16_quantization (bool): Quantize constants with float32 dtype to floa16 dtype. Defaults to False
             enable_mtk_ops (bool): Translating with custom MTK operators. Defaults to False
-            max_transpose_dims(int): Max dimensions for the `Transpose` op. Defaults to -1, which means unlimited
+            max_transpose_dims (int): Max dimensions for the `Transpose` op. Defaults to -1, which means unlimited
+            hybrid_conv (bool): Enable hybrid quantization for Conv2d and DepthwiseConv2d. Defaults to True
         """
 
         self.model = model
@@ -137,6 +139,7 @@ class TFLiteConverter(object):
         self.float16_quantization = float16_quantization
         self.enable_mtk_ops = enable_mtk_ops
         self.max_transpose_dims = max_transpose_dims
+        self.hybrid_conv = hybrid_conv
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -462,7 +465,11 @@ class TFLiteConverter(object):
 
             if self.hybrid:
                 quantizer = HybridQuantizer(
-                    self.common_graph, self.hybrid_asymmetric_inputs, self.hybrid_q_type, self.hybrid_per_channel
+                    self.common_graph,
+                    self.hybrid_asymmetric_inputs,
+                    self.hybrid_q_type,
+                    self.hybrid_per_channel,
+                    self.hybrid_conv,
                 )
                 quantizer.quantize()
                 optimizer.cleanup_dead_nodes()
