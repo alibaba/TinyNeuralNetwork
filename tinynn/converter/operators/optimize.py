@@ -390,6 +390,48 @@ class GraphOptimizer(object):
         self.graph.graph.delete_vertices(remove_ids)
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
+    def fuse_reciprocal_sqrt(self):
+        # Find fusable ops
+        edges = self.graph.graph.es.select(functools.partial(is_reciprocal_sqrt_edge, graph_converter=self.graph.graph))
+        filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target], x) for x in edges)
+
+        remove_ids = []
+        for sqrt, div, tensor in filtered_pairs:
+            sqrt['node_type'] = ExtendedOperator.RSQRT
+            sqrt['op'] = tfl.RsqrtOperator(sqrt['op'].inputs, sqrt['op'].outputs)
+
+            div_op = div['op']
+            if (
+                div_op.inputs[0].buffer is not None
+                and np.all(div_op.inputs[0].tensor == 1.0)
+                and div['op'].fusedActivationFunction == ActivationFunctionType.NONE
+            ):
+                new_output = div['outputs'][0]
+                assert new_output in self.graph.tensor_map
+
+                # For each node that is next of the div node, we connect it with the previous node
+                self.graph.connect_next_tensors(div, sqrt, new_output)
+
+                # Update graph, prepare to drop the output tensor of the div node and use the output tensor of the
+                # sqrt instead
+                sqrt['outputs'][0] = new_output
+                sqrt['op'].outputs[0] = self.graph.tensor_map[new_output]
+                self.graph.tensor_node_map[new_output] = sqrt['name']
+                tensor['name'] = div['outputs'][0]
+                tensor['label'] = div['outputs'][0]
+
+                # remove div op
+                remove_ids.append(div.index)
+            else:
+                div['node_type'] = ExtendedOperator.MUL
+                div['op'] = tfl.MulOperator(
+                    div['op'].inputs, div['op'].outputs, fusedActivationFunction=div['op'].fusedActivationFunction
+                )
+
+        # Delete div nodes
+        self.graph.graph.delete_vertices(remove_ids)
+
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_conv2d_gather(self):
         # Find fusable ops
         edges = self.graph.graph.es.select(functools.partial(is_conv2d_gather_edge, graph_converter=self.graph.graph))
@@ -1279,7 +1321,11 @@ class GraphOptimizer(object):
                     name = next_node['op'].inputs[0].name
                     q_tensor = next_node['op'].outputs[0]
                     assert q_tensor.quantization is not None
-                    if node['node_type'] in (ExtendedOperator.BATCH_MATMUL, ExtendedOperator.ABS):
+                    if node['node_type'] in (
+                        ExtendedOperator.BATCH_MATMUL,
+                        ExtendedOperator.ABS,
+                        ExtendedOperator.RSQRT,
+                    ):
                         if q_tensor.dtype not in (np.dtype('int8'), np.dtype('int16')):
                             skip = True
                     if node['node_type'] == ExtendedOperator.SOFTMAX:
@@ -3052,6 +3098,9 @@ class GraphOptimizer(object):
         self.branch_transpose_expand_pass()
         self.fuse_simple_transpose_pass()
 
+        # Fuse reciprocal and sqrt
+        self.fuse_reciprocal_sqrt()
+
         # Map quantizable ops to quantized kernels
         self.elementwise_op_quantize_passthrough_pass()
 
@@ -3118,6 +3167,9 @@ class GraphOptimizer(object):
 
         # Remove consecutive dequantize and quantize nodes
         self.fuse_dequant_quant_pass(q_first=True)
+
+        # Fuse reciprocal and sqrt
+        self.fuse_reciprocal_sqrt()
 
         # Fuse activation
         self.fuse_activation()
@@ -3470,6 +3522,8 @@ def is_quantizable_rewrite_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.LOG_SOFTMAX,
         ExtendedOperator.ABS,
         ExtendedOperator.SUM,
+        ExtendedOperator.DIV,
+        ExtendedOperator.RSQRT,
     )
 
 
@@ -3739,6 +3793,17 @@ def is_conv2d_gather_edge(edge: ig.Edge, graph_converter: ig.Graph):
         and target_vertex['op'].inputs[1].buffer is not None
         and target_vertex['op'].axis == 3
         and source_vertex['op'].inputs[1].tensor.shape[0] == target_vertex['op'].inputs[1].tensor.shape[0]
+    )
+
+
+def is_reciprocal_sqrt_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+
+    return (
+        source_vertex['node_type'] == ExtendedOperator.SQRT
+        and target_vertex['node_type'] == ExtendedOperator.DIV
+        and source_vertex.outdegree() == 1
     )
 
 

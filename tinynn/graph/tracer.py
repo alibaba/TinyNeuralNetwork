@@ -101,7 +101,7 @@ if __name__ == "__main__":
 """
 
 # Special math operators
-SPECIAL_OPERATORS = ['add', 'and', 'div', 'floordiv', 'lshift', 'mul', 'or', 'pow', 'rshift', 'sub', 'xor']
+SPECIAL_OPERATORS = ['add', 'and', 'div', 'floordiv', 'lshift', 'mul', 'or', 'pow', 'rshift', 'sub', 'xor', 'truediv']
 
 
 # Global objects
