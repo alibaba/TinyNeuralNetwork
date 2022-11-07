@@ -2205,6 +2205,13 @@ class TraceGraph(object):
             new_node.next_nodes.append(next_node)
         else:
             new_node = module
+            if prev_node not in new_node.prev_nodes:
+                new_node.prev_nodes.append(prev_node)
+            if next_node not in new_node.next_nodes:
+                new_node.next_nodes.append(next_node)
+            new_node.prev_tensors.clear()
+            new_node.next_tensors.clear()
+            new_node.prev_indices.clear()
 
         is_new_constant_node = type(new_node.module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
 

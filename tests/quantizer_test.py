@@ -976,6 +976,18 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_rsqrt_1_with_prop(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                y = torch.sqrt(x)
+                _ = y.dtype
+                return 1 / y
+
+        model = Model()
+        inputs = torch.randn(1, 3, 3, 3).abs() + 1e-7
+
+        check_quantize_rewrite(model, inputs)
+
 
 if __name__ == '__main__':
     unittest.main()

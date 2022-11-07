@@ -1787,6 +1787,9 @@ class QATQuantizer(object):
             next_nodes = {n.unique_name: n for n in node.next_nodes}.values()
             for inner_idx, next_node in enumerate(next_nodes):
                 prev_indices = []
+                if type(next_node.module) == TraceFunction and next_node.module.is_property:
+                    continue
+
                 for pt in next_node.prev_tensors:
                     for j, nt in enumerate(node.next_tensors):
                         if isinstance(nt, (list, tuple)):
