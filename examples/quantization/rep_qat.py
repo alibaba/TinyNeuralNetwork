@@ -1,0 +1,175 @@
+import argparse
+import os
+import sys
+
+CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../'))
+
+import functools
+from distutils.version import LooseVersion, StrictVersion
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.quantization as torch_q
+
+from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
+from tinynn.converter import TFLiteConverter
+from tinynn.graph.quantization.quantizer import QATQuantizer, PostQuantizer, load_processed_ptq_rules
+from tinynn.graph.tracer import model_tracer, trace
+from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate, calibrate
+from tinynn.util.train_util import DLContext, get_device, train
+
+from tinynn.util.cross_layer_equal import weight_euqal_
+from tinynn.util.bn_rebuild import model_add_bn
+
+
+def main_worker(args):
+    model = Mobilenet()
+    model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
+
+    # Provide a viable input for the model
+    dummy_input = torch.rand((1, 3, 224, 224))
+
+    # We use BN_folded MobileNetv1 to simulate reparameterized MobileOne.
+    # You can also directly use the reparameterized model of MobileOne(or other rep-model).
+    fused_model, _ = get_fused_model(dummy_input, model)
+
+    # Do CLE, if qat init precision is not ideal, try to do twice CLE or lower threshold.
+    with torch.no_grad():
+        weight_euqal_(fused_model, dummy_input, threshold=1000)
+
+    # Move model to the appropriate device
+    device = torch.device('cuda')
+    fused_model.to(device=device)
+
+    context = DLContext()
+    context.device = device
+    context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
+
+    # Do bn rebuild
+    fused_model = fused_model.train()
+    # You should filter the conv name list which need rebuild BN.
+    layers_fused_bn = [name for name, mod in fused_model.named_children() if isinstance(mod, nn.Conv2d)]
+    # The calibrating process should be done in full train_set in train mode.
+    fused_model = model_add_bn(fused_model, layers_fused_bn, torch.device('cuda'), calibrate, context)
+    print(fused_model)
+
+    context.max_epoch = 1
+    context.criterion = nn.BCEWithLogitsLoss()
+    context.optimizer = torch.optim.SGD(fused_model.parameters(), 0.0001, weight_decay=1e-4)
+    context.optimizer = torch.optim.AdamW(fused_model.parameters(), 0.0001, weight_decay=1e-4)
+    context.scheduler = optim.lr_scheduler.StepLR(context.optimizer, step_size=8, gamma=0.5)
+
+    # Float training(optional)
+    fused_model.train()
+    train(fused_model, context, train_one_epoch, validate, qat=False)
+
+    # Quantization-aware training
+    with model_tracer():
+        # TinyNeuralNetwork provides a QATQuantizer class that may rewrite the graph for and perform model fusion for
+        # quantization. The model returned by the `quantize` function is ready for QAT.
+        # By default, the rewritten model (in the format of a single file) will be generated in the working directory.
+        # You may also pass some custom configuration items through the argument `config` in the following line. For
+        # example, if you have a QAT-ready model (e.g models in torchvision.models.quantization),
+        # then you may use the following line.
+        #   quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'rewrite_graph': False})
+        # Alternatively, if you have modified the generated model description file and want the quantizer to load it
+        # instead, then use the code below.
+        #     quantizer = QATQuantizer(
+        #         model, dummy_input, work_dir='out', config={'force_overwrite': False, 'is_input_quantized': None}
+        #     )
+        # The `is_input_quantized` in the previous line is a flag on the input tensors whether they are quantized or
+        # not, which can be None (False for all inputs) or a list of booleans that corresponds to the inputs.
+        # Also, we support multiple qschemes for quantization preparation. There are several common choices.
+        #   a. Asymmetric uint8. (default) config={'asymmetric': True, 'per_tensor': True}
+        #      The is the most common choice and also conforms to the legacy TFLite quantization spec.
+        #   b. Asymmetric int8. config={'asymmetric': True, 'per_tensor': False}
+        #      The conforms to the new TFLite quantization spec. In legacy TF versions, this is usually used in post
+        #      quantization. Compared with (a), it has support for per-channel quantization in supported kernels
+        #      (e.g Conv), while (a) does not.
+        #   c. Symmetric int8. config={'asymmetric': False, 'per_tensor': False}
+        #      The is same to (b) with no offsets, which may be used on some low-end embedded chips.
+        #   d. Symmetric uint8. config={'asymmetric': False, 'per_tensor': True}
+        #      The is same to (a) with no offsets. But it is rarely used, which just serves as a placeholder here.
+
+        quantizer = QATQuantizer(fused_model, dummy_input, work_dir='out')
+        qat_model = quantizer.quantize()
+
+    print(qat_model)
+
+    # Use DataParallel to speed up training when possible
+    if torch.cuda.device_count() > 1:
+        qat_model = nn.DataParallel(qat_model)
+
+    # Move model to the appropriate device
+    device = get_device()
+    qat_model.to(device=device)
+
+    context.device = device
+    context.max_epoch = 10
+    context.criterion = nn.BCEWithLogitsLoss()
+    context.optimizer = torch.optim.SGD(qat_model.parameters(), 0.01, momentum=0.9, weight_decay=5e-4)
+    context.scheduler = optim.lr_scheduler.CosineAnnealingLR(context.optimizer, T_max=context.max_epoch + 1, eta_min=0)
+
+    qat_model.train()
+    train(qat_model, context, train_one_epoch, validate, qat=True)
+
+    with torch.no_grad():
+        qat_model.eval()
+        qat_model.cpu()
+
+        # The step below converts the model to an actual quantized model, which uses the quantized kernels.
+        qat_model = torch.quantization.convert(qat_model)
+
+        # When converting quantized models, please ensure the quantization backend is set.
+        torch.backends.quantized.engine = quantizer.backend
+
+        # The code section below is used to convert the model to the TFLite format
+        # If you need a quantized model with a specific data type (e.g. int8)
+        # you may specify `quantize_target_type='int8'` in the following line.
+        # If you need a quantized model with strict symmetric quantization check (with pre-defined zero points),
+        # you may specify `strict_symmetric_check=True` in the following line.
+        converter = TFLiteConverter(qat_model, dummy_input, tflite_path='out/qat_model.tflite')
+        converter.convert()
+
+
+def get_fused_model(dummy_input, model):
+    """The help function to get conv_bn folded model for mobilenetv1."""
+    with model_tracer():
+        model.eval()
+        quantizer = PostQuantizer(
+            model,
+            dummy_input,
+            work_dir='out',
+            config={'rewrite_graph': False, 'force_overwrite': False, 'fuse_only': True},
+        )
+        graph = trace(quantizer.model, quantizer.dummy_input)
+        graph.quantized = True
+        for node in graph.forward_nodes:
+            node.quantized = True
+        custom_data = ([], set())
+        processed_rules = load_processed_ptq_rules()
+        processed_rules = {nn.BatchNorm2d: processed_rules[nn.BatchNorm2d]}
+        is_fusable = functools.partial(quantizer.is_fusable, current_rules=processed_rules, graph=graph)
+        graph.filter_forward_nodes(is_fusable, custom_data, reverse=True)
+        quant_list = custom_data[0]
+        for quant_nodes in quant_list:
+            if type(quantizer) != PostQuantizer and LooseVersion(torch.__version__) >= LooseVersion('1.11.0'):
+                torch.ao.quantization.fuse_modules_qat(graph.module, quant_nodes, inplace=True)
+            else:
+                torch_q.fuse_modules(graph.module, quant_nodes, inplace=True)
+        fused_model = graph.module
+    return fused_model, quantizer
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data-path', metavar='DIR', default="/data/datasets/cifar10", help='path to dataset')
+    parser.add_argument('--config', type=str, default=os.path.join(CURRENT_PATH, 'config.yml'))
+    parser.add_argument('--workers', type=int, default=8)
+    parser.add_argument('--batch-size', type=int, default=192)
+
+    args = parser.parse_args()
+    main_worker(args)
