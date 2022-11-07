@@ -962,7 +962,7 @@ class QuantizerTester(unittest.TestCase):
                 return torch.reciprocal(torch.sqrt(x))
 
         model = Model()
-        inputs = torch.rand(1, 3, 3, 3).abs() + 1e-5
+        inputs = torch.rand(1, 3, 3, 3).abs() + 1e-3
 
         check_quantize_rewrite(model, inputs)
 
@@ -972,7 +972,7 @@ class QuantizerTester(unittest.TestCase):
                 return 1 / torch.sqrt(x)
 
         model = Model()
-        inputs = torch.rand(1, 3, 3, 3).abs() + 1e-5
+        inputs = torch.rand(1, 3, 3, 3).abs() + 1e-3
 
         check_quantize_rewrite(model, inputs)
 
@@ -984,7 +984,7 @@ class QuantizerTester(unittest.TestCase):
                 return 1 / y
 
         model = Model()
-        inputs = torch.rand(1, 3, 3, 3).abs() + 1e-5
+        inputs = torch.rand(1, 3, 3, 3).abs() + 1e-3
 
         check_quantize_rewrite(model, inputs)
 
