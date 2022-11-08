@@ -620,6 +620,20 @@ class OperatorConverter(ABC):
             elif self.q_type == np.int16:
                 return torch.quantize_per_tensor(tensor, tensor[0] / 127, 128, torch.quint8)
 
+    def torch_tensor_from_scalar(self, ref_tensor: torch.Tensor, src_tensor: torch.Tensor):
+        tgt_tensor = src_tensor
+        if type(src_tensor) != torch.Tensor:
+            if ref_tensor.is_quantized:
+                tgt_tensor = torch.quantize_per_tensor(
+                    torch.tensor([src_tensor], dtype=torch.float32),
+                    ref_tensor.q_scale(),
+                    ref_tensor.q_zero_point(),
+                    ref_tensor.dtype,
+                )
+            else:
+                tgt_tensor = torch.tensor([src_tensor], dtype=ref_tensor.dtype)
+        return tgt_tensor
+
 
 def get_prop_from_node(node, prop, assert_type=None, return_type=False):
     output_name = next(node.outputs()).debugName()

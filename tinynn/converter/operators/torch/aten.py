@@ -1482,7 +1482,7 @@ class ATenNeOperator(ATenNeSchema):
 
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
-            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+            self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.NotEqualOperator, graph_converter, True)
 
@@ -2437,7 +2437,7 @@ class ATenEqOperator(ATenEqSchema):
 
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
-            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+            self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.EqualOperator, graph_converter, True)
 
@@ -2703,7 +2703,7 @@ class ATenGtOperator(ATenGtSchema):
 
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
-            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+            self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.GreaterOperator, graph_converter, True)
 
@@ -2714,7 +2714,7 @@ class ATenLtOperator(ATenLtSchema):
 
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
-            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+            self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.LessOperator, graph_converter, True)
 
@@ -2725,7 +2725,7 @@ class ATenGeOperator(ATenGeSchema):
 
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
-            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+            self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.GreaterEqualOperator, graph_converter, np.True_)
 
@@ -2736,7 +2736,7 @@ class ATenLeOperator(ATenLeSchema):
 
         self.run(node)
         if type(self.input_tensors[1]) != torch.Tensor:
-            self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
+            self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.LessEqualOperator, graph_converter, True)
 

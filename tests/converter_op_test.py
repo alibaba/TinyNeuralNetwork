@@ -6239,6 +6239,37 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
 
+    def test_comparisons_with_scalar(self):
+        dummy_input = torch.quantize_per_tensor(
+            torch.randn(1, 3, 224, 224, dtype=torch.float32), 0.5, 128, torch.quint8
+        )
+
+        func_names = [
+            (torch, 'greater'),
+            (torch, 'less'),
+            (torch, 'greater_equal'),
+            (torch, 'less_equal'),
+            (torch, 'eq'),
+            (torch, 'ne'),
+        ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
+
+        for func in funcs:
+            print(f'testing {func.__name__}')
+
+            def model(x):
+                return func(x, 0)
+
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_input = torch.int_repr(dummy_input)
+            tfl_output = tfl_run_model(model_path, tfl_input, dummy_output)
+            assert_close(dummy_output, tfl_output)
+
 
 if __name__ == '__main__':
     unittest.main()
