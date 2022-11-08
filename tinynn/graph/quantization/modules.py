@@ -1,7 +1,10 @@
+from cv2 import meanShift
+from pyparsing import quotedString
 import torch
 import torch.nn as nn
 import torch.nn.quantized as nnq
-
+import numpy as np
+import math
 
 class QPReLU(nn.Module):
     def __init__(self, prelu: nn.PReLU) -> None:
@@ -70,36 +73,82 @@ class QLayerNorm(nn.Module):
         # Other necessary modules for QAT preparation
         # self.mean = torch.mean()
         # self.var = torch.var()
-        self.add1 = nnq.FloatFunctional()
-        self.add2 = nnq.FloatFunctional()
-        self.mul1 = nnq.FloatFunctional()
-        self.mul2 = nnq.FloatFunctional()
+        self.add = nnq.FloatFunctional()
+        self.mul = nnq.FloatFunctional()
+        self.div = nnq.FloatFunctional()
         # self.div = torch.div()
         # self.sqrt = torch.sqrt()
         self.quant = torch.quantization.QuantStub()
+        self.dequant = torch.quantization.DeQuantStub()
+
+
+    def qsrt(self, a):
+        # x = torch.pow(2, torch.ceil(torch.tensor(int.bit_length(a)/2)))
+        # x = a/2
+        # print(x)
+        
+        a1 = self.dequant(a)
+        x = a1
+        b = torch.div(a1, x, rounding_mode='trunc')
+        x2 = torch.div(b, 2, rounding_mode='trunc')
+
+        b = torch.div(a1, x2, rounding_mode='trunc')
+        x3 = torch.div(b, 2, rounding_mode='trunc')
+
+        b = torch.div(a1, x3, rounding_mode='trunc')
+        x4 = torch.div(b, 2, rounding_mode='trunc')
+
+        b = torch.div(a1, x4, rounding_mode='trunc')
+        x5 = torch.div(b, 2, rounding_mode='trunc')
+        x = self.quant(x5)
+        # print(x)
+        # x = torch.floor((x+torch.floor(a/x))/2)
+        return x
+
+    def loop(self, input, x):
+        dq_input = self.dequant(input)
+        x1 = self.dequant(x)
+        first = torch.div(dq_input, x1)
+        q_first = self.quant(first)
+        second = self.add.add(q_first, x)
+        dq_second = self.dequant(second)
+        third = torch.div(dq_second, 2)
+        q_third = self.quant(third)  
+        return q_third
+
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        # prelu(x) = relu(x) + weight * -relu(-x)
-        # in which neg is implemented by multiplying an item with negative one
-        # Also, we should use `add` and `mul` defined in `FloatFunctional`
-        # What's more, both the weights and the negative one needs to go through
-        # the QuantStub so as to make the whole computation graph quantized
         
+        # eps = 1e-5
+        # mean = x.mean(dim=-1, keepdim=True)
+        # # print(mean)
+        # var = ((x - mean) ** 2).mean(dim=-1, keepdim=True)
+        # # print(var)
+        # std = (var + eps).sqrt()
+        # y = (x - mean) / std
+        # print(y-output_layernorm)
         weight = self.weight.view(-1)
         bias = self.bias.view(-1)
-
-
-        x1 = torch.var(input, dim=2, keepdim=True)
-        x2 = torch.sqrt(x1)
-        x3 = torch.mean(input)
-        x4 = self.mul1.mul_scalar(x3, -1.0)
-        x5 = self.add1.add(input, x4)
-        x6 = torch.div(x5, x2)
-        
         weight_q = self.quant(weight)
         bias_q = self.quant(bias)
 
-        x7 = self.mul2.mul(weight_q, x6)
-        x = self.add2.add_scalar(x7, bias_q)
+        mean = torch.mean(input, dim=-1, keepdim=True)
+        mean_opp = self.mul.mul_scalar(mean, -1.0)
+        mean_sub = self.add.add(mean, mean_opp)
+        mean_mul = self.mul.mul(mean_sub, mean_sub)
+        var = torch.mean(mean_mul, dim=-1, keepdim=True)
+        var_add = self.add.add_scalar(var, 1)
+        # x1 = torch.div(input, var_add)
+        # loop1 = self.loop(var_add, var_add)
+        # loop2 = self.loop(loop1, var_add)
+        # loop3 = self.loop(loop2, var_add)
+        # std = self.loop(loop3, var_add)
+        std = self.qsrt(var_add)
+        std1 = self.dequant(std)
+        mean_sub1 = self.dequant(mean_sub)
+        div1 = mean_sub1/std1
+        div = self.quant(div1)
+        x1 = self.mul.mul(div, weight_q)
+        x = self.add.add(x1, bias_q)
 
         return x

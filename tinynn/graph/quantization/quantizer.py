@@ -1566,7 +1566,7 @@ class QATQuantizer(object):
                         nn.LSTM,
                         nn.RNN,
                         nn.GRU,
-                        nn.LayerNorm,
+                        # nn.LayerNorm,
                         nn.InstanceNorm1d,
                         nn.InstanceNorm2d,
                         nn.Hardsigmoid,
