@@ -1,8 +1,8 @@
 """Cross Layer Equalization
 Cross-Layer-Equalization can scale weights equivalently to reduce weight range in per_tensor mode.
 This tool is useful in two cases：
-1. When you use PTQ to quantize your model, you should fused bn to the conv,then use CLE to improve acc .
-2. When you try to quantify Re-parameterized model, e.g.Repvgg, Mobileone, the inference model often already fused BN,
+1. When you use PTQ to quantize your model, you should fuse bn to the conv, then use CLE to improve acc .
+2. When you try to quantify Re-parameterized model, e.g.Repvgg, MobileOne, the inference model often already fused BN,
 you can use CLE to adjust the model weight, then do next ptq/qat(rep-model qat need to rebuild BN).
 """
 import torch
@@ -126,8 +126,8 @@ def equalize_cdc(weight1, bias1, weight2, bias2, weight3, threshold):
         # we made some restrictions on the weight amplification of the DW convolution channel.
         # In the future, more refined constraints will be designed.
         if S1[-1] / S2[-1] > threshold:
-            S1[-1] = s - s + 1
-            S2[-1] = s - s + 1
+            S1[-1] = torch.tensor(1)
+            S2[-1] = torch.tensor(1)
 
     # Do CLE for the first and second conv weight.
     for i in range(out_channel):
@@ -170,10 +170,11 @@ def _weight_equal_helper(cls, threshold):
         print('layer_pair nums != 2,3, do not support!')
 
 
-def weight_euqal_(model: nn.Module, dummy_input, threshold=1000):
-    """Higher API to make model weight equal inplace. This function has two usage case:
+def cross_layer_equalize(model: nn.Module, dummy_input, threshold=1000):
+    """Higher-level API to perform Cross-Layer Equalization (CLE) on the given model in place.
+    This function has two usage case:
     1. Per_tensor PTQ after bn_fused.
-    2. rep-model(e.g. mobileone) which be reparameterized.
+    2. rep-model(e.g. MobileOne) which be reparameterized.
 
     Args:
         model: The bn of model should be fused into conv.

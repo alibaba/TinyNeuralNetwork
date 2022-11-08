@@ -7,7 +7,6 @@ CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(1, os.path.join(CURRENT_PATH, '../../'))
 
 import functools
-from distutils.version import LooseVersion, StrictVersion
 
 import torch
 import torch.nn as nn
@@ -21,7 +20,7 @@ from tinynn.graph.tracer import model_tracer, trace
 from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate, calibrate
 from tinynn.util.train_util import DLContext, get_device, train
 
-from tinynn.util.cross_layer_equal import weight_euqal_
+from tinynn.graph.quantization.cross_layer_equalization import cross_layer_equalize
 from tinynn.util.bn_rebuild import model_add_bn
 
 
@@ -34,14 +33,15 @@ def main_worker(args):
 
     # We use BN_folded MobileNetv1 to simulate reparameterized MobileOne.
     # You can also directly use the reparameterized model of MobileOne(or other rep-model).
-    fused_model, _ = get_fused_model(dummy_input, model)
+    fused_model = get_fused_model(model, dummy_input)
 
-    # Do CLE, if qat init precision is not ideal, try to do twice CLE or lower threshold.
+    # Do CLE. If qat init precision is not ideal, try to do twice CLE or lower threshold(Default 1000) which is a
+    # parameter of 'cross_layer_equalization' to relax CLE to prevent unquantifiable anomalies in the output of conv.
     with torch.no_grad():
-        weight_euqal_(fused_model, dummy_input, threshold=1000)
+        cross_layer_equalize(fused_model, dummy_input)
 
     # Move model to the appropriate device
-    device = torch.device('cuda')
+    device = get_device()
     fused_model.to(device=device)
 
     context = DLContext()
@@ -49,11 +49,8 @@ def main_worker(args):
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
 
     # Do bn rebuild
-    fused_model = fused_model.train()
-    # You should filter the conv name list which need rebuild BN.
-    layers_fused_bn = [name for name, mod in fused_model.named_children() if isinstance(mod, nn.Conv2d)]
     # The calibrating process should be done in full train_set in train mode.
-    fused_model = model_add_bn(fused_model, layers_fused_bn, torch.device('cuda'), calibrate, context)
+    fused_model = model_add_bn(fused_model, device, calibrate, context)
     print(fused_model)
 
     context.max_epoch = 1
@@ -62,7 +59,8 @@ def main_worker(args):
     context.optimizer = torch.optim.AdamW(fused_model.parameters(), 0.0001, weight_decay=1e-4)
     context.scheduler = optim.lr_scheduler.StepLR(context.optimizer, step_size=8, gamma=0.5)
 
-    # Float training(optional)
+    # Finetune(optional).
+    # After CLE and BN_rebuilt, you can finetune a few epoch to make the model training process stable.
     fused_model.train()
     train(fused_model, context, train_one_epoch, validate, qat=False)
 
@@ -104,14 +102,14 @@ def main_worker(args):
         qat_model = nn.DataParallel(qat_model)
 
     # Move model to the appropriate device
-    device = get_device()
     qat_model.to(device=device)
 
     context.device = device
-    context.max_epoch = 10
+    context.max_epoch = 30
     context.criterion = nn.BCEWithLogitsLoss()
-    context.optimizer = torch.optim.SGD(qat_model.parameters(), 0.01, momentum=0.9, weight_decay=5e-4)
-    context.scheduler = optim.lr_scheduler.CosineAnnealingLR(context.optimizer, T_max=context.max_epoch + 1, eta_min=0)
+    # Use the parameter of qat_prepared model to init optimizer and scheduler.
+    context.optimizer = torch.optim.AdamW(qat_model.parameters(), 0.0001, weight_decay=1e-4)
+    context.scheduler = optim.lr_scheduler.StepLR(context.optimizer, step_size=8, gamma=0.5)
 
     qat_model.train()
     train(qat_model, context, train_one_epoch, validate, qat=True)
@@ -135,8 +133,8 @@ def main_worker(args):
         converter.convert()
 
 
-def get_fused_model(dummy_input, model):
-    """The help function to get conv_bn folded model for mobilenetv1."""
+def get_fused_model(model, dummy_input):
+    """The helper function to get conv_bn folded model for mobilenetv1."""
     with model_tracer():
         model.eval()
         quantizer = PostQuantizer(
@@ -156,12 +154,9 @@ def get_fused_model(dummy_input, model):
         graph.filter_forward_nodes(is_fusable, custom_data, reverse=True)
         quant_list = custom_data[0]
         for quant_nodes in quant_list:
-            if type(quantizer) != PostQuantizer and LooseVersion(torch.__version__) >= LooseVersion('1.11.0'):
-                torch.ao.quantization.fuse_modules_qat(graph.module, quant_nodes, inplace=True)
-            else:
-                torch_q.fuse_modules(graph.module, quant_nodes, inplace=True)
+            torch_q.fuse_modules(graph.module, quant_nodes, inplace=True)
         fused_model = graph.module
-    return fused_model, quantizer
+    return fused_model
 
 
 if __name__ == '__main__':
