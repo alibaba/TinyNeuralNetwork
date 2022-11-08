@@ -626,6 +626,35 @@ class GraphOptimizer(object):
         )
         filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
 
+        r_edges = self.graph.graph.es.select(
+            functools.partial(is_dequant_quant_fusable_edge, graph_converter=self.graph.graph, q_first=not q_first)
+        )
+        r_filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in r_edges]
+
+        filtered_pairs = fuse_connected_edges(filtered_pairs + r_filtered_pairs)
+
+        new_pairs = []
+        for seq in filtered_pairs:
+            start_idx = 0
+            end_idx = len(seq)
+
+            if q_first:
+                if seq[0]['node_type'] != ExtendedOperator.QUANTIZE:
+                    start_idx += 1
+                if seq[-1]['node_type'] != ExtendedOperator.DEQUANTIZE:
+                    end_idx -= 1
+            else:
+                if seq[0]['node_type'] != ExtendedOperator.DEQUANTIZE:
+                    start_idx += 1
+                if seq[-1]['node_type'] != ExtendedOperator.QUANTIZE:
+                    end_idx -= 1
+
+            new_seq = seq[start_idx:end_idx]
+            if len(new_seq) >= 2:
+                new_pairs.append(new_seq)
+
+        filtered_pairs = new_pairs
+
         def _remove_first_pred(seq):
             first_node, last_node = seq[0], seq[-1]
             new_qparams = last_node['op'].outputs[0].quantization
