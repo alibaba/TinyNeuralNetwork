@@ -1357,7 +1357,10 @@ class GraphOptimizer(object):
                     ):
                         if q_tensor.dtype not in (np.dtype('int8'), np.dtype('int16')):
                             skip = True
-                    if node['node_type'] == ExtendedOperator.SOFTMAX:
+                    elif node['node_type'] == ExtendedOperator.DIV:
+                        if q_tensor.dtype != np.dtype('uint8'):
+                            skip = True
+                    elif node['node_type'] == ExtendedOperator.SOFTMAX:
                         if q_tensor.dtype == np.dtype('int8'):
                             if (
                                 abs(q_tensor.quantization.scale - 1.0 / 256) > 0.001 * 1.0 / 256
