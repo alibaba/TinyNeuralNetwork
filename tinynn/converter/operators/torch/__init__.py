@@ -97,6 +97,8 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::upsample_bilinear2d": ATenUpsampleBilinear2dOperator,
     "aten::upsample_nearest2d": ATenUpsampleNearest2dOperator,
     "aten::clamp": ATenClampOperator,
+    "aten::clamp_min": ATenClampMinOperator,
+    "aten::clamp_max": ATenClampMaxOperator,
     "aten::exp": ATenExpOperator,
     "aten::log": ATenLogOperator,
     "aten::to": ATenToOperator,

@@ -1425,10 +1425,19 @@ class ATenClampOperator(ATenClampSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+        self.parse_common(node, attrs, args, graph_converter)
 
-        min_value, max_value = self.input_tensors[1:]
+    def parse_common(self, node, attrs, args, graph_converter):
+        if type(self) == ATenClampOperator:
+            min_value, max_value = self.input_tensors[1:]
+        elif type(self) == ATenClampMinOperator:
+            min_value, max_value = self.input_tensors[1], None
+        elif type(self) == ATenClampMaxOperator:
+            min_value, max_value = None, self.input_tensors[1]
+
         has_min = min_value is not None
         has_max = max_value is not None
+
         assert has_min or has_max
         if min_value == 0 and max_value == 6:
             self.elementwise_unary(tfl.Relu6Operator, graph_converter)
@@ -1458,6 +1467,22 @@ class ATenClampOperator(ATenClampSchema):
 
             for op in ops:
                 graph_converter.add_operator(op)
+
+
+class ATenClampMinOperator(ATenClampMinSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenClampOperator.parse_common(self, node, attrs, args, graph_converter)
+
+
+class ATenClampMaxOperator(ATenClampMaxSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenClampOperator.parse_common(self, node, attrs, args, graph_converter)
 
 
 class ATenExpOperator(ATenExpSchema):

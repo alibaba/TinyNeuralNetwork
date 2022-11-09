@@ -1279,6 +1279,35 @@ class ConverterOPTester(unittest.TestCase):
                 tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
                 assert_close(dummy_output, tfl_output)
 
+    def test_clamp_minmax(self):
+        dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
+
+        func_names = [
+            (torch, 'clamp_min'),
+            (torch, 'clamp_max'),
+        ]
+
+        funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
+
+        funcs = [torch.clamp_min, torch.clamp_max]
+        ranges = [0, -1.5, 1.5]
+
+        for func in funcs:
+            func_name = func.__name__ if hasattr(func, '__name__') else type(func).__name__
+            print(f'testing {func_name}')
+            for val in ranges:
+
+                def model(x):
+                    return func(x, val)
+
+                model_path = get_model_path()
+                converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+                converter.convert()
+
+                dummy_output = model(dummy_input)
+                tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+                assert_close(dummy_output, tfl_output)
+
     def test_flip_single_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
