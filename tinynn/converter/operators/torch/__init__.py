@@ -124,6 +124,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::argmax": ATenArgmaxOperator,
     "aten::argmin": ATenArgminOperator,
     "aten::expand": ATenExpandOperator,
+    "aten::expand_as": ATenExpandAsOperator,
     "aten::gather": ATenGatherOperator,
     "aten::gelu": ATenGeluOperator,
     "aten::gelu_": ATenGeluOperator,
