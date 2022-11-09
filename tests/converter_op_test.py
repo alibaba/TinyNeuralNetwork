@@ -1785,6 +1785,24 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    @unittest.skipIf(not hasattr(torch.Tensor, 'expand_as'), 'expand_as is not available')
+    def test_expand_as(self):
+        dummy_input = torch.randn(3, 1, dtype=torch.float32)
+        dummy_input_1 = torch.randn(3, 4, dtype=torch.float32)
+
+        def model(x, y):
+            return x.expand_as(y)
+
+        inputs = [dummy_input, dummy_input_1]
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, inputs, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*inputs)
+        tfl_output = tfl_run_model(model_path, inputs, dummy_output)
+        assert_close(dummy_output, tfl_output, check_stride=False)
+
     def test_expand_simple(self):
         dummy_input = torch.randn(3, 1, dtype=torch.float32)
 

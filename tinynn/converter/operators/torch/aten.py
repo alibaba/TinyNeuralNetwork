@@ -2125,6 +2125,9 @@ class ATenExpandOperator(ATenExpandSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+        self.parse_common(node, attrs, args, graph_converter)
+
+    def parse_common(self, node, attrs, args, graph_converter):
         input_tensor = self.find_or_create_input(0, graph_converter)
         actual_input = input_tensor
 
@@ -2163,6 +2166,14 @@ class ATenExpandOperator(ATenExpandSchema):
 
             for op in ops:
                 graph_converter.add_operator(op)
+
+
+class ATenExpandAsOperator(ATenExpandAsSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenExpandOperator.parse_common(self, node, attrs, args, graph_converter)
 
 
 class ATenGatherOperator(ATenGatherSchema):
