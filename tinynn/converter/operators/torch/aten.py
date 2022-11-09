@@ -3048,14 +3048,7 @@ class ATenNormOperator(ATenNormSchema):
 
             actual_output = self.create_transform_tensor(outputs[0].tensor)
 
-        if keep_dim:
-            transform = self.create_transform_tensor(np.squeeze(actual_output.tensor, tuple(dims)))
-            ops.append(tfl.SumOperator([tgt_t, dim_t], [transform], keepDims=keep_dim))
-
-            shape_tensor = self.create_attr_tensor(np.array(actual_output.shape, dtype='int32'))
-            ops.append(tfl.ReshapeOperator([transform, shape_tensor], [actual_output], shape_tensor.tensor))
-        else:
-            ops.append(tfl.SumOperator([tgt_t, dim_t], [actual_output], keepDims=keep_dim))
+        ops.append(tfl.SumOperator([tgt_t, dim_t], [actual_output], keepDims=keep_dim))
 
         if actual_output != outputs[0]:
             half_t = self.create_attr_tensor(np.array([0.5], dtype='float32'))
