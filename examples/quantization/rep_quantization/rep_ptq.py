@@ -4,7 +4,7 @@ import sys
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 
-sys.path.insert(1, os.path.join(CURRENT_PATH, '../../'))
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../../'))
 
 import functools
 
@@ -21,61 +21,33 @@ from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate, calib
 from tinynn.util.train_util import DLContext, get_device, train
 
 from tinynn.graph.quantization.cross_layer_equalization import cross_layer_equalize
-from tinynn.util.bn_rebuild import model_add_bn
+from tinynn.util.bn_restore import model_restore_bn
 
 
 def main_worker(args):
-    model = Mobilenet()
-    model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
-
     # Provide a viable input for the model
     dummy_input = torch.rand((1, 3, 224, 224))
 
     # We use BN_folded MobileNetv1 to simulate reparameterized MobileOne.
-    # You can also directly use the reparameterized model of MobileOne(or other rep-model).
-    fused_model = get_fused_model(model, dummy_input)
+    # You can also directly use the reparameterized model of MobileOne_deploy(or other rep_deploy_model).
+    model = reparameterize_model_for_deploy(dummy_input)
 
-    # Do CLE. If qat init precision is not ideal, try to do twice CLE or lower threshold(Default 1000) which is a
-    # parameter of 'cross_layer_equalization' to relax CLE to prevent unquantifiable anomalies in the output of conv.
+    # Do CLE(Optional), if weight of conv_fused_bn has some outliers which is hard to quantize, you can try the CLE.
     with torch.no_grad():
-        cross_layer_equalize(fused_model, dummy_input)
+        cross_layer_equalize(model, dummy_input)
 
-    # Move model to the appropriate device
-    device = get_device()
-    fused_model.to(device=device)
-
-    context = DLContext()
-    context.device = device
-    context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
-
-    # Do bn rebuild
-    # The calibrating process should be done in full train_set in train mode.
-    fused_model = model_add_bn(fused_model, device, calibrate, context)
-    print(fused_model)
-
-    context.max_epoch = 1
-    context.criterion = nn.BCEWithLogitsLoss()
-    context.optimizer = torch.optim.SGD(fused_model.parameters(), 0.0001, weight_decay=1e-4)
-    context.optimizer = torch.optim.AdamW(fused_model.parameters(), 0.0001, weight_decay=1e-4)
-    context.scheduler = optim.lr_scheduler.StepLR(context.optimizer, step_size=8, gamma=0.5)
-
-    # Finetune(optional).
-    # After CLE and BN_rebuilt, you can finetune a few epoch to make the model training process stable.
-    fused_model.train()
-    train(fused_model, context, train_one_epoch, validate, qat=False)
-
-    # Quantization-aware training
+    # Continue to do ptq.
     with model_tracer():
-        # TinyNeuralNetwork provides a QATQuantizer class that may rewrite the graph for and perform model fusion for
-        # quantization. The model returned by the `quantize` function is ready for QAT.
+        # TinyNeuralNetwork provides a PostQuantizer class that may rewrite the graph for and perform model fusion for
+        # quantization. The model returned by the `quantize` function is ready for quantization calibration.
         # By default, the rewritten model (in the format of a single file) will be generated in the working directory.
         # You may also pass some custom configuration items through the argument `config` in the following line. For
-        # example, if you have a QAT-ready model (e.g models in torchvision.models.quantization),
+        # example, if you have a quantization-rewrite-ready model (e.g models in torchvision.models.quantization),
         # then you may use the following line.
-        #   quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'rewrite_graph': False})
+        #   quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'rewrite_graph': False})
         # Alternatively, if you have modified the generated model description file and want the quantizer to load it
         # instead, then use the code below.
-        #     quantizer = QATQuantizer(
+        #     quantizer = PostQuantizer(
         #         model, dummy_input, work_dir='out', config={'force_overwrite': False, 'is_input_quantized': None}
         #     )
         # The `is_input_quantized` in the previous line is a flag on the input tensors whether they are quantized or
@@ -91,35 +63,36 @@ def main_worker(args):
         #      The is same to (b) with no offsets, which may be used on some low-end embedded chips.
         #   d. Symmetric uint8. config={'asymmetric': False, 'per_tensor': True}
         #      The is same to (a) with no offsets. But it is rarely used, which just serves as a placeholder here.
+        # In addition, we support additional ptq algorithms including kl-divergence, the usage is shown as below:
+        #       quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'algorithm': 'kl'})
 
-        quantizer = QATQuantizer(fused_model, dummy_input, work_dir='out')
-        qat_model = quantizer.quantize()
+        quantizer = PostQuantizer(model, dummy_input, work_dir='out')
+        ptq_model = quantizer.quantize()
 
-    print(qat_model)
+    print(ptq_model)
 
-    # Use DataParallel to speed up training when possible
+    # Use DataParallel to speed up calibrating when possible
     if torch.cuda.device_count() > 1:
-        qat_model = nn.DataParallel(qat_model)
+        ptq_model = nn.DataParallel(ptq_model)
 
     # Move model to the appropriate device
-    qat_model.to(device=device)
+    device = get_device()
+    ptq_model.to(device=device)
 
+    context = DLContext()
     context.device = device
-    context.max_epoch = 30
-    context.criterion = nn.BCEWithLogitsLoss()
-    # Use the parameter of qat_prepared model to init optimizer and scheduler.
-    context.optimizer = torch.optim.AdamW(qat_model.parameters(), 0.0001, weight_decay=1e-4)
-    context.scheduler = optim.lr_scheduler.StepLR(context.optimizer, step_size=8, gamma=0.5)
+    context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
+    context.max_iteration = 100
 
-    qat_model.train()
-    train(qat_model, context, train_one_epoch, validate, qat=True)
+    # Post quantization calibration
+    calibrate(ptq_model, context)
 
     with torch.no_grad():
-        qat_model.eval()
-        qat_model.cpu()
+        ptq_model.eval()
+        ptq_model.cpu()
 
         # The step below converts the model to an actual quantized model, which uses the quantized kernels.
-        qat_model = torch.quantization.convert(qat_model)
+        ptq_model = torch.quantization.convert(ptq_model)
 
         # When converting quantized models, please ensure the quantization backend is set.
         torch.backends.quantized.engine = quantizer.backend
@@ -129,18 +102,20 @@ def main_worker(args):
         # you may specify `quantize_target_type='int8'` in the following line.
         # If you need a quantized model with strict symmetric quantization check (with pre-defined zero points),
         # you may specify `strict_symmetric_check=True` in the following line.
-        converter = TFLiteConverter(qat_model, dummy_input, tflite_path='out/qat_model.tflite')
+        converter = TFLiteConverter(ptq_model, dummy_input, tflite_path='out/rep_ptq.tflite')
         converter.convert()
 
 
-def get_fused_model(model, dummy_input):
-    """The helper function to get conv_bn folded model for mobilenetv1."""
+def reparameterize_model_for_deploy(dummy_input):
+    """The helper function to get conv_bn folded model."""
+    model = Mobilenet()
+    model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
     with model_tracer():
         model.eval()
         quantizer = PostQuantizer(
             model,
             dummy_input,
-            work_dir='out',
+            work_dir='../out',
             config={'rewrite_graph': False, 'force_overwrite': False, 'fuse_only': True},
         )
         graph = trace(quantizer.model, quantizer.dummy_input)

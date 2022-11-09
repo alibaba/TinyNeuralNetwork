@@ -43,23 +43,26 @@ class ConvBnTrain(nn.Module):
         return bn
 
 
-def add_bn(origin_model, layer_fused_bn):
+def restore_bn(origin_model, layer_fused_bn):
     model = copy.deepcopy(origin_model)
     for name, mod in model.named_modules():
         if isinstance(mod, support_conv_cls) and name in layer_fused_bn:
-            setattr(model, name, ConvBnForward(mod))
+            mod, mod_parent, name_part = get_submodule_with_parent_from_name(model, name)
+            # setattr(model, name, ConvBnForward(mod))
+            setattr(mod_parent, name_part, ConvBnForward(mod))
     return model
 
 
-def add_bn_set_param(origin_model):
+def restore_bn_set_param(origin_model):
     model = copy.deepcopy(origin_model)
-    for name, mod in model.named_children():
+    for name, mod in model.named_modules():
         if isinstance(mod, ConvBnForward):
-            setattr(model, name, ConvBnTrain(mod))
+            mod, mod_parent, name_part = get_submodule_with_parent_from_name(model, name)
+            setattr(mod_parent, name_part, ConvBnTrain(mod))
     return model
 
 
-def model_add_bn(model: nn.Module, device, calibrate_func, *params, layers_fused_bn: typing.List[str] = None):
+def model_restore_bn(model: nn.Module, device, calibrate_func, *params, layers_fused_bn: typing.List[str] = None):
     r"""High API to rebuild BN for a bn_fused model(e.g.MobileOne)
 
     Args:
@@ -74,9 +77,26 @@ def model_add_bn(model: nn.Module, device, calibrate_func, *params, layers_fused
     """
     if layers_fused_bn is None:
         layers_fused_bn = [name for name, mod in model.named_modules() if isinstance(mod, support_conv_cls)]
-    add_bn_model = add_bn(model, layers_fused_bn)
-    add_bn_model = add_bn_model.train()
-    add_bn_model.to(device)
-    calibrate_func(add_bn_model, *params)
-    bn_model = add_bn_set_param(add_bn_model)
+    restore_bn_model = restore_bn(model, layers_fused_bn)
+    restore_bn_model = restore_bn_model.train()
+    restore_bn_model.to(device)
+    calibrate_func(restore_bn_model, *params)
+    bn_model = restore_bn_set_param(restore_bn_model)
     return bn_model
+
+
+def get_submodule_with_parent_from_name(model, module_name):
+    module_name_parts = module_name.split('.')
+    cur_obj = model
+    last_obj = None
+
+    for ns in module_name_parts:
+        last_obj = cur_obj
+        if type(cur_obj) == nn.ModuleList:
+            cur_obj = cur_obj[int(ns)]
+        elif type(cur_obj) == nn.ModuleDict:
+            cur_obj = cur_obj[ns]
+        else:
+            cur_obj = getattr(cur_obj, ns)
+
+    return cur_obj, last_obj, module_name_parts[-1]
