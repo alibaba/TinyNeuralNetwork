@@ -124,6 +124,7 @@ class QATQuantizer(object):
     rounding_mode: str
     leaf_nodes: typing.Optional[typing.List[nn.Module]]
     swap_nodes: typing.Optional[typing.List[typing.Tuple[nn.Module, nn.Module]]]
+    legacy_fq: bool
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new QATQuantizer object
@@ -176,6 +177,16 @@ class QATQuantizer(object):
             self.per_tensor or self.disable_requantization_for_cat
         ), "`disable_requantization_for_cat=True` is required for per-channel quantization"
 
+        if self.legacy_fq:
+            version = None
+            if type(self) == QATQuantizer:
+                version = '1.10.0'
+            elif type(self) == QATQuantizer:
+                version = '1.12.0'
+
+            if version is not None and LooseVersion(torch.__version__) < version:
+                assert False, f"`legacy_fq=True` is only supported in {version}+"
+
         self.leaf_nodes = None
         self.swap_nodes = None
 
@@ -196,6 +207,7 @@ class QATQuantizer(object):
             'rounding_mode': 'pytorch',
             'algorithm': 'l2',
             'fuse_only': False,
+            'legacy_fq': False,
         }
 
         if config is None:
@@ -387,7 +399,14 @@ class QATQuantizer(object):
         actual_backend = backend
         if backend == 'onnx':
             actual_backend = 'qnnpack'
-        qconfig = torch_q.get_default_qat_qconfig(actual_backend)
+        if not self.legacy_fq:
+            qconfig = torch_q.get_default_qat_qconfig(actual_backend)
+        else:
+            version = None
+            if LooseVersion(torch.__version__) >= '1.12.0':
+                version = 0
+            qconfig = torch_q.get_default_qat_qconfig(actual_backend, version)
+
         qconfig_c = None
         if self.rounding_mode == 'tflite':
             q_a = FakeQuantizeTFLite.with_args(*qconfig.activation.p.args, **qconfig.activation.p.keywords)
@@ -2407,7 +2426,10 @@ class PostQuantizer(QATQuantizer):
         """
 
         log.info('setting qat backend and call prepare_qat')
-        qconfig = torch_q.get_default_qconfig(backend)
+        if not self.legacy_fq:
+            qconfig = torch_q.get_default_qconfig(backend)
+        else:
+            qconfig = torch_q.get_default_qconfig(backend, 0)
         qconfig_c = None
         if self.backend == 'qnnpack':
             if not self.asymmetric:
