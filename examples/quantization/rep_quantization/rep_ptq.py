@@ -26,13 +26,12 @@ def main_worker(args):
     # Provide a viable input for the model
     dummy_input = torch.rand((1, 3, 224, 224))
 
-    # We use BN_fused MobileNetV1 to simulate reparameterized MobileOne.
-    # You can also use the reparameterized_to_deploy model directly.
-    model = reparameterize_model_for_deploy(dummy_input)
+    # We use BN_fused MobileNetV1 to simulate MobileOne_deploy which be re-parameterized.
+    # You can directly use the re-parameterized_to_deploy model.
+    model = mobilenet_fused_bn(dummy_input)
 
     # Do CLE(Optional), if weight of conv_bn_fused has some outliers which is hard to quantize, considering trying CLE.
-    with torch.no_grad():
-        cross_layer_equalize(model, dummy_input)
+    cross_layer_equalize(model, dummy_input)
 
     # Continue to do ptq.
     with model_tracer():
@@ -77,8 +76,11 @@ def main_worker(args):
         converter.convert()
 
 
-def reparameterize_model_for_deploy(dummy_input):
-    """The helper function to get conv_bn fused model."""
+def mobilenet_fused_bn(dummy_input):
+    """
+    The helper function to get conv_bn fused mobilenet. Since the BN of Rep-model(e.g. RepVGG/MobileOne) is fused
+    into the conv when the parameters are merged. We fuse the BN of MobileNet into the conv to simulate MobileOne.
+    """
     model = Mobilenet()
     model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
     with model_tracer():

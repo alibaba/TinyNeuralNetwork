@@ -27,14 +27,13 @@ from tinynn.util.bn_restore import model_restore_bn
 def main_worker(args):
     # Provide a viable input for the model
     dummy_input = torch.rand((1, 3, 224, 224))
-    # We use BN_fused MobileNetV1 to simulate reparameterized MobileOne.
-    # You can also directly use the reparameterized model of MobileOne_deploy(or other rep_deploy_model).
-    fused_model = reparameterize_model_for_deploy(dummy_input)
+    # We use BN_fused MobileNetV1 to simulate MobileOne_deploy which be re-parameterized.
+    # You can directly use the re-parameterized_to_deploy model.
+    fused_model = mobilenet_fused_bn(dummy_input)
 
     # Do CLE(Optional).
     # If weight of conv_fused_bn has some outliers which is hard to quantize, you can try the CLE.
-    with torch.no_grad():
-        cross_layer_equalize(fused_model, dummy_input)
+    cross_layer_equalize(fused_model, dummy_input)
 
     # Move model to the appropriate device
     device = get_device()
@@ -103,8 +102,11 @@ def main_worker(args):
         converter.convert()
 
 
-def reparameterize_model_for_deploy(dummy_input):
-    """The helper function to get conv_bn fused model."""
+def mobilenet_fused_bn(dummy_input):
+    """
+    The helper function to get conv_bn fused mobilenet. Since the BN of Rep-model(e.g. RepVGG/MobileOne) is fused
+    into the conv when the parameters are merged. We fuse the BN of mobilenet into the conv to simulate MobileOne.
+    """
     model = Mobilenet()
     model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
     with model_tracer():

@@ -179,18 +179,19 @@ def cross_layer_equalize(model: nn.Module, dummy_input, threshold=1000):
         dummy_input (torch.tensor): A viable input for the model.
         threshold: (Optional) Default to be 1000, used to prevent unquantifiable anomalies in the output of inter conv.
     """
-    with model_tracer():
-        cur_graph = trace(model, dummy_input)
-        param = {}
-        for k, v in model.state_dict().items():
-            weight, _ = cur_graph.get_submodule_with_parent_from_name(k)
-            param[k] = weight.abs().max()
-        layer_groups = get_cls_set(cur_graph)
-        for cls in layer_groups:
-            _weight_equal_helper(cls, threshold)
-        stat_we = model.state_dict()
-        for k, v in stat_we.items():
-            weight, mod = cur_graph.get_submodule_with_parent_from_name(k)
-            if isinstance(mod, torch.nn.Conv2d):
-                after_max = weight.abs().max()
-                log.info(f'{k}: {param[k].data.item():.5f} -> {after_max.data.item():.5f}')
+    with torch.no_grad():
+        with model_tracer():
+            cur_graph = trace(model, dummy_input)
+            param = {}
+            for k, v in model.state_dict().items():
+                weight, _ = cur_graph.get_submodule_with_parent_from_name(k)
+                param[k] = weight.abs().max()
+            layer_groups = get_cls_set(cur_graph)
+            for cls in layer_groups:
+                _weight_equal_helper(cls, threshold)
+            stat_we = model.state_dict()
+            for k, v in stat_we.items():
+                weight, mod = cur_graph.get_submodule_with_parent_from_name(k)
+                if isinstance(mod, torch.nn.Conv2d):
+                    after_max = weight.abs().max()
+                    log.info(f'{k}: {param[k].data.item():.5f} -> {after_max.data.item():.5f}')
