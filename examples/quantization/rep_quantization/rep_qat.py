@@ -4,7 +4,7 @@ import sys
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 
-sys.path.insert(1, os.path.join(CURRENT_PATH, '../../'))
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../../'))
 
 import functools
 
@@ -21,21 +21,20 @@ from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate, calib
 from tinynn.util.train_util import DLContext, get_device, train
 
 from tinynn.graph.quantization.cross_layer_equalization import cross_layer_equalize
-from tinynn.util.bn_rebuild import model_restore_bn
+from tinynn.util.bn_restore import model_restore_bn
 
 
 def main_worker(args):
     # Provide a viable input for the model
     dummy_input = torch.rand((1, 3, 224, 224))
-    # We use BN_folded MobileNetv1 to simulate reparameterized MobileOne.
+    # We use BN_fused MobileNetV1 to simulate reparameterized MobileOne.
     # You can also directly use the reparameterized model of MobileOne_deploy(or other rep_deploy_model).
     fused_model = reparameterize_model_for_deploy(dummy_input)
 
-    # Do CLE. If qat init precision is not ideal, try to do twice CLE or lower threshold(Default 1000) which is a
-    # parameter of 'cross_layer_equalization' to relax CLE to prevent unquantifiable anomalies in the output of conv.
+    # Do CLE(Optional).
+    # If weight of conv_fused_bn has some outliers which is hard to quantize, you can try the CLE.
     with torch.no_grad():
         cross_layer_equalize(fused_model, dummy_input)
-        # quit()
 
     # Move model to the appropriate device
     device = get_device()
@@ -45,7 +44,7 @@ def main_worker(args):
     context.device = device
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
 
-    # Do bn rebuild
+    # Do bn rebuild.
     # The calibrating process should be done in full train_set in train mode.
     fused_model = model_restore_bn(fused_model, device, calibrate, context)
     print(fused_model)
@@ -62,32 +61,7 @@ def main_worker(args):
 
     # Quantization-aware training
     with model_tracer():
-        # TinyNeuralNetwork provides a QATQuantizer class that may rewrite the graph for and perform model fusion for
-        # quantization. The model returned by the `quantize` function is ready for QAT.
-        # By default, the rewritten model (in the format of a single file) will be generated in the working directory.
-        # You may also pass some custom configuration items through the argument `config` in the following line. For
-        # example, if you have a QAT-ready model (e.g models in torchvision.models.quantization),
-        # then you may use the following line.
-        #   quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'rewrite_graph': False})
-        # Alternatively, if you have modified the generated model description file and want the quantizer to load it
-        # instead, then use the code below.
-        #     quantizer = QATQuantizer(
-        #         model, dummy_input, work_dir='out', config={'force_overwrite': False, 'is_input_quantized': None}
-        #     )
-        # The `is_input_quantized` in the previous line is a flag on the input tensors whether they are quantized or
-        # not, which can be None (False for all inputs) or a list of booleans that corresponds to the inputs.
-        # Also, we support multiple qschemes for quantization preparation. There are several common choices.
-        #   a. Asymmetric uint8. (default) config={'asymmetric': True, 'per_tensor': True}
-        #      The is the most common choice and also conforms to the legacy TFLite quantization spec.
-        #   b. Asymmetric int8. config={'asymmetric': True, 'per_tensor': False}
-        #      The conforms to the new TFLite quantization spec. In legacy TF versions, this is usually used in post
-        #      quantization. Compared with (a), it has support for per-channel quantization in supported kernels
-        #      (e.g Conv), while (a) does not.
-        #   c. Symmetric int8. config={'asymmetric': False, 'per_tensor': False}
-        #      The is same to (b) with no offsets, which may be used on some low-end embedded chips.
-        #   d. Symmetric uint8. config={'asymmetric': False, 'per_tensor': True}
-        #      The is same to (a) with no offsets. But it is rarely used, which just serves as a placeholder here.
-
+        # More information for PostQuantizer initialization, see `examples/quantization/qat.py`.
         quantizer = QATQuantizer(fused_model, dummy_input, work_dir='out')
         qat_model = quantizer.quantize()
 
@@ -109,7 +83,6 @@ def main_worker(args):
 
     qat_model.train()
     train(qat_model, context, train_one_epoch, validate, qat=True)
-    # qat_model(dummy_input)
 
     with torch.no_grad():
         qat_model.eval()
@@ -131,17 +104,15 @@ def main_worker(args):
 
 
 def reparameterize_model_for_deploy(dummy_input):
-    """The helper function to get conv_bn folded model for mobilenetv1."""
+    """The helper function to get conv_bn fused model."""
     model = Mobilenet()
     model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
-    # import torchvision
-    # model = torchvision.models.mobilenet_v3_small(pretrained=True)
     with model_tracer():
         model.eval()
         quantizer = PostQuantizer(
             model,
             dummy_input,
-            work_dir='out',
+            work_dir='../out',
             config={'rewrite_graph': False, 'force_overwrite': False, 'fuse_only': True},
         )
         graph = trace(quantizer.model, quantizer.dummy_input)

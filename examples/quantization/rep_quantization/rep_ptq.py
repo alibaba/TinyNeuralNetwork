@@ -10,7 +10,6 @@ import functools
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.quantization as torch_q
 
 from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
@@ -21,51 +20,23 @@ from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate, calib
 from tinynn.util.train_util import DLContext, get_device, train
 
 from tinynn.graph.quantization.cross_layer_equalization import cross_layer_equalize
-from tinynn.util.bn_restore import model_restore_bn
 
 
 def main_worker(args):
     # Provide a viable input for the model
     dummy_input = torch.rand((1, 3, 224, 224))
 
-    # We use BN_folded MobileNetv1 to simulate reparameterized MobileOne.
-    # You can also directly use the reparameterized model of MobileOne_deploy(or other rep_deploy_model).
+    # We use BN_fused MobileNetV1 to simulate reparameterized MobileOne.
+    # You can also use the reparameterized_to_deploy model directly.
     model = reparameterize_model_for_deploy(dummy_input)
 
-    # Do CLE(Optional), if weight of conv_fused_bn has some outliers which is hard to quantize, you can try the CLE.
+    # Do CLE(Optional), if weight of conv_bn_fused has some outliers which is hard to quantize, considering trying CLE.
     with torch.no_grad():
         cross_layer_equalize(model, dummy_input)
 
     # Continue to do ptq.
     with model_tracer():
-        # TinyNeuralNetwork provides a PostQuantizer class that may rewrite the graph for and perform model fusion for
-        # quantization. The model returned by the `quantize` function is ready for quantization calibration.
-        # By default, the rewritten model (in the format of a single file) will be generated in the working directory.
-        # You may also pass some custom configuration items through the argument `config` in the following line. For
-        # example, if you have a quantization-rewrite-ready model (e.g models in torchvision.models.quantization),
-        # then you may use the following line.
-        #   quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'rewrite_graph': False})
-        # Alternatively, if you have modified the generated model description file and want the quantizer to load it
-        # instead, then use the code below.
-        #     quantizer = PostQuantizer(
-        #         model, dummy_input, work_dir='out', config={'force_overwrite': False, 'is_input_quantized': None}
-        #     )
-        # The `is_input_quantized` in the previous line is a flag on the input tensors whether they are quantized or
-        # not, which can be None (False for all inputs) or a list of booleans that corresponds to the inputs.
-        # Also, we support multiple qschemes for quantization preparation. There are several common choices.
-        #   a. Asymmetric uint8. (default) config={'asymmetric': True, 'per_tensor': True}
-        #      The is the most common choice and also conforms to the legacy TFLite quantization spec.
-        #   b. Asymmetric int8. config={'asymmetric': True, 'per_tensor': False}
-        #      The conforms to the new TFLite quantization spec. In legacy TF versions, this is usually used in post
-        #      quantization. Compared with (a), it has support for per-channel quantization in supported kernels
-        #      (e.g Conv), while (a) does not.
-        #   c. Symmetric int8. config={'asymmetric': False, 'per_tensor': False}
-        #      The is same to (b) with no offsets, which may be used on some low-end embedded chips.
-        #   d. Symmetric uint8. config={'asymmetric': False, 'per_tensor': True}
-        #      The is same to (a) with no offsets. But it is rarely used, which just serves as a placeholder here.
-        # In addition, we support additional ptq algorithms including kl-divergence, the usage is shown as below:
-        #       quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'algorithm': 'kl'})
-
+        # More information for PostQuantizer initialization, see `examples/quantization/post.py`.
         quantizer = PostQuantizer(model, dummy_input, work_dir='out')
         ptq_model = quantizer.quantize()
 
@@ -107,7 +78,7 @@ def main_worker(args):
 
 
 def reparameterize_model_for_deploy(dummy_input):
-    """The helper function to get conv_bn folded model."""
+    """The helper function to get conv_bn fused model."""
     model = Mobilenet()
     model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
     with model_tracer():
