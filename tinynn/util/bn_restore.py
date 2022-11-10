@@ -5,20 +5,19 @@ import torch.nn as nn
 import copy
 
 support_conv_cls = (torch.nn.Conv1d, torch.nn.Conv2d)
-bn_rebuild_cls = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d)
+bn_restore_cls = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d)
 
 
 class ConvBnForward(nn.Module):
     def __init__(self, conv):
         super().__init__()
 
-        # assert isinstance(conv, nn.Conv2d), "not a conv"
         assert isinstance(conv, support_conv_cls), "not a supported conv type"
         self.conv = conv
-        self.bn = bn_rebuild_cls[support_conv_cls.index(type(conv))](conv.out_channels)
+        self.bn = bn_restore_cls[support_conv_cls.index(type(conv))](conv.out_channels)
 
     def forward(self, input_0):
-        # We forward bn in train mode, but do not use its output to get running stat in train_set.
+        # Forward bn in train mode, but do not use its output so to get running_stat of conv at train_set.
         conv = self.conv(input_0)
         self.bn(conv)
         return conv
@@ -31,7 +30,7 @@ class ConvBnTrain(nn.Module):
         self.conv = convbn.conv
         self.bn = convbn.bn
         eps = self.bn.eps
-        # Use the forward running_stat to get weight and bias of rebuilt bn.
+        # Use the forward running_stat to get weight and bias of restored bn.
         weight = (self.bn.running_var + eps) ** 0.5
         bias = self.bn.running_mean
         self.bn.weight.data.copy_(weight)
@@ -48,7 +47,6 @@ def restore_bn(origin_model, layer_fused_bn):
     for name, mod in model.named_modules():
         if isinstance(mod, support_conv_cls) and name in layer_fused_bn:
             mod, mod_parent, name_part = get_submodule_with_parent_from_name(model, name)
-            # setattr(model, name, ConvBnForward(mod))
             setattr(mod_parent, name_part, ConvBnForward(mod))
     return model
 
@@ -63,16 +61,16 @@ def restore_bn_set_param(origin_model):
 
 
 def model_restore_bn(model: nn.Module, device, calibrate_func, *params, layers_fused_bn: typing.List[str] = None):
-    r"""High API to rebuild BN for a bn_fused model(e.g.MobileOne)
+    r"""High API to restore BN for a bn_fused model(e.g.MobileOne)
 
     Args:
-        model (nn.Module): The model which need rebuild bn.
+        model (nn.Module): The model which need restore bn.
         device (torch.device): Specifies the device of the model.
         calibrate_func: The function used to do train_set calibrate in training mode.
         params: The params of calibrate function except model.
-        layers_fused_bn: The name list of the conv which need to be bn_rebuilt. Defaults to all conv of model.
+        layers_fused_bn: The name list of the conv which need to be bn_restored. Defaults to all conv of model.
     Return:
-        The bn_rebuilt model.
+        The bn_restored model.
 
     """
     if layers_fused_bn is None:

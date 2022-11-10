@@ -27,7 +27,7 @@ def is_normal_conv(layer: nn.Module) -> bool:
     return isinstance(layer, cls_support_type) and layer.groups == 1
 
 
-def is_weight_equalable(current_group):
+def is_group_supported(current_group):
     """Currently Supported layer combinations for CLS are:
     1. [conv-conv]
     2. [dw-conv]
@@ -62,7 +62,7 @@ def graph_traverse(node: TraceNode, layer_groups, current_group=None, visited_no
         current_group = []
 
     # add cc or cdc to layer_group
-    if is_weight_equalable(current_group) and current_group not in layer_groups:
+    if is_group_supported(current_group) and current_group not in layer_groups:
         layer_groups.append(current_group)
         current_group = [current_group[-1]]
 
@@ -72,7 +72,7 @@ def graph_traverse(node: TraceNode, layer_groups, current_group=None, visited_no
         current_group.append((node.unique_name, node.module))
 
     if len(node.next_nodes) > 1 or not isinstance(node.module, (cls_scalable_type, cls_support_type)):
-        if is_weight_equalable(current_group) and current_group not in layer_groups:  # 可收集的conv
+        if is_group_supported(current_group) and current_group not in layer_groups:
             layer_groups.append(current_group)
         current_group = []
 
@@ -81,14 +81,12 @@ def graph_traverse(node: TraceNode, layer_groups, current_group=None, visited_no
         current_group = []
 
 
-def get_cls_set(model: nn.Module, dummy_input):
-    with model_tracer():
-        cur_graph = trace(model, dummy_input)
-        layer_groups = []
-        visited_nodes = []
-        for node in cur_graph.forward_nodes:
-            graph_traverse(node, layer_groups, visited_nodes=visited_nodes)
-        return layer_groups
+def get_cls_set(cur_graph):
+    layer_groups = []
+    visited_nodes = []
+    for node in cur_graph.forward_nodes:
+        graph_traverse(node, layer_groups, visited_nodes=visited_nodes)
+    return layer_groups
 
 
 def equalize(weight1, bias1, weight2):
@@ -109,7 +107,7 @@ def equalize(weight1, bias1, weight2):
 
 
 def equalize_cdc(weight1, bias1, weight2, bias2, weight3, threshold):
-    # Use the CLE algorithm mentioned in https://arxiv.org/abs/1906.04721
+    """Use the CLE algorithm mentioned in https://arxiv.org/abs/1906.04721"""
     weight3 = weight3.permute(1, 0, 2, 3)
     out_channel = weight1.shape[0]
     S1, S2 = [], []
@@ -149,7 +147,7 @@ def _weight_equal_helper(cls, threshold):
     layer_pair = [m for n, m in cls]
     if len(layer_pair) == 3:
         conv_0, conv_1, conv_2 = layer_pair
-        assert is_normal_conv(conv_0) and is_dw_conv(conv_1) and is_normal_conv(conv_2), 'not conv-dwconv-conv'
+        assert is_normal_conv(conv_0) and is_dw_conv(conv_1) and is_normal_conv(conv_2), 'not conv-dw-conv'
         weight1, bias1, weight2, bias2, weight3 = conv_0.weight, conv_0.bias, conv_1.weight, conv_1.bias, conv_2.weight
         e_weight1, e_bias1, e_weight2, e_bias2, e_weight3 = equalize_cdc(
             weight1, bias1, weight2, bias2, weight3, threshold
@@ -167,29 +165,32 @@ def _weight_equal_helper(cls, threshold):
         conv_0.bias.data.copy_(e_bias1)
         conv_1.weight.data.copy_(e_weight2)
     else:
-        print('layer_pair nums != 2,3, do not support!')
+        log.warning(f'layer_pair nums != 2,3, do not support, current layer:{cls}.')
 
 
 def cross_layer_equalize(model: nn.Module, dummy_input, threshold=1000):
-    """Higher-level API to perform Cross-Layer Equalization (CLE) on the given model in place.
+    """Higher-level API to perform Cross-Layer Equalization(CLE) on the given model in place.
     This function has two usage case:
     1. Per_tensor PTQ after bn_fused.
-    2. rep-model(e.g. MobileOne) which be reparameterized.
+    2. Rep-model(e.g. MobileOne) which be reparameterized.
 
     Args:
         model: The bn of model should be fused into conv.
         dummy_input (torch.tensor): A viable input for the model.
         threshold: (Optional) Default to be 1000, used to prevent unquantifiable anomalies in the output of inter conv.
     """
-    param = {}
-    for k, v in model.state_dict().items():
-        param[k] = v.abs().max()
-    layer_groups = get_cls_set(model, dummy_input)
-    for cls in layer_groups:
-        _weight_equal_helper(cls, threshold)
-    stat_we = model.state_dict()
-    for k, v in stat_we.items():
-        layer_name = k.split('.')[0]
-        if hasattr(model, layer_name) and isinstance(getattr(model, layer_name), torch.nn.Conv2d):
-            after_max = stat_we[k].abs().max()
-            log.info(f'{k}: {param[k].data.item():.5f} -> {after_max.data.item():.5f}')
+    with model_tracer():
+        cur_graph = trace(model, dummy_input)
+        param = {}
+        for k, v in model.state_dict().items():
+            weight, _ = cur_graph.get_submodule_with_parent_from_name(k)
+            param[k] = weight.abs().max()
+        layer_groups = get_cls_set(cur_graph)
+        for cls in layer_groups:
+            _weight_equal_helper(cls, threshold)
+        stat_we = model.state_dict()
+        for k, v in stat_we.items():
+            weight, mod = cur_graph.get_submodule_with_parent_from_name(k)
+            if isinstance(mod, torch.nn.Conv2d):
+                after_max = weight.abs().max()
+                log.info(f'{k}: {param[k].data.item():.5f} -> {after_max.data.item():.5f}')
