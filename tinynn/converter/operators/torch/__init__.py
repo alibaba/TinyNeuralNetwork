@@ -165,6 +165,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::scatter_": ATenScatterOperator,
     "aten::abs": ATenAbsOperator,
     "aten::im2col": ATenIm2colOperator,
+    "aten::col2im": ATenCol2imOperator,
     "aten::mish": ATenMishOperator,
     # quantized
     "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,

@@ -3098,6 +3098,55 @@ class ATenIm2colOperator(ATenIm2colSchema):
         graph_converter.add_operator(tfl.GatherNdOperator([inter_tensor, indices_tensor], output_tensors))
 
 
+class ATenCol2imOperator(ATenCol2imSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        assert (
+            input_tensor.tensor.ndim in (2, 3)
+        ), "Currently, only unbatched (3D) or batched (4D) image-like output tensors are supported"
+        output_tensors = self.to_tfl_tensors(self.output_names, self.output_tensors)
+
+        output_size_h, output_size_w = self.input_tensors[1]
+        kernel_h, kernel_w = self.input_tensors[2]
+        dilation_h, dilation_w = self.input_tensors[3]
+        padding_h, padding_w = self.input_tensors[4]
+        stride_h, stride_w = self.input_tensors[5]
+
+        fold_out = torch.nn.functional.fold(
+            torch.from_numpy(input_tensor.tensor), (output_size_h, output_size_w), (kernel_h, kernel_w),
+            (dilation_h, dilation_w), (padding_h, padding_w), (stride_h, stride_w)
+        )
+        padded_fold_out = torch.nn.functional.pad(fold_out, (padding_w, padding_w, padding_h, padding_h)).numpy()
+        fake_input = torch.arange(0.0, padded_fold_out.size).reshape(padded_fold_out.shape)
+        if input_tensor.tensor.ndim == 2:
+            fake_input = fake_input.unsqueeze(0)
+        fake_output = torch.nn.functional.unfold(
+            fake_input, (kernel_h, kernel_w), (dilation_h, dilation_w), (0, 0), (stride_h, stride_w)
+        ).to(dtype=torch.int64)
+        if input_tensor.tensor.ndim == 2:
+            fake_input = fake_input.squeeze(0)
+            fake_output = fake_output.squeeze(0)
+        indices = torch.nonzero(fake_input >= 0)[fake_output].to(dtype=torch.int32)
+        indices_tensor = self.create_attr_tensor(indices)
+        shape_tensor = self.create_attr_tensor(np.array(padded_fold_out.shape, dtype='int32'))
+        padded_fold_out_tensor = self.create_transform_tensor(padded_fold_out)
+        graph_converter.add_operator(
+            tfl.ScatterNdOperator([indices_tensor, input_tensor, shape_tensor], [padded_fold_out_tensor])
+        )
+
+        fake_input = torch.arange(0.0, padded_fold_out.size).reshape(padded_fold_out.shape)
+        fake_output = fake_input[..., padding_h:output_size_h + padding_h, padding_w:output_size_w + padding_w].to(
+            dtype=torch.int64)
+        indices = torch.nonzero(fake_input >= 0)[fake_output].to(dtype=torch.int32)
+        indices_tensor = self.create_attr_tensor(indices)
+        graph_converter.add_operator(
+            tfl.GatherNdOperator([padded_fold_out_tensor, indices_tensor], output_tensors)
+        )
+
+
 class ATenMishOperator(ATenMishSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
