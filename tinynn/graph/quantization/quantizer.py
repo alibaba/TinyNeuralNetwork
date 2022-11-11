@@ -179,13 +179,13 @@ class QATQuantizer(object):
 
         if self.legacy_fq:
             version = None
-            if type(self) == QATQuantizer:
+            if type(self).__name__ == 'QATQuantizer':
                 version = '1.10.0'
-            elif type(self) == QATQuantizer:
+            elif type(self).__name__ == 'PostQuantizer':
                 version = '1.12.0'
 
-            if LooseVersion(torch.__version__) < version:
-                log.info(f'legacy_fq=True is only available for PyTorch {version}+')
+            if version is None or LooseVersion(torch.__version__) < version:
+                log.info(f'legacy_fq=True is only available for QATQuantizer and PostQuantizer with PyTorch {version}+')
                 self.legacy_fq = False
 
         self.leaf_nodes = None
