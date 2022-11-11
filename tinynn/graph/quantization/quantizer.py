@@ -184,8 +184,9 @@ class QATQuantizer(object):
             elif type(self) == QATQuantizer:
                 version = '1.12.0'
 
-            if version is not None and LooseVersion(torch.__version__) < version:
-                assert False, f"`legacy_fq=True` is only supported in {version}+"
+            if LooseVersion(torch.__version__) < version:
+                log.info(f'legacy_fq=True is only available for PyTorch {version}+')
+                self.legacy_fq = False
 
         self.leaf_nodes = None
         self.swap_nodes = None
@@ -207,7 +208,7 @@ class QATQuantizer(object):
             'rounding_mode': 'pytorch',
             'algorithm': 'l2',
             'fuse_only': False,
-            'legacy_fq': False,
+            'legacy_fq': True,
         }
 
         if config is None:
