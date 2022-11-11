@@ -3703,6 +3703,28 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.1.0'), 'scatter_nd is not supported')
+    def test_col2im(self):
+        dummy_input = torch.randn(1, 12, 12, dtype=torch.float32)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.fold = nn.Fold((4, 5), (2, 2), (1, 1), (0, 0), (1, 1))
+
+            def forward(self, x):
+                return self.fold(x)
+
+        model_path = get_model_path()
+
+        model = Model()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.4.0'), 'cumsum is not supported')
     def test_cumsum(self):
         def model(x):
