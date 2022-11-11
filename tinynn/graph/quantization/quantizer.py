@@ -403,10 +403,19 @@ class QATQuantizer(object):
         if not self.legacy_fq:
             qconfig = torch_q.get_default_qat_qconfig(actual_backend)
         else:
-            version = None
-            if LooseVersion(torch.__version__) >= '1.12.0':
-                version = 0
-            qconfig = torch_q.get_default_qat_qconfig(actual_backend, version)
+            if LooseVersion(torch.__version__) >= '1.13.0':
+                # See https://github.com/pytorch/pytorch/pull/88876
+                qconfig = torch_q.QConfig(
+                    activation=torch_q.FakeQuantize.with_args(
+                        observer=torch_q.MovingAverageMinMaxObserver, quant_min=0, quant_max=255, reduce_range=False
+                    ),
+                    weight=torch_q.default_weight_fake_quant,
+                )
+            else:
+                version = None
+                if LooseVersion(torch.__version__) >= '1.12.0':
+                    version = 0
+                qconfig = torch_q.get_default_qat_qconfig(actual_backend, version)
 
         qconfig_c = None
         if self.rounding_mode == 'tflite':
