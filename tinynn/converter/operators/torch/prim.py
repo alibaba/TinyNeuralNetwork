@@ -110,6 +110,13 @@ class PrimGetItemConverter(PrimOperatorConverter):
         self.output_tensors.append(input_tensor[idx])
 
 
+class PrimLenConverter(PrimOperatorConverter):
+    def parse(self, node, attrs, args, graph_converter):
+        input_tensor = self.input_tensors[0]
+
+        self.output_tensors.append(len(input_tensor))
+
+
 class PrimConstantChunkConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         chunks, chunks_type = attrs.get('chunks', (None, None))

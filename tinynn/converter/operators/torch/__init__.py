@@ -16,6 +16,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "prim::NumToTensor": PrimNumToTensorConverter,
     "prim::If": PrimIfConverter,
     "aten::__getitem__": PrimGetItemConverter,
+    "aten::len": PrimLenConverter,
     # aten
     "aten::t": ATenTOperator,
     "aten::view": ATenViewOperator,
