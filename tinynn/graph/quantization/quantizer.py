@@ -2186,29 +2186,32 @@ class QATQuantizer(object):
                 setattr(q_model, q_name, nn.Identity())
                 setattr(q_model, activ_name, nn.Identity())
 
-        if hasattr(torch_q, 'get_default_static_quant_module_mappings'):
-            mapping = torch_q.get_default_static_quant_module_mappings()
-        elif hasattr(torch_q, 'get_static_quant_module_mappings'):
-            mapping = copy.deepcopy(torch_q.get_static_quant_module_mappings())
+        if type(self).__name__ == 'QATQuantizer':
+            if hasattr(torch_q, 'get_default_static_quant_module_mappings'):
+                mapping = torch_q.get_default_static_quant_module_mappings()
+            elif hasattr(torch_q, 'get_static_quant_module_mappings'):
+                mapping = copy.deepcopy(torch_q.get_static_quant_module_mappings())
+            else:
+                mapping = copy.deepcopy(torch_q.DEFAULT_MODULE_MAPPING)
+
+            mapping.update(FUSE_QAT_MODULES_CVT)
+
+            float_mods = {}
+
+            for qat_t, q_t in FUSE_QAT_MODULES_CVT.items():
+                float_mod = getattr(q_t, '_FLOAT_MODULE', None)
+                if float_mod is not None:
+                    float_mods[q_t] = float_mod
+                    setattr(q_t, '_FLOAT_MODULE', qat_t)
+
+            q_model = torch.quantization.convert(q_model, mapping)
+
+            for q_t, orig_t in float_mods.items():
+                setattr(q_t, '_FLOAT_MODULE', orig_t)
+
+            float_mods.clear()
         else:
-            mapping = copy.deepcopy(torch_q.DEFAULT_MODULE_MAPPING)
-
-        mapping.update(FUSE_QAT_MODULES_CVT)
-
-        float_mods = {}
-
-        for qat_t, q_t in FUSE_QAT_MODULES_CVT.items():
-            float_mod = getattr(q_t, '_FLOAT_MODULE', None)
-            if float_mod is not None:
-                float_mods[q_t] = float_mod
-                setattr(q_t, '_FLOAT_MODULE', qat_t)
-
-        q_model = torch.quantization.convert(q_model, mapping)
-
-        for q_t, orig_t in float_mods.items():
-            setattr(q_t, '_FLOAT_MODULE', orig_t)
-
-        float_mods.clear()
+            q_model = torch.quantization.convert(q_model)
 
         return q_model
 
