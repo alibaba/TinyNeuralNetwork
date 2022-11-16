@@ -1665,6 +1665,94 @@ class ATenInstanceNormOperator(ATenInstanceNormSchema):
             graph_converter.add_operator(op)
 
 
+class ATenGroupNormOperator(ATenGroupNormSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        inp = self.find_or_create_input(0, graph_converter)
+        eps = self.input_tensors[args['eps']]
+
+        n_channels = inp.shape[1]
+        n_groups, weight, bias = self.input_tensors[1:4]
+        affine = False
+        if weight is not None and bias is not None:
+            affine = True
+            weight, bias = [self.find_or_create_input(i, graph_converter) for i in range(2, 4)]
+
+        ops = []
+
+        inputs = []
+        dims = len(inp.shape)
+        if n_channels == n_groups and n_groups > 1:
+            axis = tuple(range(2, dims))
+            axis_tensor = self.create_attr_tensor(np.array(axis, dtype='int32'))
+            inputs.append(inp)
+        elif n_groups == 1:
+            axis = tuple(range(1, dims))
+            axis_tensor = self.create_attr_tensor(np.array(axis, dtype='int32'))
+            inputs.append(inp)
+        else:
+            axis = tuple(range(1, dims))
+            axis_tensor = self.create_attr_tensor(np.array(axis, dtype='int32'))
+            split_dim_tensor = self.create_attr_tensor(np.array([1], dtype='int32'))
+            inputs = [self.create_transform_tensor(t) for t in np.split(inp.tensor, n_groups, axis=1)]
+            ops.append(tfl.SplitOperator([split_dim_tensor, inp], inputs, n_groups))
+
+        dim_ones = (1,) * (dims - 2)
+
+        norms = []
+        for input_t in inputs:
+            mean = self.create_transform_tensor(np.mean(input_t.tensor, axis=axis, keepdims=True))
+            ops.append(tfl.MeanOperator([input_t, axis_tensor], [mean], keepDims=True))
+
+            squared_diff = self.create_transform_tensor(np.power(input_t.tensor - mean.tensor, 2))
+            ops.append(tfl.SquaredDifferenceOperator([input_t, mean], [squared_diff]))
+
+            var = self.create_transform_tensor(np.mean(squared_diff.tensor, axis=axis, keepdims=True))
+            ops.append(tfl.MeanOperator([squared_diff, axis_tensor], [var], keepDims=True))
+
+            numerator = self.create_transform_tensor(input_t.tensor - mean.tensor)
+            ops.append(tfl.SubOperator([input_t, mean], [numerator]))
+
+            eps_tensor = self.create_attr_tensor(np.array([eps], dtype='float32'))
+            with_eps = self.create_transform_tensor(var.tensor + eps_tensor.tensor)
+            ops.append(tfl.AddOperator([var, eps_tensor], [with_eps]))
+
+            denominator = self.create_transform_tensor(np.sqrt(with_eps.tensor))
+            ops.append(tfl.SqrtOperator([with_eps], [denominator]))
+
+            norm = self.create_transform_tensor(numerator.tensor / denominator.tensor)
+            ops.append(tfl.DivOperator([numerator, denominator], [norm]))
+
+            norms.append(norm)
+
+        if len(norms) > 1:
+            cat_out = self.create_transform_tensor(np.concatenate([x.tensor for x in norms], 1))
+            ops.append(tfl.ConcatenationOperator(norms, [cat_out], 1))
+        else:
+            cat_out = norms[0]
+
+        if affine:
+            weight.tensor = weight.tensor.reshape(-1, *dim_ones)
+            bias.tensor = bias.tensor.reshape(-1, *dim_ones)
+
+            weight_tensor = self.create_attr_tensor(weight.tensor)
+            bias_tensor = self.create_attr_tensor(bias.tensor)
+
+            mul_out = self.create_transform_tensor(cat_out.tensor * weight_tensor.tensor)
+            ops.append(tfl.MulOperator([cat_out, weight_tensor], [mul_out]))
+
+            outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+            ops.append(tfl.AddOperator([mul_out, bias_tensor], outputs))
+        else:
+            outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+            ops[-1].outputs = outputs
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
+
 class ATenIndexOperator(ATenIndexSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
@@ -3104,8 +3192,9 @@ class ATenCol2imOperator(ATenCol2imSchema):
 
         self.run(node)
         input_tensor = self.find_or_create_input(0, graph_converter)
-        assert (
-            input_tensor.tensor.ndim in (2, 3)
+        assert input_tensor.tensor.ndim in (
+            2,
+            3,
         ), "Currently, only unbatched (3D) or batched (4D) image-like output tensors are supported"
         output_tensors = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
@@ -3116,8 +3205,12 @@ class ATenCol2imOperator(ATenCol2imSchema):
         stride_h, stride_w = self.input_tensors[5]
 
         fold_out = torch.nn.functional.fold(
-            torch.from_numpy(input_tensor.tensor), (output_size_h, output_size_w), (kernel_h, kernel_w),
-            (dilation_h, dilation_w), (padding_h, padding_w), (stride_h, stride_w)
+            torch.from_numpy(input_tensor.tensor),
+            (output_size_h, output_size_w),
+            (kernel_h, kernel_w),
+            (dilation_h, dilation_w),
+            (padding_h, padding_w),
+            (stride_h, stride_w),
         )
         padded_fold_out = torch.nn.functional.pad(fold_out, (padding_w, padding_w, padding_h, padding_h)).numpy()
         fake_input = torch.arange(0.0, padded_fold_out.size).reshape(padded_fold_out.shape)
@@ -3138,13 +3231,12 @@ class ATenCol2imOperator(ATenCol2imSchema):
         )
 
         fake_input = torch.arange(0.0, padded_fold_out.size).reshape(padded_fold_out.shape)
-        fake_output = fake_input[..., padding_h:output_size_h + padding_h, padding_w:output_size_w + padding_w].to(
-            dtype=torch.int64)
+        fake_output = fake_input[..., padding_h : output_size_h + padding_h, padding_w : output_size_w + padding_w].to(
+            dtype=torch.int64
+        )
         indices = torch.nonzero(fake_input >= 0)[fake_output].to(dtype=torch.int32)
         indices_tensor = self.create_attr_tensor(indices)
-        graph_converter.add_operator(
-            tfl.GatherNdOperator([padded_fold_out_tensor, indices_tensor], output_tensors)
-        )
+        graph_converter.add_operator(tfl.GatherNdOperator([padded_fold_out_tensor, indices_tensor], output_tensors))
 
 
 class ATenMishOperator(ATenMishSchema):

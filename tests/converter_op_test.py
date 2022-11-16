@@ -3254,6 +3254,36 @@ class ConverterOPTester(unittest.TestCase):
 
             assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
 
+    def test_group_norms(self):
+        dummy_input = torch.randn(1, 6, 224, 224, dtype=torch.float32)
+
+        funcs = [nn.GroupNorm(1, 6), nn.GroupNorm(3, 6), nn.GroupNorm(6, 6)]
+
+        for func in funcs:
+
+            class Model(nn.Module):
+                def __init__(self) -> None:
+                    super().__init__()
+                    self.norm = func
+
+                def forward(self, x):
+                    return self.norm(x)
+
+            model = Model()
+            model.eval()
+
+            model_path = get_model_path()
+            converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+            converter.convert()
+
+            dummy_output = model(dummy_input)
+            tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+
+            def msg(*args, **kwargs):
+                return f'testing {func} failed: {args}'
+
+            assert_close(dummy_output, tfl_output, msg=msg, atol=256.0, rtol=256.0, equal_nan=True)
+
     def test_conv(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 
