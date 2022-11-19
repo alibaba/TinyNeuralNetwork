@@ -1353,6 +1353,46 @@ class QATQuantizer(object):
                         # It is even simple here. We only need to swap the order of the tensors.
                         node.module.parse_args(node.prev_tensors[1], node.prev_tensors[0])
 
+        # Rewrite torch.clamp to relu and relu6
+        def _is_clamp_node(node: TraceNode, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if cur_class == TraceFunction:
+                return cur_module.kind == 'clamp' and node.next_tensors[0].dtype == torch.float32
+
+        clamp_nodes = graph.filter_forward_nodes(_is_clamp_node)
+        log.info(f'rewriting clamp for {[node.unique_name for node in convertible_nodes]}')
+        for node in clamp_nodes:
+
+            def _parse_args(min=None, max=None, *args, **kwargs):
+                return min, max
+
+            min, max = eval(f'_parse_args({node.module.args_string_no_self})')
+
+            kind = None
+            if min == 0.0:
+                if max is None:
+                    kind = 'relu'
+                elif max == 6.0:
+                    kind = 'relu6'
+
+            if kind is None:
+                continue
+
+            inplace = node.module.func_type == f'{node.module.kind}_'
+            node.module.kind = kind
+            node.module.func_type = kind
+            node.module.full_name = f'torch.nn.functional.{kind}'
+
+            if inplace:
+                arg_str = 'inplace=True'
+            else:
+                arg_str = ''
+
+            node.module.args_template_no_self = arg_str
+            node.module.args_template = f'{{}} {arg_str}'
+            node.module.update_args_string()
+
         # Rewrite other fusable functions
         # e.g. add_relu(x, y) =>
         #            r = torch.add(x, y)
@@ -1461,7 +1501,7 @@ class QATQuantizer(object):
             elif node.module.kind in ('elu', 'leaky_relu'):
                 if hasattr(node.module, 'args_string_no_self'):
 
-                    def _parse_args(alpha=1.0, *args, **kwargs):
+                    def _parse_args(alpha=1.0, *args, **kwargs):  # noqa: F811
                         return alpha
 
                     alpha = eval(f'_parse_args({node.module.args_string_no_self})')
