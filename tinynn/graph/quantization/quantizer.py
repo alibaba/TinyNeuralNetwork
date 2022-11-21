@@ -1353,7 +1353,39 @@ class QATQuantizer(object):
                         # It is even simple here. We only need to swap the order of the tensors.
                         node.module.parse_args(node.prev_tensors[1], node.prev_tensors[0])
 
-        # Rewrite torch.clamp to relu and relu6
+        # Rewrite torch.clamp_{min,max} to torch.clamp
+        def _is_clamp_min_max_node(node: TraceNode, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if cur_class == TraceFunction:
+                return cur_module.kind in ('clamp_min', 'clamp_max') and node.next_tensors[0].dtype == torch.float32
+
+        clamp_min_max_nodes = graph.filter_forward_nodes(_is_clamp_min_max_node)
+        log.info(f'rewriting clamp_{{min,max}} for {[node.unique_name for node in convertible_nodes]}')
+        for node in clamp_min_max_nodes:
+            kw = node.module.kind[-3:]
+            _parse_args = eval(f'lambda {kw}, *args, **kwargs: {kw}')
+
+            val = eval(f'_parse_args({node.module.args_string_no_self})')
+
+            if kw != 'min' or val != 0.0:
+                continue
+
+            if kw == 'min':
+                arg_str = f'{val}'
+            else:
+                arg_str = f'None, {val}'
+
+            sub_str = f'_{kw}'
+            node.module.kind = node.module.kind.replace(sub_str, '')
+            node.module.func_type = node.module.func_type.replace(sub_str, '')
+            node.module.full_name = '.'.join(node.module.full_name.split('.')[:-1] + [node.module.func_type])
+
+            node.module.args_template_no_self = arg_str
+            node.module.args_template = f'{{}}, {arg_str}'
+            node.module.update_args_string()
+
+        # Rewrite torch.clamp to relu, relu6 and clamp_{min, max}
         def _is_clamp_node(node: TraceNode, custom_data):
             cur_module = node.module
             cur_class = type(cur_module)
@@ -1377,20 +1409,35 @@ class QATQuantizer(object):
                     kind = 'relu6'
 
             if kind is None:
-                continue
+                if max is None:
+                    kind = 'clamp_min'
+                elif min is None:
+                    kind = 'clamp_max'
+                else:
+                    continue
 
-            inplace = node.module.func_type == f'{node.module.kind}_'
-            node.module.kind = kind
-            node.module.func_type = kind
-            node.module.full_name = f'torch.nn.functional.{kind}'
+            if kind in ('clamp_min', 'clamp_max'):
+                node.module.kind = kind
+                node.module.func_type = node.module.func_type.replace('clamp', kind)
+                node.module.full_name = '.'.join(node.module.full_name.split('.')[:-1] + [node.module.func_type])
 
-            if inplace:
-                arg_str = 'inplace=True'
+                if max is None:
+                    arg_str = f'{min}'
+                else:
+                    arg_str = f'{max}'
             else:
-                arg_str = ''
+                inplace = node.module.func_type == f'{node.module.kind}_'
+                node.module.kind = kind
+                node.module.func_type = kind
+                node.module.full_name = f'torch.nn.functional.{kind}'
+
+                if inplace:
+                    arg_str = 'inplace=True'
+                else:
+                    arg_str = ''
 
             node.module.args_template_no_self = arg_str
-            node.module.args_template = f'{{}} {arg_str}'
+            node.module.args_template = f'{{}}, {arg_str}'
             node.module.update_args_string()
 
         # Rewrite other fusable functions
@@ -1815,6 +1862,8 @@ class QATQuantizer(object):
                     'bmm',
                     'abs',
                     'sum',
+                    'clamp_min',
+                    'clamp_max',
                 )
             else:
                 if LooseVersion(torch.__version__) >= LooseVersion('1.13.0'):
@@ -1908,7 +1957,7 @@ class QATQuantizer(object):
         # Remove consecutive dequant quant nodes
         def _is_consecutive_dequant_quant_nodes(node, custom_data):
             cur_type = node.type()
-            skip_types = set(['bmm', 'matmul', 'truediv'])
+            skip_types = set(['bmm', 'matmul', 'truediv', 'clamp_min', 'clamp_max'])
             if self.set_quantizable_op_stats:
                 skip_types |= set(KNOWN_QSTATS.keys())
             skip_types_prev = skip_types | set(['reciprocal'])
