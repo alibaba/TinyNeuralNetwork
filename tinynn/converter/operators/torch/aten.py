@@ -1446,23 +1446,47 @@ class ATenClampOperator(ATenClampSchema):
         else:
             ops = []
             input_tensor = self.find_or_create_input(0, graph_converter)
+            if has_min:
+                min_value_arr = np.array([min_value], dtype=input_tensor.dtype)
+                if input_tensor.quantization is not None:
+                    min_value_tensor = self.create_attr_tensor(
+                        self.quantize_numpy(
+                            min_value_arr,
+                            input_tensor.quantization.scale,
+                            input_tensor.quantization.zero_point,
+                            input_tensor.dtype,
+                        ),
+                        quantization=input_tensor.quantization,
+                    )
+                else:
+                    min_value_tensor = self.create_attr_tensor(min_value_arr)
+            if has_max:
+                max_value_arr = np.array([max_value], dtype=input_tensor.dtype)
+                if input_tensor.quantization is not None:
+                    max_value_tensor = self.create_attr_tensor(
+                        self.quantize_numpy(
+                            max_value_arr,
+                            input_tensor.quantization.scale,
+                            input_tensor.quantization.zero_point,
+                            input_tensor.dtype,
+                        ),
+                        quantization=input_tensor.quantization,
+                    )
+                else:
+                    max_value_tensor = self.create_attr_tensor(max_value_tensor)
             if has_min and has_max:
                 inter_tensor = self.create_transform_tensor(
-                    np.where(input_tensor.tensor > min_value, input_tensor.tensor, min_value)
+                    np.minimum(input_tensor.tensor, min_value_tensor.tensor), quantization=input_tensor.quantization
                 )
-                min_value_tensor = self.create_attr_tensor(np.array([min_value], dtype=input_tensor.dtype))
                 ops.append(tfl.MaximumOperator([input_tensor, min_value_tensor], [inter_tensor]))
 
                 outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-                max_value_tensor = self.create_attr_tensor(np.array([max_value], dtype=input_tensor.dtype))
                 ops.append(tfl.MinimumOperator([inter_tensor, max_value_tensor], outputs))
             elif has_min:
                 outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-                max_value_tensor = self.create_attr_tensor(np.array([min_value], dtype=input_tensor.dtype))
                 ops.append(tfl.MaximumOperator([input_tensor, max_value_tensor], outputs))
             else:
                 outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-                max_value_tensor = self.create_attr_tensor(np.array([max_value], dtype=input_tensor.dtype))
                 ops.append(tfl.MinimumOperator([input_tensor, max_value_tensor], outputs))
 
             for op in ops:

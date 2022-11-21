@@ -839,6 +839,41 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_conv_clamp_min(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.Conv2d(3, 3, 1)
+
+            def forward(self, x):
+                s = self.conv(x)
+                return torch.clamp_min(s, 0.0)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_clamp_max(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                return torch.clamp_max(x, 1.0)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_single_clamp(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                return torch.clamp(x, -1.0, 1.0)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
     def test_conv1d(self):
         class Model(nn.Module):
             def __init__(self) -> None:

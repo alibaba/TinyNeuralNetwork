@@ -214,7 +214,7 @@ class OperatorConverter(ABC):
             tensor, name, has_buffer=False, quantization=quantization, asymmetric=self.asymmetric, q_type=self.q_type
         )
 
-    def create_attr_tensor(self, tensor, name=None, hybrid=False):
+    def create_attr_tensor(self, tensor, name=None, hybrid=False, quantization=None):
         if name is None:
             name = self.get_unique_attr_name()
 
@@ -223,7 +223,9 @@ class OperatorConverter(ABC):
         else:
             q_type = self.q_type
 
-        tensor = tfl.Tensor(tensor, name, has_buffer=True, asymmetric=self.asymmetric, q_type=q_type)
+        tensor = tfl.Tensor(
+            tensor, name, has_buffer=True, quantization=quantization, asymmetric=self.asymmetric, q_type=q_type
+        )
 
         if hybrid and self.hybrid_q_type == np.uint8:
             tensor.reinterpret_as(self.hybrid_q_type)
@@ -256,6 +258,18 @@ class OperatorConverter(ABC):
             cur_scale = weight_tensor.quantization.scale
             log.info(f'rescale quantized weight of {weight_tensor.name}: {orig_scale:.8f}->{cur_scale:.8f}')
 
+    def quantize_numpy(self, tensor, scale, zero_point, dtype=np.uint8):
+        q_tensor = np.rint(tensor / scale + zero_point)
+        type_info = np.iinfo(dtype)
+        if np.any(q_tensor > type_info.max):
+            warnings.warn('Overflow while quantizing the tensor')
+            q_tensor = np.minimum(q_tensor, type_info.max)
+        if np.any(q_tensor < type_info.min):
+            warnings.warn('Underflow while quantizing the tensor')
+            q_tensor = np.maximum(q_tensor, type_info.min)
+        q_tensor = q_tensor.astype(dtype)
+        return q_tensor
+
     def quantize(self, tensor, scale, zero_point, dtype=torch.uint8, dim=None):
         if isinstance(scale, list):
             scale = torch.tensor(scale)
@@ -265,8 +279,10 @@ class OperatorConverter(ABC):
         type_info = torch.iinfo(dtype)
         if (q_tensor > type_info.max).any():
             warnings.warn('Overflow while quantizing the tensor')
+            q_tensor[q_tensor > type_info.max] = type_info.max
         if (q_tensor < type_info.min).any():
             warnings.warn('Underflow while quantizing the tensor')
+            q_tensor[q_tensor < type_info.min] = type_info.min
         q_tensor = q_tensor.to(dtype=dtype)
         if isinstance(scale, torch.Tensor):
             scale = scale.tolist()

@@ -1328,8 +1328,33 @@ class GraphOptimizer(object):
                 if prev_node['node_type'] == ExtendedOperator.DEQUANTIZE:
                     q_tensors[prev_node_name] = prev_node['op'].inputs[0]
 
-                if prev_node['node_type'] == ExtendedOperator.CONSTANT_NODE and prev_node_name in self.graph.q_mapping:
-                    skip_names.append(prev_node_name)
+                if prev_node['node_type'] == ExtendedOperator.CONSTANT_NODE:
+                    if (
+                        node['node_type'] in (ExtendedOperator.MINIMUM, ExtendedOperator.MAXIMUM)
+                        and i != 0
+                        and prev_node_name not in self.graph.q_mapping
+                    ):
+                        f_tensor = self.graph.tensor_map[prev_node_name]
+                        r_tensor = q_tensors[op.inputs[0].name]
+                        q_arr = np.rint(
+                            f_tensor.tensor / r_tensor.quantization.scale + r_tensor.quantization.zero_point
+                        )
+                        i_type = np.iinfo(r_tensor.tensor.dtype)
+
+                        if np.any(q_arr > i_type.max):
+                            warnings.warn('Overflow while quantizing the tensor')
+                            q_arr = np.minimum(q_arr, i_type.max)
+
+                        if np.any(q_arr < i_type.min):
+                            warnings.warn('Underflow while quantizing the tensor')
+                            q_arr = np.maximum(q_arr, i_type.min)
+
+                        q_arr = q_arr.astype(r_tensor.dtype)
+                        q_tensor = self.create_attr_tensor(q_arr, quantization=r_tensor.quantization)
+                        self.graph.q_mapping[prev_node_name] = q_tensor
+
+                    if prev_node_name in self.graph.q_mapping:
+                        skip_names.append(prev_node_name)
 
             next_nodes = []
             next_edges = []
@@ -3556,6 +3581,8 @@ def is_quantizable_rewrite_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.SUM,
         ExtendedOperator.DIV,
         ExtendedOperator.RSQRT,
+        ExtendedOperator.MAXIMUM,
+        ExtendedOperator.MINIMUM,
     )
 
 
@@ -3569,6 +3596,8 @@ def is_elementwise_binary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
             ExtendedOperator.SUB,
             ExtendedOperator.MUL,
             ExtendedOperator.DIV,
+            ExtendedOperator.MAXIMUM,
+            ExtendedOperator.MINIMUM,
         )
         and len(op.inputs) >= 2
     )
@@ -3890,7 +3919,7 @@ def op_input_indices(op: tfl.BaseOperator):
         input_indices = range(len(op.inputs))
     elif isinstance(op, tfl.SplitOperator):
         input_indices = (1,)
-    elif isinstance(op, tfl.BatchMatmulOperator):
+    elif isinstance(op, (tfl.BatchMatmulOperator, tfl.MinimumOperator, tfl.MaximumOperator)):
         input_indices = range(2)
     elif isinstance(op, (tfl.AddOperator, tfl.SubOperator, tfl.MulOperator, tfl.DivOperator)):
         if len(op.inputs[1].shape) == 1 and op.inputs[1].shape[0] == 1:
