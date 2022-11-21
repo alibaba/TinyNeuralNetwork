@@ -1473,7 +1473,7 @@ class ATenClampOperator(ATenClampSchema):
                         quantization=input_tensor.quantization,
                     )
                 else:
-                    max_value_tensor = self.create_attr_tensor(max_value_tensor)
+                    max_value_tensor = self.create_attr_tensor(max_value_arr)
             if has_min and has_max:
                 inter_tensor = self.create_transform_tensor(
                     np.minimum(input_tensor.tensor, min_value_tensor.tensor), quantization=input_tensor.quantization
@@ -1484,7 +1484,7 @@ class ATenClampOperator(ATenClampSchema):
                 ops.append(tfl.MinimumOperator([inter_tensor, max_value_tensor], outputs))
             elif has_min:
                 outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-                ops.append(tfl.MaximumOperator([input_tensor, max_value_tensor], outputs))
+                ops.append(tfl.MaximumOperator([input_tensor, min_value_tensor], outputs))
             else:
                 outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
                 ops.append(tfl.MinimumOperator([input_tensor, max_value_tensor], outputs))

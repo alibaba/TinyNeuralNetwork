@@ -1385,7 +1385,7 @@ class QATQuantizer(object):
             node.module.args_template = f'{{}}, {arg_str}'
             node.module.update_args_string()
 
-        # Rewrite torch.clamp to relu and relu6
+        # Rewrite torch.clamp to relu, relu6 and clamp_{min, max}
         def _is_clamp_node(node: TraceNode, custom_data):
             cur_module = node.module
             cur_class = type(cur_module)
@@ -1409,17 +1409,32 @@ class QATQuantizer(object):
                     kind = 'relu6'
 
             if kind is None:
-                continue
+                if max is None:
+                    kind = 'clamp_min'
+                elif min is None:
+                    kind = 'clamp_max'
+                else:
+                    continue
 
-            inplace = node.module.func_type == f'{node.module.kind}_'
-            node.module.kind = kind
-            node.module.func_type = kind
-            node.module.full_name = f'torch.nn.functional.{kind}'
+            if kind in ('clamp_min', 'clamp_max'):
+                node.module.kind = kind
+                node.module.func_type = node.module.func_type.replace('clamp', kind)
+                node.module.full_name = '.'.join(node.module.full_name.split('.')[:-1] + [node.module.func_type])
 
-            if inplace:
-                arg_str = 'inplace=True'
+                if max is None:
+                    arg_str = f'{min}'
+                else:
+                    arg_str = f'{max}'
             else:
-                arg_str = ''
+                inplace = node.module.func_type == f'{node.module.kind}_'
+                node.module.kind = kind
+                node.module.func_type = kind
+                node.module.full_name = f'torch.nn.functional.{kind}'
+
+                if inplace:
+                    arg_str = 'inplace=True'
+                else:
+                    arg_str = ''
 
             node.module.args_template_no_self = arg_str
             node.module.args_template = f'{{}}, {arg_str}'
