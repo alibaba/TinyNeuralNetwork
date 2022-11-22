@@ -116,6 +116,10 @@ overridable_creation_funcs = {}
 torch_overrides_funcs = []
 torch_overrides_wrappers = []
 
+# Reuse generated wrapper functions and modules
+generated_wrapper_funcs = {}
+generated_wrapper_modules = {}
+
 # Load state for the override items
 overridable_funcs_loaded = GlobalData(False)
 overridable_modules_loaded = GlobalData(False)
@@ -1149,7 +1153,8 @@ def patch_modules(objects, names, gens):
         for name, gen in zip(names, gens):
             key = qualified_name(obj, name, short=True)
             pre_patched_values[key] = getattr(obj, name)
-            setattr(obj, name, gen(pre_patched_values[key], key))
+            generated_wrapper_modules.setdefault(key, gen(pre_patched_values[key], key))
+            setattr(obj, name, generated_wrapper_modules[key])
     yield objects
     for obj in objects:
         for name in names:
@@ -1173,25 +1178,27 @@ def patch_funcs(object_dicts, gens):
                     log.warning(f'{key} declared more than once in torch_func_override.yml, skipping')
                 else:
                     if key == 'torch.Tensor.__getitem__':
-                        objs = list(obj.__bases__) + [obj]
                         pre_patched_value_dict[key] = getattr(torch._C._TensorBase, '__getitem__')
-                        new_func = gen(pre_patched_value_dict[key], key, hasattr(obj, '__module__'))
-                        for o in objs:
-                            key = qualified_name(o, name)
-                            pre_patched_value_dict[key] = patch_getitem(o, new_func)
+                        generated_wrapper_funcs.setdefault(
+                            key, gen(pre_patched_value_dict[key], key, hasattr(obj, '__module__'))
+                        )
+                        new_func = generated_wrapper_funcs[key]
+                        key = qualified_name(obj, name)
+                        pre_patched_value_dict[key] = patch_getitem(obj, new_func)
                     else:
                         pre_patched_value_dict[key] = getattr(obj, name)
-                        setattr(obj, name, gen(pre_patched_value_dict[key], key, hasattr(obj, '__module__')))
+                        generated_wrapper_funcs.setdefault(
+                            key, gen(pre_patched_value_dict[key], key, hasattr(obj, '__module__'))
+                        )
+                        setattr(obj, name, generated_wrapper_funcs[key])
     yield object_dict
     for object_dict, gen in zip(object_dicts, gens):
         for obj, names in object_dict.items():
             for name in names:
                 key = qualified_name(obj, name)
                 if key == 'torch.Tensor.__getitem__':
-                    objs = list(obj.__bases__) + [obj]
-                    for o in objs:
-                        key = qualified_name(o, name)
-                        revert_getitem(o, pre_patched_value_dict[key])
+                    key = qualified_name(obj, name)
+                    revert_getitem(obj, pre_patched_value_dict[key])
                 else:
                     setattr(obj, name, pre_patched_value_dict[key])
 
@@ -1628,6 +1635,14 @@ def override_current_trace_graph(new_graph: 'TraceGraph') -> 'TraceGraph':
     current_graph(new_graph)
     yield current_graph.get_value()
     current_graph(old_graph)
+
+
+@contextlib.contextmanager
+def import_patcher():
+    with tracer_context():
+        with patch_helper(wrap_creation_funcs=False, wrap_funcs=True, wrap_modules=False):
+            with no_catch():
+                yield True
 
 
 class TraceGraph(object):
