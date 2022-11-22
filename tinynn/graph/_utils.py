@@ -175,6 +175,11 @@ PyTypeObject._fields_ = [
     # ...
 ]
 
+
+class SlotsPointer(PyObject):
+    _fields_ = [('dict', ctypes.POINTER(PyObject))]
+
+
 _decref = ctypes.pythonapi.Py_DecRef
 _decref.argtypes = [ctypes.py_object]
 _decref.restype = None
@@ -182,6 +187,22 @@ _decref.restype = None
 _incref = ctypes.pythonapi.Py_IncRef
 _incref.argtypes = [ctypes.py_object]
 _incref.restype = None
+
+
+def proxy_builtin(klass):
+    name = klass.__name__
+    slots = getattr(klass, '__dict__', name)
+
+    pointer = SlotsPointer.from_address(id(slots))
+    namespace = {}
+
+    ctypes.pythonapi.PyDict_SetItem(
+        ctypes.py_object(namespace),
+        ctypes.py_object(name),
+        pointer.dict,
+    )
+
+    return namespace[name]
 
 
 def patch_getitem(base_cls, func):
@@ -198,42 +219,67 @@ def patch_getitem(base_cls, func):
         except NotImplementedError:
             return NotImplementedRet
 
-    tp_as_name, impl_method = "tp_as_mapping", "mp_subscript"
-    tyobj = PyTypeObject.from_address(id(base_cls))
-    _incref(tyobj)
-    struct_ty = PyMappingMethods
-    tp_as_ptr = getattr(tyobj, tp_as_name)
-    if not tp_as_ptr:
-        # allocate new array
-        tp_as_obj = struct_ty()
-        tp_as_new_ptr = ctypes.cast(ctypes.addressof(tp_as_obj), ctypes.POINTER(struct_ty))
+    cls_list = list(base_cls.__bases__) + [base_cls]
 
-        setattr(tyobj, tp_as_name, tp_as_new_ptr)
-    tp_as = tp_as_ptr[0]
+    orig_mp_funcs = []
+    orig_gm_funcs = []
 
-    # find the C function type
-    for fname, ftype in struct_ty._fields_:
-        if fname == impl_method:
-            cfunc_t = ftype
+    for klass in cls_list:
+        tp_as_name, impl_method = "tp_as_mapping", "mp_subscript"
+        tyobj = PyTypeObject.from_address(id(klass))
+        _incref(tyobj)
+        struct_ty = PyMappingMethods
+        tp_as_ptr = getattr(tyobj, tp_as_name)
+        if not tp_as_ptr:
+            # allocate new array
+            tp_as_obj = struct_ty()
+            tp_as_new_ptr = ctypes.cast(ctypes.addressof(tp_as_obj), ctypes.POINTER(struct_ty))
 
-    cfunc = cfunc_t(wrapper)
-    orig = ctypes.cast(getattr(tp_as, impl_method), ctypes.c_void_p)
-    setattr(tp_as, impl_method, cfunc)
-    return orig
+            setattr(tyobj, tp_as_name, tp_as_new_ptr)
+        tp_as = tp_as_ptr[0]
+
+        # find the C function type
+        for fname, ftype in struct_ty._fields_:
+            if fname == impl_method:
+                cfunc_t = ftype
+
+        cfunc = cfunc_t(wrapper)
+        orig_mp = ctypes.cast(getattr(tp_as, impl_method), ctypes.c_void_p)
+        orig_mp_funcs.append(orig_mp)
+        setattr(tp_as, impl_method, cfunc)
+
+    for klass in cls_list:
+        cls_dict = proxy_builtin(klass)
+        orig_gm = cls_dict.get('__getitem__', None)
+        orig_gm_funcs.append(orig_gm)
+        if orig_gm is not None:
+            cls_dict['__getitem__'] = wrapper
+
+    return orig_mp_funcs, orig_gm_funcs
 
 
 def revert_getitem(base_cls, func):
-    tp_as_name, impl_method = "tp_as_mapping", "mp_subscript"
-    tyobj = PyTypeObject.from_address(id(base_cls))
-    struct_ty = PyMappingMethods
-    tp_as_ptr = getattr(tyobj, tp_as_name)
-    tp_as = tp_as_ptr[0]
+    cls_list = list(base_cls.__bases__) + [base_cls]
 
-    # find the C function type
-    for fname, ftype in struct_ty._fields_:
-        if fname == impl_method:
-            cfunc_t = ftype
+    orig_mp_funcs, orig_gm_funcs = func
 
-    orig = ctypes.cast(func, cfunc_t)
-    setattr(tp_as, impl_method, orig)
-    _decref(tyobj)
+    for klass, orig_mp in zip(cls_list, orig_mp_funcs):
+        tp_as_name, impl_method = "tp_as_mapping", "mp_subscript"
+        tyobj = PyTypeObject.from_address(id(klass))
+        struct_ty = PyMappingMethods
+        tp_as_ptr = getattr(tyobj, tp_as_name)
+        tp_as = tp_as_ptr[0]
+
+        # find the C function type
+        for fname, ftype in struct_ty._fields_:
+            if fname == impl_method:
+                cfunc_t = ftype
+
+        orig = ctypes.cast(orig_mp, cfunc_t)
+        setattr(tp_as, impl_method, orig)
+        _decref(tyobj)
+
+    for klass, orig_gm in zip(cls_list, orig_gm_funcs):
+        if orig_gm is not None:
+            cls_dict = proxy_builtin(klass)
+            cls_dict['__getitem__'] = orig_gm
