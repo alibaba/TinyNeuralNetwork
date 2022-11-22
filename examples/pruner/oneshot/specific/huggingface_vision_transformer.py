@@ -15,15 +15,13 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, CyclicLR
 from tinynn.converter import TFLiteConverter
 from tinynn.util.util import import_from_path
 from tinynn.util.cifar10 import train_one_epoch
-from tinynn.graph.tracer import patch_helper, no_catch, model_tracer
+from tinynn.graph.tracer import import_patcher
 from tinynn.util.cifar10 import get_dataloader, validate
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
 from tinynn.util.train_util import train, DLContext, get_device
 
-with model_tracer():
-    with patch_helper(wrap_creation_funcs=False, wrap_funcs=True, wrap_modules=False):
-        with no_catch():
-            from transformers import ViTForImageClassification
+with import_patcher():
+    from transformers import ViTForImageClassification
 
 
 class ViTWrapper(nn.Module):

@@ -210,3 +210,30 @@ Usually, when the number of hidden layers is large enough (128+), the LSTM OP wi
 ##### How to convert ops including `ABS`, `SUM`, `SOFTMAX`, `LOG_SOFTMAX` and `BATCH_MATMUL` to quantized kernels?
 First, you need to add the parameter `rewrite_quantizable=True` when defining TFLiteConverter.
 Second, for ops including `SOFTMAX` and `LOG_SOFTMAX`, you need to add the parameter `set_quantizable_op_stats=True` when defining QATQuantizer or PostQuantizer.
+
+## Interoperability with other frameworks
+
+### HuggingFace Transformers
+Some of the models in [huggingface/transformer](https://github.com/huggingface/transformers) including `ViTForImageClassification` preloads the PyTorch functions during module import, which breaks our logic for tracing. You may need to use the `import_patcher` for model pruning and quantization.
+
+```py
+# Import import_patcher from TinyNN
+from tinynn.graph.tracer import import_patcher
+
+# Apply import_patcher during module import for transformers
+with import_patcher():
+    from transformers import ViTForImageClassification
+```
+
+### ONNX2PyTorch
+[ToriML/onnx2pytorch](https://github.com/ToriML/onnx2pytorch) is a project that translates ONNX models to PyTorch, so that TinyNN can be used to perform model compression. For pruning and quantization to work, you may follow the logic below.
+```py
+# Import import_patcher from TinyNN
+from tinynn.graph.tracer import import_patcher
+# Import ConvertModel from onnx2pytorch
+from onnx2pytorch import ConvertModel
+
+# Apply import_patcher during module conversion for onnx2pytorch
+    with import_patcher():
+        model = ConvertModel(onnx_model)
+```

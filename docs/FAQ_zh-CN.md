@@ -212,3 +212,30 @@ Note: 这些状态变量都是二维的，维度为`[batch_size, hidden_size或�
 #### 怎么把`ABS`、`SUM`、`SOFTMAX`、`LOG_SOFTMAX`和`BATCH_MATMUL`算子转换成定点？
 首先，在定义`TFLiteConverter`时加上`rewrite_quantizable=True`这个参数。
 其次，对于`SOFTMAX`、`LOG_SOFTMAX`，需要在定义`QATQuantizer`或者`PostQuantizer`时加上`set_quantizable_op_stats=True`这个参数。
+
+## 与其他框架的互操作
+
+### HuggingFace Transformers
+在 [huggingface/transformer](https://github.com/huggingface/transformers) 中的部分模型，例如 `ViTForImageClassification` 在导入时预加载了PyTorch的部分函数，导致TinyNN trace失败。对其完成剪枝或者量化需要用到 `import_patcher` 。
+
+```py
+# Import import_patcher from TinyNN
+from tinynn.graph.tracer import import_patcher
+
+# Apply import_patcher during module import for transformers
+with import_patcher():
+    from transformers import ViTForImageClassification
+```
+
+### ONNX2PyTorch
+[ToriML/onnx2pytorch](https://github.com/ToriML/onnx2pytorch) 是一个把 ONNX 模型转换为 PyTorch 的项目, 之后我们用 TinyNN 来完成模型压缩。量化或者剪枝的情况下，你需要按照下面的代码逻辑。
+```py
+# Import import_patcher from TinyNN
+from tinynn.graph.tracer import import_patcher
+# Import ConvertModel from onnx2pytorch
+from onnx2pytorch import ConvertModel
+
+# Apply import_patcher during module conversion for onnx2pytorch
+    with import_patcher():
+        model = ConvertModel(onnx_model)
+```
