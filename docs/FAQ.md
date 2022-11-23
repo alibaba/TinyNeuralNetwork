@@ -237,3 +237,23 @@ from onnx2pytorch import ConvertModel
     with import_patcher():
         model = ConvertModel(onnx_model)
 ```
+
+### ONNX2Torch
+[ENOT-AutoDL/onnx2torch](https://github.com/ENOT-AutoDL/onnx2torch) is a new project that converts AI models from ONNX to PyTorch. As for handling dynamic shape, we need to use some hacks while using TinyNN for pruning and quantization.
+```py
+# Import import_patcher from TinyNN
+from tinynn.graph.tracer import import_patcher
+# Apply import_patcher during module  for onnx2torch
+with import_patcher():
+    from onnx2torch import convert
+
+model = convert(onnx_model)
+
+# Graph tracing
+graph = trace(model, dummy_input, patch_torch_size=True)
+graph.generate_code('my_model.py', 'my_model.pth', 'MyModel')
+
+# Quantization
+quantizer = PostQuantizer(model, dummy_input, config={'extra_tracer_opts': {'patch_torch_size': True}})
+ptq_model = quantizer.quantize()
+```
