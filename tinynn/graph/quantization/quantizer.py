@@ -125,6 +125,7 @@ class QATQuantizer(object):
     leaf_nodes: typing.Optional[typing.List[nn.Module]]
     swap_nodes: typing.Optional[typing.List[typing.Tuple[nn.Module, nn.Module]]]
     legacy_fq: bool
+    extra_tracer_opts: typing.Optional[typing.Dict]
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new QATQuantizer object
@@ -209,6 +210,7 @@ class QATQuantizer(object):
             'algorithm': 'l2',
             'fuse_only': False,
             'legacy_fq': True,
+            'extra_tracer_opts': {},
         }
 
         if config is None:
@@ -229,7 +231,7 @@ class QATQuantizer(object):
         self.model.train()
 
         # After tracing the model, we will get a TraceGraph object
-        graph = trace(self.model, self.dummy_input)
+        graph = trace(self.model, self.dummy_input, **self.extra_tracer_opts)
 
         if self.rewrite_graph:
             # Retrives the name of the model from type info
