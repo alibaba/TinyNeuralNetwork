@@ -21,7 +21,7 @@ from torch.nn.parallel.distributed import DistributedDataParallel
 
 from tinynn.util.train_util import get_module_device
 from tinynn.util.util import get_logger, import_from_path, tensors2ndarray
-from ._utils import patch_getitem, revert_getitem
+from ._utils import patch_getitem, revert_getitem, patch_new, revert_new
 
 # Basic types
 
@@ -115,6 +115,7 @@ overridable_modules = []
 overridable_creation_funcs = {}
 torch_overrides_funcs = []
 torch_overrides_wrappers = []
+torch_tracking_modules = []
 
 # Reuse generated wrapper functions and modules
 generated_wrapper_funcs = {}
@@ -125,10 +126,12 @@ overridable_funcs_loaded = GlobalData(False)
 overridable_modules_loaded = GlobalData(False)
 overridable_creation_funcs_loaded = GlobalData(False)
 torch_overrides_funcs_loaded = GlobalData(False)
+tracking_modules_loaded = GlobalData(False)
 
 funcs_overrided = GlobalData(False)
 modules_overrided = GlobalData(False)
 creation_funcs_overrided = GlobalData(False)
+tracking_modules_overrided = GlobalData(False)
 
 # Lock for tracing
 lock = GlobalData(False)
@@ -839,6 +842,25 @@ def new_getattr_gen(orig_getattr, key: str, is_class: bool):
     return new_getattr
 
 
+def new_init_tracking_gen(orig_init, key: str):
+    """Wrapper function for the init functions of the modules in PyTorch"""
+    log.debug(f'registered module init tracking wrapper: {key}')
+
+    def new_init_tracking(obj, args, kwargs):
+        log.debug(f'{key} in init tracking function wrapper')
+
+        with no_catch():
+            is_tensor = torch.is_tensor(args[0])
+
+        if is_tensor:
+            return args[0].unbind(0)
+        else:
+            with no_catch():
+                return tuple([torch.as_tensor(x) for x in args[0]])
+
+    return new_init_tracking
+
+
 def new_init_gen(orig_init, key: str):
     """Wrapper function for the init functions of the modules in PyTorch"""
     log.debug(f'registered module init wrapper: {key}')
@@ -1154,13 +1176,20 @@ def patch_modules(objects, names, gens):
             key = qualified_name(obj, name, short=True)
             pre_patched_values[key] = getattr(obj, name)
             generated_wrapper_modules.setdefault(key, gen(pre_patched_values[key], key))
-            setattr(obj, name, generated_wrapper_modules[key])
+            if key == 'torch.Size.__new__':
+                pre_patched_values[key] = patch_new(obj, generated_wrapper_modules[key])
+            else:
+                setattr(obj, name, generated_wrapper_modules[key])
+
     yield objects
     for obj in objects:
         for name in names:
             key = qualified_name(obj, name, short=True)
             pre_patched_value = pre_patched_values[key]
-            setattr(obj, name, pre_patched_value)
+            if key == 'torch.Size.__new__':
+                revert_new(obj, pre_patched_value)
+            else:
+                setattr(obj, name, pre_patched_value)
 
 
 @contextlib.contextmanager
@@ -1598,7 +1627,7 @@ def tracer_context():
 @contextlib.contextmanager
 def model_constructor_tracer():
     """Basic context manager for capturing constructors for `nn.Module`"""
-    with patch_helper(wrap_funcs=False, wrap_creation_funcs=False):
+    with patch_helper(wrap_funcs=False, wrap_creation_funcs=False, wrap_tracking_modules=False):
         yield True
 
 
@@ -1621,9 +1650,11 @@ def model_tracer():
 
 
 @contextlib.contextmanager
-def construct_trace_graph(module, dummy_input: torch.Tensor, eliminate_dead_graph: bool) -> 'TraceGraph':
+def construct_trace_graph(
+    module, dummy_input: torch.Tensor, eliminate_dead_graph: bool, patch_torch_size: bool
+) -> 'TraceGraph':
     """Simple context manager for creating a new TraceGraph"""
-    current_graph(TraceGraph(module, dummy_input, eliminate_dead_graph))
+    current_graph(TraceGraph(module, dummy_input, eliminate_dead_graph, patch_torch_size))
     yield current_graph.get_value()
     current_graph(None)
 
@@ -1640,7 +1671,7 @@ def override_current_trace_graph(new_graph: 'TraceGraph') -> 'TraceGraph':
 @contextlib.contextmanager
 def import_patcher():
     with tracer_context():
-        with patch_helper(wrap_creation_funcs=False, wrap_funcs=True, wrap_modules=False):
+        with patch_helper(wrap_creation_funcs=False, wrap_funcs=True, wrap_modules=False, wrap_tracking_modules=False):
             with no_catch():
                 yield True
 
@@ -1668,7 +1699,13 @@ class TraceGraph(object):
     quantized: bool
     code: str
 
-    def __init__(self, module: torch.nn.Module, dummy_input: torch.Tensor, eliminate_dead_graph: bool = False):
+    def __init__(
+        self,
+        module: torch.nn.Module,
+        dummy_input: torch.Tensor,
+        eliminate_dead_graph: bool = False,
+        patch_torch_size: bool = False,
+    ):
         # Used for function / node numbering
         self.global_functions = {}
         self.global_nodes = {}
@@ -1728,6 +1765,9 @@ class TraceGraph(object):
 
         # Used namespaces
         self.used_namespaces = set()
+
+        # Tracer options
+        self.patch_torch_size = patch_torch_size
 
     def all_nodes(self) -> typing.List[TraceNode]:
         """Returns all the nodes in a computation graph during forward process"""
@@ -1793,7 +1833,7 @@ class TraceGraph(object):
 
             original_state_dict = copy.deepcopy(self.module.state_dict())
 
-            with patch_helper():
+            with patch_helper(wrap_tracking_modules=self.patch_torch_size):
                 with hook_modules(self.module):
                     self.module(*actual_input)
 
@@ -2629,8 +2669,23 @@ def load_creation_funcs():
     return creation_funcs
 
 
+def load_tracking_modules():
+    if tracking_modules_loaded():
+        tracking_modules = torch_tracking_modules
+    else:
+        tracking_modules = fetch_modules(os.path.join(current_dir, 'configs/torch_tracking_modules.yml'))
+        torch_tracking_modules.extend(tracking_modules)
+        tracking_modules_loaded(True)
+    return tracking_modules
+
+
 @contextlib.contextmanager
-def patch_helper(wrap_modules: bool = True, wrap_funcs: bool = True, wrap_creation_funcs: bool = True):
+def patch_helper(
+    wrap_modules: bool = True,
+    wrap_funcs: bool = True,
+    wrap_creation_funcs: bool = True,
+    wrap_tracking_modules: bool = False,
+):
     """Temporarily monkeypatches the functions and the modules in PyTorch."""
     if wrap_modules:
         if not modules_overrided():
@@ -2651,6 +2706,12 @@ def patch_helper(wrap_modules: bool = True, wrap_funcs: bool = True, wrap_creati
             creation_funcs_overrided(True)
         else:
             wrap_creation_funcs = False
+    if wrap_tracking_modules:
+        if not tracking_modules_overrided():
+            tracking_modules = load_tracking_modules()
+            tracking_modules_overrided(True)
+        else:
+            wrap_tracking_modules = False
     if wrap_modules:
         module_manager = patch_modules(modules, ('__init__', '__setattr__'), (new_init_gen, new_setattr_gen))
         module_manager.__enter__()
@@ -2664,6 +2725,9 @@ def patch_helper(wrap_modules: bool = True, wrap_funcs: bool = True, wrap_creati
     if wrap_creation_funcs:
         creation_func_manager = patch_funcs(creation_funcs, new_creation_func_gen)
         creation_func_manager.__enter__()
+    if wrap_tracking_modules:
+        tracking_module_manager = patch_modules(tracking_modules, '__new__', new_init_tracking_gen)
+        tracking_module_manager.__enter__()
     yield True
     if wrap_modules:
         module_manager.__exit__(None, None, None)
@@ -2674,6 +2738,9 @@ def patch_helper(wrap_modules: bool = True, wrap_funcs: bool = True, wrap_creati
     if wrap_creation_funcs:
         creation_func_manager.__exit__(None, None, None)
         creation_funcs_overrided(False)
+    if wrap_tracking_modules:
+        tracking_module_manager.__exit__(None, None, None)
+        tracking_modules_overrided(False)
 
 
 def check_types(values: typing.Iterable) -> bool:
@@ -2728,10 +2795,15 @@ def tensor_name_from_parts(node_name, node_idx=None, is_constant_node=False):
             return f'{ns}{node_name}[{node_idx}]'
 
 
-def trace(module: torch.nn.Module, dummy_input: torch.Tensor, eliminate_dead_graph: bool = False) -> TraceGraph:
+def trace(
+    module: torch.nn.Module,
+    dummy_input: torch.Tensor,
+    eliminate_dead_graph: bool = False,
+    patch_torch_size: bool = False,
+) -> TraceGraph:
     """main function for tracing"""
     try:
-        with construct_trace_graph(module, dummy_input, eliminate_dead_graph) as new_graph:
+        with construct_trace_graph(module, dummy_input, eliminate_dead_graph, patch_torch_size) as new_graph:
             new_graph.init()
             return new_graph
     except Exception:

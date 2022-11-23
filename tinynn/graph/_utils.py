@@ -172,6 +172,28 @@ PyTypeObject._fields_ = [
     ('tp_hash', ctypes.CFUNCTYPE(ctypes.c_int64, PyObject_p)),
     ('tp_call', ctypes.CFUNCTYPE(PyObject_p, PyObject_p, PyObject_p, PyObject_p)),
     ('tp_str', ctypes.CFUNCTYPE(PyObject_p, PyObject_p)),
+    ('tp_getattro', ctypes.c_void_p),  # Type not declared yet
+    ('tp_setattro', ctypes.c_void_p),  # Type not declared yet
+    ('tp_as_buffer', ctypes.c_void_p),  # Type not declared yet
+    ('tp_flags', ctypes.c_void_p),  # Type not declared yet
+    ('tp_doc', ctypes.c_void_p),  # Type not declared yet
+    ('tp_traverse', ctypes.c_void_p),  # Type not declared yet
+    ('tp_clear', ctypes.c_void_p),  # Type not declared yet
+    ('tp_richcompare', ctypes.c_void_p),  # Type not declared yet
+    ('tp_weaklistoffset', ctypes.c_void_p),  # Type not declared yet
+    ('tp_iter', ctypes.c_void_p),  # Type not declared yet
+    ('iternextfunc', ctypes.c_void_p),  # Type not declared yet
+    ('tp_methods', ctypes.c_void_p),  # Type not declared yet
+    ('tp_members', ctypes.c_void_p),  # Type not declared yet
+    ('tp_getset', ctypes.c_void_p),  # Type not declared yet
+    ('tp_base', ctypes.c_void_p),  # Type not declared yet
+    ('tp_dict', ctypes.c_void_p),  # Type not declared yet
+    ('tp_descr_get', ctypes.c_void_p),  # Type not declared yet
+    ('tp_descr_set', ctypes.c_void_p),  # Type not declared yet
+    ('tp_dictoffset', ctypes.c_void_p),  # Type not declared yet
+    ('tp_init', ctypes.c_void_p),  # Type not declared yet
+    ('tp_alloc', ctypes.c_void_p),  # Type not declared yet
+    ('tp_new', ctypes.CFUNCTYPE(PyObject_p, PyObject_p, PyObject_p, ctypes.c_void_p)),
     # ...
 ]
 
@@ -203,6 +225,74 @@ def proxy_builtin(klass):
     )
 
     return namespace[name]
+
+
+def patch_new(base_cls, func):
+    assert callable(func)
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        """
+        This wrapper returns the address of the resulting object as a
+        python integer which is then converted to a pointer by ctypes
+        """
+        try:
+            return func(*args, **kwargs)
+        except NotImplementedError:
+            return NotImplementedRet
+
+    orig_mp_funcs = []
+    orig_gm_funcs = []
+
+    tp_as_name = "tp_new"
+    tyobj = PyTypeObject.from_address(id(base_cls))
+    _incref(tyobj)
+    struct_ty = PyTypeObject
+
+    # find the C function type
+    for fname, ftype in struct_ty._fields_:
+        if fname == tp_as_name:
+            cfunc_t = ftype
+
+    tp_as_ptr = getattr(tyobj, tp_as_name)
+
+    cfunc = cfunc_t(wrapper)
+    orig_mp = ctypes.cast(tp_as_ptr, ctypes.c_void_p)
+    orig_mp_funcs.append(orig_mp)
+    setattr(tyobj, tp_as_name, cfunc)
+
+    cls_dict = proxy_builtin(base_cls)
+    orig_gm = cls_dict.get('__new__', None)
+    orig_gm_funcs.append(orig_gm)
+    if orig_gm is not None:
+        cls_dict['__new__'] = wrapper
+
+    return orig_mp_funcs, orig_gm_funcs
+
+
+def revert_new(base_cls, func):
+    cls_list = [base_cls]
+
+    orig_mp_funcs, orig_gm_funcs = func
+
+    for klass, orig_mp in zip(cls_list, orig_mp_funcs):
+        tp_as_name = "tp_new"
+        tyobj = PyTypeObject.from_address(id(klass))
+        struct_ty = PyTypeObject
+
+        # find the C function type
+        for fname, ftype in struct_ty._fields_:
+            if fname == tp_as_name:
+                cfunc_t = ftype
+
+        orig = ctypes.cast(orig_mp, cfunc_t)
+        setattr(tyobj, tp_as_name, orig)
+        _decref(tyobj)
+
+    for klass, orig_gm in zip(cls_list, orig_gm_funcs):
+        if orig_gm is not None:
+            cls_dict = proxy_builtin(klass)
+            cls_dict['__new__'] = orig_gm
 
 
 def patch_getitem(base_cls, func):
