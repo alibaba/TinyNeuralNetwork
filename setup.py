@@ -18,8 +18,15 @@ def get_sha():
 
 
 def get_datetime():
-    now = datetime.now()
-    return now.strftime("%Y%m%d%H%M%S")
+    try:
+        return (
+            subprocess.check_output(['git', 'show', '-s', '--date=format:%Y%m%d%H%M%S', '--format=%cd'])
+            .decode('ascii')
+            .strip()
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        now = datetime.now()
+        return now.strftime("%Y%m%d%H%M%S")
 
 
 predefined_version = os.getenv('TINYML_BUILD_VERSION')
