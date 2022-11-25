@@ -1,4 +1,5 @@
 import os
+import queue
 import typing
 import warnings
 
@@ -443,6 +444,57 @@ class CommonGraph(object):
         # assert self.graph.is_simple(), "The graph has multiple edges between at least one pair of nodes"
         # assert self.graph.is_connected('weak'), "The graph is not connected"
 
+    def topological_sort(self) -> typing.List[int]:
+        """Sort the graph topologically
+
+        Returns:
+            typing.List[int]: The sorted indices of the nodes
+        """
+
+        # Emulating DFS with LifoQueue(stack)
+        q = queue.LifoQueue()
+
+        visited = set()
+        indices = []
+
+        # We push all inputs nodes to the target queue.
+        inputs = [v for v in self.graph.vs if v['node_type'] == ExtendedOperator.INPUT_NODE]
+        for i in reversed(inputs):
+            q.put(i)
+
+        # Constants are all known, so just marking them here.
+        constants = [v for v in self.graph.vs if v['node_type'] == ExtendedOperator.CONSTANT_NODE]
+        for c in constants:
+            indices.append(c.index)
+            visited.add(c.index)
+
+        while not q.empty():
+            v = q.get()
+
+            # Skip if already visited
+            if v.index in visited:
+                continue
+
+            # Ensure all input nodes are visited
+            skip = False
+            for e in v.in_edges():
+                if e.source not in visited:
+                    skip = True
+                    break
+
+            if skip:
+                continue
+
+            # Mark visited if the previous constraints are met
+            visited.add(v.index)
+            indices.append(v.index)
+
+            # Push the out nodes to the target queue
+            for e in reversed(v.out_edges()):
+                q.put(e.target_vertex)
+
+        return indices
+
     def collect_operators(self) -> typing.List[tfl.BaseOperator]:
         """Collect ops
 
@@ -450,7 +502,8 @@ class CommonGraph(object):
             typing.List[tfl.BaseOperator]: operators with the numbered index
         """
 
-        ids = self.graph.topological_sorting()
+        # We define our custom for figuring out a better order than using `self.graph.topological_sorting()`
+        ids = self.topological_sort()
         nodes = (self.graph.vs[idx] for idx in ids)
         filtered_nodes = (node for node in nodes if node['node_type'] >= 0)
         ops: typing.List[tfl.BaseOperator] = (x['op'] for x in filtered_nodes)
