@@ -51,6 +51,7 @@ class TFLiteConverter(object):
         enable_mtk_ops: bool = False,
         max_transpose_dims: int = -1,
         hybrid_conv: bool = True,
+        unroll_lstm: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -94,6 +95,7 @@ class TFLiteConverter(object):
             enable_mtk_ops (bool): Translating with custom MTK operators. Defaults to False
             max_transpose_dims (int): Max dimensions for the `Transpose` op. Defaults to -1, which means unlimited
             hybrid_conv (bool): Enable hybrid quantization for Conv2d and DepthwiseConv2d. Defaults to True
+            unroll_lstm (bool): Unrolling LSTM (translate LSTM to seperate ops). Defaults to False
         """
 
         self.model = model
@@ -140,6 +142,7 @@ class TFLiteConverter(object):
         self.enable_mtk_ops = enable_mtk_ops
         self.max_transpose_dims = max_transpose_dims
         self.hybrid_conv = hybrid_conv
+        self.unroll_lstm = unroll_lstm
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -369,6 +372,7 @@ class TFLiteConverter(object):
                 self.map_bilstm_to_lstm,
                 self.enable_mtk_ops,
                 self.hybrid_asymmetric_inputs,
+                self.unroll_lstm,
             )
             # Don't track the operator if all the input nodes are not tracked unless it has custom implementation
             # (e.g prim::* ops)

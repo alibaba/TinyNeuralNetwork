@@ -28,6 +28,7 @@ class OperatorConverter(ABC):
         map_bilstm_to_lstm=False,
         enable_mtk_ops=False,
         hybrid_asymmetric_inputs=False,
+        unroll_lstm=False,
     ) -> None:
         self.input_names = self.get_input_names(node)
         self.output_names = self.get_output_names(node)
@@ -43,6 +44,7 @@ class OperatorConverter(ABC):
         self.map_bilstm_to_lstm = map_bilstm_to_lstm
         self.enable_mtk_ops = enable_mtk_ops
         self.hybrid_asymmetric_inputs = hybrid_asymmetric_inputs
+        self.unroll_lstm = unroll_lstm
 
     @abstractmethod
     def parse(self, node, attrs, args, graph_converter):
