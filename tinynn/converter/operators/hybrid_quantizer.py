@@ -38,6 +38,7 @@ class HybridQuantizer(object):
         filtered_nodes = self.graph.graph.vs.select(functools.partial(is_quantizable_node, with_conv=self.enable_conv))
 
         actions = []
+        replaced_tensors = {}
         for node in filtered_nodes:
             weight_indices = WEIGHT_MAPPING.get(node['node_type'], [1])
             skip = False
@@ -80,6 +81,8 @@ class HybridQuantizer(object):
                         name, weight, torch.qint8, torch.per_channel_symmetric, -1, q_type=self.q_type
                     )
 
+                replaced_tensors.setdefault(new_weight.name, new_weight)
+                new_weight = replaced_tensors[new_weight.name]
                 actions.append((self.graph.replace_operator_input, (node, weight_idx, new_weight)))
 
         for func, args in actions:
