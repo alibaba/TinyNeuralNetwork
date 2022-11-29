@@ -64,6 +64,7 @@ class ATenLstmOperator(ATenLstmSchema):
             input_tensors[input_index] = self.create_attr_tensor(hidden_state_tensor[slice_idx])
             input_tensors[input_index].is_variable = True
         else:
+            assert self.unroll_lstm, "Input state tensors are only supported when unroll_lstm=True is specified"
             input_tensors[input_index] = tf_state_tensor[slice_idx]
 
     def parse_common(

@@ -182,6 +182,8 @@ export_converter_files(model, dummy_input, export_dir, export_name)
 可以在定义TFLiteConverter时加上`map_bilstm_to_lstm=True`这个参数。
 
 #### 如何转换带LSTM的模型？
+最简单的方式是在定义TFLiteConverter时加上`unroll_lstm=True`这个参数，这样转换后LSTM的行为和PyTorch中一致，当然这样LSTM就会被翻译成很多算子，让计算图看起来很复杂。所以，如果你想将每个LSTM转成单个算子，那么你需要参考下面的内容。
+
 由于我们转换的目标为TFLite，因此需要先了解一下在PyTorch和Tensorflow中LSTM分别是如何运行的。
 
 使用TF2.X导出LSTM模型至Tensorflow Lite时，会将其翻译成`UnidirectionalLSTM`这个算子，其中的状态数据保存为一个`Variable`，即一个持久化的数据空间当中，每组mini-batch的状态会自动的做累积。这些状态量是不包含在模型的输入和输出之中的。

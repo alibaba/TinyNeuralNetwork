@@ -180,6 +180,8 @@ Since TFLite does not officially support grouped (de)convolution, we have extend
 You may add the parameter `map_bilstm_to_lstm=True` when defining TFLiteConverter.
 
 #### How to convert a model with LSTM?
+The easy way is to pass in `unroll_lstm=True` when defining TFLiteConverter, so that everything works just like in PyTorch. But the `LSTM`s will be translated to a bunch of ops, which makes the computation graph complicated. Alternatively, if you need a single op for each `LSTM`, then you may refer to the content below.
+
 Since the target format of our conversion is TFLite, we need to understand how LSTM works in PyTorch and Tensorflow respectively.
 
 When using TF2.X to export the LSTM model to Tensorflow Lite, it will be translated into the `UnidirectionalLSTM` operator, and the state tensors in it will be saved as a `Variable` (a.k.a persistent memory). The state of each mini-batch will be automatically be accumulated. These state tensors are not included in the input and output of the model.
