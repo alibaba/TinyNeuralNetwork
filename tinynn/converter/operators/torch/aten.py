@@ -53,13 +53,19 @@ class ATenLstmOperator(ATenLstmSchema):
         layer_idx,
         suffix,
         state_type,
+        tf_state_tensors,
     ):
 
         hidden_state_tensor = hidden_state_tensors[hidden_state_index]
+        tf_state_tensor = tf_state_tensors[hidden_state_index]
         assert hidden_state_tensor.dim() == 3
         slice_idx = layer_idx * num_directions + direction_idx
-        input_tensors[input_index] = self.create_attr_tensor(hidden_state_tensor[slice_idx])
-        input_tensors[input_index].is_variable = True
+        if tf_state_tensor[slice_idx] is None:
+            input_tensors[input_index] = self.create_attr_tensor(hidden_state_tensor[slice_idx])
+            input_tensors[input_index].is_variable = True
+        else:
+            assert self.unroll_lstm, "Input state tensors are only supported when unroll_lstm=True is specified"
+            input_tensors[input_index] = tf_state_tensor[slice_idx]
 
     def parse_common(
         self,
@@ -102,9 +108,26 @@ class ATenLstmOperator(ATenLstmSchema):
         input_start_indices = [1, 18]
 
         ops = []
+
+        names = graph_converter.get_list_expanded_names(self.input_names[1])
+        tf_in_state_tensors = [graph_converter.tensor_map.get(n, None) for n in names]
+        tf_state_tensors = []
+        unpacked_tensors = {}
+        for t in tf_in_state_tensors:
+            if t is not None and self.unroll_lstm:
+                tensors = [
+                    self.create_transform_tensor(np.squeeze(x, 0))
+                    for x in np.split(t.tensor, num_directions * num_layers, 0)
+                ]
+                tf_state_tensors.append(tensors)
+                ops.append(tfl.UnpackOperator([t], tensors, len(tensors), 0))
+            else:
+                tf_state_tensors.append([None] * num_directions * num_layers)
+
         current_input = self.find_or_create_input(0, graph_converter)
         lstm_output = self.to_tfl_tensors(self.output_names[:1], self.output_tensors[:1])[0]
         params_offset = 0
+        tf_out_state_tensors = [[], []]
         for layer_idx in range(num_layers):
             inputs = [current_input] + [tfl.OptionalTensorInstance] * (num_input_tensors - 1)
 
@@ -132,6 +155,7 @@ class ATenLstmOperator(ATenLstmSchema):
                         layer_idx,
                         suffixes[direction_idx],
                         state_kinds[state_kind_idx],
+                        tf_state_tensors,
                     )
 
             if layer_idx == num_layers - 1:
@@ -142,7 +166,133 @@ class ATenLstmOperator(ATenLstmSchema):
                 layer_output = self.create_transform_tensor(np.empty(output_shape, dtype=inputs[0].dtype))
             outputs = [layer_output]
 
-            if bidirectional:
+            if self.unroll_lstm:
+                ts_axis = 1 if batch_first else 0
+                num_timestep = inputs[0].shape[ts_axis]
+                if inputs[0].name in unpacked_tensors:
+                    input_ts = unpacked_tensors[inputs[0].name]
+                else:
+                    input_ts = [
+                        self.create_transform_tensor(np.squeeze(x, ts_axis))
+                        for x in np.split(inputs[0].tensor, num_timestep, ts_axis)
+                    ]
+                    ops.append(tfl.UnpackOperator([inputs[0]], input_ts, num_timestep, ts_axis))
+                strides = [1, -1]
+
+                output_ts = []
+                for direction_idx in range(num_directions):
+                    input_start = input_start_indices[direction_idx]
+                    w_i = self.create_attr_tensor(
+                        np.concatenate([inputs[x].tensor for x in range(input_start, input_start + 4)], 0),
+                        quantization=inputs[input_start].quantization,
+                    )
+                    w_r = self.create_attr_tensor(
+                        np.concatenate([inputs[x].tensor for x in range(input_start + 4, input_start + 8)], 0),
+                        quantization=inputs[input_start + 4].quantization,
+                    )
+                    b_i = self.create_attr_tensor(
+                        np.concatenate([inputs[x].tensor for x in range(input_start + 11, input_start + 15)], 0)
+                    )
+                    b_r = self.create_attr_tensor(np.zeros_like(b_i.tensor))
+
+                    state_start = state_start_index + direction_idx * num_directions
+                    h = inputs[state_start]
+                    c = inputs[state_start + 1]
+
+                    stride = strides[direction_idx]
+
+                    # Skip some computations for the first timestep
+                    compute_h = h.buffer is None or np.any(h.tensor)
+                    compute_c = c.buffer is None or np.any(c.tensor)
+
+                    stacked_hs = []
+                    for i, t in enumerate(input_ts[::stride]):
+                        input_mm = self.create_transform_tensor(
+                            np.matmul(t.tensor, np.transpose(w_i.tensor, [1, 0])) + b_i.tensor
+                        )
+                        ops.append(tfl.FullyConnectedOperator([t, w_i, b_i], [input_mm]))
+
+                        if i != 0 or compute_h:
+                            hidden_mm = self.create_transform_tensor(
+                                np.matmul(h.tensor, np.transpose(w_r.tensor, [1, 0])) + b_r.tensor
+                            )
+                            ops.append(tfl.FullyConnectedOperator([h, w_r, b_r], [hidden_mm]))
+
+                            add_out = self.create_transform_tensor(input_mm.tensor + hidden_mm.tensor)
+                            ops.append(tfl.AddOperator([input_mm, hidden_mm], [add_out]))
+                        else:
+                            add_out = input_mm
+
+                        gate_outs = [self.create_transform_tensor(t) for t in np.split(add_out.tensor, 4, 1)]
+                        split_dim_tensor = self.create_attr_tensor(np.array([1], dtype='int32'))
+                        ops.append(tfl.SplitOperator([split_dim_tensor, add_out], gate_outs, 4))
+
+                        gate_i = self.create_transform_tensor(
+                            torch.sigmoid(torch.from_numpy(gate_outs[0].tensor)).numpy()
+                        )
+                        ops.append(tfl.LogisticOperator([gate_outs[0]], [gate_i]))
+
+                        if i != 0 or compute_c:
+                            gate_f = self.create_transform_tensor(
+                                torch.sigmoid(torch.from_numpy(gate_outs[1].tensor)).numpy()
+                            )
+                            ops.append(tfl.LogisticOperator([gate_outs[1]], [gate_f]))
+
+                        gate_g = self.create_transform_tensor(np.tanh(gate_outs[2].tensor))
+                        ops.append(tfl.TanhOperator([gate_outs[2]], [gate_g]))
+
+                        gate_o = self.create_transform_tensor(
+                            torch.sigmoid(torch.from_numpy(gate_outs[3].tensor)).numpy()
+                        )
+                        ops.append(tfl.LogisticOperator([gate_outs[3]], [gate_o]))
+
+                        if i != 0 or compute_c:
+                            c_left = self.create_transform_tensor(gate_f.tensor * c.tensor)
+                            ops.append(tfl.MulOperator([gate_f, c], [c_left]))
+
+                        c_right = self.create_transform_tensor(gate_i.tensor * gate_g.tensor)
+                        ops.append(tfl.MulOperator([gate_i, gate_g], [c_right]))
+
+                        if i != 0 or compute_c:
+                            c = self.create_transform_tensor(c_left.tensor + c_right.tensor)
+                            ops.append(tfl.AddOperator([c_left, c_right], [c]))
+                        else:
+                            c = c_right
+
+                        c_act = self.create_transform_tensor(np.tanh(c.tensor))
+                        ops.append(tfl.TanhOperator([c], [c_act]))
+
+                        h = self.create_transform_tensor(gate_o.tensor * c_act.tensor)
+                        ops.append(tfl.MulOperator([gate_o, c_act], [h]))
+
+                        stacked_hs.append(h)
+
+                    tf_out_state_tensors[0].append(h)
+                    tf_out_state_tensors[1].append(c)
+
+                    output_ts.extend(stacked_hs[::stride])
+
+                if bidirectional:
+                    # For bidirectional LSTMs, the forward output tensors and the backward output tensors are
+                    # concatenated before we pack them together
+                    fw_out = self.create_transform_tensor(
+                        np.stack([x.tensor for x in output_ts[:num_timestep]], ts_axis)
+                    )
+                    ops.append(tfl.PackOperator(output_ts[:num_timestep], [fw_out], num_timestep, axis=ts_axis))
+
+                    bw_out = self.create_transform_tensor(
+                        np.stack([x.tensor for x in output_ts[num_timestep:]], ts_axis)
+                    )
+                    ops.append(tfl.PackOperator(output_ts[num_timestep:], [bw_out], num_timestep, axis=ts_axis))
+
+                    ops.append(tfl.ConcatenationOperator([fw_out, bw_out], outputs, axis=2))
+                elif layer_idx != num_layers - 1:
+                    # Reusing unpacked tensors for the logic in the next layer
+                    unpacked_tensors[outputs[0].name] = output_ts
+                else:
+                    # For the last layer, we have to pack the together
+                    ops.append(tfl.PackOperator(output_ts, outputs, len(output_ts), axis=ts_axis))
+            elif bidirectional:
                 if not self.map_bilstm_to_lstm:
                     ops.append(
                         tfl.BidirectionalSequenceLstmOperator(
@@ -221,6 +371,18 @@ class ATenLstmOperator(ATenLstmSchema):
 
             current_input = outputs[0]
             params_offset += params_step * num_directions
+
+        if self.unroll_lstm:
+            state_outputs = self.to_tfl_tensors(self.output_names[1:], self.output_tensors[1:])
+            for i, (orig, new) in enumerate(zip(tf_in_state_tensors, tf_out_state_tensors)):
+                if orig is not None:
+                    ops.append(tfl.PackOperator(new, state_outputs[i : i + 1], len(new), 0))
+        else:
+            common_names = set(self.output_names[1:]) & set(graph_converter.outputs)
+            assert len(common_names) == 0, (
+                f"Please remove the LSTM state outputs ({common_names}) from the model. Alternatively, you can try"
+                " unroll_lstm=True"
+            )
 
         for op in ops:
             graph_converter.add_operator(op)
