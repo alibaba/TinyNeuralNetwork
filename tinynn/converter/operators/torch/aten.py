@@ -3485,4 +3485,3 @@ class ATenAddbmmOperator(ATenAddbmmSchema):
         graph_converter.add_operator(
             tfl.AddOperator([input_tensor, sum_bmm_out_tensor], output_tensors)
         )
-
