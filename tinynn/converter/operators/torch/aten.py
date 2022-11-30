@@ -3425,35 +3425,6 @@ class ATenCol2imOperator(ATenCol2imSchema):
         graph_converter.add_operator(tfl.GatherNdOperator([padded_fold_out_tensor, indices_tensor], output_tensors))
 
 
-class ATenMishOperator(ATenMishSchema):
-    def parse(self, node, attrs, args, graph_converter):
-        super().parse(node, attrs, args, graph_converter)
-
-        self.run(node)
-
-        ops = []
-
-        input_tensor = self.find_or_create_input(0, graph_converter)
-        exp_out = self.create_transform_tensor(np.exp(input_tensor.tensor))
-        ops.append(tfl.ExpOperator([input_tensor], [exp_out]))
-
-        one_tensor = self.create_attr_tensor(np.ones((1,), dtype=exp_out.dtype))
-        add_out = self.create_transform_tensor(exp_out.tensor + one_tensor.tensor)
-        ops.append(tfl.AddOperator([exp_out, one_tensor], [add_out]))
-
-        softplus_out = self.create_transform_tensor(np.log(add_out.tensor))
-        ops.append(tfl.LogOperator([add_out], [softplus_out]))
-
-        tanh_out = self.create_transform_tensor(np.tanh(softplus_out.tensor))
-        ops.append(tfl.TanhOperator([softplus_out], [tanh_out]))
-
-        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
-        ops.append(tfl.MulOperator([input_tensor, tanh_out], outputs))
-
-        for op in ops:
-            graph_converter.add_operator(op)
-
-
 class ATenAddbmmOperator(ATenAddbmmSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
@@ -3482,6 +3453,33 @@ class ATenAddbmmOperator(ATenAddbmmSchema):
         graph_converter.add_operator(
             tfl.SumOperator([bmm_out_tensor, dim_t], [sum_bmm_out_tensor], keepDims=False)
         )
-        graph_converter.add_operator(
-            tfl.AddOperator([input_tensor, sum_bmm_out_tensor], output_tensors)
-        )
+        graph_converter.add_operator(tfl.AddOperator([input_tensor, sum_bmm_out_tensor], output_tensors))
+
+
+class ATenMishOperator(ATenMishSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        ops = []
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        exp_out = self.create_transform_tensor(np.exp(input_tensor.tensor))
+        ops.append(tfl.ExpOperator([input_tensor], [exp_out]))
+
+        one_tensor = self.create_attr_tensor(np.ones((1,), dtype=exp_out.dtype))
+        add_out = self.create_transform_tensor(exp_out.tensor + one_tensor.tensor)
+        ops.append(tfl.AddOperator([exp_out, one_tensor], [add_out]))
+
+        softplus_out = self.create_transform_tensor(np.log(add_out.tensor))
+        ops.append(tfl.LogOperator([add_out], [softplus_out]))
+
+        tanh_out = self.create_transform_tensor(np.tanh(softplus_out.tensor))
+        ops.append(tfl.TanhOperator([softplus_out], [tanh_out]))
+
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        ops.append(tfl.MulOperator([input_tensor, tanh_out], outputs))
+
+        for op in ops:
+            graph_converter.add_operator(op)
