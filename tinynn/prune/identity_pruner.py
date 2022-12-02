@@ -1,18 +1,6 @@
-import copy
-import sys
-import typing
-import time
-
-import torch
-import torch.nn as nn
-import torch.distributed as dist
 from tinynn.prune import OneShotChannelPruner
 
-from tinynn.graph import modifier
-from tinynn.graph.tracer import ignore_mod_param_update_warning
 from tinynn.util.util import get_logger
-from tinynn.prune.base_pruner import BasePruner
-from tinynn.graph.modifier import is_dw_conv
 
 log = get_logger(__name__)
 

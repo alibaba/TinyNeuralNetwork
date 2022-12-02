@@ -10,7 +10,7 @@ repos:
     hooks:
     -   id: black
         exclude: ^tinynn/converter/schemas
--   repo: https://github.com/pycqa/flake8
-    rev: 4.0.1
+-   repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.0.150
     hooks:
-    -   id: flake8
+    -   id: ruff

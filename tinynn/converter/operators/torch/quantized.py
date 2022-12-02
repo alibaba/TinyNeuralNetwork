@@ -3,7 +3,6 @@ import torch
 
 from ...schemas.tflite import schema_generated as tfl_schema
 from ...schemas.torch.quantized_schema import *
-from .. import CommonGraph
 from .. import tflite as tfl
 
 

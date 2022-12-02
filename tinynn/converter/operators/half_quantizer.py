@@ -2,9 +2,6 @@ import functools
 import typing
 
 import igraph as ig
-import numpy as np
-
-import torch
 
 from . import tflite as tfl
 from .base import ExtendedOperator

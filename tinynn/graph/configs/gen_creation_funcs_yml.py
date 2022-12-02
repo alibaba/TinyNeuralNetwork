@@ -2,7 +2,7 @@ import inspect
 import torch
 import yaml
 import re
-from torch.overrides import get_testing_overrides, get_overridable_functions
+from torch.overrides import get_overridable_functions
 
 # TODO: Better detection
 # The list is not complete, some functions are missing.

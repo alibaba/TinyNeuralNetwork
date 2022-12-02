@@ -17,7 +17,7 @@ from tinynn.graph.quantization.quantizer import QATQuantizer
 from tinynn.prune import OneShotChannelPruner
 from tinynn.util.cifar10 import get_dataloader, train_one_epoch, train_one_epoch_distill, validate
 from tinynn.util.train_util import DLContext, get_device, train
-from tinynn.util.util import set_global_log_level
+from tinynn.util.util import set_global_log_level  # noqa: F401
 
 from examples.models.cifar10 import mobilenet
 

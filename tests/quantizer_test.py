@@ -1,28 +1,15 @@
-import gc
 import inspect
-import io
-import logging
-import os
 import sys
 import unittest
 
 from distutils.version import LooseVersion
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision
-import torchvision.models
-from common_utils import (
-    IS_CI,
-    collect_custom_models,
-    collect_torchvision_models,
-    prepare_inputs,
-)
 
 from tinynn.graph.quantization.quantizer import QATQuantizer
-from tinynn.graph.tracer import model_tracer, trace
+from tinynn.graph.tracer import model_tracer
 
 
 def show_source(model, title, reload_cache=True):

@@ -1,18 +1,9 @@
-import torch
-import torchvision
-import torchvision.models
-
-import inspect
-import logging
 import os
 import re
 import unittest
 import gc
 
-import numpy as np
-
 from tinynn.graph.tracer import trace, model_tracer
-from tinynn.util.util import import_from
 from common_utils import collect_custom_models, collect_torchvision_models, prepare_inputs, IS_CI
 
 

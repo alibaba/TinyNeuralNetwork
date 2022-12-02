@@ -3,7 +3,6 @@ import os
 import torch
 import torch.distributed as dist
 
-from tinynn.graph import modifier
 from tinynn.util.util import get_logger
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
 

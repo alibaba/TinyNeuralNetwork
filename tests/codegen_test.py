@@ -1,9 +1,6 @@
 import re
 import unittest
 
-import torch
-import torch.nn as nn
-
 from tinynn.graph.tracer import fetch_modules, gen_module_constrctor_line
 
 

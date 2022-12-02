@@ -5,27 +5,18 @@ The pre-training code of vit comes from https://github.com/nateraw/huggingface-v
 import sys
 import argparse
 
-from tinynn.converter import TFLiteConverter
-
 sys.path.append('../../../../')
 
 import torch
 import torch.nn as nn
-from torch.cuda.amp import GradScaler
-from torch.optim.lr_scheduler import CosineAnnealingLR, CyclicLR
 
-# from tinynn.converter import TFLiteConverter
 from tinynn.util.util import import_from_path
-from tinynn.util.cifar10 import train_one_epoch
-from tinynn.graph.tracer import patch_helper, no_catch, model_tracer
-from tinynn.util.cifar10 import get_dataloader, validate
+from tinynn.graph.tracer import import_patcher
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
-from tinynn.util.train_util import train, DLContext, get_device
+from tinynn.util.train_util import DLContext, get_device
 
-with model_tracer():
-    with patch_helper(wrap_creation_funcs=False, wrap_funcs=True, wrap_modules=False):
-        with no_catch():
-            from transformers import BertTokenizer, BertModel
+with import_patcher():
+    from transformers import BertModel
 
 
 class ViTWrapper(nn.Module):
