@@ -91,7 +91,6 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::flip": ATenFlipOperator,
     "aten::floor": ATenFloorOperator,
     "aten::floor_divide": ATenFloorDivideOperator,
-    "aten::leaky_relu": ATenLeakyReluOperator,
     "aten::matmul": ATenMatmulOperator,
     "aten::mm": ATenMmOperator,
     "aten::flatten": ATenFlattenOperator,
