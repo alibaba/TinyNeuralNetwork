@@ -8,12 +8,10 @@ sys.path.insert(1, os.path.join(CURRENT_PATH, '../../'))
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 
-from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
 from tinynn.converter import TFLiteConverter
 from tinynn.graph.quantization.quantizer import DynamicQuantizer
-from tinynn.graph.tracer import model_tracer, trace
+from tinynn.graph.tracer import model_tracer
 
 
 class SimpleLSTM(nn.Module):
