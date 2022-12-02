@@ -1,10 +1,7 @@
 import time
 
 import torch
-import torchvision
-import torchvision.models
 
-import inspect
 import os
 import re
 import gc

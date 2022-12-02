@@ -1,10 +1,7 @@
 import unittest
 
 import torch
-import torchvision
-import torch.nn as nn
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
-import inspect
 
 from models.hrnet125 import hrnet125
 from models.efficientnet_v2_s import efficientnet_v2_s

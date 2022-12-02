@@ -29,8 +29,6 @@
 import ctypes
 from functools import wraps
 
-import builtins as __builtin__
-
 Py_ssize_t = ctypes.c_int64 if ctypes.sizeof(ctypes.c_void_p) == 8 else ctypes.c_int32
 
 

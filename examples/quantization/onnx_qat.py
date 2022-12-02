@@ -11,7 +11,6 @@ import torch.nn as nn
 import torch.optim as optim
 
 from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
-from tinynn.converter import TFLiteConverter
 from tinynn.graph.quantization.quantizer import QATQuantizer
 from tinynn.graph.tracer import model_tracer
 from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate

@@ -1,11 +1,6 @@
 import torch
-import torchvision
-import torchvision.models
 
 import gc
-import io
-import inspect
-import logging
 import os
 import re
 import sys
@@ -14,9 +9,9 @@ import unittest
 import numpy as np
 
 from tinynn.converter import TFLiteConverter
-from tinynn.graph.tracer import model_tracer, trace
+from tinynn.graph.tracer import model_tracer
 from tinynn.graph.quantization.quantizer import QATQuantizer
-from common_utils import IS_CI, collect_custom_models, collect_torchvision_models, prepare_inputs
+from common_utils import IS_CI, collect_torchvision_models, prepare_inputs
 
 
 HAS_TF = False

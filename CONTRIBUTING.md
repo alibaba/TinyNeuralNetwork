@@ -7,12 +7,12 @@ We appreciate your interest in our project and welcome external contributions.
 
 #### Formatting
 
-We use `flake8` and `black` to perform and check code formatting, please use the following commands to install and use them.
+We use `ruff` and `black` to perform and check code formatting, please use the following commands to install and use them.
 ```bash
 pip install black flake8
 
 python3 -m black .
-python3 -m flake8
+python3 -m ruff .
 ```
 
 Or you can use `pre-commit`, which performs the corresponding checks before `git commit` automatically.

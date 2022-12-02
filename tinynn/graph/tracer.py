@@ -1970,7 +1970,7 @@ class TraceGraph(object):
 
             for pn in {pn.unique_name: pn for pn in node.prev_nodes}.values():
                 if node.forward_order == max([n.forward_order for n in pn.next_nodes]):
-                    if not pn.type() in (ConstantNode, torch.nn.quantized.FloatFunctional):
+                    if pn.type() not in (ConstantNode, torch.nn.quantized.FloatFunctional):
                         lines.append(f"        {pn.unique_name} = None")
 
         def _gen_output_node(node):

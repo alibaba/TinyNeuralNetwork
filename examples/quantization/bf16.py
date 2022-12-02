@@ -14,7 +14,7 @@ from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
 from tinynn.converter import TFLiteConverter
 from tinynn.graph.quantization import disable_fake_quant
 from tinynn.graph.quantization.quantizer import BF16Quantizer
-from tinynn.graph.tracer import model_tracer, trace
+from tinynn.graph.tracer import model_tracer
 from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate
 from tinynn.util.train_util import DLContext, get_device, train
 

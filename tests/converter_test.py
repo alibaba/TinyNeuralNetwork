@@ -1,11 +1,6 @@
 import torch
-import torchvision
-import torchvision.models
 
 import gc
-import io
-import inspect
-import logging
 import os
 import re
 import unittest

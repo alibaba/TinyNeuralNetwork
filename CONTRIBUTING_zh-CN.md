@@ -7,12 +7,12 @@
 
 #### 格式化
 
-我们使用`flake8`和`black`来完成/检查代码的格式化，请使用下面的命令来安装和使用他们。
+我们使用`ruff`和`black`来完成/检查代码的格式化，请使用下面的命令来安装和使用他们。
 ```bash
 pip install black flake8
 
 python3 -m black .
-python3 -m flake8
+python3 -m ruff .
 ```
 
 或者你也可以使用`pre-commit`来自动在`git commit`前完成对应的检查。

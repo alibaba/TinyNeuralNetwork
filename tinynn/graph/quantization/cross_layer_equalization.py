@@ -7,7 +7,7 @@ you can use CLE to adjust the model weight, then do next ptq/qat(rep-model qat n
 """
 import torch
 import torch.nn as nn
-from tinynn.graph.tracer import model_tracer, trace, TraceGraph, TraceNode
+from tinynn.graph.tracer import model_tracer, trace, TraceNode
 from tinynn.util.util import get_logger
 
 log = get_logger(__name__)

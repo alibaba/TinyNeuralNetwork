@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from distutils.version import LooseVersion
 
-import ctypes
 import inspect
 import math
 import warnings

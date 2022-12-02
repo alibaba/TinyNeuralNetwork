@@ -1,9 +1,11 @@
-import torch
-import torch.quantization as torch_q
-import torch.nn.functional as F
-import numpy as np
-from typing import Any, List, Tuple, Optional, Dict, Union
 import copy
+
+from typing import Tuple
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+import torch.quantization as torch_q
 
 
 class MinMaxObserver(torch_q.MinMaxObserver):

@@ -14,10 +14,10 @@ import torch.quantization as torch_q
 
 from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
 from tinynn.converter import TFLiteConverter
-from tinynn.graph.quantization.quantizer import QATQuantizer, PostQuantizer, load_processed_ptq_rules
+from tinynn.graph.quantization.quantizer import PostQuantizer, load_processed_ptq_rules
 from tinynn.graph.tracer import model_tracer, trace
-from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate, calibrate
-from tinynn.util.train_util import DLContext, get_device, train
+from tinynn.util.cifar10 import get_dataloader, calibrate
+from tinynn.util.train_util import DLContext, get_device
 
 from tinynn.graph.quantization.cross_layer_equalization import cross_layer_equalize
 

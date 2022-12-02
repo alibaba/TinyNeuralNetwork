@@ -3,6 +3,8 @@ tmp/
 out/
 .idea/
 .mypy_cache/
+.pytest_cache/
+.ruff_cache/
 .vscode/
 debugging/
 tests/models/

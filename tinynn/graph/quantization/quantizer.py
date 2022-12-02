@@ -1,19 +1,15 @@
 import copy
 import functools
-import logging
 import os
 import sys
 import queue
 import typing
 
-from distutils.version import LooseVersion, StrictVersion
+from distutils.version import LooseVersion
 
 import torch
 import torch.nn as nn
 import torch.nn.intrinsic as nni
-import torch.nn.intrinsic.qat as nniqat
-import torch.nn.intrinsic.quantized as nniq
-import torch.nn.qat as nnqat
 import torch.nn.quantized as nnq
 import torch.nn.quantized.dynamic as nnqd
 import torch.quantization as torch_q

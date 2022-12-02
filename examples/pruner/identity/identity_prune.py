@@ -3,8 +3,6 @@ import os
 import sys
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
 
 from tinynn.prune.identity_pruner import IdentityChannelPruner
 
@@ -13,16 +11,13 @@ CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(1, os.path.join(CURRENT_PATH, '../../../'))
 
 from examples.models.cifar10 import mobilenet
-from tinynn.prune import OneShotChannelPruner
-from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate
+from tinynn.util.cifar10 import get_dataloader, validate
 from tinynn.util.distributed_util import (
-    deinit_distributed,
     get_device,
     init_distributed,
     is_distributed,
-    is_main_process,
 )
-from tinynn.util.train_util import DLContext, train
+from tinynn.util.train_util import DLContext
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 

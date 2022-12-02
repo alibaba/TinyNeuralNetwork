@@ -1,5 +1,4 @@
 from .generated_ops import CustomOperator
-from .base import create_byte_array
 from ...schemas.tflite import schema_generated as tflite
 
 HAS_FLEXBUFFER = False

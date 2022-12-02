@@ -18,8 +18,7 @@ from tinynn.graph import modifier
 from tinynn.graph.modifier import l2_norm, update_weight_metric
 from tinynn.graph.tracer import model_tracer, trace
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
-from tinynn.prune.oneshot_pruner import OneShotChannelPruner as OneShotChannelPrunerOld
-from tinynn.util.util import import_from_path, set_global_log_level
+from tinynn.util.util import import_from_path
 
 from common_utils import IS_CI
 
