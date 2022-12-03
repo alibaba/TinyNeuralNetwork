@@ -49,5 +49,5 @@ def test_func(param1: int, param2: str) -> bool:
 
 As for the model converter, when an operator or optimization pass is added, the corresponding unit tests need to be written as well.
 The location of the code for unit tests:
-- [Operators](../tests/converter_op_test.py)
-- [Optimization passes](../tests/converter_op_test.py)
+- [Operators](tests/converter_op_test.py)
+- [Optimization passes](tests/converter_optimizer_test.py)
