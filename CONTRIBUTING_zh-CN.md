@@ -50,4 +50,4 @@ def test_func(param1: int, param2: str) -> bool:
 对于模型转换器，每添加一个算子或者优化pass，需要添加相应的单元测试。
 代码的位置：
 - [算子](tests/converter_op_test.py)
-- [优化pass](tests/converter_op_test.py)
+- [优化pass](tests/converter_optimizer_test.py)
