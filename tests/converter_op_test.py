@@ -6325,8 +6325,10 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    @unittest.skipIf(
+        LooseVersion(tf.__version__) < '2.9.0', 'TFLite hybrid LSTM kernel with batch_first=True is broken'
+    )
     def test_lstm_dynamic_batch_first(self):
-        raise unittest.SkipTest('TFLite hybrid LSTM kernel with batch_first=True is broken')
         dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
 
         class Model(nn.Module):
@@ -6395,8 +6397,10 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    @unittest.skipIf(
+        LooseVersion(tf.__version__) < '2.9.0', 'TFLite hybrid LSTM kernel with batch_first=True is broken'
+    )
     def test_bilstm_dynamic_batch_first(self):
-        raise unittest.SkipTest('TFLite hybrid LSTM kernel with batch_first=True is broken')
         dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
 
         class Model(nn.Module):
@@ -6467,8 +6471,10 @@ class ConverterQuantizedOPTester(unittest.TestCase):
         assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
 
     @unittest.skipIf(not hasattr(torch.nn.quantized.dynamic, 'LSTM'), 'Quantized lstm is not supported')
+    @unittest.skipIf(
+        LooseVersion(tf.__version__) < '2.9.0', 'TFLite hybrid LSTM kernel with batch_first=True is broken'
+    )
     def test_bilstm_dynamic_batch_first_as_lstm(self):
-        raise unittest.SkipTest('TFLite hybrid LSTM kernel with batch_first=True is broken')
         dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
 
         class Model(nn.Module):
