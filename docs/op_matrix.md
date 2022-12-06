@@ -23,8 +23,8 @@ Operators that are implemented in Python
 | `aten::abs` |  |
 | `aten::adaptive_avg_pool2d` | Only 4D input is supported |
 | `aten::adaptive_max_pool2d` | Only 4D input is supported |
-| `aten::add` | other should have type int, float, tensor in aten::add(input, other) |
-| `aten::add_` | other should have type int, float, tensor in aten::add(input, other) |
+| `aten::add` | Only alpha == 1 is supported |
+| `aten::add_` | Only alpha == 1 is supported |
 | `aten::addbmm` | batch1 and batch2 must be 3-D tensors each containing the same number of matrices |
 | `aten::addmm` | Weight of AddMM should be 2D |
 | `aten::amax` |  |
@@ -32,8 +32,8 @@ Operators that are implemented in Python
 | `aten::argmax` | aten::argmax(tensor) is not supported |
 | `aten::argmin` | aten::argmin(tensor) is not supported |
 | `aten::atan2` |  |
-| `aten::avg_pool2d` |  |
-| `aten::batch_norm` | Running mean and variance should not be None. Please use LayerNorm instead. |
+| `aten::avg_pool2d` | Only divisor_override == kernel_h == kernel_w is supported |
+| `aten::batch_norm` | Running mean and variance should not be None for aten::batch_norm. Otherwise, use LayerNorm instead. |
 | `aten::bitwise_and` |  |
 | `aten::bitwise_not` | Only bools are supported in aten::bitwise_not |
 | `aten::bitwise_or` |  |
@@ -58,7 +58,7 @@ Operators that are implemented in Python
 | `aten::dropout_` |  |
 | `aten::elu` | Only alpha == scale == input_scale == 1 is supported |
 | `aten::elu_` | Only alpha == scale == input_scale == 1 is supported |
-| `aten::embedding` |  |
+| `aten::embedding` | Only 2D weight tensors are supported<br>Only integral indices are supported |
 | `aten::eq` |  |
 | `aten::exp` |  |
 | `aten::expand` |  |
@@ -102,7 +102,7 @@ Operators that are implemented in Python
 | `aten::masked_fill_` |  |
 | `aten::matmul` |  |
 | `aten::max` |  |
-| `aten::max_pool2d` |  |
+| `aten::max_pool2d` | Only dilation == 1 is supported |
 | `aten::mean` |  |
 | `aten::meshgrid` | aten::meshgrid for dynamic tensors is not supported |
 | `aten::min` |  |
@@ -112,12 +112,12 @@ Operators that are implemented in Python
 | `aten::mul_` |  |
 | `aten::ne` |  |
 | `aten::neg` |  |
-| `aten::norm` |  |
+| `aten::norm` | only torch.norm with p=1,2 is supported |
 | `aten::pad` |  |
 | `aten::permute` |  |
 | `aten::pixel_shuffle` |  |
 | `aten::pixel_unshuffle` |  |
-| `aten::pow` |  |
+| `aten::pow` | Input should be tensors of type torch.float32 or torch.int32 |
 | `aten::prelu` |  |
 | `aten::prod` |  |
 | `aten::quantize_per_tensor` |  |
@@ -137,8 +137,8 @@ Operators that are implemented in Python
 | `aten::round` |  |
 | `aten::rsqrt` |  |
 | `aten::rsqrt_` |  |
-| `aten::rsub` | other should have type int, float, tensor in aten::rsub(input, other) |
-| `aten::rsub_` | other should have type int, float, tensor in aten::rsub(input, other) |
+| `aten::rsub` | Only alpha == 1 is supported |
+| `aten::rsub_` | Only alpha == 1 is supported |
 | `aten::scatter_` | aten::scatter with non-zero input is not supported<br>aten::scatter with reduction is not supported<br>aten::scatter with variable input is not supported |
 | `aten::select` |  |
 | `aten::sigmoid` |  |
@@ -156,8 +156,8 @@ Operators that are implemented in Python
 | `aten::squeeze_` |  |
 | `aten::stack` |  |
 | `aten::std` |  |
-| `aten::sub` | other should have type int, float, tensor in aten::sub(input, other) |
-| `aten::sub_` | other should have type int, float, tensor in aten::sub(input, other) |
+| `aten::sub` | Only alpha == 1 is supported |
+| `aten::sub_` | Only alpha == 1 is supported |
 | `aten::sum` |  |
 | `aten::t` |  |
 | `aten::tanh` |  |
