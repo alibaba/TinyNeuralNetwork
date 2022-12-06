@@ -24,6 +24,9 @@
 4. 包含连续transpose和reshape消除、无用op删除等大量的优化pass
 5. 纯Python编写，易于维护
 
+## 支持的算子
+[这里](../../docs/op_matrix.md)可以看到目前支持的算子支持情况。
+
 ## 使用方法
 可以支持对于模型直接进行转换，或者从`tinynn.util.converter_util.export_converter_files`生成json配置文件来做转换。
 

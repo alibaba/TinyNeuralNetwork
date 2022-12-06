@@ -162,7 +162,7 @@ class QuantizerTester(unittest.TestCase):
                 return torch.reciprocal(x)
 
         model = Model()
-        inputs = torch.randn(1, 3, 224, 224)
+        inputs = torch.randn(1, 3, 224, 224) * 0.5 + 0.5
 
         check_quantize_rewrite(model, inputs)
 

@@ -429,7 +429,7 @@ class ATenBatchNormOperator(ATenBatchNormSchema):
         # running mean & var
         assert (
             self.input_tensors[3] is not None and self.input_tensors[4] is not None
-        ), "Running mean and variance should not be None. Please use LayerNorm instead."
+        ), "Running mean and variance should not be None for aten::batch_norm. Otherwise, use LayerNorm instead."
 
         inputs = [self.find_or_create_input(i, graph_converter) for i in range(5)]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
@@ -533,7 +533,9 @@ class ATenAvgPool2dOperator(ATenAvgPool2dSchema):
         count_include_pad = self.input_tensors[5] in (True, 1)
         divisor_override = self.input_tensors[6]
 
-        assert divisor_override is None or divisor_override == kernel_h == kernel_w
+        assert (
+            divisor_override is None or divisor_override == kernel_h == kernel_w
+        ), "Only divisor_override == kernel_h == kernel_w is supported"
 
         padding = tfl_schema.Padding.VALID
 
@@ -657,7 +659,7 @@ class ATenEluOperator(ATenEluSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        assert all(x == 1.0 for x in self.input_tensors[1:])
+        assert all(x == 1.0 for x in self.input_tensors[1:]), "Only alpha == scale == input_scale == 1 is supported"
         self.elementwise_unary(tfl.EluOperator, graph_converter)
 
 
@@ -718,7 +720,7 @@ class ATenSubOperator(ATenSubSchema):
 
         other = self.input_tensors[1]
         alpha = self.input_tensors[-1]
-        assert alpha == 1
+        assert alpha == 1, "Only alpha == 1 is supported"
 
         if type(other) in (int, float, bool):
             self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
@@ -736,12 +738,12 @@ class ATenRsubOperator(ATenRsubSchema):
 
         other = self.input_tensors[1]
         alpha = self.input_tensors[-1]
-        assert alpha == 1
+        assert alpha == 1, "Only alpha == 1 is supported"
 
         if type(other) in (int, float, bool):
             self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
         elif type(other) != torch.Tensor:
-            assert False, "other should have type int, float, tensor in aten::sub(input, other)"
+            assert False, "other should have type int, float, tensor in aten::rsub(input, other)"
 
         # Swap the first two input tensors and their names
         self.input_names[0], self.input_names[1] = self.input_names[1], self.input_names[0]
@@ -867,7 +869,10 @@ class ATenPowOperator(ATenPowSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        assert self.input_tensors[0].dtype in (torch.float32, torch.int32)
+        assert self.input_tensors[0].dtype in (
+            torch.float32,
+            torch.int32,
+        ), "Input should be tensors of type torch.float32 or torch.int32"
 
         if type(self.input_tensors[1]) != torch.Tensor:
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
@@ -890,7 +895,7 @@ class ATenMaxPool2dOperator(ATenMaxPool2dSchema):
         dilation_h, dilation_w = self.input_tensors[4]
         ceil_mode = self.input_tensors[5]
 
-        assert dilation_h == dilation_w == 1
+        assert dilation_h == dilation_w == 1, "Only dilation == 1 is supported"
 
         padding = tfl_schema.Padding.VALID
 
@@ -1449,7 +1454,7 @@ class ATenAddOperator(ATenAddSchema):
 
         other = self.input_tensors[1]
         alpha = self.input_tensors[-1]
-        assert alpha == 1
+        assert alpha == 1, "Only alpha == 1 is supported"
 
         if type(other) in (int, float, bool):
             self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
@@ -1539,8 +1544,8 @@ class ATenEmbeddingOperator(ATenEmbeddingSchema):
 
         weight, indices = [self.find_or_create_input(i, graph_converter) for i in range(2)]
 
-        assert weight.tensor.ndim == 2
-        assert indices.dtype in (np.int32, np.int64)
+        assert weight.tensor.ndim == 2, "Only 2D weight tensors are supported"
+        assert indices.dtype in (np.int32, np.int64), "Only integral indices are supported"
 
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
@@ -3284,8 +3289,7 @@ class ATenNormOperator(ATenNormSchema):
         self.run(node)
 
         p = self.input_tensors[1]
-        if p not in (1, 2):
-            raise AssertionError("only torch.norm with p=1,2 is supported")
+        assert p in (1, 2), "only torch.norm with p=1,2 is supported"
 
         input_t = self.find_or_create_input(0, graph_converter)
 
@@ -3430,29 +3434,20 @@ class ATenAddbmmOperator(ATenAddbmmSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        input_tensor, batch1_tensor, batch2_tensor = [
-            self.find_or_create_input(i, graph_converter) for i in range(3)
-        ]
+        input_tensor, batch1_tensor, batch2_tensor = [self.find_or_create_input(i, graph_converter) for i in range(3)]
         output_tensors = self.to_tfl_tensors(self.output_names, self.output_tensors)
         assert (
             batch1_tensor.tensor.ndim == batch2_tensor.tensor.ndim == 3
         ), "batch1 and batch2 must be 3-D tensors each containing the same number of matrices"
 
-        bmm_out = torch.bmm(
-            torch.from_numpy(batch1_tensor.tensor),
-            torch.from_numpy(batch2_tensor.tensor)
-        )
+        bmm_out = torch.bmm(torch.from_numpy(batch1_tensor.tensor), torch.from_numpy(batch2_tensor.tensor))
         bmm_out_tensor = self.create_transform_tensor(bmm_out)
-        graph_converter.add_operator(
-            tfl.BatchMatmulOperator([batch1_tensor, batch2_tensor], [bmm_out_tensor])
-        )
+        graph_converter.add_operator(tfl.BatchMatmulOperator([batch1_tensor, batch2_tensor], [bmm_out_tensor]))
 
         sum_bmm_out = torch.sum(bmm_out, dim=0)
         sum_bmm_out_tensor = self.create_transform_tensor(sum_bmm_out)
         dim_t = self.create_attr_tensor(np.array([0], dtype='int32'))
-        graph_converter.add_operator(
-            tfl.SumOperator([bmm_out_tensor, dim_t], [sum_bmm_out_tensor], keepDims=False)
-        )
+        graph_converter.add_operator(tfl.SumOperator([bmm_out_tensor, dim_t], [sum_bmm_out_tensor], keepDims=False))
         graph_converter.add_operator(tfl.AddOperator([input_tensor, sum_bmm_out_tensor], output_tensors))
 
 
