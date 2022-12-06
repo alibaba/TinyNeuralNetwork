@@ -1,0 +1,218 @@
+# Supported PyTorch Operators
+## Primitives
+Operators that are implemented in Python
+| Operator                  | Limitations  |
+|---------------------------|--------------|
+| `aten::__getitem__` |  |
+| `aten::len` |  |
+| `prim::Constant` |  |
+| `prim::ConstantChunk` |  |
+| `prim::GetAttr` |  |
+| `prim::If` |  |
+| `prim::ListConstruct` |  |
+| `prim::ListUnpack` |  |
+| `prim::NumToTensor` |  |
+| `prim::TupleConstruct` |  |
+
+## ATen Operators
+| Operator                  | Limitations  |
+|---------------------------|--------------|
+| `aten::__and__` |  |
+| `aten::__or__` |  |
+| `aten::_convolution` |  |
+| `aten::abs` |  |
+| `aten::adaptive_avg_pool2d` | Only 4D input is supported |
+| `aten::adaptive_max_pool2d` | Only 4D input is supported |
+| `aten::add` | other should have type int, float, tensor in aten::add(input, other) |
+| `aten::add_` | other should have type int, float, tensor in aten::add(input, other) |
+| `aten::addbmm` | batch1 and batch2 must be 3-D tensors each containing the same number of matrices |
+| `aten::addmm` | Weight of AddMM should be 2D |
+| `aten::amax` |  |
+| `aten::amin` |  |
+| `aten::argmax` | aten::argmax(tensor) is not supported |
+| `aten::argmin` | aten::argmin(tensor) is not supported |
+| `aten::atan2` |  |
+| `aten::avg_pool2d` |  |
+| `aten::batch_norm` | Running mean and variance should not be None. Please use LayerNorm instead. |
+| `aten::bitwise_and` |  |
+| `aten::bitwise_not` | Only bools are supported in aten::bitwise_not |
+| `aten::bitwise_or` |  |
+| `aten::bmm` |  |
+| `aten::cat` |  |
+| `aten::chunk` |  |
+| `aten::clamp` |  |
+| `aten::clamp_max` |  |
+| `aten::clamp_min` |  |
+| `aten::clone` |  |
+| `aten::col2im` | Currently, only unbatched (3D) or batched (4D) image-like output tensors are supported |
+| `aten::constant_pad_nd` |  |
+| `aten::contiguous` |  |
+| `aten::conv2d` |  |
+| `aten::copy_` |  |
+| `aten::cos` |  |
+| `aten::cumsum` |  |
+| `aten::dequantize` |  |
+| `aten::div` |  |
+| `aten::div_` |  |
+| `aten::dropout` |  |
+| `aten::dropout_` |  |
+| `aten::elu` | Only alpha == scale == input_scale == 1 is supported |
+| `aten::elu_` | Only alpha == scale == input_scale == 1 is supported |
+| `aten::embedding` |  |
+| `aten::eq` |  |
+| `aten::exp` |  |
+| `aten::expand` |  |
+| `aten::expand_as` |  |
+| `aten::fake_quantize_per_channel_affine` |  |
+| `aten::fake_quantize_per_tensor_affine` |  |
+| `aten::feature_dropout` |  |
+| `aten::feature_dropout_` |  |
+| `aten::fill_` | aten::fill_ for dynamic tensors is not supported |
+| `aten::flatten` |  |
+| `aten::flip` |  |
+| `aten::floor` |  |
+| `aten::floor_divide` | floor_divide for floats is not supported<br>floor_divide for negative numbers is not supported |
+| `aten::gather` |  |
+| `aten::ge` |  |
+| `aten::gelu` |  |
+| `aten::gelu_` |  |
+| `aten::glu` |  |
+| `aten::glu_` |  |
+| `aten::group_norm` |  |
+| `aten::gt` |  |
+| `aten::hardsigmoid` |  |
+| `aten::hardsigmoid_` |  |
+| `aten::hardswish` |  |
+| `aten::hardswish_` |  |
+| `aten::hardtanh` |  |
+| `aten::hardtanh_` |  |
+| `aten::im2col` | only 4-D input tensors (batched image-like tensors) are supported |
+| `aten::index` | Multiple indices for aten::index is not supported |
+| `aten::instance_norm` |  |
+| `aten::layer_norm` |  |
+| `aten::le` |  |
+| `aten::leaky_relu` |  |
+| `aten::leaky_relu_` |  |
+| `aten::linear` |  |
+| `aten::log` |  |
+| `aten::log_softmax` |  |
+| `aten::lstm` |  |
+| `aten::lt` |  |
+| `aten::masked_fill` |  |
+| `aten::masked_fill_` |  |
+| `aten::matmul` |  |
+| `aten::max` |  |
+| `aten::max_pool2d` |  |
+| `aten::mean` |  |
+| `aten::meshgrid` | aten::meshgrid for dynamic tensors is not supported |
+| `aten::min` |  |
+| `aten::mish` |  |
+| `aten::mm` |  |
+| `aten::mul` |  |
+| `aten::mul_` |  |
+| `aten::ne` |  |
+| `aten::neg` |  |
+| `aten::norm` |  |
+| `aten::pad` |  |
+| `aten::permute` |  |
+| `aten::pixel_shuffle` |  |
+| `aten::pixel_unshuffle` |  |
+| `aten::pow` |  |
+| `aten::prelu` |  |
+| `aten::prod` |  |
+| `aten::quantize_per_tensor` |  |
+| `aten::quantized_lstm` |  |
+| `aten::reciprocal` |  |
+| `aten::reciprocal_` |  |
+| `aten::reflection_pad1d` |  |
+| `aten::reflection_pad2d` |  |
+| `aten::relu` |  |
+| `aten::relu6` |  |
+| `aten::relu6_` |  |
+| `aten::relu_` |  |
+| `aten::remainder` |  |
+| `aten::repeat` |  |
+| `aten::reshape` |  |
+| `aten::roll` |  |
+| `aten::round` |  |
+| `aten::rsqrt` |  |
+| `aten::rsqrt_` |  |
+| `aten::rsub` | other should have type int, float, tensor in aten::rsub(input, other) |
+| `aten::rsub_` | other should have type int, float, tensor in aten::rsub(input, other) |
+| `aten::scatter_` | aten::scatter with non-zero input is not supported<br>aten::scatter with reduction is not supported<br>aten::scatter with variable input is not supported |
+| `aten::select` |  |
+| `aten::sigmoid` |  |
+| `aten::sigmoid_` |  |
+| `aten::silu` |  |
+| `aten::silu_` |  |
+| `aten::sin` |  |
+| `aten::slice` |  |
+| `aten::softmax` |  |
+| `aten::softplus` | Only beta=1.0 is supported for aten::softplus |
+| `aten::split` |  |
+| `aten::split_with_sizes` |  |
+| `aten::sqrt` |  |
+| `aten::squeeze` |  |
+| `aten::squeeze_` |  |
+| `aten::stack` |  |
+| `aten::std` |  |
+| `aten::sub` | other should have type int, float, tensor in aten::sub(input, other) |
+| `aten::sub_` | other should have type int, float, tensor in aten::sub(input, other) |
+| `aten::sum` |  |
+| `aten::t` |  |
+| `aten::tanh` |  |
+| `aten::to` |  |
+| `aten::topk` | tflite topk only support last dim<br>tflite topk only support largest=True and sorted=True |
+| `aten::transpose` |  |
+| `aten::type_as` |  |
+| `aten::unbind` |  |
+| `aten::unsqueeze` |  |
+| `aten::unsqueeze_` |  |
+| `aten::upsample_bilinear2d` |  |
+| `aten::upsample_nearest2d` |  |
+| `aten::var` |  |
+| `aten::view` |  |
+| `aten::where` | aten::where(condition) is not supported |
+
+## Quantized Operators
+| Operator                  | Limitations  |
+|---------------------------|--------------|
+| `quantized::add` |  |
+| `quantized::add_relu` |  |
+| `quantized::add_scalar` |  |
+| `quantized::batch_norm1d` |  |
+| `quantized::batch_norm2d` |  |
+| `quantized::batch_norm2d_relu` |  |
+| `quantized::cat` |  |
+| `quantized::conv1d` |  |
+| `quantized::conv1d_relu` |  |
+| `quantized::conv2d` |  |
+| `quantized::conv2d_relu` |  |
+| `quantized::conv_transpose1d` |  |
+| `quantized::conv_transpose2d` |  |
+| `quantized::elu` |  |
+| `quantized::hardswish` |  |
+| `quantized::leaky_relu` |  |
+| `quantized::linear` |  |
+| `quantized::linear_dynamic` |  |
+| `quantized::linear_relu` |  |
+| `quantized::linear_relu_dynamic` |  |
+| `quantized::mul` |  |
+| `quantized::mul_scalar` |  |
+| `quantized::relu6` |  |
+
+## Passthrough Operators
+Non-tracking operators that are ignored during translation
+| Operator                  | Limitations  |
+|---------------------------|--------------|
+| `aten::Int` |  |
+| `aten::arange` |  |
+| `aten::detach` |  |
+| `aten::empty` |  |
+| `aten::new_ones` |  |
+| `aten::new_zeros` |  |
+| `aten::ones` |  |
+| `aten::ones_like` |  |
+| `aten::size` |  |
+| `aten::zeros` |  |
+| `aten::zeros_like` |  |

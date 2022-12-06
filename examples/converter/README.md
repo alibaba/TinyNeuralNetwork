@@ -23,6 +23,9 @@ To solve the above problems, we implement this converter that translates models 
 4. A lot of optimization pass including continuous transpose, reshape elimination, no-op removal and etc.
 5. Written in 100% Python, which is easy to maintain
 
+## Supported operators
+Current supported operators could be found in the [operator support matrix](../../docs/op_matrix.md).
+
 ## Usage
 You may either perform conversion from models directly, or from the json configuration files generated using `tinynn.util.converter_util.export_converter_files`.
 
