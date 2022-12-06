@@ -101,4 +101,7 @@ jobs:
           python scripts/gen_op_docs.py
           if [[ $(git diff --stat) != '' ]]; then
             echo "OP matrix is not updated. Please run python scripts/gen_op_docs.py and update your commit"
+            echo "Differences:"
+            git --no-pager diff
+            exit 1
           fi
