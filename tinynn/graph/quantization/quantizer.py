@@ -141,6 +141,12 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     nn.LogSoftmax: None,
 }
 
+Q_MODULES_MAPPING = {
+    nn.PReLU: QPReLU,
+}
+if hasattr(nn, 'SiLU'):
+    Q_MODULES_MAPPING.update({nn.SiLU: QSiLU})
+
 # Processed QAT fuse rules
 processed_qat_rules = {}
 processed_ptq_rules = {}
@@ -406,23 +412,21 @@ class QATQuantizer(object):
 
         is_fusable = functools.partial(self.is_fusable, current_rules=processed_rules, graph=graph)
 
-        def _find_quantized_prelu_nodes(node: TraceNode, custom_node):
-            # Find quantized PReLU nodes
-            return node.type() == nn.PReLU and node.quantized
+        def _find_quantized_module_nodes(node: TraceNode, custom_node):
+            # Find quantized module nodes
+            return node.type() in Q_MODULES_MAPPING and node.quantized
 
-        # Replace PReLU nodes with our custom variants
-        quantized_prelu_nodes = graph.filter_forward_nodes(_find_quantized_prelu_nodes)
-        graph.update_submodule_in_nodes_from_predicate(quantized_prelu_nodes, QPReLU)
+        # Replace module nodes with our custom variants
+        quantized_mod_nodes = graph.filter_forward_nodes(_find_quantized_module_nodes)
 
-        if LooseVersion(torch.__version__) >= LooseVersion('1.7.0'):
+        type_dict = {}
+        for node in quantized_mod_nodes:
+            node_type = node.type()
+            type_dict.setdefault(node_type, [])
+            type_dict[node_type].append(node)
 
-            def _find_quantized_silu_nodes(node: TraceNode, custom_node):
-                # Find quantized SiLU nodes
-                return node.type() == nn.SiLU and node.quantized
-
-            # Replace SiLU nodes with our custom variants
-            quantized_silu_nodes = graph.filter_forward_nodes(_find_quantized_silu_nodes)
-            graph.update_submodule_in_nodes_from_predicate(quantized_silu_nodes, QSiLU)
+        for node_type, nodes in type_dict.items():
+            graph.update_submodule_in_nodes_from_predicate(nodes, Q_MODULES_MAPPING[node_type])
 
         custom_data = ([], set())
         graph.filter_forward_nodes(is_fusable, custom_data, reverse=True)

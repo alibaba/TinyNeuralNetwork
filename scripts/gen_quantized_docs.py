@@ -5,6 +5,7 @@ from tinynn.graph.quantization.quantizer import (
     FUSE_RULE_LIST_EXTRA,
     FUSE_RULE_LIST_PTQ_ONLY,
     KNOWN_QSTATS,
+    Q_MODULES_MAPPING,
     REWRITE_QUANTIZABLE_RULE_LIST,
     REWRITE_TO_FUSE_RULE_LIST,
     UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST,
@@ -23,9 +24,9 @@ def prepare_unsupported_operators(lines):
 
     lines.append('| Operator                  | Minimum Supported PyTorch Version  |\n')
     lines.append('|---------------------------|------------------------------------|\n')
-    transformed_ops = {
-        qualified_name(k, short=True): (v or '/') for k, v in UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.items()
-    }
+    unsupported_dict = UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.copy()
+    unsupported_dict.update({k: None for k in Q_MODULES_MAPPING})
+    transformed_ops = {qualified_name(k, short=True): (v or '/') for k, v in unsupported_dict.items()}
     sorted_ops = {k: transformed_ops[k] for k in sorted(transformed_ops)}
     for k, v in sorted_ops.items():
         lines.append(f'| `{k}` | {v} |\n')
@@ -36,14 +37,19 @@ def prepare_rewrite_quantizable_operators(lines):
 
     lines.append('| Operators                  | Notes  |\n')
     lines.append('|----------------------------|--------|\n')
-    full_dict = set(((k,) for k in KNOWN_QSTATS)) | REWRITE_QUANTIZABLE_RULE_LIST
+    full_dict = (
+        set(((k,) for k in KNOWN_QSTATS)) | REWRITE_QUANTIZABLE_RULE_LIST | set(((k,) for k in Q_MODULES_MAPPING))
+    )
 
     transformed_ops = {}
     for k in full_dict:
         notes = []
         if len(k) == 1 and k[0] in KNOWN_QSTATS:
-            notes.append('For QATQuantizer/PostQuantizer, set `config={{"set_quantizable_op_stats": True}}`')
-        notes.append('For TFLiteConverter, set `rewrite_quantizable=True`')
+            notes.append('For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`')
+        if len(k) != 1 or k[0] not in Q_MODULES_MAPPING:
+            notes.append('For TFLiteConverter, set `rewrite_quantizable=True`')
+        if len(notes) == 0:
+            notes.append('No action needed')
         if len(k) == 1:
             new_k = qualified_name(k[0], short=True)
         else:
