@@ -1597,7 +1597,7 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind in ('relu', 'relu6', 'elu', 'leaky_relu', 'prelu')
+                return cur_module.kind in FUNCTIONAL_MODULE_MAPPING
 
         func_nodes_to_rewrite = graph.filter_forward_nodes(_is_functional_rewrite_node)
         log.info(f'rewriting functional to module for {[node.unique_name for node in func_nodes_to_rewrite]}')
