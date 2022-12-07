@@ -90,6 +90,63 @@ KNOWN_QSTATS = {
     'log_softmax': (255, 16.0),
 }
 
+REWRITE_QUANTIZABLE_RULE_LIST = {
+    ('abs',),
+    ('sum',),
+    ('bmm',),
+    ('matmul',),
+    ('truediv',),
+    ('clamp_min',),
+    ('clamp_max',),
+    ('sqrt', 'reciprocal'),
+}
+
+UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
+    'pad': '1.7.0',
+    'pow': None,
+    'truediv': None,
+    'sqrt': None,
+    'atan2': None,
+    'atan': None,
+    'sin': None,
+    'cos': None,
+    'hardsigmoid': None,
+    'silu': None,
+    'reciprocal': None,
+    'exp': None,
+    'layer_norm': None,
+    'instance_norm': None,
+    'softmax': None,
+    'log_softmax': None,
+    'mm': None,
+    'matmul': None,
+    'bmm': None,
+    'abs': None,
+    'sum': None,
+    'clamp_min': None,
+    'clamp_max': None,
+    nn.LSTM: '1.13.0',
+    nn.ConvTranspose2d: '1.7.0',
+    nn.ConstantPad1d: '1.7.0',
+    nn.ConstantPad2d: '1.7.0',
+    nn.ConstantPad3d: '1.7.0',
+    nn.ZeroPad2d: '1.7.0',
+    nn.RNN: None,
+    nn.GRU: None,
+    nn.LayerNorm: None,
+    nn.InstanceNorm1d: None,
+    nn.InstanceNorm2d: None,
+    nn.Hardsigmoid: None,
+    nn.Softmax: None,
+    nn.LogSoftmax: None,
+}
+
+Q_MODULES_MAPPING = {
+    nn.PReLU: QPReLU,
+}
+if hasattr(nn, 'SiLU'):
+    Q_MODULES_MAPPING.update({nn.SiLU: QSiLU})
+
 # Processed QAT fuse rules
 processed_qat_rules = {}
 processed_ptq_rules = {}
@@ -355,23 +412,21 @@ class QATQuantizer(object):
 
         is_fusable = functools.partial(self.is_fusable, current_rules=processed_rules, graph=graph)
 
-        def _find_quantized_prelu_nodes(node: TraceNode, custom_node):
-            # Find quantized PReLU nodes
-            return node.type() == nn.PReLU and node.quantized
+        def _find_quantized_module_nodes(node: TraceNode, custom_node):
+            # Find quantized module nodes
+            return node.type() in Q_MODULES_MAPPING and node.quantized
 
-        # Replace PReLU nodes with our custom variants
-        quantized_prelu_nodes = graph.filter_forward_nodes(_find_quantized_prelu_nodes)
-        graph.update_submodule_in_nodes_from_predicate(quantized_prelu_nodes, QPReLU)
+        # Replace module nodes with our custom variants
+        quantized_mod_nodes = graph.filter_forward_nodes(_find_quantized_module_nodes)
 
-        if LooseVersion(torch.__version__) >= LooseVersion('1.7.0'):
+        type_dict = {}
+        for node in quantized_mod_nodes:
+            node_type = node.type()
+            type_dict.setdefault(node_type, [])
+            type_dict[node_type].append(node)
 
-            def _find_quantized_silu_nodes(node: TraceNode, custom_node):
-                # Find quantized SiLU nodes
-                return node.type() == nn.SiLU and node.quantized
-
-            # Replace SiLU nodes with our custom variants
-            quantized_silu_nodes = graph.filter_forward_nodes(_find_quantized_silu_nodes)
-            graph.update_submodule_in_nodes_from_predicate(quantized_silu_nodes, QSiLU)
+        for node_type, nodes in type_dict.items():
+            graph.update_submodule_in_nodes_from_predicate(nodes, Q_MODULES_MAPPING[node_type])
 
         custom_data = ([], set())
         graph.filter_forward_nodes(is_fusable, custom_data, reverse=True)
@@ -1833,69 +1888,18 @@ class QATQuantizer(object):
             if cur_class == ConstantNode:
                 return False
             elif cur_class == TraceFunction:
-                if LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
-                    if cur_module.kind in ('pad',):
-                        return True
                 if node.type() in ('__truediv__', '__itruediv__', 'div', 'div_'):
                     if node.prev_nodes[0].kind() in ('shape', 'size'):
                         return False
-                return cur_module.kind in (
-                    'pow',
-                    'truediv',
-                    'sqrt',
-                    'atan2',
-                    'atan',
-                    'sin',
-                    'cos',
-                    'hardsigmoid',
-                    'silu',
-                    'reciprocal',
-                    'exp',
-                    'layer_norm',
-                    'instance_norm',
-                    'softmax',
-                    'log_softmax',
-                    'mm',
-                    'matmul',
-                    'bmm',
-                    'abs',
-                    'sum',
-                    'clamp_min',
-                    'clamp_max',
-                )
+                supported_version = UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.get(cur_module.kind, torch.__version__)
+                return supported_version is None or LooseVersion(torch.__version__) < supported_version
             else:
-                if LooseVersion(torch.__version__) >= LooseVersion('1.13.0'):
-                    if isinstance(
-                        cur_module,
-                        nn.LSTM,
-                    ):
-                        return False
-                elif LooseVersion(torch.__version__) < LooseVersion('1.7.0'):
-                    if isinstance(
-                        cur_module,
-                        (
-                            nn.ConvTranspose2d,
-                            nn.ConstantPad1d,
-                            nn.ConstantPad2d,
-                            nn.ConstantPad3d,
-                            nn.ZeroPad2d,
-                        ),
-                    ):
-                        return True
-                return isinstance(
-                    cur_module,
-                    (
-                        nn.LSTM,
-                        nn.RNN,
-                        nn.GRU,
-                        nn.LayerNorm,
-                        nn.InstanceNorm1d,
-                        nn.InstanceNorm2d,
-                        nn.Hardsigmoid,
-                        nn.Softmax,
-                        nn.LogSoftmax,
-                    ),
+                unsupported_types = tuple(
+                    k
+                    for k, v in UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.items()
+                    if type(k) != str and (v is None or LooseVersion(torch.__version__) < v)
                 )
+                return isinstance(cur_module, unsupported_types)
 
         unsupported_nodes = graph.filter_forward_nodes(_is_not_quantizable)
         for idx, node in enumerate(reversed(unsupported_nodes)):
@@ -1955,11 +1959,11 @@ class QATQuantizer(object):
         # Remove consecutive dequant quant nodes
         def _is_consecutive_dequant_quant_nodes(node, custom_data):
             cur_type = node.type()
-            skip_types = set(['bmm', 'matmul', 'truediv', 'clamp_min', 'clamp_max'])
+            skip_types = set(k for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) == 1)
             if self.set_quantizable_op_stats:
                 skip_types |= set(KNOWN_QSTATS.keys())
-            skip_types_prev = skip_types | set(['reciprocal'])
-            skip_types_next = skip_types | set(['sqrt'])
+            skip_types_prev = skip_types | set(k[-1] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) > 1)
+            skip_types_next = skip_types | set(k[0] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) > 1)
             if cur_type in (torch_q.QuantStub, torch_q.DeQuantStub):
                 for next_node in node.next_nodes:
                     next_type = next_node.type()
