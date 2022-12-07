@@ -1,6 +1,7 @@
 import os
 
 from tinynn.graph.quantization.quantizer import (
+    FUNCTIONAL_MODULE_MAPPING,
     FUSE_RULE_LIST,
     FUSE_RULE_LIST_EXTRA,
     FUSE_RULE_LIST_PTQ_ONLY,
@@ -37,8 +38,14 @@ def prepare_rewrite_quantizable_operators(lines):
 
     lines.append('| Operators                  | Notes  |\n')
     lines.append('|----------------------------|--------|\n')
+    functional_ops = set(
+        ((k,) for k in UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.keys() & FUNCTIONAL_MODULE_MAPPING.keys())
+    )
     full_dict = (
-        set(((k,) for k in KNOWN_QSTATS)) | REWRITE_QUANTIZABLE_RULE_LIST | set(((k,) for k in Q_MODULES_MAPPING))
+        set(((k,) for k in KNOWN_QSTATS))
+        | REWRITE_QUANTIZABLE_RULE_LIST
+        | set(((k,) for k in Q_MODULES_MAPPING))
+        | functional_ops
     )
 
     transformed_ops = {}
@@ -46,7 +53,7 @@ def prepare_rewrite_quantizable_operators(lines):
         notes = []
         if len(k) == 1 and k[0] in KNOWN_QSTATS:
             notes.append('For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`')
-        if len(k) != 1 or k[0] not in Q_MODULES_MAPPING:
+        if len(k) != 1 or (k[0] not in Q_MODULES_MAPPING and k[0] not in FUNCTIONAL_MODULE_MAPPING):
             notes.append('For TFLiteConverter, set `rewrite_quantizable=True`')
         if len(notes) == 0:
             notes.append('No action needed')

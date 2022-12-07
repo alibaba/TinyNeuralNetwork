@@ -129,6 +129,49 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_not_quantizable_prelu(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.weight = torch.zeros(3).fill_(0.25)
+
+            def forward(self, x):
+                return F.prelu(x, self.weight)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_not_quantizable_prelu_weight(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.weight = nn.Parameter(torch.zeros(3).fill_(0.25))
+
+            def forward(self, x):
+                return F.prelu(x, self.weight)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_not_quantizable_prelu_module(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.activ = nn.PReLU()
+
+            def forward(self, x):
+                y = torch.split(x, 1, 1)
+                return self.activ(y[0])
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
     @unittest.skipIf(not hasattr(F, 'silu'), 'F.silu not supported')
     def test_not_quantizable_silu(self):
         class Model(nn.Module):
@@ -1057,6 +1100,30 @@ class QuantizerTester(unittest.TestCase):
 
         model = Model()
         inputs = torch.rand(1, 3, 3, 3) * 0.5 + 0.5
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_not_quantizable_glu(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                return F.glu(x)
+
+        model = Model()
+        inputs = torch.rand(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_not_quantizable_glu_module(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.act = nn.GLU()
+
+            def forward(self, x):
+                return self.act(x)
+
+        model = Model()
+        inputs = torch.rand(1, 3, 224, 224)
 
         check_quantize_rewrite(model, inputs)
 
