@@ -125,6 +125,8 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     'sum': None,
     'clamp_min': None,
     'clamp_max': None,
+    'prelu': None,
+    'elu': None,
     nn.LSTM: '1.13.0',
     nn.ConvTranspose2d: '1.7.0',
     nn.ConstantPad1d: '1.7.0',
@@ -146,6 +148,14 @@ Q_MODULES_MAPPING = {
 }
 if hasattr(nn, 'SiLU'):
     Q_MODULES_MAPPING.update({nn.SiLU: QSiLU})
+
+FUNCTIONAL_MODULE_MAPPING = {
+    'relu': nn.ReLU,
+    'relu6': nn.ReLU6,
+    'leaky_relu': nn.LeakyReLU,
+    'elu': nn.ELU,
+    'prelu': nn.PReLU,
+}
 
 # Processed QAT fuse rules
 processed_qat_rules = {}
@@ -1587,17 +1597,16 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind in ('relu', 'relu6', 'elu', 'leaky_relu')
+                return cur_module.kind in ('relu', 'relu6', 'elu', 'leaky_relu', 'prelu')
 
         func_nodes_to_rewrite = graph.filter_forward_nodes(_is_functional_rewrite_node)
         log.info(f'rewriting functional to module for {[node.unique_name for node in func_nodes_to_rewrite]}')
         for idx, node in enumerate(func_nodes_to_rewrite):
             kind = node.module.kind
             inplace = node.module.func_type == f'{kind}_' or 'True' in node.module.args_string
-            if node.module.kind == 'relu':
-                new_func = nn.ReLU(inplace=inplace)
-            elif node.module.kind == 'relu6':
-                new_func = nn.ReLU6(inplace=inplace)
+            klass = FUNCTIONAL_MODULE_MAPPING[kind]
+            if node.module.kind in ('relu', 'relu6'):
+                new_func = klass(inplace=inplace)
             elif node.module.kind in ('elu', 'leaky_relu'):
                 if hasattr(node.module, 'args_string_no_self'):
 
@@ -1606,15 +1615,50 @@ class QATQuantizer(object):
 
                     alpha = eval(f'_parse_args({node.module.args_string_no_self})')
                     if node.module.kind == 'leaky_relu':
-                        new_func = nn.LeakyReLU(alpha, inplace=inplace)
+                        new_func = klass(alpha, inplace=inplace)
                     else:
-                        new_func = nn.ELU(alpha, inplace=inplace)
+                        new_func = klass(alpha, inplace=inplace)
                 else:
                     alpha = None
                     if node.module.kind == 'leaky_relu':
-                        new_func = nn.LeakyReLU(alpha, inplace=inplace)
+                        new_func = klass(inplace=inplace)
                     else:
-                        new_func = nn.ELU()
+                        new_func = klass()
+            elif node.module.kind == 'prelu':
+                weight_t = node.prev_tensors[1]
+                weight_node = node.prev_nodes[1]
+                if weight_node.type() == torch_q.QuantStub:
+                    weight_node = weight_node.prev_nodes[0]
+
+                if weight_node.type() != ConstantNode or not weight_node.module.is_parameter:
+                    log.warning('Rewrite for F.prelu(x, buffer) to nn.PReLU is skipped as it changes the semantics')
+                    continue
+
+                num_parameters = weight_t.nelement()
+                new_func = klass(num_parameters)
+                new_func.weight.data.copy_(node.prev_tensors[1])
+
+                # Drop last input
+                node.prev_tensors.pop()
+                last_node = node.prev_nodes.pop()
+                last_node.next_nodes.remove(node)
+
+                # Remove unused forward functions iteratively
+                new_last_node = last_node
+                while new_last_node is not None:
+                    last_node = new_last_node
+                    if (
+                        len(last_node.next_nodes) == 0
+                        and len(last_node.prev_nodes) < 2
+                        and last_node in graph.forward_nodes
+                    ):
+                        if len(last_node.prev_nodes) == 1:
+                            new_last_node = last_node.prev_nodes[0]
+                        else:
+                            new_last_node = None
+                        graph.remove_node(last_node)
+                    else:
+                        new_last_node = None
 
             graph.module_unique_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
             graph.module_original_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
@@ -1630,6 +1674,12 @@ class QATQuantizer(object):
                     arg_str = f'{alpha}, {arg_str}'
                 else:
                     arg_str = f'{alpha}'
+
+            if node.module.kind == 'prelu':
+                if num_parameters != 1:
+                    arg_str = f'{num_parameters}'
+                else:
+                    arg_str = ''
 
             module_constructor_lines[id(new_func)] = f'{qualified_name(relu_cls)}({arg_str})'
             graph.replace_node_module(node, new_func)

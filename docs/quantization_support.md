@@ -11,6 +11,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `clamp_max` | / |
 | `clamp_min` | / |
 | `cos` | / |
+| `elu` | / |
 | `exp` | / |
 | `hardsigmoid` | / |
 | `instance_norm` | / |
@@ -20,6 +21,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `mm` | / |
 | `pad` | 1.7.0 |
 | `pow` | / |
+| `prelu` | / |
 | `reciprocal` | / |
 | `silu` | / |
 | `sin` | / |
@@ -50,8 +52,10 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `bmm` | For TFLiteConverter, set `rewrite_quantizable=True` |
 | `clamp_max` | For TFLiteConverter, set `rewrite_quantizable=True` |
 | `clamp_min` | For TFLiteConverter, set `rewrite_quantizable=True` |
+| `elu` | No action needed |
 | `log_softmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
 | `matmul` | For TFLiteConverter, set `rewrite_quantizable=True` |
+| `prelu` | No action needed |
 | `softmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
 | `sum` | For TFLiteConverter, set `rewrite_quantizable=True` |
 | `torch.nn.LogSoftmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
