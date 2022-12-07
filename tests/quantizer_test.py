@@ -1103,6 +1103,30 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_not_quantizable_glu(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                return F.glu(x)
+
+        model = Model()
+        inputs = torch.rand(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_not_quantizable_glu_module(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.act = nn.GLU()
+
+            def forward(self, x):
+                return self.act(x)
+
+        model = Model()
+        inputs = torch.rand(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
 
 if __name__ == '__main__':
     unittest.main()

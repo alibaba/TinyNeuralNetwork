@@ -13,6 +13,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `cos` | / |
 | `elu` | / |
 | `exp` | / |
+| `glu` | / |
 | `hardsigmoid` | / |
 | `instance_norm` | / |
 | `layer_norm` | / |
@@ -32,6 +33,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `torch.nn.ConstantPad2d` | 1.7.0 |
 | `torch.nn.ConstantPad3d` | 1.7.0 |
 | `torch.nn.ConvTranspose2d` | 1.7.0 |
+| `torch.nn.GLU` | / |
 | `torch.nn.GRU` | / |
 | `torch.nn.Hardsigmoid` | / |
 | `torch.nn.InstanceNorm1d` | / |
@@ -53,11 +55,14 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `clamp_max` | For TFLiteConverter, set `rewrite_quantizable=True` |
 | `clamp_min` | For TFLiteConverter, set `rewrite_quantizable=True` |
 | `elu` | No action needed |
+| `glu` | No action needed |
 | `log_softmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
 | `matmul` | For TFLiteConverter, set `rewrite_quantizable=True` |
 | `prelu` | No action needed |
+| `silu` | No action needed |
 | `softmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
 | `sum` | For TFLiteConverter, set `rewrite_quantizable=True` |
+| `torch.nn.GLU` | No action needed |
 | `torch.nn.LogSoftmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
 | `torch.nn.PReLU` | No action needed |
 | `torch.nn.SiLU` | No action needed |

@@ -18,7 +18,7 @@ from torch.nn.parallel.data_parallel import DataParallel
 from torch.nn.parallel.distributed import DistributedDataParallel
 
 from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16, FakeQuantizeTFLite
-from tinynn.graph.quantization.modules import QPReLU, QSiLU
+from tinynn.graph.quantization.modules import QGLU, QPReLU, QSiLU
 from tinynn.graph.quantization.qat_modules import Conv1d, ConvTranspose1d
 from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserverKL
 from tinynn.graph.tracer import (
@@ -127,6 +127,7 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     'clamp_max': None,
     'prelu': None,
     'elu': None,
+    'glu': None,
     nn.LSTM: '1.13.0',
     nn.ConvTranspose2d: '1.7.0',
     nn.ConstantPad1d: '1.7.0',
@@ -141,13 +142,14 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     nn.Hardsigmoid: None,
     nn.Softmax: None,
     nn.LogSoftmax: None,
+    nn.GLU: None,
+    nn.PReLU: None,
 }
 
 Q_MODULES_MAPPING = {
     nn.PReLU: QPReLU,
+    nn.GLU: QGLU,
 }
-if hasattr(nn, 'SiLU'):
-    Q_MODULES_MAPPING.update({nn.SiLU: QSiLU})
 
 FUNCTIONAL_MODULE_MAPPING = {
     'relu': nn.ReLU,
@@ -155,7 +157,13 @@ FUNCTIONAL_MODULE_MAPPING = {
     'leaky_relu': nn.LeakyReLU,
     'elu': nn.ELU,
     'prelu': nn.PReLU,
+    'glu': nn.GLU,
 }
+
+if hasattr(nn, 'SiLU'):
+    UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.update({nn.SiLU: None})
+    Q_MODULES_MAPPING.update({nn.SiLU: QSiLU})
+    FUNCTIONAL_MODULE_MAPPING.update({'silu': nn.SiLU})
 
 # Processed QAT fuse rules
 processed_qat_rules = {}
@@ -1605,7 +1613,7 @@ class QATQuantizer(object):
             kind = node.module.kind
             inplace = node.module.func_type == f'{kind}_' or 'True' in node.module.args_string
             klass = FUNCTIONAL_MODULE_MAPPING[kind]
-            if node.module.kind in ('relu', 'relu6'):
+            if node.module.kind in ('relu', 'relu6', 'silu'):
                 new_func = klass(inplace=inplace)
             elif node.module.kind in ('elu', 'leaky_relu'):
                 if hasattr(node.module, 'args_string_no_self'):
@@ -1659,6 +1667,17 @@ class QATQuantizer(object):
                         graph.remove_node(last_node)
                     else:
                         new_last_node = None
+            elif node.module.kind == 'glu':
+                if hasattr(node.module, 'args_string_no_self'):
+
+                    def _parse_args_dim(dim=-1, *args, **kwargs):  # noqa: F811
+                        return dim
+
+                    dim = eval(f'_parse_args_dim({node.module.args_string_no_self})')
+                    new_func = klass(dim)
+                else:
+                    dim = None
+                    new_func = klass()
 
             graph.module_unique_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
             graph.module_original_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
@@ -1678,6 +1697,12 @@ class QATQuantizer(object):
             if node.module.kind == 'prelu':
                 if num_parameters != 1:
                     arg_str = f'{num_parameters}'
+                else:
+                    arg_str = ''
+
+            if node.module.kind == 'glu':
+                if dim is not None and dim != -1:
+                    arg_str = f'{dim}'
                 else:
                     arg_str = ''
 
@@ -1947,7 +1972,9 @@ class QATQuantizer(object):
                 unsupported_types = tuple(
                     k
                     for k, v in UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.items()
-                    if type(k) != str and (v is None or LooseVersion(torch.__version__) < v)
+                    if type(k) != str
+                    and k not in Q_MODULES_MAPPING
+                    and (v is None or LooseVersion(torch.__version__) < v)
                 )
                 return isinstance(cur_module, unsupported_types)
 

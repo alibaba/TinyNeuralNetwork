@@ -2,7 +2,7 @@ import unittest
 
 import torch
 import torch.nn as nn
-from tinynn.graph.quantization.modules import QPReLU, QSiLU
+from tinynn.graph.quantization.modules import QGLU, QPReLU, QSiLU
 
 
 class QATModuleTester(unittest.TestCase):
@@ -53,6 +53,26 @@ class QATModuleTester(unittest.TestCase):
         for i in range(100):
             orig = nn.SiLU()
             quant = QSiLU(orig)
+
+            inp = (torch.randn((100, 100)) - 0.5) * 2
+
+            orig_outp = orig(inp)
+            quant_outp = quant(inp)
+
+            if not torch.allclose(orig_outp, quant_outp):
+                print('original:')
+                print(orig_outp)
+                print('quanted:')
+                print(quant_outp)
+
+                print('diff (min, max):', torch.max(quant_outp - orig_outp), torch.min(quant_outp - orig_outp))
+
+                self.assertTrue(False)
+
+    def test_glu(self):
+        for i in range(100):
+            orig = nn.GLU()
+            quant = QGLU(orig)
 
             inp = (torch.randn((100, 100)) - 0.5) * 2
 
