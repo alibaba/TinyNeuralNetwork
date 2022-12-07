@@ -37,7 +37,9 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `torch.nn.LSTM` | 1.13.0 |
 | `torch.nn.LayerNorm` | / |
 | `torch.nn.LogSoftmax` | / |
+| `torch.nn.PReLU` | / |
 | `torch.nn.RNN` | / |
+| `torch.nn.SiLU` | / |
 | `torch.nn.Softmax` | / |
 | `torch.nn.ZeroPad2d` | 1.7.0 |
 | `truediv` | / |
@@ -53,6 +55,8 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `softmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
 | `sum` | For TFLiteConverter, set `rewrite_quantizable=True` |
 | `torch.nn.LogSoftmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
+| `torch.nn.PReLU` | No action needed |
+| `torch.nn.SiLU` | No action needed |
 | `torch.nn.Softmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
 | `truediv` | For TFLiteConverter, set `rewrite_quantizable=True` |
 | `{sqrt, reciprocal}` | For TFLiteConverter, set `rewrite_quantizable=True` |
