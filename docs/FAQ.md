@@ -42,7 +42,7 @@ The training in TinyNeuralNetwork is based on PyTorch. Usually, the bottleneck i
 Q: Some operators such as max_pool2d_with_indices will fail when quantizing
 
 A: The quantization-aware training of TinyNeuralNetwork is based on that of PyTorch, and only reduces its complexity related to operator fusion and computational graph rewrite.
-TinyNeuralNetwork does not support operators that are not natively supported by PyTorch, such as LeakyReLU and etc. Please wrap up `torch.quantization.QuantWrapper` on those modules.
+TinyNeuralNetwork does not support operators that are not natively supported by PyTorch, such as LeakyReLU and etc. The full table may be seen [here](quantization_support.md#unsupported-operators-in-pytorch-for-static-quantization). Please wrap up `torch.quantization.QuantWrapper` on those modules.
 (*More operators are supported in higher versions of PyTorch. So, please consult us first or try a higher version if you encounter any failure*)
 
 #### How to perform mixed precision quantization?
@@ -209,9 +209,8 @@ Usually, when the number of hidden layers is large enough (128+), the LSTM OP wi
 
 ## Quantized model conversion
 
-##### How to convert ops including `ABS`, `SUM`, `SOFTMAX`, `LOG_SOFTMAX` and `BATCH_MATMUL` to quantized kernels?
-First, you need to add the parameter `rewrite_quantizable=True` when defining TFLiteConverter.
-Second, for ops including `SOFTMAX` and `LOG_SOFTMAX`, you need to add the parameter `set_quantizable_op_stats=True` when defining QATQuantizer or PostQuantizer.
+##### How to convert ops that cannot be quantized in PyTorch to quantized kernels, e.g. `SOFTMAX`, `LOG_SOFTMAX` and `BATCH_MATMUL`?
+You may refer to this [table](quantization_support.md#extra-flags-for-translating-the-above-ops-to-quantized-tflite).
 
 ## Interoperability with other frameworks
 

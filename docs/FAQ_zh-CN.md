@@ -42,7 +42,7 @@ TinyNeuralNetwork的训练依托于PyTorch，通常瓶颈都是在数据处理�
 Q：有的算子例如max_pool2d_with_indices在量化的时候会失败
 
 A：TinyNeuralNetwork的量化训练是使用PyTorch的量化训练作为后端，仅优化了其算子融合与计算图转换相关的逻辑。PyTorch原生
-不支持的算子TinyNeuralNetwork也无法支持例如ConvTrans2D、max_pool2d_with_indices、LeakyReLU等等（*高版本的PyTorch
+不支持的算子TinyNeuralNetwork也无法支持例如ConvTrans2D、max_pool2d_with_indices、LeakyReLU等等。完整的表格可以参见[这里](quantization_support.md#unsupported-operators-in-pytorch-for-static-quantization)（*高版本的PyTorch
 支持的算子更多， 遇到失败的情况可以第一时间咨询我们或者尝试更高的版本*)
 
 #### 如何实现混合精度量化？
@@ -211,9 +211,8 @@ Note: 这些状态变量都是二维的，维度为`[batch_size, hidden_size或�
 
 ## 量化模型转换
 
-#### 怎么把`ABS`、`SUM`、`SOFTMAX`、`LOG_SOFTMAX`和`BATCH_MATMUL`算子转换成定点？
-首先，在定义`TFLiteConverter`时加上`rewrite_quantizable=True`这个参数。
-其次，对于`SOFTMAX`、`LOG_SOFTMAX`，需要在定义`QATQuantizer`或者`PostQuantizer`时加上`set_quantizable_op_stats=True`这个参数。
+#### 怎么把例如`SOFTMAX`、`LOG_SOFTMAX`和`BATCH_MATMUL`等PyTorch中不支持量化的算子转换成定点？
+可以参见这个[表格](quantization_support.md#extra-flags-for-translating-the-above-ops-to-quantized-tflite)。
 
 ## 与其他框架的互操作
 
