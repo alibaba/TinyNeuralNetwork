@@ -128,6 +128,7 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     'prelu': None,
     'elu': None,
     'glu': None,
+    'group_norm': None,
     nn.LSTM: '1.13.0',
     nn.ConvTranspose2d: '1.7.0',
     nn.ConstantPad1d: '1.7.0',
@@ -144,6 +145,7 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     nn.LogSoftmax: None,
     nn.GLU: None,
     nn.PReLU: None,
+    nn.GroupNorm: None,
 }
 
 Q_MODULES_MAPPING = {
