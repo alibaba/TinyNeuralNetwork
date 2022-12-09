@@ -535,6 +535,16 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_functional_to_module_sigmoid(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                return F.sigmoid(x)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
     def test_functional_to_module_dropout(self):
         class Model(nn.Module):
             def forward(self, x):
