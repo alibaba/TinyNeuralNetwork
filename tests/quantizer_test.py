@@ -324,6 +324,21 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_not_quantizable_group_norm(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.w = torch.randn(4)
+                self.b = torch.randn(4)
+
+            def forward(self, x):
+                return F.group_norm(x, 2, self.w, self.b)
+
+        model = Model()
+        inputs = torch.randn(1, 4, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
     def test_not_quantizable_layer_norm_module(self):
         class Model(nn.Module):
             def __init__(self) -> None:
@@ -376,6 +391,20 @@ class QuantizerTester(unittest.TestCase):
 
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_not_quantizable_group_norm_module(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.norm = nn.GroupNorm(2, 4)
+
+            def forward(self, x):
+                return self.norm(x)
+
+        model = Model()
+        inputs = torch.randn(1, 4, 224, 224)
 
         check_quantize_rewrite(model, inputs)
 

@@ -14,6 +14,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `elu` | / |
 | `exp` | / |
 | `glu` | / |
+| `group_norm` | / |
 | `hardsigmoid` | / |
 | `instance_norm` | / |
 | `layer_norm` | / |
@@ -35,6 +36,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `torch.nn.ConvTranspose2d` | 1.7.0 |
 | `torch.nn.GLU` | / |
 | `torch.nn.GRU` | / |
+| `torch.nn.GroupNorm` | / |
 | `torch.nn.Hardsigmoid` | / |
 | `torch.nn.InstanceNorm1d` | / |
 | `torch.nn.InstanceNorm2d` | / |
