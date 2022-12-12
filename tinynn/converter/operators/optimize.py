@@ -48,6 +48,7 @@ class GraphOptimizer(object):
         fuse_input_indices: typing.Optional[typing.List[int]] = None,
         fuse_output_indices: typing.Optional[typing.List[int]] = None,
         max_transpose_dims: int = -1,
+        bypass_elementwise_passthrough_constraint: bool = False,
     ) -> None:
         self.graph = graph
         self.fuse_tensor_count = 0
@@ -61,6 +62,7 @@ class GraphOptimizer(object):
         self.fuse_input_indices = fuse_input_indices
         self.fuse_output_indices = fuse_output_indices
         self.max_transpose_dims = max_transpose_dims
+        self.bypass_elementwise_passthrough_constraint = bypass_elementwise_passthrough_constraint
 
     def create_attr_tensor(
         self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
@@ -1631,16 +1633,29 @@ class GraphOptimizer(object):
                 len(prev_nodes) + len(next_nodes) - num_constant_nodes - cur_transpose_size + num_reshape_transpose
             )
 
-            # Skip if the number of transpose nodes is not decreasing
-            if len(next_nodes) == 0 or new_transpose_size > cur_transpose_size:
+            # Skip if the following conditions are met
+            # a. the number of transpose nodes is not decreasing (skip if `bypass_elementwise_passthrough_constraint`)
+            # b. no hint can be found (skip if optimize level is below BRANCH_OPTIMIZE_EXTENDED)
+            is_increasing = new_transpose_size > cur_transpose_size
+            is_not_decreasing = new_transpose_size >= cur_transpose_size
+            is_same = new_transpose_size == cur_transpose_size
+            if len(next_nodes) == 0:
                 continue
-            elif new_transpose_size == cur_transpose_size:
-                skip = True
-                if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED:
-                    if 'down' in prev_hints or 'up' in next_hints:
-                        skip = False
-                if skip:
-                    continue
+            else:
+                if self.bypass_elementwise_passthrough_constraint:
+                    condition = is_not_decreasing
+                else:
+                    if is_increasing:
+                        continue
+                    condition = is_same
+
+                if condition:
+                    skip = True
+                    if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED:
+                        if 'down' in prev_hints or 'up' in next_hints:
+                            skip = False
+                    if skip:
+                        continue
 
             num_actions += 1
 

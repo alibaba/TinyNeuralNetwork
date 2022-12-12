@@ -52,6 +52,7 @@ class TFLiteConverter(object):
         max_transpose_dims: int = -1,
         hybrid_conv: bool = True,
         unroll_lstm: bool = False,
+        bypass_elementwise_passthrough_constraint: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -96,6 +97,8 @@ class TFLiteConverter(object):
             max_transpose_dims (int): Max dimensions for the `Transpose` op. Defaults to -1, which means unlimited
             hybrid_conv (bool): Enable hybrid quantization for Conv2d and DepthwiseConv2d. Defaults to True
             unroll_lstm (bool): Unrolling LSTM (translate LSTM to seperate ops). Defaults to False
+            bypass_elementwise_passthrough_constraint (bool): Bypass constraints in elementwise passthrough passes. \
+                Defaults to False
         """
 
         self.model = model
@@ -143,6 +146,7 @@ class TFLiteConverter(object):
         self.max_transpose_dims = max_transpose_dims
         self.hybrid_conv = hybrid_conv
         self.unroll_lstm = unroll_lstm
+        self.bypass_elementwise_passthrough_constraint = bypass_elementwise_passthrough_constraint
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -462,6 +466,7 @@ class TFLiteConverter(object):
                 self.fuse_input_indices,
                 self.fuse_output_indices,
                 self.max_transpose_dims,
+                self.bypass_elementwise_passthrough_constraint,
             )
             optimizer.optimize()
 
