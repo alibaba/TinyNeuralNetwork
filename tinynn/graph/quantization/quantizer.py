@@ -1,5 +1,6 @@
 import copy
 import functools
+import inspect
 import os
 import sys
 import queue
@@ -1618,9 +1619,10 @@ class QATQuantizer(object):
             kind = node.module.kind
             inplace = node.module.func_type == f'{kind}_' or 'True' in node.module.args_string
             klass = FUNCTIONAL_MODULE_MAPPING[kind]
-            if node.module.kind in ('sigmoid', 'tanh'):
+            arguments = {k for k in inspect.signature(klass.__init__).parameters if k != 'self'}
+            if len(arguments) == 0:
                 new_func = klass()
-            elif node.module.kind in ('relu', 'relu6', 'silu', 'hardswish'):
+            elif len(arguments) == 1 and 'inplace' in arguments:
                 new_func = klass(inplace=inplace)
             elif node.module.kind in ('elu', 'leaky_relu'):
                 if hasattr(node.module, 'args_string_no_self'):
@@ -1685,6 +1687,8 @@ class QATQuantizer(object):
                 else:
                     dim = None
                     new_func = klass()
+            else:
+                raise NotImplementedError(f"Don't know how to parse {klass.__name__} with parameters {arguments}")
 
             graph.module_unique_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
             graph.module_original_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
