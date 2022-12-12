@@ -1618,7 +1618,8 @@ class QATQuantizer(object):
             kind = node.module.kind
             inplace = node.module.func_type == f'{kind}_' or 'True' in node.module.args_string
             klass = FUNCTIONAL_MODULE_MAPPING[kind]
-            if klass.__init__ == nn.Module.__init__:
+            arguments = getattr(klass, '__constants__', None)
+            if arguments is None:
                 new_func = klass()
             elif node.module.kind in ('relu', 'relu6', 'silu', 'hardswish'):
                 new_func = klass(inplace=inplace)
@@ -1686,7 +1687,7 @@ class QATQuantizer(object):
                     dim = None
                     new_func = klass()
             else:
-                raise NotImplementedError(f"Don't know how to parse {klass.__name__}")
+                raise NotImplementedError(f"Don't know how to parse {klass.__name__} with argument {arguments}")
 
             graph.module_unique_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
             graph.module_original_name_dict[id(new_func)] = f'rewritten_{kind}_{idx}'
