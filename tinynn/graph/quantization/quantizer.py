@@ -161,6 +161,8 @@ FUNCTIONAL_MODULE_MAPPING = {
     'prelu': nn.PReLU,
     'glu': nn.GLU,
     'sigmoid': nn.Sigmoid,
+    'tanh': nn.Tanh,
+    'hardswish': nn.Hardswish,
 }
 
 if hasattr(nn, 'SiLU'):
@@ -1616,9 +1618,9 @@ class QATQuantizer(object):
             kind = node.module.kind
             inplace = node.module.func_type == f'{kind}_' or 'True' in node.module.args_string
             klass = FUNCTIONAL_MODULE_MAPPING[kind]
-            if node.module.kind == 'sigmoid':
+            if node.module.kind in ('sigmoid', 'tanh'):
                 new_func = klass()
-            elif node.module.kind in ('relu', 'relu6', 'silu'):
+            elif node.module.kind in ('relu', 'relu6', 'silu', 'hardswish'):
                 new_func = klass(inplace=inplace)
             elif node.module.kind in ('elu', 'leaky_relu'):
                 if hasattr(node.module, 'args_string_no_self'):
