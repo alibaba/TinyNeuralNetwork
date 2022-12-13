@@ -125,6 +125,15 @@ P.S. 对于 `int8` 类型的输入，你可能需要在模型输入前自行完�
     ptq_model = quantizer.quantize()
 ```
 
+#### 有没有办法把量化改写后的模型还原为浮点模型？
+我们设计了`DeQuantizer`来完成这项工作，可以这样使用
+```py
+# `model_qat` 是 生成的模型描述中的模型定义，通常在 out 目录下
+model = model_qat()
+dummy_input = torch.randn(1, 3, 224, 224)
+dequantizer = DeQuantizer(model, dummy_input, work_dir='out')
+float_model = dequantizer.dequantize()
+```
 
 ## 模型转换
 

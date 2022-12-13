@@ -2873,6 +2873,187 @@ class DynamicQuantizer(QATQuantizer):
         return self.model
 
 
+class DeQuantizer(object):
+    rewrite_graph: bool
+    force_overwrite: bool
+    remove_weights_after_load: bool
+    extra_tracer_opts: typing.Optional[typing.Dict]
+
+    def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
+        """ Constructs a new DeQuantizer object
+
+        Args:
+            model: The model to be dequantized
+            dummy_input: A viable input to the model
+            work_dir (typing.Optional[str], optional): The working directory in which the intermediate files will be \
+                generated. Defaults to None, in which case "output" will be used.
+            config (typing.Optional[dict]): Options for the dequantizer
+        """
+
+        if isinstance(model, DataParallel) or isinstance(model, DistributedDataParallel):
+            self.model = model.module
+        else:
+            self.model = model
+
+        self.dummy_input = dummy_input
+        self.work_dir = 'out' if work_dir is None else work_dir
+
+        self.parse_config(config)
+
+    def dequantize(self) -> nn.Module:
+        # We need a model in training mode so that QAT could take place
+        self.model.train()
+
+        # After tracing the model, we will get a TraceGraph object
+        graph = trace(self.model, self.dummy_input, **self.extra_tracer_opts)
+
+        if self.rewrite_graph:
+            # Retrives the name of the model from type info
+            model_name = type(self.model).__name__
+            if model_name.endswith('_qat'):
+                model_name = model_name[:-4]
+            model_name_float = f'{model_name}_float'
+            model_name_float_lower = model_name_float.lower()
+            model_ns = f'tinynn_rewritten_models.{model_name_float}'
+
+            model_code_path = os.path.join(self.work_dir, f'{model_name_float_lower}.py')
+            model_weights_path = os.path.join(self.work_dir, f'{model_name_float_lower}.pth')
+
+            # Generate the code for the modified model
+            # We will try to do some op rewriting in the `rewrite_quantize_graph` function.
+            if self.force_overwrite or not os.path.exists(model_code_path) or not os.path.exists(model_weights_path):
+                self.rewrite_quantize_graph(graph)
+                graph.generate_code(model_code_path, model_weights_path, model_name_float)
+
+            # Import the new model
+            rewritten_model = import_from_path(model_ns, model_code_path, model_name_float)()
+            rewritten_model.load_state_dict(torch.load(model_weights_path))
+
+            device = get_module_device(self.model)
+            if device is not None:
+                rewritten_model.to(device=device)
+
+            # Remove the weights file to save space
+            if self.remove_weights_after_load:
+                os.unlink(model_weights_path)
+
+            # Set the model to training mode before tracing again, since we need to perform QAT
+            rewritten_model.train()
+
+            # Update the model so that the original one can be released
+            self.model = rewritten_model
+        else:
+            rewritten_model = self.model
+
+        return rewritten_model
+
+    def parse_config(self, config: typing.Optional[dict]):
+        default_values = {
+            'rewrite_graph': True,
+            'force_overwrite': True,
+            'extra_tracer_opts': {},
+            'remove_weights_after_load': False,
+        }
+
+        if config is None:
+            config = dict()
+
+        for k, v in default_values.items():
+            actual_v = config.get(k, v)
+            setattr(self, k, actual_v)
+
+    def rewrite_quantize_graph(self, graph: TraceGraph) -> None:
+        """Rewrites the computation graph for quantization"""
+        if graph.quantized:
+            return
+
+        graph_quantized = False
+        for n in graph.forward_nodes:
+            if n.type() in (torch_q.QuantStub, torch_q.DeQuantStub):
+                graph_quantized = True
+                break
+
+        for n in graph.other_init_nodes:
+            if n.type() == nnq.FloatFunctional:
+                graph_quantized = True
+                break
+
+        if not graph_quantized:
+            log.warning(
+                'Graph is not quantized. No need to rewrite. Please pass in `config={"rewrite_graph": False}` to'
+                ' suppress this warning'
+            )
+            return
+
+        # Remove QuantStubs and DeQuantStubs
+        names = [n.unique_name for n in graph.forward_nodes]
+        for name in names:
+            n = graph.nodes_map[name]
+            if n.type() in (torch_q.QuantStub, torch_q.DeQuantStub):
+                graph.remove_node(n)
+
+        def _is_add_relu_node(node: TraceNode, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if cur_class == TraceFunction:
+                return (
+                    cur_module.kind == 'add_relu'
+                    and len(node.prev_nodes) > 1
+                    and node.prev_nodes[0].type() == nnq.FloatFunctional
+                )
+
+        # Split FloatFunctional.add_relu to FloatFunctional.add and torch.relu
+        add_relu_nodes = graph.filter_forward_nodes(_is_add_relu_node)
+        for n in add_relu_nodes:
+            n.module.kind = 'add'
+            n.module.func_type = 'add'
+
+            parts = n.module.full_name.split('.')[:-1] + [n.module.func_type]
+            n.module.full_name = '.'.join(parts)
+
+            with override_current_trace_graph(graph):
+                next_func = TraceFunction('torch.relu').parse_args(n.next_tensors[0])
+
+            next_out = torch.relu(n.next_tensors[0])
+            graph.insert_after(n, next_func, [next_out])
+
+        # Replace FloatFunctional.{add, mul, cat} with torch.{add, mul, cat}
+        def _is_add_mul_cat_node(node: TraceNode, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if cur_class == TraceFunction:
+                return (
+                    cur_module.kind in ('add', 'mul', 'cat')
+                    and len(node.prev_nodes) > 1
+                    and node.prev_nodes[0].type() == nnq.FloatFunctional
+                )
+
+        add_mul_cat_nodes = graph.filter_forward_nodes(_is_add_mul_cat_node)
+        for n in add_mul_cat_nodes:
+            parts = ['torch'] + [n.module.func_type]
+            n.module.full_name = '.'.join(parts)
+            n.module.is_class = False
+
+            n.prev_nodes[0].next_nodes.remove(n)
+            n.prev_nodes.pop(0)
+            n.prev_indices.pop(0)
+
+            n.module.tensor_names.pop(0)
+            n.module.args_parsed.pop(0)
+            n.module.args_to_string(n.module.args_parsed)
+
+        # Remove FloatFunctional nodes
+        names = [n.unique_name for n in graph.other_init_nodes]
+        for name in names:
+            n = graph.nodes_map[name]
+            if n.type() == nnq.FloatFunctional:
+                graph.other_init_nodes.remove(n)
+                del graph.nodes_map[n.unique_name]
+
+        graph.quantized = False
+        graph.recompute_forward_order()
+
+
 def load_creation_func_names():
     if len(creation_func_names) == 0:
         funcs_d = load_creation_funcs()
