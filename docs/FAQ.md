@@ -124,6 +124,17 @@ At present, PyTorch officially uses L2_norm as the post-quantization algorithm, 
     ptq_model = quantizer.quantize()
 ```
 
+#### How to restore a quantization-rewritten model to the original floating point model?
+We have designed `DeQuantizer` for this purpose. Please refer to the code below.
+```py
+# `model_qat` is the generated model definition of the TinyNN graph tracer,
+#  which is typically in the "out/" directory.
+model = model_qat()
+dummy_input = torch.randn(1, 3, 224, 224)
+dequantizer = DeQuantizer(model, dummy_input, work_dir='out')
+float_model = dequantizer.dequantize()
+```
+
 ## Model conversion
 
 #### What should I do if the operator is not supported?

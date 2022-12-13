@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from tinynn.graph.quantization.quantizer import QATQuantizer
+from tinynn.graph.quantization.quantizer import DeQuantizer, QATQuantizer
 from tinynn.graph.tracer import model_tracer
 
 
@@ -49,6 +49,24 @@ def check_quantize_rewrite(model, inputs, show_rewritten=True, skip_train=False)
             qat_model = quantizer.convert(qat_model)
 
             torch.jit.trace(qat_model, inputs)
+
+
+def check_dequantize_rewrite(model, inputs, show_rewritten=True, skip_train=False):
+    with model_tracer():
+        config = {'remove_weights_after_load': True}
+
+        dequantizer = DeQuantizer(model, inputs, work_dir='out', config=config)
+        float_model = dequantizer.dequantize()
+
+        if show_rewritten:
+            show_source(float_model, 'Rewritten:')
+
+        if not skip_train:
+            for _ in range(1):
+                if isinstance(inputs, (list, tuple)):
+                    float_model(*inputs)
+                else:
+                    float_model(inputs)
 
 
 class QuantizerTester(unittest.TestCase):
@@ -1185,6 +1203,99 @@ class QuantizerTester(unittest.TestCase):
         inputs = torch.rand(1, 3, 224, 224)
 
         check_quantize_rewrite(model, inputs)
+
+
+class DeQuantizerTester(unittest.TestCase):
+    def test_simple_q_model(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+                self.q = torch.quantization.QuantStub()
+                self.dq = torch.quantization.DeQuantStub()
+
+            def forward(self, x):
+                return self.dq(self.q(x).reshape(3, 224, 224))
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_dequantize_rewrite(model, inputs)
+
+    def test_simple_q_add_relu(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+                self.q = torch.quantization.QuantStub()
+                self.dq = torch.quantization.DeQuantStub()
+                self.f = torch.nn.quantized.FloatFunctional()
+
+            def forward(self, x):
+                x = self.q(x)
+                x_r = x.reshape(3, 224, 224)
+                return self.f.add_relu(x, x_r)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_dequantize_rewrite(model, inputs)
+
+    def test_simple_q_add(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+                self.q = torch.quantization.QuantStub()
+                self.dq = torch.quantization.DeQuantStub()
+                self.f = torch.nn.quantized.FloatFunctional()
+
+            def forward(self, x):
+                x = self.q(x)
+                x_r = x.reshape(3, 224, 224)
+                return self.f.add(x, x_r)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_dequantize_rewrite(model, inputs)
+
+    def test_simple_q_mul(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+                self.q = torch.quantization.QuantStub()
+                self.dq = torch.quantization.DeQuantStub()
+                self.f = torch.nn.quantized.FloatFunctional()
+
+            def forward(self, x):
+                x = self.q(x)
+                x_r = x.reshape(3, 224, 224)
+                return self.f.mul(x, x_r)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_dequantize_rewrite(model, inputs)
+
+    def test_simple_q_cat(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+                self.q = torch.quantization.QuantStub()
+                self.dq = torch.quantization.DeQuantStub()
+                self.f = torch.nn.quantized.FloatFunctional()
+
+            def forward(self, x):
+                x = self.q(x)
+                return self.f.cat([x, x], -1)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_dequantize_rewrite(model, inputs)
 
 
 if __name__ == '__main__':
