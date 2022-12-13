@@ -6,12 +6,9 @@ CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 
 sys.path.insert(1, os.path.join(CURRENT_PATH, '../../../'))
 
-import functools
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.quantization as torch_q
 
 from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
 from tinynn.converter import TFLiteConverter
@@ -27,41 +24,40 @@ from tinynn.util.bn_restore import model_restore_bn
 def main_worker(args):
     # Provide a viable input for the model
     dummy_input = torch.rand((1, 3, 224, 224))
-    # We use BN_fused MobileNetV1 to simulate MobileOne_deploy which be re-parameterized.
-    # You can directly use the re-parameterized_to_deploy model.
-    fused_model = mobilenet_fused_bn(dummy_input)
 
-    # Do CLE(Optional).
-    # If weight of conv_fused_bn has some outliers which is hard to quantize, you can try the CLE.
-    cross_layer_equalize(fused_model, dummy_input)
+    # Provide your pretrain model
+    model = Mobilenet()
+    model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
 
-    # Move model to the appropriate device
+    # Define the train_related context
     device = get_device()
-    fused_model.to(device=device)
-
     context = DLContext()
     context.device = device
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
 
-    # Do bn rebuild.
-    # The calibrating process should be done in full train_set in train mode.
-    fused_model = model_restore_bn(fused_model, device, calibrate, context)
-    print(fused_model)
+    # if your pretrained model is Rep_style_deploy, use the following line to do bn restore to do High Bias Absorb.
+    # model = model_restore_bn(model, device, calibrate, context)
+    # Do CLE, if weight has some outliers which is hard to quantize, considering trying CLE
+    model = cross_layer_equalize(model, dummy_input, device)
 
+    # Do bn restore after CLE to make training easy.
+    model = model_restore_bn(model, device, calibrate, context)
+
+    # Move model to the appropriate device
+    model.to(device=device)
+
+    # (Optional)Finetune model, After CLE and bn_restore, you can finetune a few epoch to make training process stable.
     context.max_epoch = 1
     context.criterion = nn.BCEWithLogitsLoss()
-    context.optimizer = torch.optim.AdamW(fused_model.parameters(), 0.0001, weight_decay=1e-4)
+    context.optimizer = torch.optim.AdamW(model.parameters(), 0.0001, weight_decay=1e-4)
     context.scheduler = optim.lr_scheduler.StepLR(context.optimizer, step_size=8, gamma=0.5)
+    model.train()
+    train(model, context, train_one_epoch, validate, qat=False)
 
-    # Finetune(optional).
-    # After CLE and BN_rebuilt, you can finetune a few epoch to make the model training process stable.
-    fused_model.train()
-    train(fused_model, context, train_one_epoch, validate, qat=False)
-
-    # Quantization-aware training
+    # Now you get a model whose weights and activations is easy to quantize, continue to do QAT
     with model_tracer():
-        # More information for PostQuantizer initialization, see `examples/quantization/qat.py`.
-        quantizer = QATQuantizer(fused_model, dummy_input, work_dir='out')
+        # More information for QATQuantizer initialization, see `examples/quantization/qat.py`.
+        quantizer = QATQuantizer(model, dummy_input, work_dir='out')
         qat_model = quantizer.quantize()
 
     print(qat_model)
@@ -100,37 +96,6 @@ def main_worker(args):
         # you may specify `strict_symmetric_check=True` in the following line.
         converter = TFLiteConverter(qat_model, dummy_input, tflite_path='out/rep_qat.tflite')
         converter.convert()
-
-
-def mobilenet_fused_bn(dummy_input):
-    """
-    The helper function to get conv_bn fused mobilenet. Since the BN of Rep-model(e.g. RepVGG/MobileOne) is fused
-    into the conv when the parameters are merged. We fuse the BN of mobilenet into the conv to simulate MobileOne.
-    """
-    model = Mobilenet()
-    model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
-    with model_tracer():
-        model.eval()
-        quantizer = PostQuantizer(
-            model,
-            dummy_input,
-            work_dir='../out',
-            config={'rewrite_graph': False, 'force_overwrite': False, 'fuse_only': True},
-        )
-        graph = trace(quantizer.model, quantizer.dummy_input)
-        graph.quantized = True
-        for node in graph.forward_nodes:
-            node.quantized = True
-        custom_data = ([], set())
-        processed_rules = load_processed_ptq_rules()
-        processed_rules = {nn.BatchNorm2d: processed_rules[nn.BatchNorm2d]}
-        is_fusable = functools.partial(quantizer.is_fusable, current_rules=processed_rules, graph=graph)
-        graph.filter_forward_nodes(is_fusable, custom_data, reverse=True)
-        quant_list = custom_data[0]
-        for quant_nodes in quant_list:
-            torch_q.fuse_modules(graph.module, quant_nodes, inplace=True)
-        fused_model = graph.module
-    return fused_model
 
 
 if __name__ == '__main__':
