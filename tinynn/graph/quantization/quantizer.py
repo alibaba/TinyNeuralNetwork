@@ -1085,6 +1085,24 @@ class QATQuantizer(object):
         if graph.quantized:
             return
 
+        graph_quantized = False
+        for n in graph.forward_nodes:
+            if n.module.type() in (torch_q.QuantStub, torch_q.DeQuantStub):
+                graph_quantized = True
+                break
+
+        for n in graph.other_init_nodes:
+            if n.module.type() == nnq.FloatFunctional:
+                graph_quantized = True
+                break
+
+        if graph_quantized:
+            log.warning(
+                'Graph is quantized. No need to rewrite. Please pass in `config={"rewrite_graph": False}` to suppress'
+                ' this warning'
+            )
+            return
+
         creation_func_names = load_creation_func_names()
 
         def _is_extra_constant_nodes(node, custom_data):
