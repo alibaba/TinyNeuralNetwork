@@ -1087,12 +1087,12 @@ class QATQuantizer(object):
 
         graph_quantized = False
         for n in graph.forward_nodes:
-            if n.module.type() in (torch_q.QuantStub, torch_q.DeQuantStub):
+            if n.type() in (torch_q.QuantStub, torch_q.DeQuantStub):
                 graph_quantized = True
                 break
 
         for n in graph.other_init_nodes:
-            if n.module.type() == nnq.FloatFunctional:
+            if n.type() == nnq.FloatFunctional:
                 graph_quantized = True
                 break
 
