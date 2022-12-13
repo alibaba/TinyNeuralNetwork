@@ -14,10 +14,9 @@ from tinynn.converter import TFLiteConverter
 
 from tinynn.graph.quantization.quantizer import PostQuantizer
 from tinynn.graph.quantization.cross_layer_equalization import cross_layer_equalize
-from tinynn.graph.tracer import model_tracer, trace
-from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate, calibrate
-from tinynn.util.train_util import DLContext, get_device, train
-from tinynn.util.bn_restore import model_restore_bn
+from tinynn.graph.tracer import model_tracer
+from tinynn.util.cifar10 import get_dataloader, calibrate
+from tinynn.util.train_util import DLContext, get_device
 
 
 def main_worker(args):
