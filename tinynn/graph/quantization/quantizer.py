@@ -1,5 +1,6 @@
 import copy
 import functools
+import inspect
 import os
 import sys
 import queue
@@ -2552,12 +2553,35 @@ class QATQuantizer(object):
 
             return pre_hook
 
+        def get_hook_func(acp, idx, orig_func):
+            def pre_hook(*input):
+                new_input = list(input)
+                if orig_func.__name__ == 'cat':
+                    new_input[0][idx] = acp(new_input[0][idx])
+                else:
+                    new_input[idx] = acp(new_input[idx])
+                input = tuple(new_input)
+                return orig_func(*input)
+
+            return pre_hook
+
         for start_mod, end_mod, idx in self.swap_nodes:
             acp = start_mod.activation_post_process
 
-            assert isinstance(end_mod, nn.Module), "Only end nodes with `nn.Module` are supported duing module swapping"
+            if inspect.isroutine(end_mod) and isinstance(end_mod.__self__, nnq.FloatFunctional):
+                ff = end_mod.__self__
+                ff.cat = get_hook_func(acp, idx, ff.cat)
+                ff.add = get_hook_func(acp, idx, ff.add)
+                ff.mul = get_hook_func(acp, idx, ff.mul)
+                ff.add_scalar = get_hook_func(acp, idx, ff.add_scalar)
+                ff.mul_scalar = get_hook_func(acp, idx, ff.mul_scalar)
+                ff.add_relu = get_hook_func(acp, idx, ff.add_relu)
+            else:
+                assert isinstance(
+                    end_mod, nn.Module
+                ), "Only end nodes with `nn.Module` are supported duing module swapping"
 
-            end_mod.register_forward_pre_hook(get_pre_hook(acp, idx))
+                end_mod.register_forward_pre_hook(get_pre_hook(acp, idx))
 
         q_model.apply(torch_q.disable_observer)
 
