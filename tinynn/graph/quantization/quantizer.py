@@ -2659,7 +2659,7 @@ class PostQuantizer(QATQuantizer):
         """
 
         log.info('setting qat backend and call prepare_qat')
-        if not self.legacy_fq:
+        if not self.legacy_fq or LooseVersion(torch.__version__) < '1.12.0':
             qconfig = torch_q.get_default_qconfig(backend)
         else:
             qconfig = torch_q.get_default_qconfig(backend, 0)
