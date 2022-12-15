@@ -25,22 +25,22 @@ def main_worker(args):
     # Provide a viable input for the model
     dummy_input = torch.rand((1, 3, 224, 224))
 
-    # Provide your pretrain model
+    # Provide your pretrained model
     model = Mobilenet()
     model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
 
-    # Define the train_related context
+    # Define the training_related context
     device = get_device()
     context = DLContext()
     context.device = device
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
 
-    # if your pretrained model is Rep_style_deploy, use the following line to do bn restore to do High Bias Absorb.
+    # If there is no BN after conv in the given model(such as RepVGG_deploy), use the following line to do BN restore.
     # model = model_restore_bn(model, device, calibrate, context)
-    # Do CLE, if weight has some outliers which is hard to quantize, considering trying CLE
+    # Apply CLE. If the weights of model have some outliers which is hard to quantize, considering trying CLE
     model = cross_layer_equalize(model, dummy_input, device)
 
-    # Do bn restore after CLE to make training easy.
+    # Perform bn restore after CLE to make training easy.
     model = model_restore_bn(model, device, calibrate, context)
 
     # Move model to the appropriate device
@@ -54,7 +54,7 @@ def main_worker(args):
     model.train()
     train(model, context, train_one_epoch, validate, qat=False)
 
-    # Now you get a model whose weights and activations is easy to quantize, continue to do QAT
+    # Now that you get a model whose weights and activations are easy to quantize, continue to QAT.
     with model_tracer():
         # More information for QATQuantizer initialization, see `examples/quantization/qat.py`.
         quantizer = QATQuantizer(model, dummy_input, work_dir='out')

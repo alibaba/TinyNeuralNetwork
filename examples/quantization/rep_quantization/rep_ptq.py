@@ -17,28 +17,29 @@ from tinynn.graph.quantization.cross_layer_equalization import cross_layer_equal
 from tinynn.graph.tracer import model_tracer
 from tinynn.util.cifar10 import get_dataloader, calibrate
 from tinynn.util.train_util import DLContext, get_device
+from tinynn.util.bn_restore import model_restore_bn
 
 
 def main_worker(args):
     # Provide a viable input for the model
     dummy_input = torch.rand((1, 3, 224, 224))
 
-    # Provide your pretrain model
+    # Provide your pretrained model
     model = Mobilenet()
     model.load_state_dict(torch.load(DEFAULT_STATE_DICT))
 
-    # Define the train_related context
+    # Define the training_related context
     device = get_device()
     context = DLContext()
     context.device = device
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
 
-    # if your pretrained model is Rep_style_deploy, use the following line to do bn restore to do High Bias Absorb.
-    # model = model_restore_bn(model, device, calibrate, context)
-    # Do CLE, if weight has some outliers which is hard to quantize, considering trying CLE.
+    # If there is no BN after conv in the given model(such as RepVGG_deploy), use the following line to do bn restore.
+    model = model_restore_bn(model, device, calibrate, context)
+    # Apply CLE. If the weights of model have some outliers which is hard to quantize, considering trying CLE.
     model = cross_layer_equalize(model, dummy_input, device)
 
-    # Now you get a model whose weights and activations is easy to quantize, continue to do ptq.
+    # Now that you get a model whose weights and activations are easy to quantize, continue to PTQ.
     with model_tracer():
         # More information for PostQuantizer initialization, see `examples/quantization/post.py`.
         quantizer = PostQuantizer(model, dummy_input, work_dir='out')
@@ -52,7 +53,7 @@ def main_worker(args):
 
     # Move model to the appropriate device
     ptq_model.to(device=device)
-    # Set calibrate iteration nums
+    # Set number of iteration for calibration
     context.max_iteration = 100
 
     # Post quantization calibration
