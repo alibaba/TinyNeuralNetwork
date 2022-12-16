@@ -2433,7 +2433,7 @@ class ConverterOPTester(unittest.TestCase):
         assert_close(dummy_output, tfl_output)
 
     @unittest.skipIf(
-        LooseVersion(torch.__version__) >= '1.13.0' and LooseVersion(torch.__version__) < '1.13.1',
+        LooseVersion(torch.__version__) >= '1.13.0' and LooseVersion(torch.__version__) < '1.14.0',
         "See https://github.com/pytorch/pytorch/issues/87968",
     )
     def test_upsample_bilinear_align_corners(self):
