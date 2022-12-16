@@ -190,6 +190,7 @@ def _cross_layer_equalize(model: nn.Module, dummy_input, threshold=1000) -> Tupl
                     elif k.endswith('.bias'):
                         after_max = p.max()
                     if after_max.data.item() != param[k].data.item():
+                        # Print the weight and bias change when applying CLE
                         log.info(f'{k}: {param[k].data.item():.5f} -> {after_max.data.item():.5f}')
 
     return layer_groups, model
@@ -215,12 +216,12 @@ def cross_layer_equalize(
     model = model_rewrite(model, dummy_input, work_dir=work_dir)
     model = model_fuse_bn(model, dummy_input)
 
-    log.info("start to do Cross Layer Equalization.")
+    log.info("start to do Cross Layer Equalization. The range change of bias after CLE:")
     for i in range(cle_iters):
         layers_groups, model = _cross_layer_equalize(model, dummy_input, threshold)
 
     if hba_flag:
-        log.info("start to do High Bias Absorbing.")
+        log.info("start to do High Bias Absorbing. the range change of bias after HBA:")
         model = high_bias_absorb(model, device, layers_groups)
     clear_model_fused_bn(model)
 
@@ -362,7 +363,6 @@ def model_rewrite(model, dummy_input, work_dir='out'):
         model_name = type(model).__name__
         model_rewrite = f'{model_name}_cle_Rewrite'
         model_name_rewrite_lower = model_rewrite.lower()
-        model_ns = f'tinynn_rewritten_models.{model_rewrite}'
         model_ns = f'out.{model_name_rewrite_lower}'
         model_code_path = os.path.join(work_dir, f'{model_name_rewrite_lower}.py')
         model_weights_path = os.path.join(work_dir, f'{model_name_rewrite_lower}.pth')

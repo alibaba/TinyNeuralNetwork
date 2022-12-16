@@ -34,12 +34,12 @@ def main_worker(args):
     context.device = device
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
 
-    # If there is no BN after conv in the given model(such as RepVGG_deploy), use the following line to do bn restore.
+    # If there is no BN after conv in the given model(such as RepVGG_deploy), use the following line to do BN restore.
     model = model_restore_bn(model, device, calibrate, context)
-    # Apply CLE. If the weights of model have some outliers which is hard to quantize, considering trying CLE.
+    # Apply CLE. If the weights of model have some outliers which is hard to quantize, trying CLE.
     model = cross_layer_equalize(model, dummy_input, device)
 
-    # Now that you get a model whose weights and activations are easy to quantize, continue to PTQ.
+    # Now that you get a model whose weights and activations are easy to quantize, the next step is PTQ.
     with model_tracer():
         # More information for PostQuantizer initialization, see `examples/quantization/post.py`.
         quantizer = PostQuantizer(model, dummy_input, work_dir='out')

@@ -13,7 +13,7 @@
 
 为了解决以上问题，我们给出了两个工具来近乎数学等价的修改预训练模型，以辅助量化。
 1. [BatchNorm Restoration(BNR)](../../../tinynn/util/bn_restore.py)：BN恢复工具。由于重参数模型的推理模型中，BN已经被合并到卷积中，使用BNR工具恢复BN后可以有效助力量化。
-2. [Cross_Layer_Equalization(CLE)](../../../tinynn/graph/quantization/cross_layer_equalization.py)：由[高通](https://arxiv.org/abs/1906.04721)提出。
+2. [Cross Layer Equalization(CLE)](../../../tinynn/graph/quantization/cross_layer_equalization.py)：由[高通](https://arxiv.org/abs/1906.04721)提出。
    1. 使用CLE对预训练模型进行不同卷积权重之间的均匀化操作后，可以消除极大部分的权重离群点，极大降低了权重量化难度。CLE是数学等价的。
    2. 在进行CLE操作时，会将Conv-BN进行融合，此时模型的卷积带有bias。CLE会将部分卷积权重值较小的进行放大，同时导致bias放大，进而导致激活值放大，激活值量化困难；为了消除这种现象的影响，CLE完成后还会进行High Bias Absorb(HBA)操作将较大的bias吸收到后续的卷积中。
 
@@ -23,11 +23,11 @@
 2. 训练时量化：参考[`rep_qat.py`](rep_qat.py)。
 
 ## 实验结果(CIFAR10)：
-| Model       | Top1 acc. (%) | Top1 acc. (%)<br/>(PTQ w/o CLE) | Top1 acc (%)<br/>(PTQ w/ CLE) |
-|-------------|---------------|---------------------------------|-------------------------------|
-| MobileOne   | 96.41         | 70.55(-25.86)                   | 95.44(-0.97)                  |
-| RepVGG      | 94.46         | 46.35(-48.11)                   | 94.15(-0.31)                  |
-| MobileNetV1 | 94.42         | 94.24(-0.18)                    | 94.30(-0.12)                  |
+| Model       | Top1 acc. (%) | Top1 acc. (%)<br/>(PTQ w/o CLE) | Top1 acc. (%)<br/>(PTQ w/ CLE) |
+|-------------|---------------|---------------------------------|--------------------------------|
+| MobileOne   | 96.41         | 70.55(-25.86)                   | 95.44(-0.97)                   |
+| RepVGG      | 94.46         | 46.35(-48.11)                   | 94.15(-0.31)                   |
+| MobileNetV1 | 94.42         | 94.24(-0.18)                    | 94.30(-0.12)                   |
 
 ## 注意事项
 
@@ -43,7 +43,7 @@ def calibare_func(model, context):
    for data in context.cali_loader:
       model(data)
 
-device = troch.device('cpu') # 根据实际情况设置
+device = torch.device('cpu') # 根据实际情况设置
 context.cali_loader = train_dataloader # 设置对应的calibarte数据集
 # 指定特定的卷积算子来进行BNR，否则默认会在所有卷积后都添加一个BN。
 layers_fused_bn = [name for name, mod in model.named_modules() if isinstance(mod, torch.nn.Conv2d) and 'reparam' in name]

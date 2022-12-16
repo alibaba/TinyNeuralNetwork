@@ -37,10 +37,10 @@ def main_worker(args):
 
     # If there is no BN after conv in the given model(such as RepVGG_deploy), use the following line to do BN restore.
     # model = model_restore_bn(model, device, calibrate, context)
-    # Apply CLE. If the weights of model have some outliers which is hard to quantize, considering trying CLE
+    # Apply CLE. If the weights of model have some outliers which is hard to quantize, trying CLE.
     model = cross_layer_equalize(model, dummy_input, device)
 
-    # Perform bn restore after CLE to make training easy.
+    # Perform BN restore after CLE to make training easy
     model = model_restore_bn(model, device, calibrate, context)
 
     # Move model to the appropriate device
@@ -54,7 +54,7 @@ def main_worker(args):
     model.train()
     train(model, context, train_one_epoch, validate, qat=False)
 
-    # Now that you get a model whose weights and activations are easy to quantize, continue to QAT.
+    # Now that you get a model whose weights and activations are easy to quantize, the next step is QAT.
     with model_tracer():
         # More information for QATQuantizer initialization, see `examples/quantization/qat.py`.
         quantizer = QATQuantizer(model, dummy_input, work_dir='out')
