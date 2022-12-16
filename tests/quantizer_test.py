@@ -1297,6 +1297,23 @@ class DeQuantizerTester(unittest.TestCase):
 
         check_dequantize_rewrite(model, inputs)
 
+    def test_conv_transpose_bn_fusion(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv = nn.ConvTranspose2d(3, 5, 2, 2, 1)
+                self.bn = nn.BatchNorm2d(5)
+
+            def forward(self, x):
+                x = self.conv(x)
+                x = self.bn(x)
+                return x
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_dequantize_rewrite(model, inputs)
+
 
 if __name__ == '__main__':
     unittest.main()

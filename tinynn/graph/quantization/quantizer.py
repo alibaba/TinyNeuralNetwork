@@ -20,7 +20,7 @@ from torch.nn.parallel.distributed import DistributedDataParallel
 
 from tinynn.graph.quantization.fake_quantize import FakeQuantizeBFloat16, FakeQuantizeTFLite
 from tinynn.graph.quantization.modules import QGLU, QPReLU, QSiLU
-from tinynn.graph.quantization.qat_modules import Conv1d, ConvTranspose1d
+from tinynn.graph.quantization.qat_modules import Conv1d, ConvTranspose1d, ConvTranspose2d, ConvTransposeBn2d
 from tinynn.graph.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserverKL
 from tinynn.graph.tracer import (
     ConstantNode,
@@ -35,6 +35,7 @@ from tinynn.graph.tracer import (
 )
 from tinynn.util.train_util import get_module_device, get_logger
 from tinynn.util.util import import_from_path
+from . import fused_modules as fm
 
 # Fusable OPs for Quantize Aware Training
 FUSE_RULE_LIST = {
@@ -50,12 +51,12 @@ FUSE_RULE_LIST = {
     (torch.nn.Linear, torch.nn.ReLU),
     (torch.nn.BatchNorm2d, torch.nn.ReLU),
     (torch.nn.BatchNorm3d, torch.nn.ReLU),
+    (torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d),
 }
 
 FUSE_RULE_LIST_PTQ_ONLY = {
     (nn.Linear, nn.BatchNorm1d): '1.8.0',
     (nn.ConvTranspose1d, nn.BatchNorm1d): '1.11.0',
-    (nn.ConvTranspose2d, nn.BatchNorm2d): '1.11.0',
     (nn.ConvTranspose3d, nn.BatchNorm3d): '1.11.0',
 }
 
@@ -74,11 +75,21 @@ FUSE_RULE_LIST_EXTRA = {
     ('add', 'relu6'),
 }
 
-FUSE_QAT_MODULES = {nn.Conv1d: Conv1d, nn.ConvTranspose1d: ConvTranspose1d}
+FUSE_QAT_MODULES = {
+    nn.Conv1d: Conv1d,
+    nn.ConvTranspose1d: ConvTranspose1d,
+    nn.ConvTranspose2d: ConvTranspose2d,
+    fm.ConvTransposeBn2d: ConvTransposeBn2d,
+}
 
 FUSE_QAT_MODULES_CVT = {Conv1d: nnq.Conv1d}
 if hasattr(nnq, 'ConvTranspose1d'):
-    FUSE_QAT_MODULES_CVT.update({ConvTranspose1d: nnq.ConvTranspose1d})
+    FUSE_QAT_MODULES_CVT.update(
+        {
+            ConvTranspose1d: nnq.ConvTranspose1d,
+            ConvTranspose2d: nnq.ConvTranspose2d,
+        }
+    )
 
 REWRITE_TO_FUSE_RULE_LIST = {
     (torch.nn.Linear, torch.nn.BatchNorm1d),
@@ -457,11 +468,17 @@ class QATQuantizer(object):
         quant_list = custom_data[0]
         log.info(f'found nodes to fuse: {quant_list}')
 
+        new_fuser_func = fm.gen_fuse_known_modules_wrapper(
+            sys.modules['torch.quantization.fuse_modules'].fuse_known_modules
+        )
+
         for quant_nodes in quant_list:
             if type(self) != PostQuantizer and LooseVersion(torch.__version__) >= LooseVersion('1.11.0'):
-                torch.ao.quantization.fuse_modules_qat(graph.module, quant_nodes, inplace=True)
+                torch.ao.quantization.fuse_modules_qat(
+                    graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True
+                )
             else:
-                torch_q.fuse_modules(graph.module, quant_nodes, inplace=True)
+                torch_q.fuse_modules(graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True)
 
         self.prepare_qconfig(graph, backend)
 
@@ -2384,6 +2401,18 @@ class QATQuantizer(object):
                 setattr(q_model, activ_name, nn.Identity())
 
         if type(self).__name__ == 'QATQuantizer':
+
+            q = queue.Queue()
+            q.put(q_model)
+
+            while not q.empty():
+                m = q.get()
+                for n, c in m.named_children():
+                    if isinstance(c, ConvTransposeBn2d):
+                        setattr(m, n, c.transform(c))
+                    else:
+                        q.put(c)
+
             if hasattr(torch_q, 'get_default_static_quant_module_mappings'):
                 mapping = torch_q.get_default_static_quant_module_mappings()
             elif hasattr(torch_q, 'get_static_quant_module_mappings'):
