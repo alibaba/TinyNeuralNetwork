@@ -88,7 +88,6 @@ if hasattr(nnq, 'ConvTranspose1d'):
         {
             ConvTranspose1d: nnq.ConvTranspose1d,
             ConvTranspose2d: nnq.ConvTranspose2d,
-            #  ConvTransposeBn2d: nnq.ConvTranspose2d
         }
     )
 
