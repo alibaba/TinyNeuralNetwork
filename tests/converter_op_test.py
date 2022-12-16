@@ -3228,9 +3228,13 @@ class ConverterOPTester(unittest.TestCase):
 
     @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.1.0'), 'scatter_nd is not supported')
     @unittest.skipIf(
-        LooseVersion(torch.__version__) < LooseVersion('1.7.0')
-        or LooseVersion(torch.__version__) >= LooseVersion('1.12.0'),
+        LooseVersion(torch.__version__) < LooseVersion('1.7.0'),
         "torch.Tensor.scatter_ cannot take scalar inputs",
+    )
+    @unittest.skipIf(
+        LooseVersion(torch.__version__) >= LooseVersion('1.12.0')
+        and LooseVersion(torch.__version__) < LooseVersion('1.13.0'),
+        "https://github.com/pytorch/pytorch/issues/80508",
     )
     def test_scatter_scalar(self):
         dummy_input = torch.randperm(10)[:3]
