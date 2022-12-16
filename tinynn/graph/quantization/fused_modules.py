@@ -19,51 +19,33 @@ class ConvTransposeBn2d(_FusedModule):
 
 
 HAS_QAT_IN_FUNC = LooseVersion(torch.__version__) >= '1.11.0'
-if HAS_QAT_IN_FUNC:
 
-    def fuse_convtranspose_bn(is_qat, convt, bn):
-        r"""Given ConvTranspose and bn modules, fuses them and returns the fused module
 
-        Args:
-            convt: Module instance of type ConvTransposeNd
-            bn: BatchNormNd instance that needs to be fused with the linear layer.
-                batch norm N should match the ConvTranspose N
+def fuse_convtranspose_bn(is_qat, convt, bn):
+    r"""Given ConvTranspose and bn modules, fuses them and returns the fused module
 
-        Examples::
+    Args:
+        convt: Module instance of type ConvTransposeNd
+        bn: BatchNormNd instance that needs to be fused with the linear layer.
+            batch norm N should match the ConvTranspose N
 
-            >>> m1 = nn.ConvTranspose2d(10, 20, 3)
-            >>> b1 = nn.BatchNorm2d(20)
-            >>> # xdoctest: +SKIP
-            >>> m2 = fuse_convtranspose_bn(m1, b1)
-        """
-        assert convt.training == bn.training, "ConvTranspose and BN both must be in the same mode (train or eval)."
+    Examples::
 
-        if is_qat:
-            return ConvTransposeBn2d(convt, bn)
-        else:
+        >>> m1 = nn.ConvTranspose2d(10, 20, 3)
+        >>> b1 = nn.BatchNorm2d(20)
+        >>> # xdoctest: +SKIP
+        >>> m2 = fuse_convtranspose_bn(m1, b1)
+    """
+    assert convt.training == bn.training, "ConvTranspose and BN both must be in the same mode (train or eval)."
+
+    if is_qat is None:
+        is_qat = convt.training
+
+    if is_qat:
+        return ConvTransposeBn2d(convt, bn)
+    else:
+        if HAS_QAT_IN_FUNC:
             return nn.utils.fusion.fuse_conv_bn_eval(convt, bn, transpose=True)
-
-else:
-
-    def fuse_convtranspose_bn(convt, bn):
-        r"""Given ConvTranspose and bn modules, fuses them and returns the fused module
-
-        Args:
-            convt: Module instance of type ConvTransposeNd
-            bn: BatchNormNd instance that needs to be fused with the linear layer.
-                batch norm N should match the ConvTranspose N
-
-        Examples::
-
-            >>> m1 = nn.ConvTranspose2d(10, 20, 3)
-            >>> b1 = nn.BatchNorm2d(20)
-            >>> # xdoctest: +SKIP
-            >>> m2 = fuse_convtranspose_bn(m1, b1)
-        """
-        assert convt.training == bn.training, "ConvTranspose and BN both must be in the same mode (train or eval)."
-
-        if convt.training:
-            return ConvTransposeBn2d(convt, bn)
         else:
             fused_conv = copy.deepcopy(convt)
 
@@ -87,14 +69,12 @@ def gen_fuse_known_modules_wrapper(orig_fuse_known_modules):
         types = tuple(type_before_parametrizations(m) for m in mod_list)
         if HAS_QAT_IN_FUNC:
             is_qat = kwargs.get('is_qat', args[0])
-        print(types)
+        else:
+            is_qat = None
         if types in PATCH_MOD_MAPPING:
             new_mod = [None] * len(mod_list)
             fuse_func = PATCH_MOD_MAPPING[types]
-            if HAS_QAT_IN_FUNC:
-                fused = fuse_func(is_qat, *mod_list)
-            else:
-                fused = fuse_func(*mod_list)
+            fused = fuse_func(is_qat, *mod_list)
             # NOTE: forward hooks not processed in the two following for loops will be lost after the fusion
             # Move pre forward hooks of the base module to resulting fused module
             for handle_id, pre_hook_fn in mod_list[0]._forward_pre_hooks.items():
