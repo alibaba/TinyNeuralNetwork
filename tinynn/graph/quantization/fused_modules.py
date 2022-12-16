@@ -18,7 +18,8 @@ class ConvTransposeBn2d(_FusedModule):
         super(ConvTransposeBn2d, self).__init__(conv, bn)
 
 
-if LooseVersion(torch.__version__) >= '1.11.0':
+HAS_QAT_IN_FUNC = LooseVersion(torch.__version__) >= '1.11.0'
+if HAS_QAT_IN_FUNC:
 
     def fuse_convtranspose_bn(is_qat, convt, bn):
         r"""Given ConvTranspose and bn modules, fuses them and returns the fused module
@@ -71,3 +72,62 @@ else:
             )
 
             return fused_conv
+
+
+PATCH_MOD_MAPPING = {
+    (
+        nn.ConvTranspose2d,
+        nn.BatchNorm2d,
+    ): fuse_convtranspose_bn
+}
+
+
+def gen_fuse_known_modules_wrapper(orig_fuse_known_modules):
+    def fuse_known_modules(mod_list, *args, **kwargs):
+        types = tuple(type_before_parametrizations(m) for m in mod_list)
+        if HAS_QAT_IN_FUNC:
+            is_qat = kwargs.get('is_qat', args[0])
+        print(types)
+        if types in PATCH_MOD_MAPPING:
+            new_mod = [None] * len(mod_list)
+            fuse_func = PATCH_MOD_MAPPING[types]
+            if HAS_QAT_IN_FUNC:
+                fused = fuse_func(is_qat, *mod_list)
+            else:
+                fused = fuse_func(*mod_list)
+            # NOTE: forward hooks not processed in the two following for loops will be lost after the fusion
+            # Move pre forward hooks of the base module to resulting fused module
+            for handle_id, pre_hook_fn in mod_list[0]._forward_pre_hooks.items():
+                fused.register_forward_pre_hook(pre_hook_fn)
+                del mod_list[0]._forward_pre_hooks[handle_id]
+            # Move post forward hooks of the last module to resulting fused module
+            for handle_id, hook_fn in mod_list[-1]._forward_hooks.items():
+                fused.register_forward_hook(hook_fn)
+                del mod_list[-1]._forward_hooks[handle_id]
+            new_mod[0] = fused
+
+            for i in range(1, len(mod_list)):
+                identity = nn.Identity()
+                identity.training = mod_list[0].training
+                new_mod[i] = identity
+
+            return new_mod
+        else:
+            return orig_fuse_known_modules(mod_list, *args, **kwargs)
+
+    return fuse_known_modules
+
+
+def type_before_parametrizations(module):
+    has_parametrize = hasattr(torch.nn.utils, 'parametrize')
+    has_is_parametrized = has_parametrize and hasattr(torch.nn.utils.parametrize, 'is_parametrized')
+    has_type_before_parametrizations = has_parametrize and hasattr(
+        torch.nn.utils.parametrize, 'type_before_parametrizations'
+    )
+
+    if has_type_before_parametrizations:
+        return torch.nn.utils.parametrize.type_before_parametrizations(module)
+    elif has_is_parametrized and torch.nn.utils.parametrize.is_parametrized(module):
+        return module.__class__.__bases__[0]
+    else:
+        return type(module)

@@ -57,7 +57,6 @@ FUSE_RULE_LIST = {
 FUSE_RULE_LIST_PTQ_ONLY = {
     (nn.Linear, nn.BatchNorm1d): '1.8.0',
     (nn.ConvTranspose1d, nn.BatchNorm1d): '1.11.0',
-    (nn.ConvTranspose2d, nn.BatchNorm2d): '1.11.0',
     (nn.ConvTranspose3d, nn.BatchNorm3d): '1.11.0',
 }
 
@@ -470,15 +469,17 @@ class QATQuantizer(object):
         quant_list = custom_data[0]
         log.info(f'found nodes to fuse: {quant_list}')
 
-        from torch.ao.quantization.fuser_method_mappings import DEFAULT_OP_LIST_TO_FUSER_METHOD
-
-        DEFAULT_OP_LIST_TO_FUSER_METHOD.update({(nn.ConvTranspose2d, nn.BatchNorm2d): fm.fuse_convtranspose_bn})
+        new_fuser_func = fm.gen_fuse_known_modules_wrapper(
+            sys.modules['torch.quantization.fuse_modules'].fuse_known_modules
+        )
 
         for quant_nodes in quant_list:
             if type(self) != PostQuantizer and LooseVersion(torch.__version__) >= LooseVersion('1.11.0'):
-                torch.ao.quantization.fuse_modules_qat(graph.module, quant_nodes, inplace=True)
+                torch.ao.quantization.fuse_modules_qat(
+                    graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True
+                )
             else:
-                torch_q.fuse_modules(graph.module, quant_nodes, inplace=True)
+                torch_q.fuse_modules(graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True)
 
         self.prepare_qconfig(graph, backend)
 
