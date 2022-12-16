@@ -216,7 +216,7 @@ def cross_layer_equalize(
     model = model_rewrite(model, dummy_input, work_dir=work_dir)
     model = model_fuse_bn(model, dummy_input)
 
-    log.info("start to do Cross Layer Equalization. The range change of bias after CLE:")
+    log.info("start to do Cross Layer Equalization. the range change of bias after CLE:")
     for i in range(cle_iters):
         layers_groups, model = _cross_layer_equalize(model, dummy_input, threshold)
 
