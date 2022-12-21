@@ -73,6 +73,10 @@ FUSE_RULE_LIST_EXTRA = {
     (torch.nn.BatchNorm3d, torch.nn.ReLU6),
     ('add', torch.nn.ReLU6),
     ('add', 'relu6'),
+    (torch.nn.ConvTranspose2d, torch.nn.ReLU),
+    (torch.nn.ConvTranspose2d, torch.nn.ReLU6),
+    (torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d, torch.nn.ReLU),
+    (torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d, torch.nn.ReLU6),
 }
 
 FUSE_QAT_MODULES = {
@@ -2205,6 +2209,15 @@ class QATQuantizer(object):
                     break
                 cur_node = cur_node.prev_nodes[0]
             else:
+                if cur_class == nn.ConvTranspose2d:
+                    if len(final_names) > 0:
+                        next_types = []
+                        for _ in range(len(final_names)):
+                            next_node = cur_node.next_nodes[0]
+                            next_types.append(next_node.kind())
+                            cur_node = next_node
+                        if tuple(next_types) == (nn.BatchNorm2d, nn.ReLU):
+                            final_names.clear()
                 break
 
         if len(final_names) > 0:
