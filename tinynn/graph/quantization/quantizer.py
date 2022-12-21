@@ -714,12 +714,20 @@ class QATQuantizer(object):
                 )
                 qconfig_propagation_list = torch_q.get_default_qconfig_propagation_list()
 
+                orig_from_float = torch.ao.nn.quantizable.LSTM.from_float
+
+                from .quantizable import from_float
+
+                torch.ao.nn.quantizable.LSTM.from_float = from_float
+
                 torch_q.add_observer_(
                     model,
                     qconfig_propagation_list,
                     set(mapping.values()),
                     custom_module_class_mapping=custom_module_class_mapping,
                 )
+
+                torch.ao.nn.quantizable.LSTM.from_float = orig_from_float
             else:
                 torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
             for n in graph.forward_nodes:
