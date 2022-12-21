@@ -18,6 +18,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `hardsigmoid` | / |
 | `instance_norm` | / |
 | `layer_norm` | / |
+| `log` | / |
 | `log_softmax` | / |
 | `matmul` | / |
 | `mm` | / |
@@ -29,6 +30,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `sin` | / |
 | `softmax` | / |
 | `sqrt` | / |
+| `std` | / |
 | `sum` | / |
 | `torch.nn.ConstantPad1d` | 1.7.0 |
 | `torch.nn.ConstantPad2d` | 1.7.0 |
@@ -49,6 +51,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `torch.nn.Softmax` | / |
 | `torch.nn.ZeroPad2d` | 1.7.0 |
 | `truediv` | / |
+| `var` | / |
 ## Extra flags for translating the above ops to quantized TFLite
 | Operators                  | Notes  |
 |----------------------------|--------|

@@ -2264,6 +2264,10 @@ class TraceGraph(object):
                 new_node.prev_nodes.append(prev_node)
             if next_node not in new_node.next_nodes:
                 new_node.next_nodes.append(next_node)
+
+            if next_tensors is None:
+                next_tensors = list(new_node.next_tensors)
+
             new_node.prev_tensors.clear()
             new_node.next_tensors.clear()
             new_node.prev_indices.clear()
@@ -2275,19 +2279,21 @@ class TraceGraph(object):
         prev_indices = []
         for pt, pidx in zip(next_node.prev_tensors, next_node.prev_indices):
             for nt in prev_node.next_tensors:
-                if isinstance(nt, (list, tuple)):
+                if id(pt) == id(nt):
+                    prev_tensors.append(pt)
+                    prev_indices.append(pidx)
+                    break
+                elif isinstance(nt, (list, tuple)):
                     for i, ntt in enumerate(nt):
                         if id(ntt) == id(pt):
                             prev_tensors.append(pt)
                             prev_indices.append(pidx)
                             break
-                elif id(pt) == id(nt):
-                    prev_tensors.append(pt)
-                    prev_indices.append(pidx)
-                    break
 
         if next_tensors is None:
             next_tensors = [None] * len(prev_tensors)
+
+        assert len(next_tensors) > 0, f'{prev_node.unique_name} and {next_node.unique_name} has no common tensors'
 
         for idx, (t, new_t, pidx) in enumerate(zip(prev_tensors, next_tensors, prev_indices)):
             if new_t is None:
