@@ -476,10 +476,16 @@ class QATQuantizer(object):
         )
 
         for quant_nodes in quant_list:
-            if type(self) != PostQuantizer and LooseVersion(torch.__version__) >= LooseVersion('1.11.0'):
-                torch.ao.quantization.fuse_modules_qat(
-                    graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True
-                )
+            if type(self) != PostQuantizer:
+                # See https://github.com/pytorch/pytorch/pull/88193
+                if LooseVersion(torch.__version__) >= '1.11.0' and LooseVersion(torch.__version__) < '1.14.0':
+                    sys.modules['torch.quantization.fuse_modules']._fuse_modules(
+                        graph.module, quant_nodes, is_qat=True, inplace=True, fuser_func=new_fuser_func
+                    )
+                else:
+                    torch.ao.quantization.fuse_modules_qat(
+                        graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True
+                    )
             else:
                 torch_q.fuse_modules(graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True)
 
