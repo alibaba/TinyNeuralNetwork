@@ -480,7 +480,7 @@ class QATQuantizer(object):
         )
 
         for quant_nodes in quant_list:
-            if type(self) != PostQuantizer or LooseVersion(torch.__version__) < '1.11.0':
+            if type(self) != PostQuantizer and LooseVersion(torch.__version__) >= '1.11.0':
                 # See https://github.com/pytorch/pytorch/pull/88193
                 if LooseVersion(torch.__version__) < '1.14.0':
                     sys.modules['torch.quantization.fuse_modules']._fuse_modules(
