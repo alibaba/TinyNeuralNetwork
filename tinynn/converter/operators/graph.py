@@ -529,18 +529,24 @@ class CommonGraph(object):
 
         return indices
 
-    def collect_operators(self) -> typing.List[tfl.BaseOperator]:
+    def collect_operators(
+        self, ops: typing.Optional[typing.List[tfl.BaseOperator]] = None
+    ) -> typing.List[tfl.BaseOperator]:
         """Collect ops
+
+        Args:
+            ops (typing.Optional[typing.List[tfl.BaseOperator]], optional): TFLite operators. Defaults to None.
 
         Returns:
             typing.List[tfl.BaseOperator]: operators with the numbered index
         """
 
         # We define our custom for figuring out a better order than using `self.graph.topological_sorting()`
-        ids = self.topological_sort()
-        nodes = (self.graph.vs[idx] for idx in ids)
-        filtered_nodes = (node for node in nodes if node['node_type'] >= 0)
-        ops: typing.List[tfl.BaseOperator] = (x['op'] for x in filtered_nodes)
+        if ops is None:
+            ids = self.topological_sort()
+            nodes = (self.graph.vs[idx] for idx in ids)
+            filtered_nodes = (node for node in nodes if node['node_type'] >= 0)
+            ops: typing.List[tfl.BaseOperator] = (x['op'] for x in filtered_nodes)
 
         log.debug('Collecting operators...')
         result = []
@@ -554,25 +560,45 @@ class CommonGraph(object):
 
     def collect_tensor_buffers(
         self,
+        labels: typing.Set[str] = None,
+        inputs: typing.List[str] = None,
+        outputs: typing.List[str] = None,
+        tensor_map: typing.Dict[str, tfl.Tensor] = None,
     ) -> typing.Tuple[typing.List[tfl.Tensor], typing.List[tfl.Buffer], typing.List[int], typing.List[int]]:
         """ Collect tensors, buffers and I/O indices
+
+        Args:
+            labels (typing.Set[str], optional): TFLite tensor names. Defaults to None.
+            inputs (typing.List[str], optional): Input tensor names. Defaults to None.
+            outputs (typing.List[str], optional): Output tensor names. Defaults to None.
+            tensor_map (typing.Dict[str, tfl.Tensor], optional): All tensors. Defaults to None.
 
         Returns:
             typing.Tuple[typing.List[tfl.Tensor], typing.List[tfl.Buffer], typing.List[int], typing.List[int]]: \
                 tensors, buffers with the numbered index and I/O indices
         """
 
-        labels = set(self.graph.es['label'])
+        if labels is None:
+            labels = set(self.graph.es['label'])
+
+        if inputs is None:
+            inputs = self.inputs
+
+        if outputs is None:
+            outputs = self.outputs
+
+        if tensor_map is None:
+            tensor_map = self.tensor_map
 
         tensor_idx = 0
         buffer_idx = 1
 
         tensors = []
         buffers = [tfl.Buffer(bytes(0))]
-        input_idx = [-1] * len(self.inputs)
-        output_idx = [-1] * len(self.outputs)
+        input_idx = [-1] * len(inputs)
+        output_idx = [-1] * len(outputs)
         for label in labels:
-            tensor: tfl.Tensor = self.tensor_map[label]
+            tensor: tfl.Tensor = tensor_map[label]
             if tensor.index != -1:
                 if tensor.is_variable:
                     tensor.buffer.index = 0
@@ -587,18 +613,18 @@ class CommonGraph(object):
 
                     buffers.append(tensor.buffer)
 
-            if label in self.inputs:
-                item_indices = [i for i, x in enumerate(self.inputs) if x == label]
+            if label in inputs:
+                item_indices = [i for i, x in enumerate(inputs) if x == label]
                 for item_idx in item_indices:
                     input_idx[item_idx] = tensor.index
 
-            if label in self.outputs:
-                item_indices = [i for i, x in enumerate(self.outputs) if x == label]
+            if label in outputs:
+                item_indices = [i for i, x in enumerate(outputs) if x == label]
                 for item_idx in item_indices:
                     output_idx[item_idx] = tensor.index
 
-        missing_inputs = [name for name, _ in filter(lambda x: x[1] < 0, zip(self.inputs, input_idx))]
-        missing_outputs = [name for name, _ in filter(lambda x: x[1] < 0, zip(self.outputs, output_idx))]
+        missing_inputs = [name for name, _ in filter(lambda x: x[1] < 0, zip(inputs, input_idx))]
+        missing_outputs = [name for name, _ in filter(lambda x: x[1] < 0, zip(outputs, output_idx))]
 
         assert len(missing_outputs) == 0, f'Some output nodes are missing: {missing_outputs}'
 
@@ -609,7 +635,7 @@ class CommonGraph(object):
                 tensor.index = tensor_idx
                 tensor_idx += 1
                 tensors.append(tensor)
-                item_idx = self.inputs.index(name)
+                item_idx = inputs.index(name)
                 input_idx[item_idx] = tensor.index
 
         return tensors, buffers, input_idx, output_idx
@@ -624,6 +650,80 @@ class CommonGraph(object):
         # Collect multiple data to build a tflite model
         tensors, buffers, input_idx, output_idx = self.collect_tensor_buffers()
         ops = self.collect_operators()
+
+        # Construct the flatbuffer model
+        tflite_model = self.build_model(ops, tensors, buffers, input_idx, output_idx)
+
+        # Check output directory
+        tflite_dir = os.path.abspath(os.path.dirname(tflite_path))
+        os.makedirs(tflite_dir, exist_ok=True)
+
+        # Write to file
+        with open(tflite_path, 'wb') as f:
+            f.write(tflite_model)
+
+        full_ops = ops
+        orig_tflite_path = tflite_path
+
+        for v in self.graph.vs:
+            if v['op'] is None:
+                continue
+
+            orig_op = v['op'].extra_hints.get('orig_float', None)
+            if orig_op is None:
+                continue
+
+            dq_op = v['op']
+            op_dict: typing.Dict[str, tfl.BaseOperator] = {'float': orig_op, 'dq': dq_op}
+            index = full_ops.index(dq_op)
+
+            for k, op in op_dict.items():
+                # Collect multiple data to build a tflite model
+                inputs = [x.name for x in op.inputs if x.buffer is None and not isinstance(x, tfl.OptionalTensor)]
+                outputs = [x.name for x in op.outputs if x.buffer is None and not isinstance(x, tfl.OptionalTensor)]
+                tensor_map = {t.name: t for t in op.inputs + op.outputs}
+                labels = tensor_map.keys()
+
+                tensors, buffers, input_idx, output_idx = self.collect_tensor_buffers(
+                    labels, inputs, outputs, tensor_map
+                )
+                ops = self.collect_operators([op])
+
+                # Construct the flatbuffer model
+                tflite_model = self.build_model(ops, tensors, buffers, input_idx, output_idx)
+
+                fn, ext = os.path.splitext(orig_tflite_path)
+                fn += f'_{k}_{index}'
+                tflite_path = f'{fn}{ext}'
+
+                # Check output directory
+                tflite_dir = os.path.abspath(os.path.dirname(tflite_path))
+                os.makedirs(tflite_dir, exist_ok=True)
+
+                # Write to file
+                with open(tflite_path, 'wb') as f:
+                    f.write(tflite_model)
+
+    def build_model(
+        self,
+        ops: typing.List[tfl.BaseOperator],
+        tensors: typing.List[tfl.Tensor],
+        buffers: typing.List[tfl.Buffer],
+        input_idx: typing.List[int],
+        output_idx: typing.List[int],
+    ) -> bytearray:
+        """Build the flatbuffer model
+
+        Args:
+            ops (typing.List[tfl.BaseOperator]): TFLite operators
+            tensors (typing.List[tfl.Tensor]): TFLite tensors
+            buffers (typing.List[tfl.Buffer]): TFLite buffers
+            input_idx (typing.List[int]): The indices of the input tensors
+            output_idx (typing.List[int]): The indices of the output tensors
+
+        Returns:
+            bytearray: The built flatbuffer model
+        """
 
         # Start flatbuffer
         builder = flatbuffers.Builder(0)
@@ -651,11 +751,4 @@ class CommonGraph(object):
 
         # Finish Model
         tflite_model = builder.Output()
-
-        # Check output directory
-        tflite_dir = os.path.abspath(os.path.dirname(tflite_path))
-        os.makedirs(tflite_dir, exist_ok=True)
-
-        # Write to file
-        with open(tflite_path, 'wb') as f:
-            f.write(tflite_model)
+        return tflite_model
