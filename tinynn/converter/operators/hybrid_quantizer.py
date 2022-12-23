@@ -1,14 +1,15 @@
+import copy
 import functools
+
 import igraph as ig
 import numpy as np
-
 import torch
+
+from tinynn.util.util import get_logger
 
 from . import tflite as tfl
 from .base import ExtendedOperator
 from .graph import CommonGraph
-
-from tinynn.util.util import get_logger
 
 log = get_logger(__name__)
 
@@ -22,7 +23,7 @@ WEIGHT_MAPPING = {
 class HybridQuantizer(object):
     graph: CommonGraph
 
-    def __init__(self, graph, asymmetric, q_type, per_channel, enable_conv) -> None:
+    def __init__(self, graph, asymmetric, q_type, per_channel, enable_conv, gen_single_op_models, config) -> None:
         super().__init__()
 
         self.graph = graph
@@ -30,6 +31,12 @@ class HybridQuantizer(object):
         self.q_type = q_type
         self.per_channel = per_channel
         self.enable_conv = enable_conv
+        self.gen_single_op_models = gen_single_op_models
+
+        if config is None:
+            config = {}
+
+        self.config = config
 
     def quantize(self):
         self.quantize_pass()
@@ -40,6 +47,8 @@ class HybridQuantizer(object):
         actions = []
         replaced_tensors = {}
         for node in filtered_nodes:
+            if self.config.get(node['outputs'][0], True) is False:
+                continue
             weight_indices = WEIGHT_MAPPING.get(node['node_type'], [1])
             skip = False
             for weight_idx in weight_indices:
@@ -80,6 +89,9 @@ class HybridQuantizer(object):
                     new_weight = quantize(
                         name, weight, torch.qint8, torch.per_channel_symmetric, -1, q_type=self.q_type
                     )
+
+                if self.gen_single_op_models:
+                    node['op'].extra_hints['orig_float'] = copy.deepcopy(node['op'])
 
                 replaced_tensors.setdefault(new_weight.name, new_weight)
                 new_weight = replaced_tensors[new_weight.name]

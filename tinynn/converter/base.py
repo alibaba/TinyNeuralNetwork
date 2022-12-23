@@ -53,6 +53,8 @@ class TFLiteConverter(object):
         hybrid_conv: bool = True,
         unroll_lstm: bool = False,
         bypass_elementwise_passthrough_constraint: bool = False,
+        hybrid_gen_single_op_models: bool = False,
+        hybrid_config: typing.Optional[typing.Dict[str, bool]] = None,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -99,6 +101,8 @@ class TFLiteConverter(object):
             unroll_lstm (bool): Unrolling LSTM (translate LSTM to seperate ops). Defaults to False
             bypass_elementwise_passthrough_constraint (bool): Bypass constraints in elementwise passthrough passes. \
                 Defaults to False
+            hybrid_gen_single_op_models: Generate both floating point and quantized version of the model for hybrid \
+                quantizable ops. Defaults to False
         """
 
         self.model = model
@@ -147,6 +151,8 @@ class TFLiteConverter(object):
         self.hybrid_conv = hybrid_conv
         self.unroll_lstm = unroll_lstm
         self.bypass_elementwise_passthrough_constraint = bypass_elementwise_passthrough_constraint
+        self.hybrid_gen_single_op_models = hybrid_gen_single_op_models
+        self.hybrid_config = hybrid_config
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -479,6 +485,8 @@ class TFLiteConverter(object):
                     self.hybrid_q_type,
                     self.hybrid_per_channel,
                     self.hybrid_conv,
+                    self.hybrid_gen_single_op_models,
+                    self.hybrid_config,
                 )
                 quantizer.quantize()
                 optimizer.cleanup_dead_nodes()
