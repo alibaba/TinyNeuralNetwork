@@ -315,6 +315,17 @@ class QATQuantizer(object):
             actual_v = config.get(k, v)
             setattr(self, k, actual_v)
 
+    def set_model_mode(self, model: nn.Module = None):
+        """Sets the mode (train/eval) of the model
+
+        Args:
+            model (nn.Module, optional): A PyTorch model. Defaults to None.
+        """
+        if model is None:
+            model = self.model
+
+        model.train()
+
     def quantize(self) -> nn.Module:
         """Performs QAT rewrite and preparation
 
@@ -323,7 +334,7 @@ class QATQuantizer(object):
         """
 
         # We need a model in training mode so that QAT could take place
-        self.model.train()
+        self.set_model_mode()
 
         # After tracing the model, we will get a TraceGraph object
         graph = trace(self.model, self.dummy_input, **self.extra_tracer_opts)
@@ -331,12 +342,12 @@ class QATQuantizer(object):
         if self.rewrite_graph:
             # Retrives the name of the model from type info
             model_name = type(self.model).__name__
-            model_name_qat = f'{model_name}_qat'
-            model_name_qat_lower = model_name_qat.lower()
-            model_ns = f'tinynn_rewritten_models.{model_name_qat}'
+            model_name_q = f'Q{model_name}'
+            model_name_q_lower = f'{model_name}_q'.lower()
+            model_ns = f'tinynn_rewritten_models.{model_name_q}'
 
-            model_code_path = os.path.join(self.work_dir, f'{model_name_qat_lower}.py')
-            model_weights_path = os.path.join(self.work_dir, f'{model_name_qat_lower}.pth')
+            model_code_path = os.path.join(self.work_dir, f'{model_name_q_lower}.py')
+            model_weights_path = os.path.join(self.work_dir, f'{model_name_q_lower}.pth')
 
             # Generate the code for the modified model
             # We will try to do some op fusion and rewriting in the `rewrite_quantize_graph` function.
@@ -346,10 +357,10 @@ class QATQuantizer(object):
             # skip this step so it won't be overwritten.
             if self.force_overwrite or not os.path.exists(model_code_path) or not os.path.exists(model_weights_path):
                 self.rewrite_quantize_graph(graph)
-                graph.generate_code(model_code_path, model_weights_path, model_name_qat)
+                graph.generate_code(model_code_path, model_weights_path, model_name_q)
 
             # Import the new model
-            rewritten_model = import_from_path(model_ns, model_code_path, model_name_qat)()
+            rewritten_model = import_from_path(model_ns, model_code_path, model_name_q)()
             rewritten_model.load_state_dict(torch.load(model_weights_path))
 
             device = get_module_device(self.model)
@@ -361,7 +372,7 @@ class QATQuantizer(object):
                 os.unlink(model_weights_path)
 
             # Set the model to training mode before tracing again, since we need to perform QAT
-            rewritten_model.train()
+            self.set_model_mode(rewritten_model)
             rewritten_graph = trace(rewritten_model, self.dummy_input)
 
             # Update the model so that the original one can be released
@@ -2709,6 +2720,17 @@ class PostQuantizer(QATQuantizer):
 
         super().parse_config(config)
 
+    def set_model_mode(self, model: nn.Module = None):
+        """Sets the mode (train/eval) of the model
+
+        Args:
+            model (nn.Module, optional): A PyTorch model. Defaults to None.
+        """
+        if model is None:
+            model = self.model
+
+        model.eval()
+
     def prepare_qconfig(self, graph: TraceGraph, backend: str):
         """Prepare qconfig for various configurations.
 
@@ -2961,6 +2983,7 @@ class DeQuantizer(object):
     force_overwrite: bool
     remove_weights_after_load: bool
     extra_tracer_opts: typing.Optional[typing.Dict]
+    target: str
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new DeQuantizer object
@@ -2985,7 +3008,10 @@ class DeQuantizer(object):
 
     def dequantize(self) -> nn.Module:
         # We need a model in training mode so that QAT could take place
-        self.model.train()
+        if self.target == 'qat':
+            self.model.train()
+        else:
+            self.model.eval()
 
         # After tracing the model, we will get a TraceGraph object
         graph = trace(self.model, self.dummy_input, **self.extra_tracer_opts)
@@ -3021,7 +3047,10 @@ class DeQuantizer(object):
                 os.unlink(model_weights_path)
 
             # Set the model to training mode before tracing again, since we need to perform QAT
-            rewritten_model.train()
+            if self.target == 'qat':
+                rewritten_model.train()
+            else:
+                rewritten_model.eval()
 
             # Update the model so that the original one can be released
             self.model = rewritten_model
@@ -3036,6 +3065,7 @@ class DeQuantizer(object):
             'force_overwrite': True,
             'extra_tracer_opts': {},
             'remove_weights_after_load': False,
+            'target': 'qat',
         }
 
         if config is None:
