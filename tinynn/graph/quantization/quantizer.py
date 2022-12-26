@@ -37,6 +37,12 @@ from tinynn.util.train_util import get_module_device, get_logger
 from tinynn.util.util import import_from_path
 from . import fused_modules as fm
 
+try:
+    import ruamel_yaml as yaml
+except ModuleNotFoundError:
+    import ruamel.yaml as yaml
+
+
 # Fusable OPs for Quantize Aware Training
 FUSE_RULE_LIST = {
     (torch.nn.Conv1d, torch.nn.BatchNorm1d),
@@ -221,6 +227,7 @@ class QATQuantizer(object):
     swap_nodes: typing.Optional[typing.List[typing.Tuple[nn.Module, nn.Module]]]
     legacy_fq: bool
     extra_tracer_opts: typing.Optional[typing.Dict]
+    layerwise_config: typing.Dict[str, bool]
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new QATQuantizer object
@@ -286,6 +293,7 @@ class QATQuantizer(object):
 
         self.leaf_nodes = None
         self.swap_nodes = None
+        self.layerwise_config = {}
 
     def parse_config(self, config: typing.Optional[dict]):
         default_values = {
@@ -349,6 +357,12 @@ class QATQuantizer(object):
             model_code_path = os.path.join(self.work_dir, f'{model_name_q_lower}.py')
             model_weights_path = os.path.join(self.work_dir, f'{model_name_q_lower}.pth')
 
+            config_path = os.path.join(self.work_dir, f'{model_name_q_lower}_config.yml')
+
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    self.layerwise_config = yaml.load(f, Loader=yaml.RoundTripLoader)
+
             # Generate the code for the modified model
             # We will try to do some op fusion and rewriting in the `rewrite_quantize_graph` function.
             # By default, we will try to insert QuantStubs before every input and DeQuantStubs after every output in
@@ -358,6 +372,9 @@ class QATQuantizer(object):
             if self.force_overwrite or not os.path.exists(model_code_path) or not os.path.exists(model_weights_path):
                 self.rewrite_quantize_graph(graph)
                 graph.generate_code(model_code_path, model_weights_path, model_name_q)
+
+            with open(config_path, 'w') as f:
+                yaml.dump(self.layerwise_config, f, default_flow_style=False, Dumper=yaml.RoundTripDumper)
 
             # Import the new model
             rewritten_model = import_from_path(model_ns, model_code_path, model_name_q)()
@@ -457,6 +474,10 @@ class QATQuantizer(object):
 
         if not graph.quantized:
             return
+
+        for n in graph.forward_nodes:
+            if n.quantized and n.type() not in (torch_q.QuantStub, torch_q.DeQuantStub):
+                self.layerwise_config.setdefault(n.unique_name, True)
 
         if isinstance(self, PostQuantizer):
             processed_rules = load_processed_ptq_rules()
@@ -1231,7 +1252,11 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind == 'neg' and cur_module.prev_tensors[0].dtype == torch.float32
+                return (
+                    cur_module.kind == 'neg'
+                    and cur_module.prev_tensors[0].dtype == torch.float32
+                    and self.layerwise_config.get(node.unique_name, True)
+                )
 
         neg_nodes = graph.filter_forward_nodes(_is_neg_node)
         log.info(f'rewriting neg for {[node.unique_name for node in neg_nodes]}')
@@ -1260,6 +1285,7 @@ class QATQuantizer(object):
                     and cur_module.func_type != '__rtruediv__'
                     and node.next_tensors[0].dtype == torch.float32
                     and node.prev_nodes[0].kind() not in ('size', 'shape')
+                    and self.layerwise_config.get(node.unique_name, True)
                 )
 
         div_nodes = graph.filter_forward_nodes(_is_div_node)
@@ -1298,6 +1324,7 @@ class QATQuantizer(object):
                     cur_module.kind == 'sub'
                     and cur_module.prev_tensors[0].dtype == torch.float32
                     and node.next_tensors[0].dtype == torch.float32
+                    and self.layerwise_config.get(node.unique_name, True)
                 )
 
         sub_nodes = graph.filter_forward_nodes(_is_sub_node)
@@ -1373,7 +1400,11 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind == 'stack' and node.next_tensors[0].dtype == torch.float32
+                return (
+                    cur_module.kind == 'stack'
+                    and node.next_tensors[0].dtype == torch.float32
+                    and self.layerwise_config.get(node.unique_name, True)
+                )
 
         stack_nodes = graph.filter_forward_nodes(_is_stack_node)
 
@@ -1417,7 +1448,11 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind in ('add', 'mul', 'cat') and node.next_tensors[0].dtype == torch.float32
+                return (
+                    cur_module.kind in ('add', 'mul', 'cat')
+                    and node.next_tensors[0].dtype == torch.float32
+                    and self.layerwise_config.get(node.unique_name, True)
+                )
 
         convertible_nodes = graph.filter_forward_nodes(_is_convertible_node)
         unfusable_add_nodes = []  # noqa: F841
@@ -1502,7 +1537,11 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind in ('clamp_min', 'clamp_max') and node.next_tensors[0].dtype == torch.float32
+                return (
+                    cur_module.kind in ('clamp_min', 'clamp_max')
+                    and node.next_tensors[0].dtype == torch.float32
+                    and self.layerwise_config.get(node.unique_name, True)
+                )
 
         clamp_min_max_nodes = graph.filter_forward_nodes(_is_clamp_min_max_node)
         log.info(f'rewriting clamp_{{min,max}} for {[node.unique_name for node in convertible_nodes]}')
@@ -1534,7 +1573,11 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind == 'clamp' and node.next_tensors[0].dtype == torch.float32
+                return (
+                    cur_module.kind == 'clamp'
+                    and node.next_tensors[0].dtype == torch.float32
+                    and self.layerwise_config.get(node.unique_name, True)
+                )
 
         clamp_nodes = graph.filter_forward_nodes(_is_clamp_node)
         log.info(f'rewriting clamp for {[node.unique_name for node in convertible_nodes]}')
@@ -1592,6 +1635,10 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             visited_nodes = [node]
+
+            if self.layerwise_config.get(node.unique_name, True) is False:
+                return False
+
             if cur_class == TraceFunction:
                 # The intermediate result cannot be used if fused.
                 # So we don't fuse the nodes under such circumstances.
@@ -1678,7 +1725,9 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind in FUNCTIONAL_MODULE_MAPPING
+                return cur_module.kind in FUNCTIONAL_MODULE_MAPPING and self.layerwise_config.get(
+                    node.unique_name, True
+                )
 
         func_nodes_to_rewrite = graph.filter_forward_nodes(_is_functional_rewrite_node)
         log.info(f'rewriting functional to module for {[node.unique_name for node in func_nodes_to_rewrite]}')
@@ -1792,7 +1841,7 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind == 'dropout'
+                return cur_module.kind == 'dropout' and self.layerwise_config.get(node.unique_name, True)
 
         def _dropout_args(p=0.5, training=True, inplace=False):
             return p, training, inplace
@@ -1821,6 +1870,8 @@ class QATQuantizer(object):
         # Add contiguous nodes for partially-supported OPs
         # Some of the operations support quantization, but they only accept contiguous input tensors.
         def _is_partially_quantizable(node, custom_data):
+            if self.layerwise_config.get(node.unique_name, True) is False:
+                return False
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == ConstantNode:
@@ -1847,6 +1898,8 @@ class QATQuantizer(object):
 
         # Remove non-leaf `.data` nodes
         def _is_non_leaf_data_nodes(node, custom_data):
+            if self.layerwise_config.get(node.unique_name, True) is False:
+                return False
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
@@ -1859,6 +1912,8 @@ class QATQuantizer(object):
 
         # Handle PoolNd with kernel_size=1
         def _is_pool_nd_with_one_kernel_size(node, custom_data):
+            if self.layerwise_config.get(node.unique_name, True) is False:
+                return False
             cur_module = node.module
             cur_class = type(cur_module)
             kernel_size, stride = None, None
@@ -1992,6 +2047,8 @@ class QATQuantizer(object):
 
         # Rewrite BatchNorm1d to BatchNorm2d
         def _is_batch_norm_1d(node, custom_data):
+            if self.layerwise_config.get(node.unique_name, True) is False:
+                return False
             cur_module = node.module
             cur_class = type(cur_module)
             if len(node.prev_nodes) != 1:
@@ -2034,8 +2091,15 @@ class QATQuantizer(object):
                 next_out = torch.squeeze(node.next_tensors[0], 2)
                 graph.insert_after(node, next_func, [next_out])
 
+        for n in graph.forward_nodes:
+            if n.type() not in (torch_q.QuantStub, torch_q.DeQuantStub):
+                self.layerwise_config.setdefault(n.unique_name, True)
+
         # Add quant/dequant nodes for non-quantizable OPs
         def _is_not_quantizable(node, custom_data):
+            if self.layerwise_config.get(node.unique_name, True) is False:
+                return True
+
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == ConstantNode:
@@ -2058,6 +2122,9 @@ class QATQuantizer(object):
 
         unsupported_nodes = graph.filter_forward_nodes(_is_not_quantizable)
         for idx, node in enumerate(reversed(unsupported_nodes)):
+            if node.unique_name in self.layerwise_config:
+                if self.layerwise_config[node.unique_name]:
+                    del self.layerwise_config[node.unique_name]
             node_map = dict()
             next_nodes = {n.unique_name: n for n in node.next_nodes}.values()
             for inner_idx, next_node in enumerate(next_nodes):
@@ -2191,15 +2258,18 @@ class QATQuantizer(object):
         if current_rules is None:
             return False
 
-        if check_node_quantized:
-            if not node.quantized:
-                return False
-
         cur_node = node
         names = []
         final_names = []
         current_state = False
         while True:
+            if check_node_quantized:
+                if not node.quantized:
+                    return False
+                else:
+                    if self.layerwise_config.get(node.unique_name, False) is False:
+                        return False
+
             cur_module = cur_node.module
             cur_class = type(cur_module)
             if isinstance(cur_module, TraceFunction):
