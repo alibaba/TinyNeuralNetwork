@@ -67,8 +67,9 @@ def benchmark_model_adb(path):
 
     subprocess.call(['adb', 'push', path, device_dir])
     run_out = subprocess.check_output(
-        ['adb', 'shell', f'{benchmark_path} --graph={device_path} --num_threads=1']
+        ['adb', 'shell', f'{benchmark_path} --graph={device_path} --num_threads=1'], stderr=subprocess.DEVNULL
     ).decode()
+    subprocess.call(['adb', 'shell', f'rm -f {device_path}'])
 
     times = re.findall('Inference \(avg\): (.*)', run_out)
     return float(times[0]) / 1000
