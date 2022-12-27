@@ -1985,6 +1985,7 @@ class QATQuantizer(object):
             current_rules=load_processed_rewrite_to_fuse_rules(),
             check_node_quantized=False,
             graph=graph,
+            layerwise_config_default=True,
         )
         custom_data = ([], set())
         graph.filter_forward_nodes(is_rewrite_to_fuse, custom_data, reverse=True)
@@ -2305,7 +2306,14 @@ class QATQuantizer(object):
         graph.recompute_forward_order()
 
     def is_fusable(
-        self, node, custom_data, current_rules=None, check_node_quantized=True, use_original_name=True, graph=None
+        self,
+        node,
+        custom_data,
+        current_rules=None,
+        check_node_quantized=True,
+        use_original_name=True,
+        graph=None,
+        layerwise_config_default=False,
     ):
         # Tell whether a TraceNode is fusable with some nearby nodes
 
@@ -2316,7 +2324,7 @@ class QATQuantizer(object):
             if not node.quantized:
                 return False
         else:
-            if self.layerwise_config.get(node.unique_name, False) is False:
+            if self.layerwise_config.get(node.unique_name, layerwise_config_default) is False:
                 return False
 
         cur_node = node
