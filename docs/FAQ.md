@@ -48,8 +48,6 @@ TinyNeuralNetwork does not support operators that are not natively supported by 
 #### How to perform mixed precision quantization?
 Q: How to quantize only part of a quantized graph when the default is to perform quantization on the whole graph?
 
-The easy way is to use the layerwise configuration file. Please refer to the code example [here](../examples/quantization/selective_q.py). If that doesn't work, you may refer to the steps below.
-
 ```python
 # Quantization with the whole graph
 with model_tracer():
@@ -57,7 +55,7 @@ with model_tracer():
     qat_model = quantizer.quantize()
 ```
 
-A: First, perform quantization for the whole graph. Then, manually modify the positions of QuantStub and DeQuantStub. After that, using the code below to load the model.
+A: First, perform quantization for the whole graph. Then, the easy way is to use the layerwise configuration file. Please refer to the code example [here](../examples/quantization/selective_q.py). If that doesn't work, you may modify the positions of QuantStub and DeQuantStub manually. After that, using the code below to load the model. The detailed code example can be seen [here](../examples/mixed_qat/qat.py).
 ```python
 # Reload the model with modification
 with model_tracer():

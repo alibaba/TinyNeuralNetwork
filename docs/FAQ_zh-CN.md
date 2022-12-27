@@ -48,8 +48,6 @@ A：TinyNeuralNetwork的量化训练是使用PyTorch的量化训练作为后端�
 #### 如何实现混合精度量化？
 Q： 量化计算图生成默认是全图量化，如何只量化其中一部分？
 
-简单的方式是通过调整配置文件，可以参考[这个](../examples/quantization/selective_q.py)代码样例。如果不能正常运行，可以参考下面手工编辑的方法。
-
 ```python
 # 全图量化
 with model_tracer():
@@ -57,7 +55,7 @@ with model_tracer():
     qat_model = quantizer.quantize()
 ```
 
-A：先进行全图量化，然后手工修改QuantStub、DeQuantStub的位置，之后使用下面的代码来加载模型。
+A：先进行全图量化，之后较为简单的方式是通过调整配置文件，可以参考[这个](../examples/quantization/selective_q.py)代码样例。如果不能正常运行，可以手工修改QuantStub、DeQuantStub的位置，之后使用下面的代码来加载模型。具体的代码样例在[这里](../examples/mixed_qat/qat.py).
 ```python
 # 载入修改后的模型代码
 with model_tracer():
