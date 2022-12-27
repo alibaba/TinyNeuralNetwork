@@ -49,7 +49,7 @@ def quantize_by_given_list(model: nn.Module, unique_name_list: List[str], alg: s
     for name, mod in ptq_model.named_children():
         if name in unique_name_list:
             if isinstance(mod, torch.nn.quantized.FloatFunctional):
-                new_mod = QuantFolatFunctionWrapper(mod)
+                new_mod = QuantFloatFunctionWrapper(mod)
             else:
                 new_mod = torch.quantization.QuantWrapper(mod)
             setattr(new_mod, 'qconfig', qconfig)
@@ -59,7 +59,7 @@ def quantize_by_given_list(model: nn.Module, unique_name_list: List[str], alg: s
     return ptq_model
 
 
-class QuantFolatFunctionWrapper(FloatFunctional):
+class QuantFloatFunctionWrapper(FloatFunctional):
     r"""A wrapper class that wraps the input FloatFunctional module, adds QuantStub and
     DeQuantStub and surround the call to module with call to quant and dequant
     modules.
@@ -68,7 +68,7 @@ class QuantFolatFunctionWrapper(FloatFunctional):
     """
 
     def __init__(self, ff_module):
-        super(QuantFolatFunctionWrapper, self).__init__()
+        super(QuantFloatFunctionWrapper, self).__init__()
         self.add_module('quant_0', torch_q.QuantStub())
         self.add_module('quant_1', torch_q.QuantStub())
         self.add_module('dequant', torch_q.DeQuantStub())
@@ -138,6 +138,7 @@ def main_worker(args):
         for name, mod in model.named_children():
             if type(mod) in whitelist:
                 uname_config[name] = type(mod).__name__
+        os.makedirs(os.path.dirname(unique_name_file_path), exist_ok=True)
         with open(unique_name_file_path, 'w') as f:
             yaml.dump(uname_config, f, default_flow_style=False, Dumper=yaml.RoundTripDumper)
     with open(unique_name_file_path, 'r') as f:
