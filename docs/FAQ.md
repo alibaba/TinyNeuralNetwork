@@ -47,6 +47,9 @@ TinyNeuralNetwork does not support operators that are not natively supported by 
 
 #### How to perform mixed precision quantization?
 Q: How to quantize only part of a quantized graph when the default is to perform quantization on the whole graph?
+
+The easy way is to use the layerwise configuration file. Please refer to the code example [here](../examples/quantization/selective_q.py). If that doesn't work, you may refer to the steps below.
+
 ```python
 # Quantization with the whole graph
 with model_tracer():

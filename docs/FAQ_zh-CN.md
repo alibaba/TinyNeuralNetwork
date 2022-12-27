@@ -47,6 +47,9 @@ A：TinyNeuralNetwork的量化训练是使用PyTorch的量化训练作为后端�
 
 #### 如何实现混合精度量化？
 Q： 量化计算图生成默认是全图量化，如何只量化其中一部分？
+
+简单的方式是通过调整配置文件，可以参考[这个](../examples/quantization/selective_q.py)代码样例。如果不能正常运行，可以参考下面手工编辑的方法。
+
 ```python
 # 全图量化
 with model_tracer():
