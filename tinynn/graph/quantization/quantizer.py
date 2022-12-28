@@ -361,9 +361,6 @@ class QATQuantizer(object):
         # We need a model in training mode so that QAT could take place
         self.set_model_mode()
 
-        # After tracing the model, we will get a TraceGraph object
-        graph = trace(self.model, self.dummy_input, **self.extra_tracer_opts)
-
         if self.rewrite_graph:
             # Retrives the name of the model from type info
             model_name = type(self.model).__name__
@@ -388,6 +385,8 @@ class QATQuantizer(object):
             # skip the quantization rewrite for some ops, then you may modify the code generated freely and remember to
             # skip this step so it won't be overwritten.
             if self.force_overwrite or not os.path.exists(model_code_path) or not os.path.exists(model_weights_path):
+                # After tracing the model, we will get a TraceGraph object
+                graph = trace(self.model, self.dummy_input, **self.extra_tracer_opts)
                 self.rewrite_quantize_graph(graph)
                 graph.generate_code(model_code_path, model_weights_path, model_name_q)
 
@@ -413,6 +412,8 @@ class QATQuantizer(object):
             # Update the model so that the original one can be released
             self.model = rewritten_model
         else:
+            # After tracing the model, we will get a TraceGraph object
+            graph = trace(self.model, self.dummy_input, **self.extra_tracer_opts)
             rewritten_graph = graph
 
         # Fuse the modules (e.g conv, bn, relu) in the computation graph according to the fuse rules.
