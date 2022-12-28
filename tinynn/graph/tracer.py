@@ -487,28 +487,6 @@ class TraceFunction(object):
             """Get the tensor name from the computation graph"""
             ns = ''
             if constant_handler(a, self.unique_name, self.full_name):
-                # if id(a) not in current_graph().tensor_pre_node_dict:
-                # if not a.is_leaf:
-                #     log.error(
-                #         f'Connection is lost when generating code for {self.unique_name} of type {self.full_name}'
-                #     )
-                # else:
-                #     # Constant generation
-                #     log.warning('Constant generation is experimental and may yield error')
-                #     convert_to_parameter = False
-                #     persistent = False
-                #     requires_grad = a.requires_grad
-                #     if isinstance(a, torch.nn.Parameter):
-                #         convert_to_parameter = True
-                #     if a.numel() > 50:
-                #         persistent = True
-                #     raw_data = a.tolist()
-                #     with no_catch():
-                #         constant_node = ConstantNode(raw_data, a.dtype, a.shape).parse(
-                #             convert_to_parameter, persistent, requires_grad
-                #         )
-                #     trace_node = TraceNode(constant_node)
-                #     add_constant_node(trace_node, a)
                 ns = 'self.'
                 pre_node_name = current_graph().tensor_pre_node_dict[id(a)]
             else:
