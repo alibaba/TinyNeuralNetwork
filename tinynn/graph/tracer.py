@@ -486,30 +486,31 @@ class TraceFunction(object):
         def _tensor_name(a, convert_to_parameter=False):
             """Get the tensor name from the computation graph"""
             ns = ''
-            if id(a) not in current_graph().tensor_pre_node_dict:
-                if not a.is_leaf:
-                    log.error(
-                        f'Connection is lost when generating code for {self.unique_name} of type {self.full_name}'
-                    )
-                else:
-                    # Constant generation
-                    log.warning('Constant generation is experimental and may yield error')
-                    convert_to_parameter = False
-                    persistent = False
-                    requires_grad = a.requires_grad
-                    if isinstance(a, torch.nn.Parameter):
-                        convert_to_parameter = True
-                    if a.numel() > 50:
-                        persistent = True
-                    raw_data = a.tolist()
-                    with no_catch():
-                        constant_node = ConstantNode(raw_data, a.dtype, a.shape).parse(
-                            convert_to_parameter, persistent, requires_grad
-                        )
-                    trace_node = TraceNode(constant_node)
-                    add_constant_node(trace_node, a)
-                    ns = 'self.'
-                    pre_node_name = current_graph().tensor_pre_node_dict[id(a)]
+            if constant_handler(a, self.unique_name, self.full_name):
+                # if id(a) not in current_graph().tensor_pre_node_dict:
+                # if not a.is_leaf:
+                #     log.error(
+                #         f'Connection is lost when generating code for {self.unique_name} of type {self.full_name}'
+                #     )
+                # else:
+                #     # Constant generation
+                #     log.warning('Constant generation is experimental and may yield error')
+                #     convert_to_parameter = False
+                #     persistent = False
+                #     requires_grad = a.requires_grad
+                #     if isinstance(a, torch.nn.Parameter):
+                #         convert_to_parameter = True
+                #     if a.numel() > 50:
+                #         persistent = True
+                #     raw_data = a.tolist()
+                #     with no_catch():
+                #         constant_node = ConstantNode(raw_data, a.dtype, a.shape).parse(
+                #             convert_to_parameter, persistent, requires_grad
+                #         )
+                #     trace_node = TraceNode(constant_node)
+                #     add_constant_node(trace_node, a)
+                ns = 'self.'
+                pre_node_name = current_graph().tensor_pre_node_dict[id(a)]
             else:
                 pre_node_name = current_graph().tensor_pre_node_dict[id(a)]
                 node = current_graph().nodes_map[pre_node_name]
@@ -773,6 +774,49 @@ def new_module_getattr_gen(orig_getattr, key: str, res: typing.Dict[str, bool]):
     return new_getattr
 
 
+def constant_handler(
+    tensor: torch.Tensor, node_name: typing.Optional[str] = None, type_name: typing.Optional[str] = None
+) -> bool:
+    """Appends the constant tensor to the computation graph
+
+    Args:
+        tensor (torch.Tensor): The constant tensor
+        node_name (typing.Optional[str], optional): The name of the node that depends on that tensor. Defaults to None.
+        type_name (typing.Optional[str], optional): The type of the node that depends on that tensor. Defaults to None.
+
+    Returns:
+        bool: Whether it is a new constant tensor
+    """
+
+    if id(tensor) not in current_graph().tensor_pre_node_dict:
+        if not tensor.is_leaf:
+            if node_name is None:
+                node_name = 'unknown node'
+            if type_name is None:
+                type_name = 'unknown'
+            log.error(f'Connection is lost when generating code for {node_name} of type {type_name}')
+        else:
+            # constant tensor generation
+            log.warning('Constant generation is experimental and may yield error')
+            convert_to_parameter = False
+            persistent = False
+            requires_grad = tensor.requires_grad
+            if isinstance(tensor, torch.nn.Parameter):
+                convert_to_parameter = True
+            if tensor.numel() > 50:
+                persistent = True
+            raw_data = tensor.tolist()
+            with no_catch():
+                constant_node = ConstantNode(raw_data, tensor.dtype, tensor.shape).parse(
+                    convert_to_parameter, persistent, requires_grad
+                )
+            trace_node = TraceNode(constant_node)
+            add_constant_node(trace_node, tensor)
+        return True
+    else:
+        return False
+
+
 def new_getattr_gen(orig_getattr, key: str, is_class: bool):
     """Wrapper function for the __getattribute__ functions of the modules in PyTorch"""
     log.debug(f'registered module getattr wrapper: {key}')
@@ -816,6 +860,7 @@ def new_getattr_gen(orig_getattr, key: str, is_class: bool):
                             # However, by doing this, if user calls `numel` on the `torch.Size`
                             # object, it will now throw an exception.
                             # TODO: Fix the case if user calls `numel` on `torch.Size`
+                            constant_handler(obj, type_name=key)
                             original_values_for_tracked_objects[id(result)] = copy.deepcopy(result)
                             new_result = []
                             for elem in result:
@@ -1441,26 +1486,7 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
             ' [torch.dtype, torch.device, torch.Size, torch.Tensor,'
             f' torch.nn.Parameter,torch.nn.quantized.FloatFunctional], but got {type(t)}'
         )
-        if id(t) not in current_graph().tensor_pre_node_dict:
-            if not t.is_leaf:
-                log.error(f'Connection is lost when generating code for {node.unique_name} of type {node.full_name()}')
-            else:
-                # constant tensor generation
-                log.warning('Constant generation is experimental and may yield error')
-                convert_to_parameter = False
-                persistent = False
-                requires_grad = t.requires_grad
-                if isinstance(t, torch.nn.Parameter):
-                    convert_to_parameter = True
-                if t.numel() > 50:
-                    persistent = True
-                raw_data = t.tolist()
-                with no_catch():
-                    constant_node = ConstantNode(raw_data, t.dtype, t.shape).parse(
-                        convert_to_parameter, persistent, requires_grad
-                    )
-                trace_node = TraceNode(constant_node)
-                add_constant_node(trace_node, t)
+        constant_handler(t, node.unique_name, node.full_name())
         pre_node_name = current_graph().tensor_pre_node_dict[id(t)]
         node.prev_nodes.append(current_graph().nodes_map[pre_node_name])
         if id(t) in current_graph().tensor_pre_index_dict:
