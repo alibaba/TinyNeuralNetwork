@@ -290,7 +290,10 @@ class TraceNode(object):
                 and type(self.module) == TraceFunction
                 and self.module.is_property
             ):
-                ns = 'self.'
+                prev_t_ids = set(id(t) for t in self.prev_tensors)
+                next_t_ids = set(id(t) for t in self.prev_nodes[idx].next_tensors)
+                if len(prev_t_ids & next_t_ids) == 0:
+                    ns = 'self.'
             if node_idx is None:
                 return f'{ns}{node_name}'
             else:
