@@ -277,7 +277,19 @@ class TraceNode(object):
     def prev_node_unique_name(self, idx, inplace=False) -> str:
         """A utility function to generate the name of the previous node with index"""
         if idx < len(self.prev_nodes) and idx < len(self.prev_indices):
+            getattr_on_module = False
+            if (
+                isinstance(self.prev_nodes[idx].module, torch.nn.Module)
+                and type(self.module) == TraceFunction
+                and self.module.is_property
+            ):
+                getattr_on_module = True
+            actual_inplace = False
             if inplace:
+                actual_inplace = getattr_on_module
+                if isinstance(self.prev_nodes[idx].module, ConstantNode):
+                    actual_inplace = True
+            if actual_inplace:
                 node_name = self.prev_nodes[idx].original_name
             else:
                 node_name = self.prev_nodes[idx].unique_name
@@ -285,11 +297,7 @@ class TraceNode(object):
             ns = ''
             if type(self.prev_nodes[idx].module) in (ConstantNode, torch.nn.quantized.FloatFunctional):
                 ns = 'self.'
-            elif (
-                isinstance(self.prev_nodes[idx].module, torch.nn.Module)
-                and type(self.module) == TraceFunction
-                and self.module.is_property
-            ):
+            elif getattr_on_module:
                 prev_t_ids = set(id(t) for t in self.prev_tensors)
                 next_t_ids = set(id(t) for t in self.prev_nodes[idx].next_tensors)
                 if len(prev_t_ids & next_t_ids) == 0:
@@ -468,7 +476,10 @@ class TraceFunction(object):
         else:
             if prefix is None:
                 if original:
-                    tensor_names = self.original_tensor_names
+                    tensor_names = [
+                        o_name if u_name.startswith('self.') else u_name
+                        for u_name, o_name in zip(self.tensor_names, self.original_tensor_names)
+                    ]
                 else:
                     tensor_names = self.tensor_names
             else:
@@ -2294,6 +2305,11 @@ class TraceGraph(object):
 
         new_func = tmp_ns['forward']
         setattr(self.module, 'forward', types.MethodType(new_func, self.module))
+
+        for node in self.forward_nodes + self.other_init_nodes:
+            if isinstance(node.module, nn.Module) and node.unique_name not in self.related_modules:
+                setattr(self.module, node.original_name, node.module)
+
         return self.module
 
     def update_submodule_in_nodes_from_predicate(
