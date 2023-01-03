@@ -3,6 +3,9 @@ import typing
 import torch
 import torch.nn as nn
 import copy
+from tinynn.util.util import get_logger
+
+log = get_logger(__name__)
 
 support_conv_cls = (torch.nn.Conv1d, torch.nn.Conv2d)
 bn_restore_cls = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d)
@@ -29,9 +32,8 @@ class ConvBnTrain(nn.Module):
         assert isinstance(convbn, ConvBnForward), "not a ConvBnForward"
         self.conv = convbn.conv
         self.bn = convbn.bn
-        eps = self.bn.eps
-        # Use the forward running_stat to get weight and bias of restored bn.
-        weight = (self.bn.running_var + eps) ** 0.5
+        # Use the forward running_stat to get weight and bias of restored bn, weight calculation ignores eps.
+        weight = self.bn.running_var**0.5
         bias = self.bn.running_mean
         self.bn.weight.data.copy_(weight)
         self.bn.bias.data.copy_(bias)
@@ -60,8 +62,11 @@ def restore_bn_set_param(origin_model):
     return model
 
 
-def model_restore_bn(model: nn.Module, device, calibrate_func, *params, layers_fused_bn: typing.List[str] = None):
-    r"""High API to restore BN for a bn_fused model(e.g.MobileOne)
+def model_restore_bn(
+    model: nn.Module, device, calibrate_func, *params, layers_fused_bn: typing.List[str] = None
+) -> nn.Module:
+    r"""High API to restore BN for a bn_fused model(e.g.MobileOne),
+    the `calibrate_func` should be done in full train_set in train mode.
 
     Args:
         model (nn.Module): The model which need restore bn.
@@ -73,6 +78,7 @@ def model_restore_bn(model: nn.Module, device, calibrate_func, *params, layers_f
         The bn_restored model.
 
     """
+    log.info("start to do BN Restore.")
     if layers_fused_bn is None:
         layers_fused_bn = [name for name, mod in model.named_modules() if isinstance(mod, support_conv_cls)]
     restore_bn_model = restore_bn(model, layers_fused_bn)
@@ -84,6 +90,7 @@ def model_restore_bn(model: nn.Module, device, calibrate_func, *params, layers_f
 
 
 def get_submodule_with_parent_from_name(model, module_name):
+    """Gets the submodule with its parent and sub_name using the name given"""
     module_name_parts = module_name.split('.')
     cur_obj = model
     last_obj = None
