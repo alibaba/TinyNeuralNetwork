@@ -243,6 +243,7 @@ class QATQuantizer(object):
     legacy_fq: bool
     extra_tracer_opts: typing.Optional[typing.Dict]
     layerwise_config: typing.Dict[str, bool]
+    layerwise_default: bool
     fused_layerwise_config: bool
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
@@ -309,7 +310,11 @@ class QATQuantizer(object):
 
         self.leaf_nodes = None
         self.swap_nodes = None
+
         self.layerwise_config = yaml.CommentedMap()
+        self.layerwise_default = True
+        if config is not None and 'layerwise_config' in config:
+            self.layerwise_config.update(config['layerwise_config'])
 
     def parse_config(self, config: typing.Optional[dict]):
         default_values = {
@@ -374,9 +379,14 @@ class QATQuantizer(object):
             config_path = os.path.join(self.work_dir, f'{model_name_q_lower}_config.yml')
 
             yaml_ = yaml.YAML()
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
-                    self.layerwise_config = yaml_.load(f)
+            if len(self.layerwise_config) == 0:
+                if os.path.exists(config_path):
+                    with open(config_path, 'r') as f:
+                        self.layerwise_config = yaml_.load(f)
+
+            if 'default' in self.layerwise_config:
+                self.layerwise_default = self.layerwise_config['default']
+                del self.layerwise_config['default']
 
             # Generate the code for the modified model
             # We will try to do some op fusion and rewriting in the `rewrite_quantize_graph` function.
@@ -1270,7 +1280,7 @@ class QATQuantizer(object):
                 return (
                     cur_module.kind == 'neg'
                     and cur_module.prev_tensors[0].dtype == torch.float32
-                    and self.layerwise_config.get(node.unique_name, True)
+                    and self.layerwise_config.get(node.unique_name, self.layerwise_default)
                 )
 
         neg_nodes = graph.filter_forward_nodes(_is_neg_node)
@@ -1300,7 +1310,7 @@ class QATQuantizer(object):
                     and cur_module.func_type != '__rtruediv__'
                     and node.next_tensors[0].dtype == torch.float32
                     and node.prev_nodes[0].kind() not in ('size', 'shape')
-                    and self.layerwise_config.get(node.unique_name, True)
+                    and self.layerwise_config.get(node.unique_name, self.layerwise_default)
                 )
 
         div_nodes = graph.filter_forward_nodes(_is_div_node)
@@ -1339,7 +1349,7 @@ class QATQuantizer(object):
                     cur_module.kind == 'sub'
                     and cur_module.prev_tensors[0].dtype == torch.float32
                     and node.next_tensors[0].dtype == torch.float32
-                    and self.layerwise_config.get(node.unique_name, True)
+                    and self.layerwise_config.get(node.unique_name, self.layerwise_default)
                 )
 
         sub_nodes = graph.filter_forward_nodes(_is_sub_node)
@@ -1418,7 +1428,7 @@ class QATQuantizer(object):
                 return (
                     cur_module.kind == 'stack'
                     and node.next_tensors[0].dtype == torch.float32
-                    and self.layerwise_config.get(node.unique_name, True)
+                    and self.layerwise_config.get(node.unique_name, self.layerwise_default)
                 )
 
         stack_nodes = graph.filter_forward_nodes(_is_stack_node)
@@ -1466,7 +1476,7 @@ class QATQuantizer(object):
                 return (
                     cur_module.kind in ('add', 'mul', 'cat')
                     and node.next_tensors[0].dtype == torch.float32
-                    and self.layerwise_config.get(node.unique_name, True)
+                    and self.layerwise_config.get(node.unique_name, self.layerwise_default)
                 )
 
         convertible_nodes = graph.filter_forward_nodes(_is_convertible_node)
@@ -1555,7 +1565,7 @@ class QATQuantizer(object):
                 return (
                     cur_module.kind in ('clamp_min', 'clamp_max')
                     and node.next_tensors[0].dtype == torch.float32
-                    and self.layerwise_config.get(node.unique_name, True)
+                    and self.layerwise_config.get(node.unique_name, self.layerwise_default)
                 )
 
         clamp_min_max_nodes = graph.filter_forward_nodes(_is_clamp_min_max_node)
@@ -1591,7 +1601,7 @@ class QATQuantizer(object):
                 return (
                     cur_module.kind == 'clamp'
                     and node.next_tensors[0].dtype == torch.float32
-                    and self.layerwise_config.get(node.unique_name, True)
+                    and self.layerwise_config.get(node.unique_name, self.layerwise_default)
                 )
 
         clamp_nodes = graph.filter_forward_nodes(_is_clamp_node)
@@ -1651,7 +1661,7 @@ class QATQuantizer(object):
             cur_class = type(cur_module)
             visited_nodes = [node]
 
-            if self.layerwise_config.get(node.unique_name, True) is False:
+            if self.layerwise_config.get(node.unique_name, self.layerwise_default) is False:
                 return False
 
             if cur_class == TraceFunction:
@@ -1741,7 +1751,7 @@ class QATQuantizer(object):
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
                 return cur_module.kind in FUNCTIONAL_MODULE_MAPPING and self.layerwise_config.get(
-                    node.unique_name, True
+                    node.unique_name, self.layerwise_default
                 )
 
         func_nodes_to_rewrite = graph.filter_forward_nodes(_is_functional_rewrite_node)
@@ -1856,7 +1866,9 @@ class QATQuantizer(object):
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == TraceFunction:
-                return cur_module.kind == 'dropout' and self.layerwise_config.get(node.unique_name, True)
+                return cur_module.kind == 'dropout' and self.layerwise_config.get(
+                    node.unique_name, self.layerwise_default
+                )
 
         def _dropout_args(p=0.5, training=True, inplace=False):
             return p, training, inplace
@@ -1885,7 +1897,7 @@ class QATQuantizer(object):
         # Add contiguous nodes for partially-supported OPs
         # Some of the operations support quantization, but they only accept contiguous input tensors.
         def _is_partially_quantizable(node, custom_data):
-            if self.layerwise_config.get(node.unique_name, True) is False:
+            if self.layerwise_config.get(node.unique_name, self.layerwise_default) is False:
                 return False
             cur_module = node.module
             cur_class = type(cur_module)
@@ -1913,7 +1925,7 @@ class QATQuantizer(object):
 
         # Remove non-leaf `.data` nodes
         def _is_non_leaf_data_nodes(node, custom_data):
-            if self.layerwise_config.get(node.unique_name, True) is False:
+            if self.layerwise_config.get(node.unique_name, self.layerwise_default) is False:
                 return False
             cur_module = node.module
             cur_class = type(cur_module)
@@ -1927,7 +1939,7 @@ class QATQuantizer(object):
 
         # Handle PoolNd with kernel_size=1
         def _is_pool_nd_with_one_kernel_size(node, custom_data):
-            if self.layerwise_config.get(node.unique_name, True) is False:
+            if self.layerwise_config.get(node.unique_name, self.layerwise_default) is False:
                 return False
             cur_module = node.module
             cur_class = type(cur_module)
@@ -1986,7 +1998,7 @@ class QATQuantizer(object):
             current_rules=load_processed_rewrite_to_fuse_rules(),
             check_node_quantized=False,
             graph=graph,
-            layerwise_config_default=True,
+            layerwise_config_default=self.layerwise_default,
         )
         custom_data = ([], set())
         graph.filter_forward_nodes(is_rewrite_to_fuse, custom_data, reverse=True)
@@ -2063,7 +2075,7 @@ class QATQuantizer(object):
 
         # Rewrite BatchNorm1d to BatchNorm2d
         def _is_batch_norm_1d(node, custom_data):
-            if self.layerwise_config.get(node.unique_name, True) is False:
+            if self.layerwise_config.get(node.unique_name, self.layerwise_default) is False:
                 return False
             cur_module = node.module
             cur_class = type(cur_module)
@@ -2110,7 +2122,7 @@ class QATQuantizer(object):
         type_dict = {}
         for n in graph.forward_nodes:
             if n.type() not in (torch_q.QuantStub, torch_q.DeQuantStub):
-                self.layerwise_config.setdefault(n.unique_name, True)
+                self.layerwise_config.setdefault(n.unique_name, self.layerwise_default)
                 kind = n.kind()
                 type_str = kind if isinstance(kind, str) else kind.__name__
                 type_dict[n.unique_name] = type_str
@@ -2147,11 +2159,14 @@ class QATQuantizer(object):
         for n, t in type_dict.items():
             self.layerwise_config.yaml_add_eol_comment(f'type: {t}', n)
 
+        skip_types = set(k for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) == 1)
+        if self.set_quantizable_op_stats:
+            skip_types |= set(KNOWN_QSTATS.keys())
+        skip_types_prev = skip_types | set(k[-1] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) > 1)
+        skip_types_next = skip_types | set(k[0] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) > 1)
+
         # Add quant/dequant nodes for non-quantizable OPs
         def _is_not_quantizable(node, custom_data):
-            if self.layerwise_config.get(node.unique_name, True) is False:
-                return True
-
             cur_module = node.module
             cur_class = type(cur_module)
             if cur_class == ConstantNode:
@@ -2160,9 +2175,17 @@ class QATQuantizer(object):
                 if node.type() in ('__truediv__', '__itruediv__', 'div', 'div_'):
                     if node.prev_nodes[0].kind() in ('shape', 'size'):
                         return False
+                if node.type() in ('shape', 'device', 'size', 'dtype'):
+                    if node.unique_name in self.layerwise_config:
+                        del self.layerwise_config[node.unique_name]
+                    return False
+                if self.layerwise_config.get(node.unique_name, self.layerwise_default) is False:
+                    return True
                 supported_version = UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.get(cur_module.kind, torch.__version__)
                 return supported_version is None or LooseVersion(torch.__version__) < supported_version
             else:
+                if self.layerwise_config.get(node.unique_name, self.layerwise_default) is False:
+                    return True
                 unsupported_types = tuple(
                     k
                     for k, v in UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.items()
@@ -2175,8 +2198,9 @@ class QATQuantizer(object):
         unsupported_nodes = graph.filter_forward_nodes(_is_not_quantizable)
         for idx, node in enumerate(reversed(unsupported_nodes)):
             if node.unique_name in self.layerwise_config:
-                if self.layerwise_config[node.unique_name]:
+                if node.kind() not in skip_types and self.layerwise_config[node.unique_name]:
                     del self.layerwise_config[node.unique_name]
+
             node_map = dict()
             next_nodes = {n.unique_name: n for n in node.next_nodes}.values()
             for inner_idx, next_node in enumerate(next_nodes):
@@ -2195,6 +2219,9 @@ class QATQuantizer(object):
                             prev_indices.append(str(j))
                             break
 
+                # TODO: Support multiple common tensors
+                prev_indices = set(prev_indices)
+                assert len(prev_indices) == 1
                 prev_idx = '_'.join(prev_indices)
 
                 if prev_idx in node_map:
@@ -2221,6 +2248,27 @@ class QATQuantizer(object):
             assert node.rev_index is False
             prev_nodes = {n.unique_name: n for n in node.prev_nodes}.values()
             for inner_idx, prev_node in enumerate(prev_nodes):
+
+                if prev_node.kind() in ('shape', 'device', 'size', 'dtype'):
+                    continue
+
+                prev_indices = []
+                for pt in node.prev_tensors:
+                    for j, nt in enumerate(prev_node.next_tensors):
+                        if isinstance(nt, (list, tuple)):
+                            for k, ntt in enumerate(nt):
+                                if id(pt) == id(ntt):
+                                    prev_indices.append(f'{j},{k}')
+                                    break
+                        elif id(pt) == id(nt):
+                            prev_indices.append(str(j))
+                            break
+
+                # TODO: Support multiple common tensors
+                prev_indices = set(prev_indices)
+                assert len(prev_indices) == 1
+                prev_idx = '_'.join(prev_indices)
+
                 fake_dequant = fake_dequant_cls()
 
                 graph.module_unique_name_dict[id(fake_dequant)] = f'fake_dequant_inner_{idx}_{inner_idx}'
@@ -2233,34 +2281,51 @@ class QATQuantizer(object):
         # Remove consecutive dequant quant nodes
         def _is_consecutive_dequant_quant_nodes(node, custom_data):
             cur_type = node.type()
-            skip_types = set(k for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) == 1)
-            if self.set_quantizable_op_stats:
-                skip_types |= set(KNOWN_QSTATS.keys())
-            skip_types_prev = skip_types | set(k[-1] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) > 1)
-            skip_types_next = skip_types | set(k[0] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) > 1)
             if cur_type in (torch_q.QuantStub, torch_q.DeQuantStub):
                 for next_node in node.next_nodes:
                     next_type = next_node.type()
                     if next_type in (torch_q.QuantStub, torch_q.DeQuantStub):
                         if cur_type != next_type:
                             if cur_type == torch_q.QuantStub:
-                                if (len(node.prev_nodes) == 1 and node.prev_nodes[0].kind() in skip_types_prev) or (
+                                target_node = None
+                                if len(node.prev_nodes) == 1 and node.prev_nodes[0].kind() in skip_types_prev:
+                                    target_node = node.prev_nodes[0]
+                                elif (
                                     len(next_node.next_nodes) == 1 and next_node.next_nodes[0].kind() in skip_types_next
                                 ):
-                                    return False
+                                    target_node = next_node.next_nodes[0]
+                                if target_node is not None:
+                                    self.layerwise_config.setdefault(target_node.unique_name, self.layerwise_default)
+                                    if self.layerwise_config[target_node.unique_name]:
+                                        return False
                             custom_data.append((node, next_node))
                             return True
             return False
 
         consecutive_dequant_quant_nodes = []
+        consecutive_branch_dequant_quant_nodes = []
         graph.filter_forward_nodes(_is_consecutive_dequant_quant_nodes, consecutive_dequant_quant_nodes)
         for node, next_node in consecutive_dequant_quant_nodes:
-            if len(node.next_nodes) == 1:
+            if len(node.next_nodes) == 1 and len(next_node.prev_nodes) == 1:
                 graph.remove_node(next_node)
                 graph.remove_node(node)
             else:
-                # TODO: Support connect tensors between branch nodes
-                continue
+                consecutive_branch_dequant_quant_nodes.append((node, next_node))
+
+        # TODO: Support complex cases
+        for node, next_node in consecutive_branch_dequant_quant_nodes:
+            is_removable = all(
+                (
+                    n.type() in (torch_q.QuantStub, torch_q.DeQuantStub, 'shape', 'device', 'size', 'dtype')
+                    and n.type() != node.type()
+                    for n in node.next_nodes
+                )
+            )
+            if is_removable:
+                graph.remove_node(node)
+                for n in node.next_nodes:
+                    if n.type() in (torch_q.QuantStub, torch_q.DeQuantStub):
+                        graph.remove_node(n)
 
         # Process additional fusable nodes
         processed_extra_q_rules = load_processed_extra_q_rules()
