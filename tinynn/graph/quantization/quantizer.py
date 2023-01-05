@@ -2208,79 +2208,85 @@ class QATQuantizer(object):
             node_map = dict()
             next_nodes = {n.unique_name: n for n in node.next_nodes}.values()
             for inner_idx, next_node in enumerate(next_nodes):
-                prev_indices = []
+                prev_tensor_ptrs = []
                 if type(next_node.module) == TraceFunction and next_node.module.is_property:
                     continue
 
                 for pt in next_node.prev_tensors:
-                    for j, nt in enumerate(node.next_tensors):
+                    for nt in node.next_tensors:
                         if isinstance(nt, (list, tuple)):
                             for k, ntt in enumerate(nt):
                                 if id(pt) == id(ntt):
-                                    prev_indices.append(f'{j},{k}')
+                                    if id(pt) not in prev_tensor_ptrs:
+                                        prev_tensor_ptrs.append(id(pt))
                                     break
                         elif id(pt) == id(nt):
-                            prev_indices.append(str(j))
+                            if id(pt) not in prev_tensor_ptrs:
+                                prev_tensor_ptrs.append(id(pt))
                             break
 
-                # TODO: Support multiple common tensors
-                prev_indices = set(prev_indices)
-                assert len(prev_indices) == 1
-                prev_idx = '_'.join(prev_indices)
+                for ptr_idx, ptr in enumerate(prev_tensor_ptrs):
+                    if ptr in node_map:
+                        fake_quant = node_map[ptr]
 
-                if prev_idx in node_map:
-                    fake_quant = node_map[prev_idx]
+                        graph.insert_between(node, next_node, fake_quant, move_idx=True, tensor_ptrs=[ptr])
+                    else:
+                        fake_quant = torch_q.QuantStub()
 
-                    graph.insert_between(node, next_node, fake_quant, move_idx=True)
-                else:
-                    fake_quant = torch_q.QuantStub()
+                        fake_quant_name = f'fake_quant_inner_{idx}_{inner_idx}_{ptr_idx}'
 
-                    fake_quant_name = f'fake_quant_inner_{idx}_{inner_idx}'
+                        graph.module_unique_name_dict[id(fake_quant)] = fake_quant_name
+                        graph.module_original_name_dict[id(fake_quant)] = fake_quant_name
 
-                    graph.module_unique_name_dict[id(fake_quant)] = fake_quant_name
-                    graph.module_original_name_dict[id(fake_quant)] = fake_quant_name
+                        fake_quant_cls = type(fake_quant)
+                        module_constructor_lines[id(fake_quant)] = f'{qualified_name(fake_quant_cls)}()'
 
-                    fake_quant_cls = type(fake_quant)
-                    module_constructor_lines[id(fake_quant)] = f'{qualified_name(fake_quant_cls)}()'
-
-                    graph.insert_between(node, next_node, fake_quant, move_idx=True)
-                    node_map[prev_idx] = graph.nodes_map[fake_quant_name]
+                        graph.insert_between(node, next_node, fake_quant, move_idx=True, tensor_ptrs=[ptr])
+                        node_map[ptr] = graph.nodes_map[fake_quant_name]
 
         # Insert the DeQuantStub nodes before every input node of the unsupported ops
         for idx, node in enumerate(unsupported_nodes):
             fake_dequant_cls = torch_q.DeQuantStub
             assert node.rev_index is False
+            node_map = dict()
             prev_nodes = {n.unique_name: n for n in node.prev_nodes}.values()
             for inner_idx, prev_node in enumerate(prev_nodes):
 
                 if prev_node.kind() in ('shape', 'device', 'size', 'dtype'):
                     continue
 
-                prev_indices = []
+                prev_tensor_ptrs = []
                 for pt in node.prev_tensors:
-                    for j, nt in enumerate(prev_node.next_tensors):
+                    for nt in prev_node.next_tensors:
                         if isinstance(nt, (list, tuple)):
                             for k, ntt in enumerate(nt):
                                 if id(pt) == id(ntt):
-                                    prev_indices.append(f'{j},{k}')
+                                    if id(pt) not in prev_tensor_ptrs:
+                                        prev_tensor_ptrs.append(id(pt))
                                     break
                         elif id(pt) == id(nt):
-                            prev_indices.append(str(j))
+                            if id(pt) not in prev_tensor_ptrs:
+                                prev_tensor_ptrs.append(id(pt))
                             break
 
-                # TODO: Support multiple common tensors
-                prev_indices = set(prev_indices)
-                assert len(prev_indices) == 1
-                prev_idx = '_'.join(prev_indices)
+                for ptr_idx, ptr in enumerate(prev_tensor_ptrs):
+                    if ptr in node_map:
+                        fake_dequant = node_map[ptr]
 
-                fake_dequant = fake_dequant_cls()
+                        graph.insert_between(prev_node, node, fake_dequant, move_idx=True, tensor_ptrs=set([ptr]))
+                    else:
 
-                graph.module_unique_name_dict[id(fake_dequant)] = f'fake_dequant_inner_{idx}_{inner_idx}'
-                graph.module_original_name_dict[id(fake_dequant)] = f'fake_dequant_inner_{idx}_{inner_idx}'
+                        fake_dequant = fake_dequant_cls()
 
-                module_constructor_lines[id(fake_dequant)] = f'{qualified_name(fake_dequant_cls)}()'
+                        fake_dequant_name = f'fake_dequant_inner_{idx}_{inner_idx}_{ptr_idx}'
 
-                graph.insert_between(prev_node, node, fake_dequant, move_idx=True)
+                        graph.module_unique_name_dict[id(fake_dequant)] = fake_dequant_name
+                        graph.module_original_name_dict[id(fake_dequant)] = fake_dequant_name
+
+                        module_constructor_lines[id(fake_dequant)] = f'{qualified_name(fake_dequant_cls)}()'
+
+                        graph.insert_between(prev_node, node, fake_dequant, move_idx=True, tensor_ptrs=set([ptr]))
+                        node_map[ptr] = graph.nodes_map[fake_dequant_name]
 
         # Remove consecutive dequant quant nodes
         def _is_consecutive_dequant_quant_nodes(node, custom_data):

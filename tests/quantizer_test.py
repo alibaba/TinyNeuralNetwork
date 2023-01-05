@@ -1204,6 +1204,18 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_multiple_inputs_from_same_op(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                x = x.relu().unbind(1)
+                x = (x[0] / x[1]).relu()
+                return x
+
+        model = Model()
+        inputs = torch.rand(1, 3, 224, 224).abs() * 0.5 + 0.5
+
+        check_quantize_rewrite(model, inputs)
+
 
 class DeQuantizerTester(unittest.TestCase):
     def test_simple_q_model(self):
