@@ -244,6 +244,7 @@ class QATQuantizer(object):
     extra_tracer_opts: typing.Optional[typing.Dict]
     layerwise_config: typing.Dict[str, bool]
     layerwise_default: bool
+    ignore_layerwise_config: bool
     fused_layerwise_config: bool
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
@@ -336,6 +337,7 @@ class QATQuantizer(object):
             'legacy_fq': True,
             'extra_tracer_opts': {},
             'fused_layerwise_config': True,
+            'ignore_layerwise_config': False,
         }
 
         if config is None:
@@ -379,7 +381,7 @@ class QATQuantizer(object):
             config_path = os.path.join(self.work_dir, f'{model_name_q_lower}_config.yml')
 
             yaml_ = yaml.YAML()
-            if len(self.layerwise_config) == 0:
+            if len(self.layerwise_config) == 0 and not self.ignore_layerwise_config:
                 if os.path.exists(config_path):
                     with open(config_path, 'r') as f:
                         self.layerwise_config = yaml_.load(f)
@@ -2184,6 +2186,8 @@ class QATQuantizer(object):
                 supported_version = UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.get(cur_module.kind, torch.__version__)
                 return supported_version is None or LooseVersion(torch.__version__) < supported_version
             else:
+                if isinstance(cur_module, (torch_q.QuantStub, torch_q.DeQuantStub)):
+                    return False
                 if self.layerwise_config.get(node.unique_name, self.layerwise_default) is False:
                     return True
                 unsupported_types = tuple(

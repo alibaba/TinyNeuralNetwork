@@ -26,7 +26,7 @@ def show_source(model, title, reload_cache=True):
 
 def check_quantize_rewrite(model, inputs, show_rewritten=True, skip_train=False):
     with model_tracer():
-        config = {'remove_weights_after_load': True}
+        config = {'remove_weights_after_load': True, 'ignore_layerwise_config': True}
         if sys.platform == 'win32':
             config.update({'backend': 'fbgemm', 'per_tensor': False})
 
