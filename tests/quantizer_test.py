@@ -1212,7 +1212,7 @@ class QuantizerTester(unittest.TestCase):
                 return x
 
         model = Model()
-        inputs = torch.rand(1, 3, 224, 224).abs() * 0.5 + 1e-3
+        inputs = torch.rand(1, 3, 224, 224).abs() * 0.5 + 0.5
 
         check_quantize_rewrite(model, inputs)
 
