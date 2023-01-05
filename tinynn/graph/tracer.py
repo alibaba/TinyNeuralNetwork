@@ -2243,6 +2243,7 @@ class TraceGraph(object):
         module,
         next_tensors: typing.Optional[typing.List[torch.Tensor]] = None,
         move_idx: bool = False,
+        tensor_ptrs: typing.Optional[typing.Set[int]] = None,
     ):
         """Insert a module or an existing node between two nodes in the computation graph"""
         # Create a new node and connects it to the previous node/tensors
@@ -2281,17 +2282,25 @@ class TraceGraph(object):
         # Gather tensors from previous nodes
         prev_tensors = []
         prev_indices = []
+        remaining_count = 0
         for pt, pidx in zip(next_node.prev_tensors, next_node.prev_indices):
+            skip_node = tensor_ptrs is not None and id(pt) not in tensor_ptrs
             for nt in prev_node.next_tensors:
                 if id(pt) == id(nt):
-                    prev_tensors.append(pt)
-                    prev_indices.append(pidx)
+                    if not skip_node:
+                        prev_tensors.append(pt)
+                        prev_indices.append(pidx)
+                    else:
+                        remaining_count += 1
                     break
                 elif isinstance(nt, (list, tuple)):
                     for i, ntt in enumerate(nt):
                         if id(ntt) == id(pt):
-                            prev_tensors.append(pt)
-                            prev_indices.append(pidx)
+                            if not skip_node:
+                                prev_tensors.append(pt)
+                                prev_indices.append(pidx)
+                            else:
+                                remaining_count += 1
                             break
 
         if next_tensors is None:
@@ -2310,7 +2319,7 @@ class TraceGraph(object):
             new_node.prev_indices.append(pidx if move_idx else None)
 
         # Make output nodes connects to the new node
-        for idx in range(len(next_node.prev_nodes)):
+        for idx in range(len(next_node.prev_nodes) - remaining_count):
             if next_node.prev_nodes[idx] == prev_node:
                 next_node.prev_nodes[idx] = new_node
 
@@ -2329,10 +2338,14 @@ class TraceGraph(object):
 
         # Connect the previous nodes to the new node
         for prev_node in new_node.prev_nodes:
-            for i, n in enumerate(prev_node.next_nodes):
-                if n == next_node:
-                    prev_node.next_nodes[i] = new_node
-                    break
+            if remaining_count > 0:
+                if new_node not in prev_node.next_nodes:
+                    prev_node.next_tensors.append(new_node)
+            else:
+                for i, n in enumerate(prev_node.next_nodes):
+                    if n == next_node:
+                        prev_node.next_nodes[i] = new_node
+                        break
 
         # Update previous node name for next nodes (TraceFunction)
         if type(next_node.module) == TraceFunction:
