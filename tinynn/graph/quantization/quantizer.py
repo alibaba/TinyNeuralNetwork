@@ -477,6 +477,8 @@ class QATQuantizer(object):
                 log.debug(f"[QUANTIZED]{node.unique_name}:{quantized}")
 
             for n in node.next_nodes:
+                if type(n.module) == TraceFunction and n.kind() in ('shape', 'size', 'dtype', 'device'):
+                    continue
                 qat_analysis_queue.put((n, quantized))
 
         if is_input_quantized is not None:
