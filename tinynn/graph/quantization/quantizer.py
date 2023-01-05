@@ -312,7 +312,7 @@ class QATQuantizer(object):
         self.leaf_nodes = None
         self.swap_nodes = None
 
-        self.layerwise_config = yaml.CommentedMap()
+        self.layerwise_config = yaml.comments.CommentedMap()
         self.layerwise_default = True
         if config is not None and 'layerwise_config' in config:
             self.layerwise_config.update(config['layerwise_config'])
