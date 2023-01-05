@@ -2384,7 +2384,10 @@ class QATQuantizer(object):
 
         for name in self.layerwise_config:
             node = graph.nodes_map[name]
-            if isinstance(node.module, nn.Module):
+            if isinstance(node.module, nn.Module) and not isinstance(
+                node.module,
+                (nn.Dropout, nn.AdaptiveAvgPool2d, nn.AvgPool2d, nn.MaxPool2d, nn.ReLU, nn.Upsample, nn.ConstantPad2d),
+            ):
                 self.effective_layers.append(name)
             elif node.kind() in ('add', 'mul', 'cat') or node.kind() in FUNCTIONAL_MODULE_MAPPING:
                 self.effective_layers.append(name)
