@@ -98,7 +98,7 @@ class TestModelMeta(type):
 
                 inputs = prepare_inputs(m)
 
-                config = {'remove_weights_after_load': True}
+                config = {'remove_weights_after_load': True, 'ignore_layerwise_config': True}
                 if sys.platform == 'win32':
                     config.update({'backend': 'fbgemm', 'per_tensor': False})
 
