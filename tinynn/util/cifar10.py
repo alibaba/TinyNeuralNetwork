@@ -353,6 +353,6 @@ def calibrate(model, context: DLContext):
             end = time.time()
 
             if i % 10 == 0:
-                print(f'Calibrate: [{i}/{len(context.val_loader)}]\tTime {avg_batch_time.avg:.5f}\t')
+                print(f'Calibrate: [{i}/{len(context.train_loader)}]\tTime {avg_batch_time.avg:.5f}\t')
 
             context.iteration += 1
