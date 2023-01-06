@@ -476,9 +476,12 @@ class QATQuantizer(object):
                 node.quantized = quantized
                 log.debug(f"[QUANTIZED]{node.unique_name}:{quantized}")
 
-            for n in node.next_nodes:
-                if type(n.module) == TraceFunction and n.kind() in ('shape', 'size', 'dtype', 'device'):
-                    continue
+            for i, n in enumerate(node.next_nodes):
+                if type(n.module) == TraceFunction:
+                    if n.kind() in ('shape', 'size', 'dtype', 'device'):
+                        continue
+                    if n.kind() == 'expand_as' and i > 0:
+                        continue
                 qat_analysis_queue.put((n, quantized))
 
         if is_input_quantized is not None:
@@ -1754,6 +1757,54 @@ class QATQuantizer(object):
                     node.module.add_alias(node.module.tensor_names[0])
             else:
                 node.module.aliases = None
+
+        # Optional tensor shape broadcasting for quantized binary ops
+        def _is_broadcastable_binary_quantized_op_node(node: TraceNode, custom_data) -> bool:
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if cur_class != TraceFunction:
+                return False
+            return (
+                cur_module.full_name.startswith('self.float_functional_simple_')
+                and cur_module.kind in ('add', 'mul', 'add_relu')
+                and node.prev_tensors[0].shape != node.prev_tensors[1].shape
+            )
+
+        broadcastable_binary_quantized_op_nodes = graph.filter_forward_nodes(_is_broadcastable_binary_quantized_op_node)
+        for node in broadcastable_binary_quantized_op_nodes:
+            assert len(node.prev_nodes) == 2
+            assert len(node.prev_tensors) == 2
+
+            l_shape = node.prev_tensors[0].shape
+            r_shape = node.prev_tensors[1].shape
+
+            if len(l_shape) > len(r_shape):
+                ref_index = 0
+            elif len(l_shape) < len(r_shape):
+                ref_index = 1
+            else:
+                for l_dim, r_dim in zip(l_shape, r_shape):
+                    if l_dim > r_dim:
+                        ref_index = 0
+                        break
+                    elif l_dim < r_dim:
+                        ref_index = 1
+                        break
+
+            src_index = 1 - ref_index
+
+            with override_current_trace_graph(graph):
+                trace_func = TraceFunction('torch.Tensor.expand_as', True, prefix='fuse_').parse_args(
+                    node.prev_tensors[src_index], node.prev_tensors[ref_index]
+                )
+            next_tensors = [node.prev_tensors[src_index].expand_as(node.prev_tensors[ref_index])]
+            graph.insert_between(node.prev_nodes[src_index], node, trace_func, next_tensors)
+
+            new_node = graph.nodes_map[trace_func.unique_name]
+            new_node.prev_nodes.append(node.prev_nodes[ref_index])
+            new_node.prev_tensors.append(node.prev_tensors[ref_index])
+            new_node.prev_indices.append(node.prev_indices[ref_index])
+            node.prev_nodes[ref_index].next_nodes.append(new_node)
 
         # Rewrite relu, relu6 as nn.ReLU() and nn.ReLU6() for Module fusable rules
         def _is_functional_rewrite_node(node: TraceNode, custom_data):
