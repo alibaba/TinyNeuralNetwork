@@ -1766,7 +1766,7 @@ class QATQuantizer(object):
                 return False
             return (
                 cur_module.full_name.startswith('self.float_functional_simple_')
-                and cur_module.kind in ('add', 'mul', 'add_relu')
+                and cur_module.func_type in ('add', 'mul', 'add_relu')
                 and node.prev_tensors[0].shape != node.prev_tensors[1].shape
             )
 
