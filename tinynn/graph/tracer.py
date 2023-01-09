@@ -1859,16 +1859,16 @@ class TraceGraph(object):
         active_input_nodes = [i for i in self.input_nodes if i.active]
         active_forward_nodes = [i for i in self.forward_nodes if i.active]
 
-        active_constant_nodes = set()
+        active_constant_nodes = dict()
         for n in self.forward_nodes + self.output_nodes:
             if n.active:
                 for pn in n.prev_nodes:
                     if isinstance(pn.module, ConstantNode):
-                        active_constant_nodes.add(pn.module)
+                        active_constant_nodes[pn.unique_name] = pn
 
         self.input_nodes = active_input_nodes
         self.forward_nodes = active_forward_nodes
-        self.constant_nodes = list(active_constant_nodes)
+        self.constant_nodes = list(active_constant_nodes.values())
 
     @contextlib.contextmanager
     def __numbering_context(self):
