@@ -499,7 +499,46 @@ class QATQuantizer(object):
             return node.full_name() in creation_func_names
 
         extra_constant_nodes = graph.filter_forward_nodes(_is_extra_constant_nodes)
+
+        def _is_params_in_module(node, custom_data):
+            if len(node.prev_nodes) == 1 and len(node.next_nodes) == 1:
+                if len(node.prev_tensors) == 1 and len(node.next_tensors) == 1:
+                    if isinstance(node.prev_tensors[0], nn.Module) and not isinstance(
+                        node.prev_tensors[0], nnq.FloatFunctional
+                    ):
+                        return True
+            return False
+
+        param_nodes = graph.filter_forward_nodes(_is_params_in_module)
+
         for n in graph.constant_nodes + extra_constant_nodes:
+            qat_analysis_queue.put((n, not n.next_tensors[0].dtype == torch.float32))
+
+        while not qat_analysis_queue.empty():
+            node, quantized = qat_analysis_queue.get()
+            if not graph.quantized:
+                graph.quantized = graph.quantized or quantized
+            _qat_analysis(node, quantized)
+
+        for n in param_nodes:
+            prev_node = n.prev_nodes[0]
+            next_node = n.next_nodes[0]
+            is_known_mod = prev_node.kind().__name__ in (
+                'Conv1d',
+                'Conv2d',
+                'Linear',
+                'ConvTranspose1d',
+                'ConvTranspose2d',
+            )
+            if is_known_mod and n.module.full_name == 'weight' and prev_node.quantized:
+                if next_node.type() == torch_q.QuantStub:
+                    mod = nn.Sequential(torch_q.DeQuantStub(), torch_q.QuantStub())
+                    orig_mod = next_node.module
+                    next_node.module = mod
+                    setattr(graph.module, next_node.original_name, next_node.module)
+                    graph.module_original_name_dict[id(mod)] = graph.module_original_name_dict[id(orig_mod)]
+                    graph.module_unique_name_dict[id(mod)] = graph.module_unique_name_dict[id(orig_mod)]
+                continue
             qat_analysis_queue.put((n, not n.next_tensors[0].dtype == torch.float32))
 
         while not qat_analysis_queue.empty():
@@ -1228,7 +1267,8 @@ class QATQuantizer(object):
                     if node.prev_nodes[0].kind() == 'shape' and node.prev_nodes[0].module.is_property:
                         return False
                     if (
-                        node.prev_tensors[0].dtype in (torch.int32, torch.int64)
+                        isinstance(node.prev_tensors[0], torch.Tensor)
+                        and node.prev_tensors[0].dtype in (torch.int32, torch.int64)
                         and node.next_tensors[0].dtype == torch.float32
                     ):
                         return True
@@ -1237,9 +1277,45 @@ class QATQuantizer(object):
 
         int_to_float_nodes = graph.filter_forward_nodes(_is_int_to_float_nodes)
 
+        def _is_params_in_module(node, custom_data):
+            # if len(node.prev_nodes) == 0 and len(node.next_nodes) == 0
+            if len(node.prev_nodes) == 1 and len(node.next_nodes) == 1:
+                if len(node.prev_tensors) == 1 and len(node.next_tensors) == 1:
+                    if isinstance(node.prev_tensors[0], nn.Module) and not isinstance(
+                        node.prev_tensors[0], nnq.FloatFunctional
+                    ):
+                        return True
+            return False
+
+        param_nodes = graph.filter_forward_nodes(_is_params_in_module)
+        for node in param_nodes:
+            prev_node = node.prev_nodes[0]
+            is_known_mod = prev_node.kind().__name__ in (
+                'Conv1d',
+                'Conv2d',
+                'Linear',
+                'ConvTranspose1d',
+                'ConvTranspose2d',
+            )
+            prop = node.module.full_name
+
+            if is_known_mod and prop in ('weight', 'bias') and self.layerwise_config.get(prev_node.unique_name, True):
+                node.module.is_class = False
+                node.module.is_property = False
+
+                node.module.full_name = 'tinynn.graph.quantization.utils.get_parameter'
+                node.module.args_template = f'{{}}, "{prop}"'
+                node.module.args_template_no_self = f'"{prop}"'
+                node.module.args_offset = 0
+                node.module.update_args_string()
+
         # First, we insert the QuantStub nodes for every input/constant node
         for idx, node in reversed(
-            list(enumerate(graph.input_nodes + graph.constant_nodes + extra_constant_nodes + int_to_float_nodes))
+            list(
+                enumerate(
+                    graph.input_nodes + graph.constant_nodes + extra_constant_nodes + int_to_float_nodes + param_nodes
+                )
+            )
         ):
             if node.next_tensors[0].dtype in (torch.int32, torch.int64):
                 continue

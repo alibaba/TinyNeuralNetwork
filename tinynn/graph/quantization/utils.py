@@ -21,3 +21,28 @@ def fuse_conv_bn_weights(conv_w, conv_b, bn_rm, bn_rv, bn_eps, bn_w, bn_b, trans
     return torch.nn.Parameter(fused_conv_w, conv_w.requires_grad), torch.nn.Parameter(
         fused_conv_b, conv_b.requires_grad
     )
+
+
+def get_parameter(mod: torch.nn.Module, param: str) -> torch.nn.Parameter:
+    # import pdb
+    # pdb.set_trace()
+    if param == 'weight':
+        if isinstance(mod, torch.nn.Sequential):
+            return getattr(mod[0], param)
+        elif hasattr(mod, 'weight_fake_quant'):
+            return mod.weight_fake_quant(getattr(mod, param))
+        elif hasattr(mod, 'set_weight_bias'):
+            return getattr(mod, param)()
+        else:
+            return getattr(mod, param)
+    elif param == 'bias':
+        if isinstance(mod, torch.nn.Sequential):
+            return getattr(mod[0], param)
+        elif hasattr(mod, 'weight_fake_quant'):
+            return getattr(mod, param)
+        elif hasattr(mod, 'set_weight_bias'):
+            return getattr(mod, param)()
+        else:
+            return getattr(mod, param)
+    else:
+        return getattr(mod, param)

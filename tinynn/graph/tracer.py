@@ -477,7 +477,7 @@ class TraceFunction(object):
             if prefix is None:
                 if original:
                     tensor_names = [
-                        o_name if u_name.startswith('self.') else u_name
+                        f'self.{o_name}' if u_name.startswith('self.') else u_name
                         for u_name, o_name in zip(self.tensor_names, self.original_tensor_names)
                     ]
                 else:
@@ -851,8 +851,8 @@ def constant_handler(
                 key = current_graph().parameter_original_name_dict[id(tensor)].split('.')[-1]
                 trace_func = TraceFunction(key, True, True).parse_args(mod)
                 trace_node = TraceNode(trace_func)
-                add_forward_node(trace_node, [mod], [tensor])
-                return True
+                add_forward_node(trace_node, [mod], tensor)
+                return False
         if not tensor.is_leaf:
             if node_name is None:
                 node_name = 'unknown node'
@@ -1596,6 +1596,12 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
             if need_idx:
                 log.debug(f'set pre_index tensor {i}')
                 current_graph().tensor_pre_index_dict[id(t)] = i
+            if isinstance(t, torch.nn.Parameter):
+                if id(t) in current_graph().tensor_parameter_dict:
+                    node.next_tensors[i] = current_graph().tensor_parameter_dict[id(t)]()
+                else:
+                    node.next_tensors[i] = node.next_tensors[i].data
+                    current_graph().tensor_parameter_dict[id(t)] = weakref.ref(node.next_tensors[i])
 
     skip_add = False
     if node in current_graph().forward_nodes:
@@ -2108,7 +2114,7 @@ class TraceGraph(object):
 
             if type(node.module) == TraceFunction:
                 full_name = node.full_name()
-                if not full_name.startswith('torch.') and not full_name.startswith('self.'):
+                if not full_name.startswith('torch.') and not full_name.startswith('self.') and '.' in full_name:
                     ns = '.'.join(full_name.split('.')[:-1])
                     self.used_namespaces.add(ns)
                 first_arg = None
@@ -2288,8 +2294,8 @@ class TraceGraph(object):
             return True
 
     def inplace_commit(self):
-        import_block = self.__gen_import_code()
         forward_block = self.__gen_forward_code(True)
+        import_block = self.__gen_import_code()
 
         code = re.sub(r'^    ', '', forward_block, flags=re.MULTILINE)
 
