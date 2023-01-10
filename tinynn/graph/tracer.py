@@ -2482,6 +2482,79 @@ class TraceGraph(object):
             n.module.replace_tensor_name(prev_unique_name, next_unique_name)
             n.module.update_args_string()
 
+    def __call__(self, *args, **kwargs):
+        """Calls the function with a list of tensor inputs"""
+
+        # Prepare inputs
+        tensors_map = {}
+        i = 0
+        for t in args:
+            if isinstance(t, (tuple, list)):
+                for rt in t:
+                    tensors_map[(f'input_{i}_f', None)] = rt
+                    i += 1
+            else:
+                tensors_map[(f'input_{i}_f', None)] = t
+                i += 1
+
+        # Sort nodes
+        sorted_nodes = sorted(self.forward_nodes, key=lambda x: x.forward_order)
+
+        for node in sorted_nodes:
+            # Basic info
+            op_kind = node.kind()
+            op_kind = op_kind.__name__ if isinstance(op_kind, type) else op_kind
+
+            log.debug(f'{node.unique_name}({op_kind}):')
+            log.debug('  Inputs:')
+
+            # TODO: Support the following case
+            assert len(node.prev_nodes) == len(node.prev_tensors), "not supported"
+
+            # Collect input tensors
+            prev_tensors = []
+            for i, pn in enumerate(node.prev_nodes):
+                pn_name = pn.unique_name
+                pn_idx = node.prev_indices[i]
+                log.debug(f'    {pn_name} {pn_idx}')
+                if isinstance(pn.module, ConstantNode):
+                    prev_tensors.append(node.prev_tensors[i])
+                elif (pn_name, pn_idx) in tensors_map:
+                    prev_tensors.append(tensors_map[(pn_name, pn_idx)])
+                else:
+                    assert False, f"({pn_name}, {pn_idx}) is not found in tensor dict"
+
+            node.prev_tensors = prev_tensors
+
+            # Calculate output
+            if isinstance(node.module, nn.Module):
+                output = node.module(*prev_tensors)
+            else:
+                output = node.module(prev_tensors)
+
+            # Shape handling
+            if node.type() in ('shape', 'size'):
+                if len(prev_tensors) == 1:
+                    output = torch.tensor(output).unbind(0)
+                else:
+                    output = torch.tensor(output)
+
+            log.debug('')
+            log.debug('  Outputs:')
+
+            # Updating output tensors
+            if isinstance(output, (list, tuple)):
+                for j, t in enumerate(output):
+                    tensors_map[(node.unique_name, j)] = t
+                    node.next_tensors[j] = t
+            else:
+                tensors_map[(node.unique_name, None)] = output
+                node.next_tensors[0] = output
+
+            for i in range(len(node.next_tensors)):
+                log.debug(f'    {i}')
+            log.debug('')
+
     def replace_node_module(self, node: TraceNode, module: torch.nn.Module) -> None:
         """Replaces a module in a node with another"""
         # Update unique name for node
