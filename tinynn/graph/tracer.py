@@ -1448,10 +1448,18 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
         output_tensors = [output_tensors]
         need_idx = False
 
-    node.prev_tensors.extend(input_tensors)
+    flatten_inputs = []
+    for t in input_tensors:
+        if isinstance(t, (list, tuple)):
+            for rt in t:
+                flatten_inputs.append(rt)
+        else:
+            flatten_inputs.append(t)
+
+    node.prev_tensors.extend(flatten_inputs)
     node.next_tensors.extend(output_tensors)
 
-    for i, t in enumerate(input_tensors):
+    for i, t in enumerate(flatten_inputs):
         assert type(t) in (
             torch.dtype,
             torch.device,
@@ -1969,7 +1977,13 @@ class TraceGraph(object):
                     prefix = ''.join([f'{x} = ' for x in aliases])
                 line = f"        {prefix}{output} = {node.module.extra_expr(first=first_arg)}"
             else:
-                line = f"        {output} = self.{node.unique_name}({param})"
+                if node.type() == nn.LSTM and len(node.prev_nodes) == 3 and len(node.prev_tensors) == 3:
+                    first_arg = node.prev_node_unique_name(0)
+                    param = ", ".join([node.prev_node_unique_name(i) for i in range(1, len(node.prev_nodes))])
+                    line = f"        {output} = self.{node.unique_name}({first_arg}, ({param}))"
+                else:
+                    line = f"        {output} = self.{node.unique_name}({param})"
+
             lines.append(line)
 
             for pn in {pn.unique_name: pn for pn in node.prev_nodes}.values():
