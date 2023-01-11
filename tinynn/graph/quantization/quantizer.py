@@ -247,6 +247,7 @@ class QATQuantizer(object):
     effective_layers: typing.List[str]
     ignore_layerwise_config: bool
     fused_layerwise_config: bool
+    inplace: bool
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new QATQuantizer object
@@ -340,6 +341,7 @@ class QATQuantizer(object):
             'extra_tracer_opts': {},
             'fused_layerwise_config': True,
             'ignore_layerwise_config': False,
+            'inplace': False,
         }
 
         if config is None:
@@ -402,25 +404,32 @@ class QATQuantizer(object):
                 # After tracing the model, we will get a TraceGraph object
                 graph = trace(self.model, self.dummy_input, **self.extra_tracer_opts)
                 self.rewrite_quantize_graph(graph)
-                graph.generate_code(model_code_path, model_weights_path, model_name_q)
+                if self.inplace:
+                    graph.inplace_commit()
+                else:
+                    graph.generate_code(model_code_path, model_weights_path, model_name_q)
 
             with open(config_path, 'w') as f:
                 yaml_.dump(self.layerwise_config, f)
 
-            # Import the new model
-            rewritten_model = import_from_path(model_ns, model_code_path, model_name_q)()
-            rewritten_model.load_state_dict(torch.load(model_weights_path))
+            if self.inplace:
+                rewritten_model = self.model
+            else:
+                # Import the new model
+                rewritten_model = import_from_path(model_ns, model_code_path, model_name_q)()
+                rewritten_model.load_state_dict(torch.load(model_weights_path))
 
-            device = get_module_device(self.model)
-            if device is not None:
-                rewritten_model.to(device=device)
+                device = get_module_device(self.model)
+                if device is not None:
+                    rewritten_model.to(device=device)
 
-            # Remove the weights file to save space
-            if self.remove_weights_after_load:
-                os.unlink(model_weights_path)
+                # Remove the weights file to save space
+                if self.remove_weights_after_load:
+                    os.unlink(model_weights_path)
 
-            # Set the model to training mode before tracing again, since we need to perform QAT
-            self.set_model_mode(rewritten_model)
+                # Set the model to training mode before tracing again, since we need to perform QAT
+                self.set_model_mode(rewritten_model)
+
             rewritten_graph = trace(rewritten_model, self.dummy_input)
 
             # Update the model so that the original one can be released
@@ -1278,7 +1287,6 @@ class QATQuantizer(object):
         int_to_float_nodes = graph.filter_forward_nodes(_is_int_to_float_nodes)
 
         def _is_params_in_module(node, custom_data):
-            # if len(node.prev_nodes) == 0 and len(node.next_nodes) == 0
             if len(node.prev_nodes) == 1 and len(node.next_nodes) == 1:
                 if len(node.prev_tensors) == 1 and len(node.next_tensors) == 1:
                     if isinstance(node.prev_tensors[0], nn.Module) and not isinstance(

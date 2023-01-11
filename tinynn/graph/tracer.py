@@ -355,6 +355,8 @@ class ConstantNode(object):
         else:
             self.unique_name = unique_name
 
+        self.inplace = original_name is not None
+
         if original_name is None:
             self.original_name = self.unique_name
         else:
@@ -477,7 +479,9 @@ class TraceFunction(object):
             if prefix is None:
                 if original:
                     tensor_names = [
-                        f'self.{o_name}' if u_name.startswith('self.') else u_name
+                        (o_name if o_name.startswith('self.') else f'self.{o_name}')
+                        if u_name.startswith('self.')
+                        else u_name
                         for u_name, o_name in zip(self.tensor_names, self.original_tensor_names)
                     ]
                 else:
@@ -2315,6 +2319,10 @@ class TraceGraph(object):
         for node in self.forward_nodes + self.other_init_nodes:
             if isinstance(node.module, nn.Module) and node.unique_name not in self.related_modules:
                 setattr(self.module, node.original_name, node.module)
+
+        for node in self.constant_nodes:
+            if not node.module.inplace:
+                setattr(self.module, node.original_name, node.next_tensors[0])
 
         return self.module
 
