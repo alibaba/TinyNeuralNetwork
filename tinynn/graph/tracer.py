@@ -2300,13 +2300,15 @@ class TraceGraph(object):
         else:
             return True
 
-    def inplace_commit(self):
+    def inplace_commit(self, show_code: bool = False):
+        """Commit the changes to the TraceGraph and applies it to the model"""
         forward_block = self.__gen_forward_code(True)
         import_block = self.__gen_import_code()
 
         code = re.sub(r'^    ', '', forward_block, flags=re.MULTILINE)
 
-        log.info(f'The new forward function for the model:\n{code}')
+        if show_code:
+            log.info(f'The new forward function for the model:\n{code}')
 
         tmp_ns = {}
         exec(import_block, tmp_ns)
