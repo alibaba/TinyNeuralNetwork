@@ -22,6 +22,9 @@ with model_tracer():
     # even if it is used to build the model
     model.avgpool.output_size = (7, 7)
 
+    # (Optional) It works even if you want only a part of the model.
+    graph.reset_input_output_for_graph(['features_0'], ['avgpool'])
+
     # We can use it to generate the code for the original model
     # But be careful that it has to be in the with-block.
     graph.generate_code('my_alexnet.py', 'my_alexnet.pth', 'Alexnet')

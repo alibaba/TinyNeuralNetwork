@@ -2038,6 +2038,88 @@ class TraceGraph(object):
         self.forward_nodes = active_forward_nodes
         self.constant_nodes = list(active_constant_nodes.values())
 
+    def reset_input_output_for_graph(self, input_names: typing.List[str], output_names: typing.List[str]):
+        """Extract a subgraph from the original computation graph"""
+        assert len(set(input_names) & set(output_names)) == 0, "A node cannot be both input and output"
+
+        input_nodes = []
+        output_nodes = []
+        for name in input_names + output_names:
+            node = self.nodes_map.get(name, None)
+
+            assert node is not None, f"{name} is not a node in TraceGraph"
+            assert node in self.forward_nodes, f"{name} is not a forward node in TraceGraph"
+
+            if name in input_names:
+                input_nodes.append(node)
+            else:
+                output_nodes.append(node)
+
+        self.assert_is_subgraph(input_nodes, output_nodes)
+
+        for node in self.input_nodes + self.output_nodes:
+            del self.nodes_map[node.unique_name]
+
+        self.input_nodes.clear()
+        self.output_nodes.clear()
+
+        with self.__numbering_context():
+            for node in input_nodes:
+                node.prev_nodes.clear()
+                for i, t in enumerate(node.prev_tensors):
+                    with override_current_trace_graph(self):
+                        new_node = TraceNode(TraceFunction("input"))
+                        add_input_node(new_node, t)
+                    node.prev_nodes.append(new_node)
+
+            for node in output_nodes:
+                node.next_nodes.clear()
+                for i, t in enumerate(node.next_tensors):
+                    if type(t) == torch.Tensor or (
+                        isinstance(t, (list, tuple)) and all((type(x) == torch.Tensor for x in t))
+                    ):
+                        with override_current_trace_graph(self):
+                            new_node = TraceNode(TraceFunction("output"))
+                            add_output_node(new_node, t)
+                        node.next_nodes.append(new_node)
+                    else:
+                        log.warning(
+                            "Only tensors or list, tuple of tensors are supported when nested in a class, dict, list or"
+                            " tuple"
+                        )
+
+        self.eliminate_dead_graph_pass()
+        self.recompute_forward_order()
+
+    def assert_is_subgraph(self, input_nodes, output_nodes):
+        q = queue.Queue()
+        for node in output_nodes:
+            q.put(node)
+
+        start_nodes = {node.unique_name: node for node in input_nodes}
+        visited = set()
+        actual_starts = dict()
+
+        while not q.empty():
+            node = q.get()
+            if node.unique_name in visited:
+                continue
+
+            visited.add(node.unique_name)
+            if node.unique_name in start_nodes:
+                continue
+
+            if len(node.prev_nodes) == 0:
+                if not len(node.next_nodes) == 0:
+                    actual_starts[node.unique_name] = node
+                continue
+
+            for prev_node in node.prev_nodes:
+                q.put(prev_node)
+
+        missing_inputs = set(actual_starts) - set(start_nodes)
+        assert len(missing_inputs) == 0, f"Not a subgraph, missing inputs: {missing_inputs}"
+
     @contextlib.contextmanager
     def __numbering_context(self):
         """A simple context manager for numbering nodes"""
