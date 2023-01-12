@@ -3,6 +3,7 @@ import functools
 import inspect
 import os
 import queue
+import re
 import sys
 import typing
 
@@ -247,6 +248,7 @@ class QATQuantizer(object):
     effective_layers: typing.List[str]
     ignore_layerwise_config: bool
     fused_layerwise_config: bool
+    inplace: bool
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new QATQuantizer object
@@ -340,6 +342,7 @@ class QATQuantizer(object):
             'extra_tracer_opts': {},
             'fused_layerwise_config': True,
             'ignore_layerwise_config': False,
+            'inplace': False,
         }
 
         if config is None:
@@ -402,25 +405,33 @@ class QATQuantizer(object):
                 # After tracing the model, we will get a TraceGraph object
                 graph = trace(self.model, self.dummy_input, **self.extra_tracer_opts)
                 self.rewrite_quantize_graph(graph)
-                graph.generate_code(model_code_path, model_weights_path, model_name_q)
+                if self.inplace:
+                    graph.inplace_commit()
+                else:
+                    graph.generate_code(model_code_path, model_weights_path, model_name_q)
 
+            os.makedirs(self.work_dir, exist_ok=True)
             with open(config_path, 'w') as f:
                 yaml_.dump(self.layerwise_config, f)
 
-            # Import the new model
-            rewritten_model = import_from_path(model_ns, model_code_path, model_name_q)()
-            rewritten_model.load_state_dict(torch.load(model_weights_path))
+            if self.inplace:
+                rewritten_model = self.model
+            else:
+                # Import the new model
+                rewritten_model = import_from_path(model_ns, model_code_path, model_name_q)()
+                rewritten_model.load_state_dict(torch.load(model_weights_path))
 
-            device = get_module_device(self.model)
-            if device is not None:
-                rewritten_model.to(device=device)
+                device = get_module_device(self.model)
+                if device is not None:
+                    rewritten_model.to(device=device)
 
-            # Remove the weights file to save space
-            if self.remove_weights_after_load:
-                os.unlink(model_weights_path)
+                # Remove the weights file to save space
+                if self.remove_weights_after_load:
+                    os.unlink(model_weights_path)
 
-            # Set the model to training mode before tracing again, since we need to perform QAT
-            self.set_model_mode(rewritten_model)
+                # Set the model to training mode before tracing again, since we need to perform QAT
+                self.set_model_mode(rewritten_model)
+
             rewritten_graph = trace(rewritten_model, self.dummy_input)
 
             # Update the model so that the original one can be released
@@ -499,7 +510,55 @@ class QATQuantizer(object):
             return node.full_name() in creation_func_names
 
         extra_constant_nodes = graph.filter_forward_nodes(_is_extra_constant_nodes)
+
+        def _is_params_in_module(node, custom_data):
+            if len(node.prev_nodes) == 1 and len(node.next_nodes) == 1:
+                if len(node.prev_tensors) == 1 and len(node.next_tensors) == 1:
+                    if isinstance(node.prev_tensors[0], nn.Module) and not isinstance(
+                        node.prev_tensors[0], nnq.FloatFunctional
+                    ):
+                        return True
+            return False
+
+        param_nodes = graph.filter_forward_nodes(_is_params_in_module)
+
         for n in graph.constant_nodes + extra_constant_nodes:
+            qat_analysis_queue.put((n, not n.next_tensors[0].dtype == torch.float32))
+
+        while not qat_analysis_queue.empty():
+            node, quantized = qat_analysis_queue.get()
+            if not graph.quantized:
+                graph.quantized = graph.quantized or quantized
+            _qat_analysis(node, quantized)
+
+        q_dict = {}
+        for n in graph.forward_nodes:
+            if isinstance(n.module, nn.Module):
+                q_dict[n.module] = q_dict.get(n.module, False) or n.quantized
+
+        for n in graph.forward_nodes:
+            if n.module in q_dict:
+                n.quantized = q_dict[n.module]
+
+        for n in param_nodes:
+            prev_node = n.prev_nodes[0]
+            next_node = n.next_nodes[0]
+            is_known_mod = prev_node.kind().__name__ in (
+                'Conv1d',
+                'Conv2d',
+                'Linear',
+                'ConvTranspose1d',
+                'ConvTranspose2d',
+            )
+            if is_known_mod and n.module.full_name == 'weight' and prev_node.quantized:
+                if next_node.type() == torch_q.QuantStub:
+                    mod = nn.Sequential(torch_q.DeQuantStub(), torch_q.QuantStub())
+                    orig_mod = next_node.module
+                    next_node.module = mod
+                    setattr(graph.module, next_node.original_name, next_node.module)
+                    graph.module_original_name_dict[id(mod)] = graph.module_original_name_dict[id(orig_mod)]
+                    graph.module_unique_name_dict[id(mod)] = graph.module_unique_name_dict[id(orig_mod)]
+                continue
             qat_analysis_queue.put((n, not n.next_tensors[0].dtype == torch.float32))
 
         while not qat_analysis_queue.empty():
@@ -534,7 +593,7 @@ class QATQuantizer(object):
             type_dict[node_type].append(node)
 
         for node_type, nodes in type_dict.items():
-            graph.update_submodule_in_nodes_from_predicate(nodes, Q_MODULES_MAPPING[node_type])
+            graph.update_submodule_in_nodes_from_predicate(nodes, Q_MODULES_MAPPING[node_type], self.inplace)
 
         custom_data = ([], set())
         graph.filter_forward_nodes(is_fusable, custom_data, reverse=True)
@@ -546,6 +605,10 @@ class QATQuantizer(object):
         )
 
         for quant_nodes in quant_list:
+            if self.inplace:
+                quant_nodes = [re.sub('get_submodule\("(.*?)"\)', '\\1', x) for x in quant_nodes]
+                quant_nodes = [re.sub('\[("|)(.*?)("|)\]', '.\\2', x) for x in quant_nodes]
+
             if type(self) != PostQuantizer and LooseVersion(torch.__version__) >= '1.11.0':
                 # See https://github.com/pytorch/pytorch/pull/88193
                 if LooseVersion(torch.__version__) < '1.14.0':
@@ -743,24 +806,29 @@ class QATQuantizer(object):
 
         mapping.update(FUSE_QAT_MODULES)
 
+        q_dict = {}
+        for n in graph.forward_nodes:
+            if isinstance(n.module, nn.Module):
+                q_dict[n.module] = q_dict.get(n.module, False) or n.quantized
+
+        non_quantized_mods = set(m for m, s in q_dict.items() if s is False)
+
         if LooseVersion(torch.__version__) < LooseVersion("1.7.0"):
             model = torch_q.prepare(graph.module, inplace=True)
-            for n in graph.forward_nodes:
-                if not n.quantized:
-                    if hasattr(n.module, "_forward_hooks"):
-                        if len(n.module._forward_hooks) > 0:
-                            n.module._forward_hooks.popitem()
-                    if hasattr(n.module, "qconfig"):
-                        delattr(n.module, "qconfig")
-                    if hasattr(n.module, "activation_post_process"):
-                        delattr(n.module, "activation_post_process")
+            for m in non_quantized_mods:
+                if hasattr(m, "_forward_hooks"):
+                    if len(m._forward_hooks) > 0:
+                        m._forward_hooks.popitem()
+                if hasattr(m, "qconfig"):
+                    delattr(m, "qconfig")
+                if hasattr(m, "activation_post_process"):
+                    delattr(m, "activation_post_process")
             torch_q.convert(model, mapping, inplace=True)
         else:
             torch_q.propagate_qconfig_(graph.module, qconfig_dict=None)
-            for n in graph.forward_nodes:
-                if not n.quantized:
-                    if hasattr(n.module, "qconfig"):
-                        delattr(n.module, "qconfig")
+            for m in non_quantized_mods:
+                if hasattr(m, "qconfig"):
+                    delattr(m, "qconfig")
             model = torch_q.convert(graph.module, mapping=mapping, inplace=True, remove_qconfig=False)
 
             if self.dynamic_lstm_quant:
@@ -769,10 +837,9 @@ class QATQuantizer(object):
             if LooseVersion(torch.__version__) >= LooseVersion("1.13.0"):
                 torch_q.propagate_qconfig_(model, qconfig_dict=None)
 
-                for n in graph.forward_nodes:
-                    if not n.quantized:
-                        if hasattr(n.module, "qconfig"):
-                            delattr(n.module, "qconfig")
+                for m in non_quantized_mods:
+                    if hasattr(m, "qconfig"):
+                        delattr(m, "qconfig")
 
                 prepare_custom_config_dict = torch.ao.quantization.get_default_custom_config_dict()
                 custom_module_class_mapping = prepare_custom_config_dict.get(
@@ -796,15 +863,14 @@ class QATQuantizer(object):
                 torch.ao.nn.quantizable.LSTM.from_float = orig_from_float
             else:
                 torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
-            for n in graph.forward_nodes:
-                if not n.quantized:
-                    if hasattr(n.module, "qconfig"):
-                        delattr(n.module, "qconfig")
-                    if hasattr(n.module, "_forward_hooks"):
-                        if len(n.module._forward_hooks) > 0:
-                            n.module._forward_hooks.popitem()
-                    if hasattr(n.module, "activation_post_process"):
-                        delattr(n.module, "activation_post_process")
+            for m in non_quantized_mods:
+                if hasattr(m, "_forward_hooks"):
+                    if len(m._forward_hooks) > 0:
+                        m._forward_hooks.popitem()
+                if hasattr(m, "qconfig"):
+                    delattr(m, "qconfig")
+                if hasattr(m, "activation_post_process"):
+                    delattr(m, "activation_post_process")
 
         if not self.per_tensor:
             if self.backend == 'qnnpack':
@@ -846,7 +912,7 @@ class QATQuantizer(object):
                 n, state = q.get()
                 if isinstance(n.module, nn.Module):
                     orig_name = graph.module_original_name_dict.get(id(n.module))
-                    new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name)
+                    new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name, self.inplace)
                     if isinstance(new_mod, torch_q.DeQuantStub):
                         state = True
                     else:
@@ -884,7 +950,7 @@ class QATQuantizer(object):
                 if n.quantized:
                     if isinstance(n.module, nn.Module):
                         orig_name = graph.module_original_name_dict.get(id(n.module))
-                        new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name)
+                        new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name, self.inplace)
                         if isinstance(new_mod, nn.Module) and hasattr(new_mod, 'activation_post_process'):
                             q_mod = new_mod
                         elif (
@@ -936,7 +1002,7 @@ class QATQuantizer(object):
         for quant_nodes in quant_list:
             for orig_name in quant_nodes:
                 if orig_name in rev_dict:
-                    new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name)
+                    new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name, self.inplace)
                     acp = getattr(new_mod, 'activation_post_process', None)
                     if acp is not None:
                         torch.quantization.disable_fake_quant(acp)
@@ -995,7 +1061,7 @@ class QATQuantizer(object):
                 if isinstance(n.module, nn.Module):
                     is_prev_float_functional = False
                     orig_name = graph.module_original_name_dict.get(id(n.module))
-                    new_mod, parent = graph.get_submodule_with_parent_from_name(orig_name)
+                    new_mod, parent = graph.get_submodule_with_parent_from_name(orig_name, self.inplace)
                     prop = orig_name.split('.')[-1]
                     if isinstance(new_mod, (torch_q.FakeQuantize, torch_q.ObserverBase)):
                         if new_fq_count == 0:
@@ -1228,7 +1294,8 @@ class QATQuantizer(object):
                     if node.prev_nodes[0].kind() == 'shape' and node.prev_nodes[0].module.is_property:
                         return False
                     if (
-                        node.prev_tensors[0].dtype in (torch.int32, torch.int64)
+                        isinstance(node.prev_tensors[0], torch.Tensor)
+                        and node.prev_tensors[0].dtype in (torch.int32, torch.int64)
                         and node.next_tensors[0].dtype == torch.float32
                     ):
                         return True
@@ -1237,9 +1304,44 @@ class QATQuantizer(object):
 
         int_to_float_nodes = graph.filter_forward_nodes(_is_int_to_float_nodes)
 
+        def _is_params_in_module(node, custom_data):
+            if len(node.prev_nodes) == 1 and len(node.next_nodes) == 1:
+                if len(node.prev_tensors) == 1 and len(node.next_tensors) == 1:
+                    if isinstance(node.prev_tensors[0], nn.Module) and not isinstance(
+                        node.prev_tensors[0], nnq.FloatFunctional
+                    ):
+                        return True
+            return False
+
+        param_nodes = graph.filter_forward_nodes(_is_params_in_module)
+        for node in param_nodes:
+            prev_node = node.prev_nodes[0]
+            is_known_mod = prev_node.kind().__name__ in (
+                'Conv1d',
+                'Conv2d',
+                'Linear',
+                'ConvTranspose1d',
+                'ConvTranspose2d',
+            )
+            prop = node.module.full_name
+
+            if is_known_mod and prop in ('weight', 'bias') and self.layerwise_config.get(prev_node.unique_name, True):
+                node.module.is_class = False
+                node.module.is_property = False
+
+                node.module.full_name = 'tinynn.graph.quantization.utils.get_parameter'
+                node.module.args_template = f'{{}}, "{prop}"'
+                node.module.args_template_no_self = f'"{prop}"'
+                node.module.args_offset = 0
+                node.module.update_args_string()
+
         # First, we insert the QuantStub nodes for every input/constant node
         for idx, node in reversed(
-            list(enumerate(graph.input_nodes + graph.constant_nodes + extra_constant_nodes + int_to_float_nodes))
+            list(
+                enumerate(
+                    graph.input_nodes + graph.constant_nodes + extra_constant_nodes + int_to_float_nodes + param_nodes
+                )
+            )
         ):
             if node.next_tensors[0].dtype in (torch.int32, torch.int64):
                 continue

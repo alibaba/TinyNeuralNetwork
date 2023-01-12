@@ -24,7 +24,7 @@ def show_source(model, title, reload_cache=True):
     print(source)
 
 
-def check_quantize_rewrite(model, inputs, show_rewritten=True, skip_train=False):
+def check_quantize_rewrite(model, inputs, show_rewritten=True, skip_train=False, skip_trace=False):
     with model_tracer():
         config = {'remove_weights_after_load': True, 'ignore_layerwise_config': True}
         if sys.platform == 'win32':
@@ -48,7 +48,14 @@ def check_quantize_rewrite(model, inputs, show_rewritten=True, skip_train=False)
 
             qat_model = quantizer.convert(qat_model)
 
-            torch.jit.trace(qat_model, inputs)
+            # Evaluation on converted model doesn't fail
+            if isinstance(inputs, (list, tuple)):
+                qat_model(*inputs)
+            else:
+                qat_model(inputs)
+
+            if not skip_trace:
+                torch.jit.trace(qat_model, inputs)
 
 
 def check_dequantize_rewrite(model, inputs, show_rewritten=True, skip_train=False):
@@ -1240,6 +1247,123 @@ class QuantizerTester(unittest.TestCase):
         class Model(nn.Module):
             def forward(self, x):
                 return (x + x[:, 0:1]).relu()
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_known_param_from_module_weight(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.Conv2d(3, 1, 1, 1)
+
+            def forward(self, x):
+                return x + torch.squeeze(self.conv.weight, 1).expand(1, 3, 224, 224)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_known_param_from_module_bias(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.Conv2d(3, 1, 1, 1)
+
+            def forward(self, x):
+                return x + self.conv.bias.view(-1, 1, 1).expand(1, 3, 224, 224)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_known_param_from_module_weight_qmod(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.Conv2d(3, 1, 1, 1)
+
+            def forward(self, x):
+                return self.conv(x).expand(1, 3, 224, 224) + torch.squeeze(self.conv.weight, 1).expand(1, 3, 224, 224)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs, skip_trace=True)
+
+    def test_known_param_from_module_weight_qmod_reverse(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.Conv2d(3, 1, 1, 1)
+
+            def forward(self, x):
+                return torch.squeeze(self.conv.weight, 1).expand(1, 3, 224, 224) + self.conv(x).expand(1, 3, 224, 224)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs, skip_trace=True)
+
+    def test_known_param_from_module_bias_qmod(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.Conv2d(3, 1, 1, 1)
+
+            def forward(self, x):
+                return self.conv(x).expand(1, 3, 224, 224) + self.conv.bias.view(-1, 1, 1).expand(1, 3, 224, 224)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs, skip_trace=True)
+
+    def test_known_param_from_module_bias_qmod_reverse(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.Conv2d(3, 1, 1, 1)
+
+            def forward(self, x):
+                return self.conv.bias.view(-1, 1, 1).expand(1, 3, 224, 224) + self.conv(x).expand(1, 3, 224, 224)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs, skip_trace=True)
+
+    def test_known_param_simple(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.param = nn.Parameter(torch.randn(1, 3, 224, 224))
+
+            def forward(self, x):
+                return x * self.param
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_known_param_submodule(self):
+        class SubModule(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.param = nn.Parameter(torch.randn(1, 3, 224, 224))
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.sub_module = SubModule()
+
+            def forward(self, x):
+                return x * self.sub_module.param
 
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)
