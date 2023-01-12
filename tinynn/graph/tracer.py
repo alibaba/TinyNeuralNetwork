@@ -844,14 +844,10 @@ def constant_handler(
             mod_id = current_graph().parameter_module_dict[id(tensor)]
             unique_name = current_graph().module_unique_name_dict[mod_id]
             if unique_name in current_graph().related_modules:
-                if unique_name in current_graph().nodes_map:
-                    node = current_graph().nodes_map[unique_name]
-                    mod = node.module
-                else:
-                    mod = ctypes.cast(mod_id, ctypes.py_object).value
-                    node = TraceNode(mod)
-                    add_forward_node(node, [], [])
-                    current_graph().tensor_pre_node_dict[id(mod)] = node.unique_name
+                mod = ctypes.cast(mod_id, ctypes.py_object).value
+                node = TraceNode(mod)
+                add_forward_node(node, [], [])
+                current_graph().tensor_pre_node_dict[mod_id] = node.unique_name
                 key = current_graph().parameter_original_name_dict[id(tensor)].split('.')[-1]
                 trace_func = TraceFunction(key, True, True).parse_args(mod)
                 trace_node = TraceNode(trace_func)
@@ -1607,15 +1603,7 @@ def add_forward_node(node: TraceNode, input_tensors, output_tensors):
                     node.next_tensors[i] = node.next_tensors[i].data
                     current_graph().tensor_parameter_dict[id(t)] = weakref.ref(node.next_tensors[i])
 
-    skip_add = False
-    if node in current_graph().forward_nodes:
-        if len(node.prev_tensors) == len(input_tensors) and len(node.next_tensors) == len(output_tensors):
-            current_graph().forward_nodes.remove(node)
-        else:
-            skip_add = True
-
-    if not skip_add:
-        current_graph().forward_nodes.append(node)
+    current_graph().forward_nodes.append(node)
     current_graph().nodes_map[node.unique_name] = node
 
 
@@ -1639,8 +1627,7 @@ def hook_modules(module):
                 return None
 
             log.debug(f'tracer in _submodule_tracer in {type(module).__name__}')
-            unique_name = current_graph().module_unique_name_dict[id(module)]
-            node = current_graph().nodes_map.get(unique_name, TraceNode(module))
+            node = TraceNode(module)
             modified_outputs = noop_handler(node, inputs, outputs)
             if modified_outputs is None:
                 add_forward_node(node, inputs, outputs)
@@ -1947,14 +1934,20 @@ class TraceGraph(object):
                         c_p = f'{p}["{n}"]'
                     else:
                         if len(p) > 0:
-                            c_p = f'{p}.{n}'
+                            if '.' in n or '-' in n:
+                                c_p = f'{p}.get_submodule("{n}")'
+                            else:
+                                c_p = f'{p}.{n}'
                         else:
                             c_p = n
                     q.put((c, c_p))
                 for n, c in m.named_parameters(recurse=False):
                     self.parameter_module_dict[id(c)] = id(m)
                     if len(p) > 0:
-                        c_p = f'{p}.{n}'
+                        if '.' in n or '-' in n:
+                            c_p = f'{p}.get_parameter("{n}")'
+                        else:
+                            c_p = f'{p}.{n}'
                     else:
                         c_p = n
                     q.put((c, c_p))
@@ -1962,7 +1955,10 @@ class TraceGraph(object):
                 for n, c in m.named_buffers(recurse=False):
                     self.parameter_module_dict[id(c)] = id(m)
                     if len(p) > 0:
-                        c_p = f'{p}.{n}'
+                        if '.' in n or '-' in n:
+                            c_p = f'{p}.get_buffer("{n}")'
+                        else:
+                            c_p = f'{p}.{n}'
                     else:
                         c_p = n
                     q.put((c, c_p))
@@ -2054,13 +2050,15 @@ class TraceGraph(object):
         """Generates the code for the init function for a `nn.Module`"""
         generated_node = []
         lines = []
+        mod_ids = []
         mod_cache_dict = dict()
         for node in self.constant_nodes + self.forward_nodes + self.other_init_nodes:
-            if node.unique_name in generated_node:
+            if node.unique_name in generated_node or id(node.module) in mod_ids:
                 log.info(f"skip dumplicate node code gen {node.unique_name}")
                 continue
 
             generated_node.append(node.unique_name)
+            mod_ids.append(id(node.module))
             if id(node.module) in module_constructor_lines:
                 root_ns = qualified_name(node.type()).split('.')[0]
                 self.used_namespaces.add(root_ns)
@@ -2112,6 +2110,7 @@ class TraceGraph(object):
         """Generates the code for the forward function for a `nn.Module`"""
         lines = [f"    def forward(self, {','.join([i.unique_name for i in self.input_nodes])}):"]
 
+        mod_name_dict = {}
         for node in self.forward_nodes:
             output = ", ".join([node.unique_name])
             param = ", ".join([node.prev_node_unique_name(i, inplace) for i in range(len(node.prev_nodes))])
@@ -2144,7 +2143,8 @@ class TraceGraph(object):
                 if inplace:
                     mod_name = node.original_name
                 else:
-                    mod_name = node.unique_name
+                    mod_name_dict.setdefault(node.module, node.unique_name)
+                    mod_name = mod_name_dict[node.module]
                 if len(node.prev_tensors) == 0 and len(node.next_tensors) == 0:
                     continue
                 if node.type() == nn.LSTM and len(node.prev_nodes) == 3 and len(node.prev_tensors) == 3:
@@ -2225,8 +2225,11 @@ class TraceGraph(object):
 
         DummyModel = type('DummyModel', (torch.nn.Module,), {})
         dummy_model = DummyModel()
+        mod_ids = set()
         for node in self.forward_nodes:
-            setattr(dummy_model, node.unique_name, node.module)
+            if id(node.module) not in mod_ids:
+                setattr(dummy_model, node.unique_name, node.module)
+                mod_ids.add(id(node.module))
 
         for node in self.constant_nodes:
             if node.module.is_parameter or node.module.is_persistent:
@@ -2303,11 +2306,7 @@ class TraceGraph(object):
 
         code = re.sub(r'^    ', '', forward_block, flags=re.MULTILINE)
 
-        lines = code.splitlines()
-        lines.insert(1, '    print("Hello from TinyNN")')
-        code = '\n'.join(lines)
-
-        print(code)
+        log.info(f'The new forward function for the model:\n{code}')
 
         tmp_ns = {}
         exec(import_block, tmp_ns)
@@ -2327,16 +2326,22 @@ class TraceGraph(object):
         return self.module
 
     def update_submodule_in_nodes_from_predicate(
-        self, nodes: typing.List[TraceNode], module_gen_predicate: typing.Callable[[nn.Module], nn.Module]
+        self,
+        nodes: typing.List[TraceNode],
+        module_gen_predicate: typing.Callable[[nn.Module], nn.Module],
+        inplace: bool = False,
     ):
         """update a submodule from the nodes using the predicate given"""
         for node in nodes:
             module = node.module
             new_module = module_gen_predicate(module)
-            self.update_submodule_in_node(node, new_module)
+            self.update_submodule_in_node(node, new_module, inplace)
 
-    def get_submodule_with_parent_from_name(self, module_name: str):
+    def get_submodule_with_parent_from_name(self, module_name: str, inplace: bool = False):
         """Gets the submodule with its parent using the name given"""
+        if inplace:
+            module_name = re.sub('get_submodule\("(.*?)"\)', '\\1', module_name)
+            module_name = re.sub('\[("|)(.*?)("|)\]', '.\\2', module_name)
         module_name_parts = module_name.split('.')
         cur_obj = self.module
         last_obj = None
@@ -2352,13 +2357,16 @@ class TraceGraph(object):
 
         return cur_obj, last_obj
 
-    def update_submodule_in_node(self, node: TraceNode, module: nn.Module):
+    def update_submodule_in_node(self, node: TraceNode, module: nn.Module, inplace: bool = False):
         """update a submodule from the nodes using the module given"""
         module_name = self.module_original_name_dict[id(node.module)]
+        if inplace:
+            module_name = re.sub('get_submodule\("(.*?)"\)', '\\1', module_name)
+            module_name = re.sub('\[("|)(.*?)("|)\]', '.\\2', module_name)
         module_name_parts = module_name.split('.')
         cur_obj = self.module
 
-        for ns in module_name_parts[1:-1]:
+        for ns in module_name_parts[:-1]:
             if type(cur_obj) == nn.ModuleList:
                 cur_obj = cur_obj[int(ns)]
             elif type(cur_obj) == nn.ModuleDict:

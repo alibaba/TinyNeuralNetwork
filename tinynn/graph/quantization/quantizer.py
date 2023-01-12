@@ -3,6 +3,7 @@ import functools
 import inspect
 import os
 import queue
+import re
 import sys
 import typing
 
@@ -409,6 +410,7 @@ class QATQuantizer(object):
                 else:
                     graph.generate_code(model_code_path, model_weights_path, model_name_q)
 
+            os.makedirs(self.work_dir, exist_ok=True)
             with open(config_path, 'w') as f:
                 yaml_.dump(self.layerwise_config, f)
 
@@ -529,6 +531,15 @@ class QATQuantizer(object):
                 graph.quantized = graph.quantized or quantized
             _qat_analysis(node, quantized)
 
+        q_dict = {}
+        for n in graph.forward_nodes:
+            if isinstance(n.module, nn.Module):
+                q_dict[n.module] = q_dict.get(n.module, False) or n.quantized
+
+        for n in graph.forward_nodes:
+            if n.module in q_dict:
+                n.quantized = q_dict[n.module]
+
         for n in param_nodes:
             prev_node = n.prev_nodes[0]
             next_node = n.next_nodes[0]
@@ -582,7 +593,7 @@ class QATQuantizer(object):
             type_dict[node_type].append(node)
 
         for node_type, nodes in type_dict.items():
-            graph.update_submodule_in_nodes_from_predicate(nodes, Q_MODULES_MAPPING[node_type])
+            graph.update_submodule_in_nodes_from_predicate(nodes, Q_MODULES_MAPPING[node_type], self.inplace)
 
         custom_data = ([], set())
         graph.filter_forward_nodes(is_fusable, custom_data, reverse=True)
@@ -594,6 +605,10 @@ class QATQuantizer(object):
         )
 
         for quant_nodes in quant_list:
+            if self.inplace:
+                quant_nodes = [re.sub('get_submodule\("(.*?)"\)', '\\1', x) for x in quant_nodes]
+                quant_nodes = [re.sub('\[("|)(.*?)("|)\]', '.\\2', x) for x in quant_nodes]
+
             if type(self) != PostQuantizer and LooseVersion(torch.__version__) >= '1.11.0':
                 # See https://github.com/pytorch/pytorch/pull/88193
                 if LooseVersion(torch.__version__) < '1.14.0':
@@ -791,24 +806,29 @@ class QATQuantizer(object):
 
         mapping.update(FUSE_QAT_MODULES)
 
+        q_dict = {}
+        for n in graph.forward_nodes:
+            if isinstance(n.module, nn.Module):
+                q_dict[n.module] = q_dict.get(n.module, False) or n.quantized
+
+        non_quantized_mods = set(m for m, s in q_dict.items() if s is False)
+
         if LooseVersion(torch.__version__) < LooseVersion("1.7.0"):
             model = torch_q.prepare(graph.module, inplace=True)
-            for n in graph.forward_nodes:
-                if not n.quantized:
-                    if hasattr(n.module, "_forward_hooks"):
-                        if len(n.module._forward_hooks) > 0:
-                            n.module._forward_hooks.popitem()
-                    if hasattr(n.module, "qconfig"):
-                        delattr(n.module, "qconfig")
-                    if hasattr(n.module, "activation_post_process"):
-                        delattr(n.module, "activation_post_process")
+            for m in non_quantized_mods:
+                if hasattr(m, "_forward_hooks"):
+                    if len(m._forward_hooks) > 0:
+                        m._forward_hooks.popitem()
+                if hasattr(m, "qconfig"):
+                    delattr(m, "qconfig")
+                if hasattr(m, "activation_post_process"):
+                    delattr(m, "activation_post_process")
             torch_q.convert(model, mapping, inplace=True)
         else:
             torch_q.propagate_qconfig_(graph.module, qconfig_dict=None)
-            for n in graph.forward_nodes:
-                if not n.quantized:
-                    if hasattr(n.module, "qconfig"):
-                        delattr(n.module, "qconfig")
+            for m in non_quantized_mods:
+                if hasattr(m, "qconfig"):
+                    delattr(m, "qconfig")
             model = torch_q.convert(graph.module, mapping=mapping, inplace=True, remove_qconfig=False)
 
             if self.dynamic_lstm_quant:
@@ -817,10 +837,9 @@ class QATQuantizer(object):
             if LooseVersion(torch.__version__) >= LooseVersion("1.13.0"):
                 torch_q.propagate_qconfig_(model, qconfig_dict=None)
 
-                for n in graph.forward_nodes:
-                    if not n.quantized:
-                        if hasattr(n.module, "qconfig"):
-                            delattr(n.module, "qconfig")
+                for m in non_quantized_mods:
+                    if hasattr(m, "qconfig"):
+                        delattr(m, "qconfig")
 
                 prepare_custom_config_dict = torch.ao.quantization.get_default_custom_config_dict()
                 custom_module_class_mapping = prepare_custom_config_dict.get(
@@ -844,15 +863,14 @@ class QATQuantizer(object):
                 torch.ao.nn.quantizable.LSTM.from_float = orig_from_float
             else:
                 torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
-            for n in graph.forward_nodes:
-                if not n.quantized:
-                    if hasattr(n.module, "qconfig"):
-                        delattr(n.module, "qconfig")
-                    if hasattr(n.module, "_forward_hooks"):
-                        if len(n.module._forward_hooks) > 0:
-                            n.module._forward_hooks.popitem()
-                    if hasattr(n.module, "activation_post_process"):
-                        delattr(n.module, "activation_post_process")
+            for m in non_quantized_mods:
+                if hasattr(m, "_forward_hooks"):
+                    if len(m._forward_hooks) > 0:
+                        m._forward_hooks.popitem()
+                if hasattr(m, "qconfig"):
+                    delattr(m, "qconfig")
+                if hasattr(m, "activation_post_process"):
+                    delattr(m, "activation_post_process")
 
         if not self.per_tensor:
             if self.backend == 'qnnpack':
@@ -894,7 +912,7 @@ class QATQuantizer(object):
                 n, state = q.get()
                 if isinstance(n.module, nn.Module):
                     orig_name = graph.module_original_name_dict.get(id(n.module))
-                    new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name)
+                    new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name, self.inplace)
                     if isinstance(new_mod, torch_q.DeQuantStub):
                         state = True
                     else:
@@ -932,7 +950,7 @@ class QATQuantizer(object):
                 if n.quantized:
                     if isinstance(n.module, nn.Module):
                         orig_name = graph.module_original_name_dict.get(id(n.module))
-                        new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name)
+                        new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name, self.inplace)
                         if isinstance(new_mod, nn.Module) and hasattr(new_mod, 'activation_post_process'):
                             q_mod = new_mod
                         elif (
@@ -984,7 +1002,7 @@ class QATQuantizer(object):
         for quant_nodes in quant_list:
             for orig_name in quant_nodes:
                 if orig_name in rev_dict:
-                    new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name)
+                    new_mod, _ = graph.get_submodule_with_parent_from_name(orig_name, self.inplace)
                     acp = getattr(new_mod, 'activation_post_process', None)
                     if acp is not None:
                         torch.quantization.disable_fake_quant(acp)
@@ -1043,7 +1061,7 @@ class QATQuantizer(object):
                 if isinstance(n.module, nn.Module):
                     is_prev_float_functional = False
                     orig_name = graph.module_original_name_dict.get(id(n.module))
-                    new_mod, parent = graph.get_submodule_with_parent_from_name(orig_name)
+                    new_mod, parent = graph.get_submodule_with_parent_from_name(orig_name, self.inplace)
                     prop = orig_name.split('.')[-1]
                     if isinstance(new_mod, (torch_q.FakeQuantize, torch_q.ObserverBase)):
                         if new_fq_count == 0:

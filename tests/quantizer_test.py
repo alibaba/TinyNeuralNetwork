@@ -1260,7 +1260,6 @@ class QuantizerTester(unittest.TestCase):
                 self.conv = nn.Conv2d(3, 1, 1, 1)
 
             def forward(self, x):
-                # return self.conv(x) +
                 return x + torch.squeeze(self.conv.weight, 1).expand(1, 3, 224, 224)
 
         model = Model()
@@ -1275,7 +1274,6 @@ class QuantizerTester(unittest.TestCase):
                 self.conv = nn.Conv2d(3, 1, 1, 1)
 
             def forward(self, x):
-                # return self.conv(x) +
                 return x + self.conv.bias.view(-1, 1, 1).expand(1, 3, 224, 224)
 
         model = Model()
