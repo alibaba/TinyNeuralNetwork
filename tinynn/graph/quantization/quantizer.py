@@ -1556,7 +1556,7 @@ class QATQuantizer(object):
             if len(args) > 0:
                 if '=' in args:
                     k, v = args.split('=')
-                    assert k == 'dim'
+                    assert k in ('axis', 'dim')
                     dim = int(v)
                 else:
                     dim = int(args)
