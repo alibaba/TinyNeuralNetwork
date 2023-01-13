@@ -55,6 +55,7 @@ class TFLiteConverter(object):
         bypass_elementwise_passthrough_constraint: bool = False,
         hybrid_gen_single_op_models: bool = False,
         hybrid_config: typing.Optional[typing.Dict[str, bool]] = None,
+        group_buffers: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -103,6 +104,7 @@ class TFLiteConverter(object):
                 Defaults to False
             hybrid_gen_single_op_models: Generate both floating point and quantized version of the model for hybrid \
                 quantizable ops. Defaults to False
+            group_buffers (bool): Group buffers to save space. Defaults to False
         """
 
         self.model = model
@@ -111,6 +113,7 @@ class TFLiteConverter(object):
         self.tensor_map = {}
         self.tensor_map_copies = {}
         self.common_graph = CommonGraph()
+        self.common_graph.group_buffers = group_buffers
 
         if type(dummy_input) in (tuple, list):
             self.dummy_input = dummy_input
