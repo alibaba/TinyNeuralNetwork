@@ -725,6 +725,16 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_stack_with_axis_keyword(self):
+        class Model(nn.Module):
+            def forward(self, x, y):
+                return torch.stack([x, y], axis=1)
+
+        model = Model()
+        inputs = [torch.randn(1, 3, 224, 224), torch.randn(1, 3, 224, 224)]
+
+        check_quantize_rewrite(model, inputs)
+
     def test_add(self):
         class Model(nn.Module):
             def forward(self, x):

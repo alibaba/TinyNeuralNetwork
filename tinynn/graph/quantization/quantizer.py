@@ -1558,6 +1558,10 @@ class QATQuantizer(object):
                     k, v = args.split('=')
                     assert k in ('axis', 'dim')
                     dim = int(v)
+                    if k == 'axis':
+                        node.module.args_template_no_self = node.module.args_template_no_self.replace('axis', 'dim')
+                        node.module.args_template = node.module.args_template.replace('axis', 'dim')
+                        node.module.update_args_string()
                 else:
                     dim = int(args)
             else:
