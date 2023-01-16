@@ -2078,6 +2078,8 @@ class TraceGraph(object):
     def add_state_input_outputs(self):
         for node in self.forward_nodes:
             if isinstance(node.module, (nn.LSTM, nn.GRU, nn.RNN)):
+                if len(node.prev_tensors) == 0 and len(node.next_tensors) == 0:
+                    continue
                 input_tensor = node.prev_tensors[0]
                 max_batch_size = input_tensor.size(0) if node.module.batch_first else input_tensor.size(1)
                 num_directions = 2 if node.module.bidirectional else 1
