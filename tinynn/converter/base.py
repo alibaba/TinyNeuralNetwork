@@ -119,6 +119,7 @@ class TFLiteConverter(object):
             self.dummy_input = dummy_input
         else:
             self.dummy_input = [dummy_input]
+        self.flatten_inputs = []
 
         self.tflite_path = tflite_path
         self.nchw_transpose = nchw_transpose
@@ -307,11 +308,20 @@ class TFLiteConverter(object):
         log.debug('Lowered graph:')
         log.debug(self.graph)
 
+    def init_flatten_inputs(self):
+        self.flatten_inputs.clear()
+        for t in self.dummy_input:
+            if isinstance(t, (list, tuple)):
+                for rt in t:
+                    self.flatten_inputs.append(rt)
+            else:
+                self.flatten_inputs.append(t)
+
     def init_input_transpose(self):
         input_transpose = self.input_transpose
         if type(input_transpose) not in (tuple, list):
-            input_transpose = [input_transpose] * len(self.dummy_input)
-        for i, t in enumerate(self.dummy_input):
+            input_transpose = [input_transpose] * len(self.flatten_inputs)
+        for i, t in enumerate(self.flatten_inputs):
             if input_transpose[i] is None:
                 if isinstance(t, torch.Tensor):
                     input_transpose[i] = t.dim() == 4
@@ -330,7 +340,7 @@ class TFLiteConverter(object):
         for i, node in enumerate(graph_inputs):
             tensors.append(
                 Tensor(
-                    self.dummy_input[i],
+                    self.flatten_inputs[i],
                     node,
                     has_buffer=False,
                     asymmetric=not self.strict_symmetric_check,
@@ -345,7 +355,7 @@ class TFLiteConverter(object):
             if self.input_offset > 0 and i == 0:
                 self.tensor_map[graph_inputs[i]] = self.model
             else:
-                self.tensor_map[graph_inputs[i]] = self.dummy_input[i - self.input_offset]
+                self.tensor_map[graph_inputs[i]] = self.flatten_inputs[i - self.input_offset]
 
     def unsupported_operations(self, unique=True) -> typing.List[str]:
         """Returns unsupported operations in the graph"""
@@ -452,6 +462,7 @@ class TFLiteConverter(object):
         Raises:
             Exception: If unsupported ops are found, an Exception will be raised
         """
+        self.init_flatten_inputs()
         self.init_input_transpose()
         self.init_jit_graph()
         self.init_lowered_module()
