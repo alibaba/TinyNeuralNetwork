@@ -282,6 +282,7 @@ class TraceNode(object):
                 isinstance(self.prev_nodes[idx].module, torch.nn.Module)
                 and type(self.module) == TraceFunction
                 and self.module.is_property
+                and '.' not in self.module.full_name
             ):
                 getattr_on_module = True
             actual_inplace = False
