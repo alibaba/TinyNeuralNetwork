@@ -2078,39 +2078,52 @@ class TraceGraph(object):
 
     def add_state_input_outputs(self):
         for node in self.forward_nodes:
-            if isinstance(node.module, (nn.LSTM, nn.GRU, nn.RNN)):
-                if len(node.prev_tensors) == 0 and len(node.next_tensors) == 0:
-                    continue
-                input_tensor = node.prev_tensors[0]
-                max_batch_size = input_tensor.size(0) if node.module.batch_first else input_tensor.size(1)
-                num_directions = 2 if node.module.bidirectional else 1
-                real_hidden_size = (
-                    node.module.proj_size if getattr(node.module, 'proj_size', 0) > 0 else node.module.hidden_size
+            if not isinstance(node.module, (nn.LSTM, nn.GRU, nn.RNN)):
+                continue
+            if len(node.prev_tensors) == 0 and len(node.next_tensors) == 0:
+                continue
+            input_tensor = node.prev_tensors[0]
+            max_batch_size = input_tensor.size(0) if node.module.batch_first else input_tensor.size(1)
+            num_directions = 2 if node.module.bidirectional else 1
+            real_hidden_size = (
+                node.module.proj_size if getattr(node.module, 'proj_size', 0) > 0 else node.module.hidden_size
+            )
+            hidden_shape = (node.module.num_layers * num_directions, max_batch_size, real_hidden_size)
+            if len(node.prev_nodes) == 1:
+                hx = torch.zeros(
+                    hidden_shape,
+                    dtype=input_tensor.dtype,
+                    device=input_tensor.device,
                 )
-                hidden_shape = (node.module.num_layers * num_directions, max_batch_size, real_hidden_size)
-                if len(node.prev_nodes) == 1:
-                    hx = torch.zeros(
-                        hidden_shape,
-                        dtype=input_tensor.dtype,
-                        device=input_tensor.device,
-                    )
+                if isinstance(node.module, nn.LSTM):
                     cx = torch.zeros(
                         hidden_shape,
                         dtype=input_tensor.dtype,
                         device=input_tensor.device,
                     )
                     self.add_inputs_for_tensors_in_node(node, [hx, cx])
-                    for i in (-2, -1):
-                        dtype_str = str(self.input_nodes[i].next_tensors[0].dtype).replace('torch.', '')
-                        shape_str = str([x for x in self.input_nodes[i].next_tensors[0].shape])
-                        log.warning(f'Input added: {self.input_nodes[i].unique_name}: {dtype_str}{shape_str}')
+                    indices = (-2, -1)
+                else:
+                    self.add_inputs_for_tensors_in_node(node, [hx])
+                    indices = (-1,)
 
-                if len(node.next_nodes) == 1:
+                for i in indices:
+                    dtype_str = str(self.input_nodes[i].next_tensors[0].dtype).replace('torch.', '')
+                    shape_str = str([x for x in self.input_nodes[i].next_tensors[0].shape])
+                    log.warning(f'Input added: {self.input_nodes[i].unique_name}: {dtype_str}{shape_str}')
+
+            if len(node.next_nodes) == 1:
+                if isinstance(node.module, nn.LSTM):
                     self.add_outputs_for_tensors(node.next_tensors[1])
-                    for i in (-2, -1):
-                        dtype_str = str(self.output_nodes[i].prev_tensors[0].dtype).replace('torch.', '')
-                        shape_str = str([x for x in self.output_nodes[i].prev_tensors[0].shape])
-                        log.warning(f'Output added: {self.output_nodes[i].unique_name}: {dtype_str}{shape_str}')
+                    indices = (-2, -1)
+                else:
+                    self.add_outputs_for_tensors([node.next_tensors[1]])
+                    indices = (-1,)
+
+                for i in indices:
+                    dtype_str = str(self.output_nodes[i].prev_tensors[0].dtype).replace('torch.', '')
+                    shape_str = str([x for x in self.output_nodes[i].prev_tensors[0].shape])
+                    log.warning(f'Output added: {self.output_nodes[i].unique_name}: {dtype_str}{shape_str}')
 
     def reset_input_output_for_graph(self, input_names: typing.List[str], output_names: typing.List[str]):
         """Extract a subgraph from the original computation graph"""
