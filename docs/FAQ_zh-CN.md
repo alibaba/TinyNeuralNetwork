@@ -219,8 +219,17 @@ Note: 这些状态变量都是二维的，维度为`[batch_size, hidden_size或�
 
 通常情况下，当隐层数量较大时（如128及以上）LSTM的模型在TFLite中会比较耗时。这种情况下，可以考虑使用动态范围量化来优化其性能，参见[dynamic.py](../examples/converter/dynamic.py)。
 
-## 我的模型开了动态量化变得更慢了？
+#### 我的模型开了动态量化变得更慢了？
 请参考 [dynamic_with_selection.py](../examples/converter/dynamic_with_selection.py) 选择性的开启动态量化。
+
+#### 在`unroll_lstm=True`的情况下，怎么为包含LSTM的网络添加状态输入输出?
+可以用TinyNN中的代码生成来完成，参考下面的代码
+```py
+from tinynn.graph.tracer import trace
+graph = trace(model, dummy_input)
+graph.add_state_input_outputs()
+graph.inplace_commit(True)
+```
 
 ## 量化模型转换
 

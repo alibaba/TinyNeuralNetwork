@@ -2038,6 +2038,77 @@ class TraceGraph(object):
         self.forward_nodes = active_forward_nodes
         self.constant_nodes = list(active_constant_nodes.values())
 
+    def add_inputs_for_tensors(self, input_tensors):
+        """Add input nodes for specific tensors"""
+        with self.__numbering_context():
+            self.global_functions['input'] = len(self.input_nodes) - 1
+            for i, t in enumerate(input_tensors):
+                node = self.nodes_map[self.tensor_pre_node_dict[id(t)]]
+                with override_current_trace_graph(self):
+                    new_node = TraceNode(TraceFunction("input"))
+                    add_input_node(new_node, t)
+                node.prev_nodes.append(new_node)
+        self.recompute_forward_order()
+
+    def add_inputs_for_tensors_in_node(self, input_node, input_tensors):
+        """Add input nodes for specific tensors with a node"""
+        with self.__numbering_context():
+            self.global_functions['input'] = len(self.input_nodes) - 1
+            for i, t in enumerate(input_tensors):
+                input_node.prev_tensors.append(t)
+                input_node.prev_indices.append(None)
+                with override_current_trace_graph(self):
+                    new_node = TraceNode(TraceFunction("input"))
+                    add_input_node(new_node, t)
+                input_node.prev_nodes.append(new_node)
+        self.recompute_forward_order()
+
+    def add_outputs_for_tensors(self, output_tensors):
+        """Add output nodes for specific tensors"""
+        with self.__numbering_context():
+            self.global_functions['output'] = len(self.output_nodes) - 1
+            for i, t in enumerate(output_tensors):
+                node = self.nodes_map[self.tensor_pre_node_dict[id(t)]]
+                with override_current_trace_graph(self):
+                    new_node = TraceNode(TraceFunction("output"))
+                    add_output_node(new_node, t)
+                node.next_nodes.append(new_node)
+        self.recompute_forward_order()
+
+    def add_state_input_outputs(self):
+        for node in self.forward_nodes:
+            if isinstance(node.module, (nn.LSTM, nn.GRU, nn.RNN)):
+                input_tensor = node.prev_tensors[0]
+                max_batch_size = input_tensor.size(0) if node.module.batch_first else input_tensor.size(1)
+                num_directions = 2 if node.module.bidirectional else 1
+                real_hidden_size = (
+                    node.module.proj_size if getattr(node.module, 'proj_size', 0) > 0 else node.module.hidden_size
+                )
+                hidden_shape = (node.module.num_layers * num_directions, max_batch_size, real_hidden_size)
+                if len(node.prev_nodes) == 1:
+                    hx = torch.zeros(
+                        hidden_shape,
+                        dtype=input_tensor.dtype,
+                        device=input_tensor.device,
+                    )
+                    cx = torch.zeros(
+                        hidden_shape,
+                        dtype=input_tensor.dtype,
+                        device=input_tensor.device,
+                    )
+                    self.add_inputs_for_tensors_in_node(node, [hx, cx])
+                    for i in (-2, -1):
+                        dtype_str = str(self.input_nodes[i].next_tensors[0].dtype).replace('torch.', '')
+                        shape_str = str([x for x in self.input_nodes[i].next_tensors[0].shape])
+                        log.warning(f'Input added: {self.input_nodes[i].unique_name}: {dtype_str}{shape_str}')
+
+                if len(node.next_nodes) == 1:
+                    self.add_outputs_for_tensors(node.next_tensors[1])
+                    for i in (-2, -1):
+                        dtype_str = str(self.output_nodes[i].prev_tensors[0].dtype).replace('torch.', '')
+                        shape_str = str([x for x in self.output_nodes[i].prev_tensors[0].shape])
+                        log.warning(f'Output added: {self.output_nodes[i].unique_name}: {dtype_str}{shape_str}')
+
     def reset_input_output_for_graph(self, input_names: typing.List[str], output_names: typing.List[str]):
         """Extract a subgraph from the original computation graph"""
         assert len(set(input_names) & set(output_names)) == 0, "A node cannot be both input and output"
@@ -2390,7 +2461,7 @@ class TraceGraph(object):
         code = re.sub(r'^    ', '', forward_block, flags=re.MULTILINE)
 
         if show_code:
-            log.info(f'The new forward function for the model:\n{code}')
+            log.warning(f'The new forward function for the model:\n{code}')
 
         tmp_ns = {}
         exec(import_block, tmp_ns)

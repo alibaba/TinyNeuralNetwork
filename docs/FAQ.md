@@ -219,8 +219,17 @@ Note: These state variables are all two-dimensional with the shape of `[batch_si
 
 Usually, when the number of hidden layers is large enough (128+), the LSTM OP will be time-consuming in the TFLite backend. In this case, consider using dynamic range quantization to optimize its performance, see [dynamic.py](../examples/converter/dynamic.py).
 
-## What if my model runs slower when dynamic quantization is enabled?
+#### What if my model runs slower when dynamic quantization is enabled?
 Please refer to [dynamic_with_selection.py](../examples/converter/dynamic_with_selection.py) for selective dynamic quantization.
+
+#### How to add state inputs and outputs for LSTMs with `unroll_lstm=True`?
+It is possible to rewrite the model using the Graph Tracer and Code Generator of TinyNN. Please use the following code.
+```py
+from tinynn.graph.tracer import trace
+graph = trace(model, dummy_input)
+graph.add_state_input_outputs()
+graph.inplace_commit(True)
+```
 
 ## Quantized model conversion
 
