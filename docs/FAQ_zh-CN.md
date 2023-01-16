@@ -222,7 +222,7 @@ Note: 这些状态变量都是二维的，维度为`[batch_size, hidden_size或�
 #### 我的模型开了动态量化变得更慢了？
 请参考 [dynamic_with_selection.py](../examples/converter/dynamic_with_selection.py) 选择性的开启动态量化。
 
-#### 在`unroll_lstm=True`的情况下，怎么为包含LSTM的网络添加状态输入输出?
+#### 在`unroll_lstm=True`的情况下，怎么为包含LSTM、RNN和GRU的网络添加状态输入输出?
 可以用TinyNN中的代码生成来完成，参考下面的代码
 ```py
 from tinynn.graph.tracer import trace
@@ -230,6 +230,8 @@ graph = trace(model, dummy_input)
 graph.add_state_input_outputs()
 graph.inplace_commit(True)
 ```
+
+P.S. 避免使用`rnn.flatten_parameters()`，否则模型在`torch.jit.trace`时可能出错。
 
 ## 量化模型转换
 
