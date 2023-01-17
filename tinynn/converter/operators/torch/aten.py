@@ -1614,8 +1614,8 @@ class ATenClampOperator(ATenClampSchema):
             ops = []
             input_tensor = self.find_or_create_input(0, graph_converter)
             if has_min:
-                min_value_arr = np.array([min_value], dtype=input_tensor.dtype)
                 if input_tensor.quantization is not None:
+                    min_value_arr = np.array([min_value], dtype='float32')
                     min_value_tensor = self.create_attr_tensor(
                         self.quantize_numpy(
                             min_value_arr,
@@ -1626,10 +1626,11 @@ class ATenClampOperator(ATenClampSchema):
                         quantization=input_tensor.quantization,
                     )
                 else:
+                    min_value_arr = np.array([min_value], dtype=input_tensor.dtype)
                     min_value_tensor = self.create_attr_tensor(min_value_arr)
             if has_max:
-                max_value_arr = np.array([max_value], dtype=input_tensor.dtype)
                 if input_tensor.quantization is not None:
+                    max_value_arr = np.array([max_value], dtype='float32')
                     max_value_tensor = self.create_attr_tensor(
                         self.quantize_numpy(
                             max_value_arr,
@@ -1640,6 +1641,7 @@ class ATenClampOperator(ATenClampSchema):
                         quantization=input_tensor.quantization,
                     )
                 else:
+                    max_value_arr = np.array([max_value], dtype=input_tensor.dtype)
                     max_value_tensor = self.create_attr_tensor(max_value_arr)
             if has_min and has_max:
                 inter_tensor = self.create_transform_tensor(
