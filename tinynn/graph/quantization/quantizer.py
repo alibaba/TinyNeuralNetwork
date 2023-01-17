@@ -1009,7 +1009,10 @@ class QATQuantizer(object):
                         torch.quantization.disable_observer(acp)
 
                         activ_name = quant_nodes[-1]
-                        unique_name = graph.module_unique_name_dict[rev_dict[activ_name]]
+                        if activ_name in rev_dict:
+                            unique_name = graph.module_unique_name_dict[rev_dict[activ_name]]
+                        else:
+                            unique_name = activ_name
                         node = graph.nodes_map[unique_name]
 
                         post_dq = node.next_nodes[0].module
@@ -2588,7 +2591,7 @@ class QATQuantizer(object):
             prev_nodes = cur_node.prev_nodes
             log.debug(f'cur: {cur_class}')
             if cur_class in current_rules or cur_class == nn.Identity:
-                if use_original_name:
+                if use_original_name and isinstance(cur_module, nn.Module):
                     cur_name = graph.module_original_name_dict[id(cur_module)]
                 else:
                     cur_name = cur_node.unique_name
