@@ -2838,7 +2838,10 @@ class SubGraph(object):
 
         for leaf in self.leaf:
             # After all subgraph dependencies are resolved, each operator will only be pruned in a single dimension
-            assert len(leaf.dim_changes_info.constraints_i) == 1, leaf.unique_name()
+            if len(leaf.dim_changes_info.constraints_i) != 1:
+                log.error(f"[{leaf.unique_name()}] Pruning in two dimensions at the same time is not supported")
+                assert False
+
             leaf_prune_dim[leaf.unique_name()] = list(leaf.dim_changes_info.constraints_i.keys())[0]
             leaf_constraint[leaf.unique_name()] = list(leaf.dim_changes_info.constraints_i.values())[0]
 
