@@ -1431,14 +1431,11 @@ class CatModifier(Modifier):
 
         if self.node.module.kwargs.get('dim', None) is not None:
             self.dim = self.node.module.kwargs['dim']
+        elif self.node.module.kwargs.get('axis', None) is not None:
+            self.dim = self.node.module.kwargs['axis']
         else:
-            cat_args = self.args_parsed()
-            if len(cat_args) > 1:
-                pos = cat_args[1].rfind('=')
-                if pos > 0:
-                    self.dim = int(cat_args[1][pos + 1 :])
-                else:
-                    self.dim = int(cat_args[1])
+            if len(self.args_parsed()) > 1:
+                self.dim = int(self.args_parsed()[1])
             else:
                 self.dim = 0
 
