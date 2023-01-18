@@ -3817,7 +3817,7 @@ def is_transpose_branch_edge(edge: ig.Edge, graph_converter: ig.Graph):
     )
 
 
-def is_dequant_quant_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph, q_first: np.bool):
+def is_dequant_quant_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph, q_first: bool):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
 
