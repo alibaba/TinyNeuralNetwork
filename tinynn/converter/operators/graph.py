@@ -24,7 +24,6 @@ class CommonGraph(object):
     input_transpose: typing.List[bool]
     output_transpose: typing.Union[typing.List[typing.Optional[bool]], typing.Optional[bool]]
     node_op_counter: int
-    group_buffers: bool
 
     def __init__(self) -> None:
         self.graph = ig.Graph(directed=True)
@@ -37,7 +36,6 @@ class CommonGraph(object):
         self.output_transpose = None
         self.node_op_counter = 0
         self.q_mapping = {}
-        self.group_buffers = False
 
     def add_iterable_pair(
         self, input_names: typing.List[str], output_names: typing.List[str], key: typing.Optional[str] = None
@@ -599,8 +597,6 @@ class CommonGraph(object):
         buffers = [tfl.Buffer(bytes(0))]
         input_idx = [-1] * len(inputs)
         output_idx = [-1] * len(outputs)
-        if self.group_buffers:
-            buffer_map = {buffers[0].data: buffers[0]}
         for label in labels:
             tensor: tfl.Tensor = tensor_map[label]
             if tensor.index != -1:
@@ -612,15 +608,10 @@ class CommonGraph(object):
                 tensors.append(tensor)
 
                 if tensor.buffer is not None and tensor.is_variable is False:
-                    if not self.group_buffers or tensor.buffer.data not in buffer_map:
-                        tensor.buffer.index = buffer_idx
-                        buffer_idx += 1
+                    tensor.buffer.index = buffer_idx
+                    buffer_idx += 1
 
-                        buffers.append(tensor.buffer)
-                        if self.group_buffers:
-                            buffer_map[tensor.buffer.data] = tensor.buffer
-                    else:
-                        tensor.buffer = buffer_map[tensor.buffer.data]
+                    buffers.append(tensor.buffer)
 
             if label in inputs:
                 item_indices = [i for i, x in enumerate(inputs) if x == label]
