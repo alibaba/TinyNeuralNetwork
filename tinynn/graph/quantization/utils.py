@@ -24,8 +24,6 @@ def fuse_conv_bn_weights(conv_w, conv_b, bn_rm, bn_rv, bn_eps, bn_w, bn_b, trans
 
 
 def get_parameter(mod: torch.nn.Module, param: str) -> torch.nn.Parameter:
-    # import pdb
-    # pdb.set_trace()
     if param == 'weight':
         if isinstance(mod, torch.nn.Sequential):
             return getattr(mod[0], param)
@@ -46,3 +44,15 @@ def get_parameter(mod: torch.nn.Module, param: str) -> torch.nn.Parameter:
             return getattr(mod, param)
     else:
         return getattr(mod, param)
+
+
+def clamp_with_fusion(x: torch.Tensor, min_val: float, max_val: float) -> torch.Tensor:
+    if not x.is_quantized:
+        return torch.clamp(x, min_val, max_val)
+    return x
+
+
+def clamp_with_fusion_(x: torch.Tensor, min_val: float, max_val: float) -> torch.Tensor:
+    if not x.is_quantized:
+        return torch.clamp_(x, min_val, max_val)
+    return x

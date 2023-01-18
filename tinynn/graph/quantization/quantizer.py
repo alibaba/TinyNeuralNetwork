@@ -86,6 +86,8 @@ FUSE_RULE_LIST_EXTRA = {
     (torch.nn.Conv3d, torch.nn.BatchNorm3d, torch.nn.ReLU6),
     (torch.nn.Conv1d, torch.nn.ReLU6),
     (torch.nn.Conv2d, torch.nn.ReLU6),
+    (torch.nn.Conv2d, 'clamp_with_fusion'),
+    (torch.nn.Conv2d, torch.nn.BatchNorm2d, 'clamp_with_fusion'),
     (torch.nn.Conv3d, torch.nn.ReLU6),
     (torch.nn.Linear, torch.nn.ReLU6),
     (torch.nn.Linear, torch.nn.BatchNorm1d, torch.nn.ReLU6),
@@ -1013,7 +1015,9 @@ class QATQuantizer(object):
                             unique_name = graph.module_unique_name_dict[rev_dict[activ_name]]
                         else:
                             unique_name = activ_name
+                            activ_name = None
                         node = graph.nodes_map[unique_name]
+                        activ_type = node.kind()
 
                         post_dq = node.next_nodes[0].module
                         post_q = node.next_nodes[0].next_nodes[0].module
@@ -1027,7 +1031,7 @@ class QATQuantizer(object):
                         post_acp = getattr(post_q, 'activation_post_process', None)
                         assert post_acp is not None
 
-                        self.extra_qparams_mappings.append([acp, post_acp, dq_name, q_name, activ_name])
+                        self.extra_qparams_mappings.append([acp, post_acp, dq_name, q_name, activ_name, activ_type])
 
     def disable_requantization_for_cat_pass(self, graph):
         def _find_quantized_cat_nodes(node: TraceNode, custom_node):
@@ -1748,7 +1752,7 @@ class QATQuantizer(object):
                 elif min is None:
                     kind = 'clamp_max'
                 else:
-                    continue
+                    kind = 'clamp_with_fusion'
 
             if kind in ('clamp_min', 'clamp_max'):
                 node.module.kind = kind
@@ -1759,6 +1763,12 @@ class QATQuantizer(object):
                     arg_str = f'{min}'
                 else:
                     arg_str = f'{max}'
+            elif kind == 'clamp_with_fusion':
+                node.module.kind = kind
+                node.module.func_type = node.module.func_type.replace('clamp', kind)
+                node.module.full_name = f'tinynn.graph.quantization.utils.{node.module.func_type}'
+
+                arg_str = f'{min}, {max}'
             else:
                 inplace = node.module.func_type == f'{node.module.kind}_'
                 node.module.kind = kind
@@ -2814,15 +2824,18 @@ class QATQuantizer(object):
                 in PyTorch only.
         """
 
-        if backend == 'pytorch':
-            for acp, post_acp, dq_name, q_name, activ_name in self.extra_qparams_mappings:
-                acp.scale = post_acp.scale
-                acp.zero_point = post_acp.zero_point
-                acp.activation_post_process.min_val = post_acp.activation_post_process.min_val
-                acp.activation_post_process.max_val = post_acp.activation_post_process.max_val
+        for acp, post_acp, dq_name, q_name, activ_name, activ_type in self.extra_qparams_mappings:
+            if backend != 'pytorch' and activ_type in ('relu6', torch.nn.ReLU6):
+                continue
 
-                setattr(q_model, dq_name, nn.Identity())
-                setattr(q_model, q_name, nn.Identity())
+            acp.scale = post_acp.scale
+            acp.zero_point = post_acp.zero_point
+            acp.activation_post_process.min_val = post_acp.activation_post_process.min_val
+            acp.activation_post_process.max_val = post_acp.activation_post_process.max_val
+
+            setattr(q_model, dq_name, nn.Identity())
+            setattr(q_model, q_name, nn.Identity())
+            if activ_name is not None:
                 setattr(q_model, activ_name, nn.Identity())
 
         if type(self).__name__ == 'QATQuantizer':
