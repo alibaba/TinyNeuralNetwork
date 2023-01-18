@@ -233,6 +233,9 @@ graph.inplace_commit(True)
 
 P.S. Avoid using `rnn.flatten_parameters()`. Otherwise, `torch.jit.trace` may fail。
 
+#### What if duplicate tensors is generated in the TFLite model (e.g. when performing static quantization for LSTMs)?
+You may try out `group_tensors=True` to remove those duplicates.
+
 ## Quantized model conversion
 
 ##### How to convert ops that cannot be quantized in PyTorch to quantized kernels, e.g. `SOFTMAX`, `LOG_SOFTMAX` and `BATCH_MATMUL`?

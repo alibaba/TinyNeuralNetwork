@@ -233,6 +233,9 @@ graph.inplace_commit(True)
 
 P.S. 避免使用`rnn.flatten_parameters()`，否则模型在`torch.jit.trace`时可能出错。
 
+#### 生成的模型里面有重复的Tensor怎么办（例如当对包含LSTM的网络进行静态量化时）?
+可以尝试设置`group_tensors=True`来移除这些重复的Tensor。
+
 ## 量化模型转换
 
 #### 怎么把例如`SOFTMAX`、`LOG_SOFTMAX`和`BATCH_MATMUL`等PyTorch中不支持量化的算子转换成定点？
