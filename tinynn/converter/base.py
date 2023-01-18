@@ -55,6 +55,7 @@ class TFLiteConverter(object):
         bypass_elementwise_passthrough_constraint: bool = False,
         hybrid_gen_single_op_models: bool = False,
         hybrid_config: typing.Optional[typing.Dict[str, bool]] = None,
+        group_tensors: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -103,6 +104,7 @@ class TFLiteConverter(object):
                 Defaults to False
             hybrid_gen_single_op_models: Generate both floating point and quantized version of the model for hybrid \
                 quantizable ops. Defaults to False
+            group_tensors (bool): Group tensors to save space. Defaults to False
         """
 
         self.model = model
@@ -154,6 +156,7 @@ class TFLiteConverter(object):
         self.bypass_elementwise_passthrough_constraint = bypass_elementwise_passthrough_constraint
         self.hybrid_gen_single_op_models = hybrid_gen_single_op_models
         self.hybrid_config = hybrid_config
+        self.group_tensors = group_tensors
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -484,6 +487,7 @@ class TFLiteConverter(object):
                 self.fuse_output_indices,
                 self.max_transpose_dims,
                 self.bypass_elementwise_passthrough_constraint,
+                self.group_tensors,
             )
             optimizer.optimize()
 

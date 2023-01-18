@@ -49,6 +49,7 @@ class GraphOptimizer(object):
         fuse_output_indices: typing.Optional[typing.List[int]] = None,
         max_transpose_dims: int = -1,
         bypass_elementwise_passthrough_constraint: bool = False,
+        group_tensors: bool = False,
     ) -> None:
         self.graph = graph
         self.fuse_tensor_count = 0
@@ -63,6 +64,7 @@ class GraphOptimizer(object):
         self.fuse_output_indices = fuse_output_indices
         self.max_transpose_dims = max_transpose_dims
         self.bypass_elementwise_passthrough_constraint = bypass_elementwise_passthrough_constraint
+        self.group_tensors = group_tensors
 
     def create_attr_tensor(
         self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
@@ -792,6 +794,47 @@ class GraphOptimizer(object):
             return actions
 
         elinimate_sequences(self.graph, filtered_pairs, _remove_first_pred, _remove_first_action)
+
+    @class_conditional(lambda self: self.group_tensors)
+    def group_tensors_pass(self):
+        tensor_map = {}
+        actions = []
+        bytes_saved = 0
+        tensors_saved = 0
+        for v in self.graph.graph.vs:
+            if v['node_type'] == ExtendedOperator.CONSTANT_NODE:
+                tensor = self.graph.tensor_map[v['outputs'][0]]
+                if tensor.quantization is None:
+                    t_idx = (tensor.buffer.data, tensor.dtype, tensor.shape)
+                else:
+                    t_idx = (
+                        tensor.buffer.data,
+                        tensor.dtype,
+                        tensor.shape,
+                        tensor.quantization.scale,
+                        tensor.quantization.zero_point,
+                        tensor.quantization.dim,
+                    )
+
+                if t_idx in tensor_map:
+                    new_tensor = tensor_map[t_idx]
+                    for e in v.out_edges():
+                        target = e.target_vertex
+                        if target['op'] is not None:
+                            for i, inp in enumerate(target['op'].inputs):
+                                if inp.name == tensor.name:
+                                    log.debug(f'{inp.name} used in {target["outputs"][0]}:{i} -> {new_tensor.name}')
+                                    tensors_saved += 1
+                                    bytes_saved += len(inp.buffer.data)
+                                    actions.append((self.graph.replace_operator_input, (target, i, new_tensor)))
+                else:
+                    tensor_map[t_idx] = tensor
+
+        # Process actions
+        for func, args in actions:
+            func(*args)
+
+        log.info(f'{tensors_saved} duplicated tensors found, {bytes_saved / 1024 / 1024:.2f} MB saved')
 
     def cleanup_dead_nodes(self):
         cleanup_nodes = []
@@ -3263,6 +3306,9 @@ class GraphOptimizer(object):
         # TFLite micro specific
         self.cat_split_pass()
         self.split_requantize()
+
+        # Group the same tensors into one
+        self.group_tensors_pass()
 
         # Final cleanup
         self.cleanup_dead_nodes()
