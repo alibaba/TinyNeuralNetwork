@@ -963,6 +963,21 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_conv_clamp_2(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.Conv2d(3, 3, 1)
+
+            def forward(self, x):
+                s = self.conv(x)
+                return torch.clamp(s, -6.0, 6.0)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224) * 10
+
+        check_quantize_rewrite(model, inputs)
+
     def test_conv_clamp_min(self):
         class Model(nn.Module):
             def __init__(self) -> None:

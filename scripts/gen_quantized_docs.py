@@ -2,6 +2,7 @@ import os
 
 from tinynn.graph.quantization.quantizer import (
     FUNCTIONAL_MODULE_MAPPING,
+    FUSE_FALLBACK_DICT,
     FUSE_RULE_LIST,
     FUSE_RULE_LIST_EXTRA,
     FUSE_RULE_LIST_PTQ_ONLY,
@@ -87,7 +88,9 @@ def prepare_fusion_rules(lines):
     for k, v in full_dict.items():
         if v is None:
             v = ''
-        mods = ', '.join([qualified_name(x, short=True) for x in k])
+        names = [qualified_name(x, short=True) for x in k]
+        mapped_names = [FUSE_FALLBACK_DICT.get(n, n) for n in names]
+        mods = ', '.join(mapped_names)
         transformed_ops[mods] = v
 
     sorted_ops = {k: transformed_ops[k] for k in sorted(transformed_ops)}

@@ -83,21 +83,31 @@ FUSE_RULE_LIST_PTQ_ONLY = {
 FUSE_RULE_LIST_EXTRA = {
     (torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.ReLU6),
     (torch.nn.Conv2d, torch.nn.BatchNorm2d, torch.nn.ReLU6),
+    (torch.nn.Conv2d, torch.nn.BatchNorm2d, 'clamp_with_fusion'),
     (torch.nn.Conv3d, torch.nn.BatchNorm3d, torch.nn.ReLU6),
     (torch.nn.Conv1d, torch.nn.ReLU6),
     (torch.nn.Conv2d, torch.nn.ReLU6),
+    (torch.nn.Conv2d, 'clamp_with_fusion'),
     (torch.nn.Conv3d, torch.nn.ReLU6),
     (torch.nn.Linear, torch.nn.ReLU6),
+    (torch.nn.Linear, 'clamp_with_fusion'),
     (torch.nn.Linear, torch.nn.BatchNorm1d, torch.nn.ReLU6),
+    (torch.nn.Linear, torch.nn.BatchNorm1d, 'clamp_with_fusion'),
     (torch.nn.BatchNorm2d, torch.nn.ReLU6),
+    (torch.nn.BatchNorm2d, 'clamp_with_fusion'),
     (torch.nn.BatchNorm3d, torch.nn.ReLU6),
     ('add', torch.nn.ReLU6),
     ('add', 'relu6'),
+    ('add', 'clamp_with_fusion'),
     (torch.nn.ConvTranspose2d, torch.nn.ReLU),
     (torch.nn.ConvTranspose2d, torch.nn.ReLU6),
+    (torch.nn.ConvTranspose2d, 'clamp_with_fusion'),
     (torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d, torch.nn.ReLU),
     (torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d, torch.nn.ReLU6),
+    (torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d, 'clamp_with_fusion'),
 }
+
+FUSE_FALLBACK_DICT = {'clamp_with_fusion': 'clamp'}
 
 FUSE_QAT_MODULES = {
     nn.Conv1d: Conv1d,
@@ -1013,7 +1023,9 @@ class QATQuantizer(object):
                             unique_name = graph.module_unique_name_dict[rev_dict[activ_name]]
                         else:
                             unique_name = activ_name
+                            activ_name = None
                         node = graph.nodes_map[unique_name]
+                        activ_type = node.kind()
 
                         post_dq = node.next_nodes[0].module
                         post_q = node.next_nodes[0].next_nodes[0].module
@@ -1027,7 +1039,7 @@ class QATQuantizer(object):
                         post_acp = getattr(post_q, 'activation_post_process', None)
                         assert post_acp is not None
 
-                        self.extra_qparams_mappings.append([acp, post_acp, dq_name, q_name, activ_name])
+                        self.extra_qparams_mappings.append([acp, post_acp, dq_name, q_name, activ_name, activ_type])
 
     def disable_requantization_for_cat_pass(self, graph):
         def _find_quantized_cat_nodes(node: TraceNode, custom_node):
@@ -1748,7 +1760,7 @@ class QATQuantizer(object):
                 elif min is None:
                     kind = 'clamp_max'
                 else:
-                    continue
+                    kind = 'clamp_with_fusion'
 
             if kind in ('clamp_min', 'clamp_max'):
                 node.module.kind = kind
@@ -1759,6 +1771,12 @@ class QATQuantizer(object):
                     arg_str = f'{min}'
                 else:
                     arg_str = f'{max}'
+            elif kind == 'clamp_with_fusion':
+                node.module.kind = kind
+                node.module.func_type = node.module.func_type.replace('clamp', kind)
+                node.module.full_name = f'tinynn.graph.quantization.utils.{node.module.func_type}'
+
+                arg_str = f'{min}, {max}'
             else:
                 inplace = node.module.func_type == f'{node.module.kind}_'
                 node.module.kind = kind
@@ -2492,6 +2510,32 @@ class QATQuantizer(object):
 
             graph.insert_after(node, fake_dequant)
 
+        fused_clamps = []
+        for names in activ_names:
+            for name in names:
+                node = graph.nodes_map[name]
+                if node.kind() == 'clamp_with_fusion':
+                    fused_clamps.append(name)
+
+        # Rewrite unfused clamp_with_fusion to torch.clamp
+        def _is_unfused_clamp_node(node: TraceNode, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if cur_class == TraceFunction:
+                return (
+                    cur_module.kind == 'clamp_with_fusion'
+                    and node.next_tensors[0].dtype == torch.float32
+                    and node.unique_name not in fused_clamps
+                )
+            return False
+
+        unfused_clamp_nodes = graph.filter_forward_nodes(_is_unfused_clamp_node)
+        log.info(f'rewriting unfused_clamp for {[node.unique_name for node in unfused_clamp_nodes]}')
+        for node in unfused_clamp_nodes:
+            node.module.kind = kind
+            node.module.func_type = node.module.func_type.replace('clamp_with_fusion', 'clamp')
+            node.module.full_name = f'torch.{node.module.func_type}'
+
         # Optional tensor shape broadcasting for quantized binary ops
         def _is_broadcastable_binary_quantized_op_node(node: TraceNode, custom_data) -> bool:
             cur_module = node.module
@@ -2814,15 +2858,18 @@ class QATQuantizer(object):
                 in PyTorch only.
         """
 
-        if backend == 'pytorch':
-            for acp, post_acp, dq_name, q_name, activ_name in self.extra_qparams_mappings:
-                acp.scale = post_acp.scale
-                acp.zero_point = post_acp.zero_point
-                acp.activation_post_process.min_val = post_acp.activation_post_process.min_val
-                acp.activation_post_process.max_val = post_acp.activation_post_process.max_val
+        for acp, post_acp, dq_name, q_name, activ_name, activ_type in self.extra_qparams_mappings:
+            if backend != 'pytorch' and activ_type in ('relu6', torch.nn.ReLU6):
+                continue
 
-                setattr(q_model, dq_name, nn.Identity())
-                setattr(q_model, q_name, nn.Identity())
+            acp.scale = post_acp.scale
+            acp.zero_point = post_acp.zero_point
+            acp.activation_post_process.min_val = post_acp.activation_post_process.min_val
+            acp.activation_post_process.max_val = post_acp.activation_post_process.max_val
+
+            setattr(q_model, dq_name, nn.Identity())
+            setattr(q_model, q_name, nn.Identity())
+            if activ_name is not None:
                 setattr(q_model, activ_name, nn.Identity())
 
         if type(self).__name__ == 'QATQuantizer':
