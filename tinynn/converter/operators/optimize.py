@@ -3983,7 +3983,9 @@ def op_input_indices(op: tfl.BaseOperator):
         input_indices = (1,)
     elif isinstance(op, (tfl.BatchMatmulOperator, tfl.MinimumOperator, tfl.MaximumOperator)):
         input_indices = range(2)
-    elif isinstance(op, (tfl.AddOperator, tfl.SubOperator, tfl.MulOperator, tfl.DivOperator)):
+    elif isinstance(
+        op, (tfl.AddOperator, tfl.SubOperator, tfl.MulOperator, tfl.DivOperator, tfl.SquaredDifferenceOperator)
+    ):
         if len(op.inputs[1].shape) == 1 and op.inputs[1].shape[0] == 1:
             input_indices = range(1)
         elif len(op.inputs[0].shape) == 1 and op.inputs[0].shape[0] == 1:
