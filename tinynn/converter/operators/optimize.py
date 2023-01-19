@@ -3659,6 +3659,7 @@ def is_elementwise_binary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
             ExtendedOperator.DIV,
             ExtendedOperator.MAXIMUM,
             ExtendedOperator.MINIMUM,
+            ExtendedOperator.SQUARED_DIFFERENCE,
         )
         and len(op.inputs) >= 2
     )
