@@ -83,23 +83,31 @@ FUSE_RULE_LIST_PTQ_ONLY = {
 FUSE_RULE_LIST_EXTRA = {
     (torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.ReLU6),
     (torch.nn.Conv2d, torch.nn.BatchNorm2d, torch.nn.ReLU6),
+    (torch.nn.Conv2d, torch.nn.BatchNorm2d, 'clamp_with_fusion'),
     (torch.nn.Conv3d, torch.nn.BatchNorm3d, torch.nn.ReLU6),
     (torch.nn.Conv1d, torch.nn.ReLU6),
     (torch.nn.Conv2d, torch.nn.ReLU6),
     (torch.nn.Conv2d, 'clamp_with_fusion'),
-    (torch.nn.Conv2d, torch.nn.BatchNorm2d, 'clamp_with_fusion'),
     (torch.nn.Conv3d, torch.nn.ReLU6),
     (torch.nn.Linear, torch.nn.ReLU6),
+    (torch.nn.Linear, 'clamp_with_fusion'),
     (torch.nn.Linear, torch.nn.BatchNorm1d, torch.nn.ReLU6),
+    (torch.nn.Linear, torch.nn.BatchNorm1d, 'clamp_with_fusion'),
     (torch.nn.BatchNorm2d, torch.nn.ReLU6),
+    (torch.nn.BatchNorm2d, 'clamp_with_fusion'),
     (torch.nn.BatchNorm3d, torch.nn.ReLU6),
     ('add', torch.nn.ReLU6),
     ('add', 'relu6'),
+    ('add', 'clamp_with_fusion'),
     (torch.nn.ConvTranspose2d, torch.nn.ReLU),
     (torch.nn.ConvTranspose2d, torch.nn.ReLU6),
+    (torch.nn.ConvTranspose2d, 'clamp_with_fusion'),
     (torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d, torch.nn.ReLU),
     (torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d, torch.nn.ReLU6),
+    (torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d, 'clamp_with_fusion'),
 }
+
+FUSE_FALLBACK_DICT = {'clamp_with_fusion': 'clamp'}
 
 FUSE_QAT_MODULES = {
     nn.Conv1d: Conv1d,
@@ -2501,6 +2509,32 @@ class QATQuantizer(object):
             module_constructor_lines[id(fake_dequant)] = f'{qualified_name(fake_dequant_cls)}()'
 
             graph.insert_after(node, fake_dequant)
+
+        fused_clamps = []
+        for names in activ_names:
+            for name in names:
+                node = graph.nodes_map[name]
+                if node.kind() == 'clamp_with_fusion':
+                    fused_clamps.append(name)
+
+        # Rewrite unfused clamp_with_fusion to torch.clamp
+        def _is_unfused_clamp_node(node: TraceNode, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if cur_class == TraceFunction:
+                return (
+                    cur_module.kind == 'clamp_with_fusion'
+                    and node.next_tensors[0].dtype == torch.float32
+                    and node.unique_name not in fused_clamps
+                )
+            return False
+
+        unfused_clamp_nodes = graph.filter_forward_nodes(_is_unfused_clamp_node)
+        log.info(f'rewriting unfused_clamp for {[node.unique_name for node in unfused_clamp_nodes]}')
+        for node in unfused_clamp_nodes:
+            node.module.kind = kind
+            node.module.func_type = node.module.func_type.replace('clamp_with_fusion', 'clamp')
+            node.module.full_name = f'torch.{node.module.func_type}'
 
         # Optional tensor shape broadcasting for quantized binary ops
         def _is_broadcastable_binary_quantized_op_node(node: TraceNode, custom_data) -> bool:

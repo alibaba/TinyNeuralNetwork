@@ -77,8 +77,10 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 ## Supported fusion rules for static quantization
 | Operators                  | Notes  |
 |----------------------------|--------|
+| `{add, clamp}` |  |
 | `{add, relu6}` |  |
 | `{add, torch.nn.ReLU6}` |  |
+| `{torch.nn.BatchNorm2d, clamp}` |  |
 | `{torch.nn.BatchNorm2d, torch.nn.ReLU}` |  |
 | `{torch.nn.BatchNorm2d, torch.nn.ReLU6}` |  |
 | `{torch.nn.BatchNorm3d, torch.nn.ReLU}` |  |
@@ -88,7 +90,9 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `{torch.nn.Conv1d, torch.nn.BatchNorm1d, torch.nn.ReLU6}` |  |
 | `{torch.nn.Conv1d, torch.nn.ReLU}` |  |
 | `{torch.nn.Conv1d, torch.nn.ReLU6}` |  |
+| `{torch.nn.Conv2d, clamp}` |  |
 | `{torch.nn.Conv2d, torch.nn.BatchNorm2d}` |  |
+| `{torch.nn.Conv2d, torch.nn.BatchNorm2d, clamp}` |  |
 | `{torch.nn.Conv2d, torch.nn.BatchNorm2d, torch.nn.ReLU}` |  |
 | `{torch.nn.Conv2d, torch.nn.BatchNorm2d, torch.nn.ReLU6}` |  |
 | `{torch.nn.Conv2d, torch.nn.ReLU}` |  |
@@ -99,13 +103,17 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `{torch.nn.Conv3d, torch.nn.ReLU}` |  |
 | `{torch.nn.Conv3d, torch.nn.ReLU6}` |  |
 | `{torch.nn.ConvTranspose1d, torch.nn.BatchNorm1d}` | PTQ only. Only PyTorch 1.11.0+ is supported |
+| `{torch.nn.ConvTranspose2d, clamp}` |  |
 | `{torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d}` |  |
+| `{torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d, clamp}` |  |
 | `{torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d, torch.nn.ReLU}` |  |
 | `{torch.nn.ConvTranspose2d, torch.nn.BatchNorm2d, torch.nn.ReLU6}` |  |
 | `{torch.nn.ConvTranspose2d, torch.nn.ReLU}` |  |
 | `{torch.nn.ConvTranspose2d, torch.nn.ReLU6}` |  |
 | `{torch.nn.ConvTranspose3d, torch.nn.BatchNorm3d}` | PTQ only. Only PyTorch 1.11.0+ is supported |
+| `{torch.nn.Linear, clamp}` |  |
 | `{torch.nn.Linear, torch.nn.BatchNorm1d}` | for PTQ, only PyTorch 1.8.0+ is supported |
+| `{torch.nn.Linear, torch.nn.BatchNorm1d, clamp}` |  |
 | `{torch.nn.Linear, torch.nn.BatchNorm1d, torch.nn.ReLU6}` |  |
 | `{torch.nn.Linear, torch.nn.ReLU}` |  |
 | `{torch.nn.Linear, torch.nn.ReLU6}` |  |
