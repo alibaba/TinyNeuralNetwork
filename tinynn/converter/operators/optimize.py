@@ -848,16 +848,17 @@ class GraphOptimizer(object):
                         if vertex['node_type'] == ExtendedOperator.INPUT_NODE:
                             continue
                         if vertex['node_type'] != ExtendedOperator.CONSTANT_NODE:
-                            warnings.warn('Non constant node removed, something must be wrong there')
-                            log.warning('-' * 30)
-                            log.warning('Info of the deleted node:')
-                            log.warning(f'vertex: {vertex}')
-                            # edge = self.graph.graph.es.select(name=vertex['outputs'][0])
-                            # assert edge is None, (
-                            #     f'The edge {vertex["outputs"][0]} exists but the connection to the vertex'
-                            #     f' {vertex["name"]} is broken, probably there have some conflicts in the names of the'
-                            #     ' nodes'
-                            # )
+                            if vertex['op'] is None or vertex['op'].extra_hints.get('warn_on_unused', True):
+                                warnings.warn('Non constant node removed, something must be wrong there')
+                                log.warning('-' * 30)
+                                log.warning('Info of the deleted node:')
+                                log.warning(f'vertex: {vertex}')
+                                # edge = self.graph.graph.es.select(name=vertex['outputs'][0])
+                                # assert edge is None, (
+                                #     f'The edge {vertex["outputs"][0]} exists but the connection to the vertex'
+                                #     f' {vertex["name"]} is broken, probably there have some conflicts in the names'
+                                #     ' of the nodes'
+                                # )
                         cleanup_nodes.append(vertex.index)
 
                 if len(cleanup_nodes) == 0:

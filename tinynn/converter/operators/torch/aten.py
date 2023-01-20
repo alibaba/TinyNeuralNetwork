@@ -376,7 +376,9 @@ class ATenLstmOperator(ATenLstmSchema):
             state_outputs = self.to_tfl_tensors(self.output_names[1:], self.output_tensors[1:])
             for i, (orig, new) in enumerate(zip(tf_in_state_tensors, tf_out_state_tensors)):
                 if orig is not None:
-                    ops.append(tfl.PackOperator(new, state_outputs[i : i + 1], len(new), 0))
+                    pack_op = tfl.PackOperator(new, state_outputs[i : i + 1], len(new), 0)
+                    pack_op.extra_hints['warn_on_unused'] = False
+                    ops.append(pack_op)
         else:
             common_names = set(self.output_names[1:]) & set(graph_converter.outputs)
             assert len(common_names) == 0, (
