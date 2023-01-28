@@ -217,10 +217,16 @@ When using Tensorflow Lite's Interpreter, you only need to read or write these s
 
 Note: These state variables are all two-dimensional with the shape of `[batch_size, hidden_size or input_size]`. So in the streaming scenario, you only need to split these variables according to the first dimension.
 
+#### How to speed up inference for LSTMs?
 Usually, when the number of hidden layers is large enough (128+), the LSTM OP will be time-consuming in the TFLite backend. In this case, consider using dynamic range quantization to optimize its performance, see [dynamic.py](../examples/converter/dynamic.py).
+
+You may also try out static quantization for LSTMs when you have PyTorch 1.13+. But it may take much more effort to minimize the quantization error, and you probably need to perform per-layer inspection carefully.
 
 #### What if my model runs slower when dynamic quantization is enabled?
 Please refer to [dynamic_with_selection.py](../examples/converter/dynamic_with_selection.py) for selective dynamic quantization.
+
+#### I need LSTMs with separated gate calculation when `unroll_lstm=True`.
+Please set `separated_rnn_gate_calc=True`.
 
 #### How to add state inputs and outputs for LSTMs/GRUs/RNNs with `unroll_lstm=True`?
 It is possible to rewrite the model using the Graph Tracer and Code Generator of TinyNN. Please use the following code.
