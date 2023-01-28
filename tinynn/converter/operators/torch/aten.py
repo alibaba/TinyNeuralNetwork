@@ -220,7 +220,10 @@ class ATenLstmOperator(ATenLstmSchema):
                             ops.append(tfl.FullyConnectedOperator([t, w_i, b_i], [input_mm]))
                         else:
                             input_mm_list = []
-                            for w_i, b_i in zip(w_i_list, b_i_list):
+                            for j, (w_i, b_i) in enumerate(zip(w_i_list, b_i_list)):
+                                if j == 1 and i == 0 and not compute_c:
+                                    input_mm_list.append(None)
+                                    continue
                                 input_mm = self.create_transform_tensor(
                                     np.matmul(t.tensor, np.transpose(w_i.tensor, [1, 0])) + b_i.tensor
                                 )
@@ -238,7 +241,10 @@ class ATenLstmOperator(ATenLstmSchema):
                                 ops.append(tfl.AddOperator([input_mm, hidden_mm], [add_out]))
                             else:
                                 hidden_mm_list = []
-                                for w_r, b_r in zip(w_r_list, b_r_list):
+                                for j, (w_r, b_r) in enumerate(zip(w_r_list, b_r_list)):
+                                    if j == 1 and i == 0 and not compute_c:
+                                        hidden_mm_list.append(None)
+                                        continue
                                     hidden_mm = self.create_transform_tensor(
                                         np.matmul(h.tensor, np.transpose(w_r.tensor, [1, 0])) + b_r.tensor
                                     )
@@ -247,9 +253,10 @@ class ATenLstmOperator(ATenLstmSchema):
 
                                 gate_outs = []
                                 for input_mm, hidden_mm in zip(input_mm_list, hidden_mm_list):
-                                    add_out = self.create_transform_tensor(input_mm.tensor + hidden_mm.tensor)
-                                    ops.append(tfl.AddOperator([input_mm, hidden_mm], [add_out]))
-                                    gate_outs.append(add_out)
+                                    if input_mm is not None and hidden_mm is not None:
+                                        add_out = self.create_transform_tensor(input_mm.tensor + hidden_mm.tensor)
+                                        ops.append(tfl.AddOperator([input_mm, hidden_mm], [add_out]))
+                                        gate_outs.append(add_out)
                         else:
                             if not self.separated_rnn_gate_calc:
                                 add_out = input_mm
