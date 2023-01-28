@@ -182,18 +182,24 @@ class ATenLstmOperator(ATenLstmSchema):
                 output_ts = []
                 for direction_idx in range(num_directions):
                     input_start = input_start_indices[direction_idx]
-                    w_i = self.create_attr_tensor(
-                        np.concatenate([inputs[x].tensor for x in range(input_start, input_start + 4)], 0),
-                        quantization=inputs[input_start].quantization,
-                    )
-                    w_r = self.create_attr_tensor(
-                        np.concatenate([inputs[x].tensor for x in range(input_start + 4, input_start + 8)], 0),
-                        quantization=inputs[input_start + 4].quantization,
-                    )
-                    b_i = self.create_attr_tensor(
-                        np.concatenate([inputs[x].tensor for x in range(input_start + 11, input_start + 15)], 0)
-                    )
-                    b_r = self.create_attr_tensor(np.zeros_like(b_i.tensor))
+                    if not self.separated_rnn_gate_calc:
+                        w_i = self.create_attr_tensor(
+                            np.concatenate([inputs[x].tensor for x in range(input_start, input_start + 4)], 0),
+                            quantization=inputs[input_start].quantization,
+                        )
+                        w_r = self.create_attr_tensor(
+                            np.concatenate([inputs[x].tensor for x in range(input_start + 4, input_start + 8)], 0),
+                            quantization=inputs[input_start + 4].quantization,
+                        )
+                        b_i = self.create_attr_tensor(
+                            np.concatenate([inputs[x].tensor for x in range(input_start + 11, input_start + 15)], 0)
+                        )
+                        b_r = self.create_attr_tensor(np.zeros_like(b_i.tensor))
+                    else:
+                        w_i_list = [inputs[x] for x in range(input_start, input_start + 4)]
+                        w_r_list = [inputs[x] for x in range(input_start + 4, input_start + 8)]
+                        b_i_list = [inputs[x] for x in range(input_start + 11, input_start + 15)]
+                        b_r_list = [self.create_attr_tensor(np.zeros_like(b_i.tensor)) for b_i in b_i_list]
 
                     state_start = state_start_index + direction_idx * num_directions
                     h = inputs[state_start]
@@ -207,25 +213,53 @@ class ATenLstmOperator(ATenLstmSchema):
 
                     stacked_hs = []
                     for i, t in enumerate(input_ts[::stride]):
-                        input_mm = self.create_transform_tensor(
-                            np.matmul(t.tensor, np.transpose(w_i.tensor, [1, 0])) + b_i.tensor
-                        )
-                        ops.append(tfl.FullyConnectedOperator([t, w_i, b_i], [input_mm]))
+                        if not self.separated_rnn_gate_calc:
+                            input_mm = self.create_transform_tensor(
+                                np.matmul(t.tensor, np.transpose(w_i.tensor, [1, 0])) + b_i.tensor
+                            )
+                            ops.append(tfl.FullyConnectedOperator([t, w_i, b_i], [input_mm]))
+                        else:
+                            input_mm_list = []
+                            for w_i, b_i in zip(w_i_list, b_i_list):
+                                input_mm = self.create_transform_tensor(
+                                    np.matmul(t.tensor, np.transpose(w_i.tensor, [1, 0])) + b_i.tensor
+                                )
+                                ops.append(tfl.FullyConnectedOperator([t, w_i, b_i], [input_mm]))
+                                input_mm_list.append(input_mm)
 
                         if i != 0 or compute_h:
-                            hidden_mm = self.create_transform_tensor(
-                                np.matmul(h.tensor, np.transpose(w_r.tensor, [1, 0])) + b_r.tensor
-                            )
-                            ops.append(tfl.FullyConnectedOperator([h, w_r, b_r], [hidden_mm]))
+                            if not self.separated_rnn_gate_calc:
+                                hidden_mm = self.create_transform_tensor(
+                                    np.matmul(h.tensor, np.transpose(w_r.tensor, [1, 0])) + b_r.tensor
+                                )
+                                ops.append(tfl.FullyConnectedOperator([h, w_r, b_r], [hidden_mm]))
 
-                            add_out = self.create_transform_tensor(input_mm.tensor + hidden_mm.tensor)
-                            ops.append(tfl.AddOperator([input_mm, hidden_mm], [add_out]))
+                                add_out = self.create_transform_tensor(input_mm.tensor + hidden_mm.tensor)
+                                ops.append(tfl.AddOperator([input_mm, hidden_mm], [add_out]))
+                            else:
+                                hidden_mm_list = []
+                                for w_r, b_r in zip(w_r_list, b_r_list):
+                                    hidden_mm = self.create_transform_tensor(
+                                        np.matmul(h.tensor, np.transpose(w_r.tensor, [1, 0])) + b_r.tensor
+                                    )
+                                    ops.append(tfl.FullyConnectedOperator([h, w_r, b_r], [hidden_mm]))
+                                    hidden_mm_list.append(hidden_mm)
+
+                                gate_outs = []
+                                for input_mm, hidden_mm in zip(input_mm_list, hidden_mm_list):
+                                    add_out = self.create_transform_tensor(input_mm.tensor + hidden_mm.tensor)
+                                    ops.append(tfl.AddOperator([input_mm, hidden_mm], [add_out]))
+                                    gate_outs.append(add_out)
                         else:
-                            add_out = input_mm
+                            if not self.separated_rnn_gate_calc:
+                                add_out = input_mm
+                            else:
+                                gate_outs = input_mm_list
 
-                        gate_outs = [self.create_transform_tensor(t) for t in np.split(add_out.tensor, 4, 1)]
-                        split_dim_tensor = self.create_attr_tensor(np.array([1], dtype='int32'))
-                        ops.append(tfl.SplitOperator([split_dim_tensor, add_out], gate_outs, 4))
+                        if not self.separated_rnn_gate_calc:
+                            gate_outs = [self.create_transform_tensor(t) for t in np.split(add_out.tensor, 4, 1)]
+                            split_dim_tensor = self.create_attr_tensor(np.array([1], dtype='int32'))
+                            ops.append(tfl.SplitOperator([split_dim_tensor, add_out], gate_outs, 4))
 
                         gate_i = self.create_transform_tensor(
                             torch.sigmoid(torch.from_numpy(gate_outs[0].tensor)).numpy()

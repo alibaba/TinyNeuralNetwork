@@ -217,10 +217,16 @@ export_converter_files(model, dummy_input, export_dir, export_name)
 
 Note: 这些状态变量都是二维的，维度为`[batch_size, hidden_size或者input_size]`。所以在流式场景下，你只需要根据第一个维度对这些变量做拆分就可以了。
 
+#### 如何加速LSTM的推理？
 通常情况下，当隐层数量较大时（如128及以上）LSTM的模型在TFLite中会比较耗时。这种情况下，可以考虑使用动态范围量化来优化其性能，参见[dynamic.py](../examples/converter/dynamic.py)。
+
+对于使用PyTorch 1.13+版本的用户，也可以尝试对LSTM进行静态量化。但是全量化LSTM通常是较为困难的，可能需要比较细致的按层量化误差分析。
 
 #### 我的模型开了动态量化变得更慢了？
 请参考 [dynamic_with_selection.py](../examples/converter/dynamic_with_selection.py) 选择性的开启动态量化。
+
+#### 在设置了`unroll_lstm=True`后，LSTM中多个门的计算被融合了。有没有办法分开？
+尝试设置`separated_rnn_gate_calc=True`。
 
 #### 在`unroll_lstm=True`的情况下，怎么为包含LSTM、RNN和GRU的网络添加状态输入输出?
 可以用TinyNN中的代码生成来完成，参考下面的代码
