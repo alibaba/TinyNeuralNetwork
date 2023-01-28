@@ -55,7 +55,7 @@ jobs:
       - name: Install TinyNeuralNetwork
         run: python setup.py install
       - name: Install test dependencies
-        run: pip install black ruff tensorflow scipy interval
+        run: pip install black 'ruff<0.0.234' tensorflow scipy interval
       - name: Lint checks
         run: python -m ruff .
       - name: Style checks
