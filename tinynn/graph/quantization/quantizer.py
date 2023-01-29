@@ -616,8 +616,8 @@ class QATQuantizer(object):
 
         for quant_nodes in quant_list:
             if self.inplace:
-                quant_nodes = [re.sub('get_submodule\("(.*?)"\)', '\\1', x) for x in quant_nodes]
-                quant_nodes = [re.sub('\[("|)(.*?)("|)\]', '.\\2', x) for x in quant_nodes]
+                quant_nodes = [re.sub('get_submodule\\("(.*?)"\\)', '\\1', x) for x in quant_nodes]
+                quant_nodes = [re.sub('\\[("|)(.*?)("|)\\]', '.\\2', x) for x in quant_nodes]
 
             if type(self) != PostQuantizer and LooseVersion(torch.__version__) >= '1.11.0':
                 # See https://github.com/pytorch/pytorch/pull/88193

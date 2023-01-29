@@ -1,5 +1,7 @@
 import unittest
 
+import tinynn
+
 
 class ImportTester(unittest.TestCase):
     def test_oneshot_pruner(self):

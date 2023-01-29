@@ -2511,8 +2511,8 @@ class TraceGraph(object):
     def get_submodule_with_parent_from_name(self, module_name: str, inplace: bool = False):
         """Gets the submodule with its parent using the name given"""
         if inplace:
-            module_name = re.sub('get_submodule\("(.*?)"\)', '\\1', module_name)
-            module_name = re.sub('\[("|)(.*?)("|)\]', '.\\2', module_name)
+            module_name = re.sub('get_submodule\\("(.*?)"\\)', '\\1', module_name)
+            module_name = re.sub('\\[("|)(.*?)("|)\\]', '.\\2', module_name)
         module_name_parts = module_name.split('.')
         cur_obj = self.module
         last_obj = None
@@ -2532,8 +2532,8 @@ class TraceGraph(object):
         """update a submodule from the nodes using the module given"""
         module_name = self.module_original_name_dict[id(node.module)]
         if inplace:
-            module_name = re.sub('get_submodule\("(.*?)"\)', '\\1', module_name)
-            module_name = re.sub('\[("|)(.*?)("|)\]', '.\\2', module_name)
+            module_name = re.sub('get_submodule\\("(.*?)"\\)', '\\1', module_name)
+            module_name = re.sub('\\[("|)(.*?)("|)\\]', '.\\2', module_name)
         module_name_parts = module_name.split('.')
         cur_obj = self.module
 
