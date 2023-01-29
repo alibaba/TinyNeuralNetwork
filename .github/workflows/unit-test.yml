@@ -63,7 +63,7 @@ jobs:
       - name: Run unit tests
         run: |
           cd tests
-          python3 import_test.py -v
+          python import_test.py -v
           python converter_op_test.py -v
           python converter_optimizer_test.py -v
           python quantizer_test.py -v

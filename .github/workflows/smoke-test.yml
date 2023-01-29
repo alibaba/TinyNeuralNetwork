@@ -29,4 +29,4 @@ jobs:
       - name: Basic imports
         run: |
           cd tests
-          python3 import_test.py -v
+          python import_test.py -v
