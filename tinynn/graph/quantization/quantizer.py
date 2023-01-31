@@ -259,6 +259,7 @@ class QATQuantizer(object):
     ignore_layerwise_config: bool
     fused_layerwise_config: bool
     inplace: bool
+    train_mode_dict: typing.Dict[nn.Module, bool]
 
     def __init__(self, model, dummy_input, work_dir: typing.Optional[str] = None, config: typing.Optional[dict] = None):
         """ Constructs a new QATQuantizer object
@@ -325,6 +326,8 @@ class QATQuantizer(object):
         self.leaf_nodes = None
         self.swap_nodes = None
 
+        self.train_mode_dict = {}
+
         self.layerwise_config = yaml.comments.CommentedMap()
         self.effective_layers = []
         self.layerwise_default = True
@@ -362,8 +365,26 @@ class QATQuantizer(object):
             actual_v = config.get(k, v)
             setattr(self, k, actual_v)
 
-    def set_model_mode(self, model: nn.Module = None):
+    def set_model_mode(self, model: nn.Module = None, preserve: bool = False):
         """Sets the mode (train/eval) of the model
+
+        Args:
+            model (nn.Module, optional): A PyTorch model. Defaults to None.
+            preserve (bool, optional): Whether the old state is preserved. Defaults to False.
+        """
+        if model is None:
+            model = self.model
+
+        if preserve:
+            for m in model.modules():
+                training = getattr(m, 'training', None)
+                if isinstance(training, bool):
+                    self.train_mode_dict[m] = training
+
+        model.train()
+
+    def restore_model_mode(self, model: nn.Module = None):
+        """Restores the mode (train/eval) of the model
 
         Args:
             model (nn.Module, optional): A PyTorch model. Defaults to None.
@@ -371,7 +392,13 @@ class QATQuantizer(object):
         if model is None:
             model = self.model
 
-        model.train()
+        for m, training in self.train_mode_dict.items():
+            if training:
+                m.train()
+            else:
+                m.eval()
+
+        self.train_mode_dict.clear()
 
     def quantize(self) -> nn.Module:
         """Performs QAT rewrite and preparation
@@ -381,7 +408,7 @@ class QATQuantizer(object):
         """
 
         # We need a model in training mode so that QAT could take place
-        self.set_model_mode()
+        self.set_model_mode(preserve=True)
 
         if self.rewrite_graph:
             # Retrives the name of the model from type info
@@ -438,6 +465,9 @@ class QATQuantizer(object):
                 # Remove the weights file to save space
                 if self.remove_weights_after_load:
                     os.unlink(model_weights_path)
+
+                # Restores the mode of the model
+                self.restore_model_mode()
 
                 # Set the model to training mode before tracing again, since we need to perform QAT
                 self.set_model_mode(rewritten_model)
