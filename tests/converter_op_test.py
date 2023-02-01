@@ -2140,6 +2140,22 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    def test_baddbmm(self):
+        dummy_input = torch.randn(3, 5, dtype=torch.float32)
+        batch1 = torch.randn(10, 3, 4, dtype=torch.float32)
+        batch2 = torch.randn(10, 4, 5, dtype=torch.float32)
+
+        def model(x):
+            return torch.baddbmm(x, batch1, batch2)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_pooling(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 

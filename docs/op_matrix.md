@@ -34,6 +34,7 @@ Operators that are implemented in Python
 | `aten::argmin` | aten::argmin(tensor) is not supported |
 | `aten::atan2` |  |
 | `aten::avg_pool2d` | Only divisor_override == kernel_h == kernel_w is supported |
+| `aten::baddbmm` | batch1 and batch2 must be 3-D tensors each containing the same number of matrices |
 | `aten::batch_norm` | Running mean and variance should not be None for aten::batch_norm. Otherwise, use LayerNorm instead. |
 | `aten::bitwise_and` |  |
 | `aten::bitwise_not` | Only bools are supported in aten::bitwise_not |

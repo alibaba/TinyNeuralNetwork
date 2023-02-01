@@ -3496,6 +3496,23 @@ class ATenAddbmmOperator(ATenAddbmmSchema):
         graph_converter.add_operator(tfl.AddOperator([input_tensor, sum_bmm_out_tensor], output_tensors))
 
 
+class ATenBaddbmmOperator(ATenBaddbmmSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        input_tensor, batch1_tensor, batch2_tensor = [self.find_or_create_input(i, graph_converter) for i in range(3)]
+        output_tensors = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        assert (
+            batch1_tensor.tensor.ndim == batch2_tensor.tensor.ndim == 3
+        ), "batch1 and batch2 must be 3-D tensors each containing the same number of matrices"
+
+        bmm_out = torch.bmm(torch.from_numpy(batch1_tensor.tensor), torch.from_numpy(batch2_tensor.tensor))
+        bmm_out_tensor = self.create_transform_tensor(bmm_out)
+        graph_converter.add_operator(tfl.BatchMatmulOperator([batch1_tensor, batch2_tensor], [bmm_out_tensor]))
+        graph_converter.add_operator(tfl.AddOperator([input_tensor, bmm_out_tensor], output_tensors))
+
+
 class ATenMishOperator(ATenMishSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
