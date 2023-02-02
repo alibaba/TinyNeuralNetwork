@@ -2230,6 +2230,12 @@ class TraceGraph(object):
             mod_ids.append(id(node.module))
             if id(node.module) in module_constructor_lines:
                 root_ns = qualified_name(node.type()).split('.')[0]
+                if isinstance(node.module, TraceFunction) and (
+                    node.module.full_name.startswith('torch.')
+                    or node.module.full_name.startswith('self.')
+                    or '.' not in node.module.full_name
+                ):
+                    continue
                 self.used_namespaces.add(root_ns)
                 orig_constructor_line = module_constructor_lines[id(node.module)]
                 line = f'        self.{node.unique_name} = {orig_constructor_line}'
