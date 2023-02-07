@@ -255,6 +255,7 @@ class QATQuantizer(object):
     extra_tracer_opts: typing.Optional[typing.Dict]
     layerwise_config: typing.Dict[str, bool]
     layerwise_default: bool
+    override_qconfig_func: typing.Optional[typing.Callable[[str, nn.Module], typing.Optional[torch_q.QConfig]]]
     effective_layers: typing.List[str]
     ignore_layerwise_config: bool
     fused_layerwise_config: bool
@@ -356,6 +357,7 @@ class QATQuantizer(object):
             'fused_layerwise_config': True,
             'ignore_layerwise_config': False,
             'inplace': False,
+            'override_qconfig_func': None,
         }
 
         if config is None:
@@ -663,6 +665,30 @@ class QATQuantizer(object):
                 torch_q.fuse_modules(graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True)
 
         self.prepare_qconfig(graph, backend)
+        self.override_qconfig(graph.module)
+
+    def override_qconfig(self, module: nn.Module):
+        """Sets qconfig according to the provided `override_qconfig_func`
+
+        Args:
+            module (nn.Module): The model to be prepared for quantization
+        """
+        if self.override_qconfig_func is not None:
+            q = queue.Queue()
+            q.put(('', module))
+
+            while not q.empty():
+                n, m = q.get()
+
+                new_qconfig = self.override_qconfig_func(n, m)
+                if new_qconfig is not None:
+                    m.qconfig = new_qconfig
+                else:
+                    for cn, cm in m.named_children():
+                        fn = cn
+                        if len(n) > 0:
+                            fn = f'{n}.{fn}'
+                        q.put((fn, cm))
 
     def prepare_qconfig(self, graph: TraceGraph, backend: str):
         """Prepare qconfig for various configurations.
@@ -3181,14 +3207,21 @@ class PostQuantizer(QATQuantizer):
 
         super().parse_config(config)
 
-    def set_model_mode(self, model: nn.Module = None):
+    def set_model_mode(self, model: nn.Module = None, preserve: bool = False):
         """Sets the mode (train/eval) of the model
 
         Args:
             model (nn.Module, optional): A PyTorch model. Defaults to None.
+            preserve (bool, optional): Whether the old state is preserved. Defaults to False.
         """
         if model is None:
             model = self.model
+
+        if preserve:
+            for m in model.modules():
+                training = getattr(m, 'training', None)
+                if isinstance(training, bool):
+                    self.train_mode_dict[m] = training
 
         model.eval()
 
