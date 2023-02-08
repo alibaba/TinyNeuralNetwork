@@ -307,7 +307,7 @@ def patch_getitem(base_cls, func):
         except NotImplementedError:
             return NotImplementedRet
 
-    cls_list = list(base_cls.__bases__) + [base_cls]
+    cls_list = list(base_cls.__bases__) + [base_cls] + base_cls.__subclasses__()
 
     orig_mp_funcs = []
     orig_gm_funcs = []

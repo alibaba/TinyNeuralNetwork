@@ -910,7 +910,7 @@ def new_getattr_gen(orig_getattr, key: str, is_class: bool):
                         node_name = current_graph().tensor_pre_node_dict[id(result)]
                         trace_node = current_graph().nodes_map[node_name]
                         if trace_node.module.is_property and trace_node.module.func_type == 'shape':
-                            result = trace_node.next_tensors
+                            result = tuple(trace_node.next_tensors)
                     else:
                         # Handling dynamic shape
 
@@ -918,7 +918,7 @@ def new_getattr_gen(orig_getattr, key: str, is_class: bool):
                         # then we connect it to the graph.
                         # Otherwise, don't track it.
                         old_result = None
-                        if type(result) == torch.Size and type(obj) == torch.Tensor:
+                        if type(result) == torch.Size and isinstance(obj, torch.Tensor):
                             # Create a list of new tensors for the sake of tracking
                             # The reason to use that instead of a tensor is stated below.
                             # e.g. Users may use the following clause to deal with sizes
