@@ -3111,22 +3111,27 @@ class QATQuantizer(object):
             return pre_hook
 
         def get_hook_func(acp, idx, orig_func):
-            def pre_hook(*input):
+            def pre_hook(*input, **kwargs):
                 new_input = list(input)
                 if orig_func.__name__ == 'cat':
                     new_input[0][idx] = acp(new_input[0][idx])
                 else:
                     new_input[idx] = acp(new_input[idx])
                 input = tuple(new_input)
-                return orig_func(*input)
+                return orig_func(*input, **kwargs)
 
             return pre_hook
 
+        visited_mods = set()
         for start_mod, end_mod, idx in self.swap_nodes:
             acp = start_mod.activation_post_process
 
             if inspect.isroutine(end_mod) and isinstance(end_mod.__self__, nnq.FloatFunctional):
                 ff = end_mod.__self__
+                if ff in visited_mods:
+                    continue
+                visited_mods.add(ff)
+
                 ff.cat = get_hook_func(acp, idx, ff.cat)
                 ff.add = get_hook_func(acp, idx, ff.add)
                 ff.mul = get_hook_func(acp, idx, ff.mul)
@@ -3134,6 +3139,10 @@ class QATQuantizer(object):
                 ff.mul_scalar = get_hook_func(acp, idx, ff.mul_scalar)
                 ff.add_relu = get_hook_func(acp, idx, ff.add_relu)
             else:
+                if ff in visited_mods:
+                    continue
+                visited_mods.add(ff)
+
                 assert isinstance(
                     end_mod, nn.Module
                 ), "Only end nodes with `nn.Module` are supported duing module swapping"
