@@ -808,7 +808,7 @@ def new_module_getattr_gen(orig_getattr, key: str, res: typing.Dict[str, bool]):
                         related = res[res_key]
                     else:
                         lines = inspect.getframeinfo(last_frame)[3]
-                        related = not re.match(r' *if .*', lines[0])
+                        related = not re.match(r' *if .*', lines[0]) and not re.match(r'.*repr\(self\..*\)', lines[0])
                         res[res_key] = related
         if related:
             if result_is_str:
