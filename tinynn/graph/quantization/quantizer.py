@@ -934,7 +934,7 @@ class QATQuantizer(object):
                     set(mapping.values()),
                     custom_module_class_mapping=custom_module_class_mapping,
                 )
-                
+
                 quantizable.gru.GRU.from_float = quantizable.gru.from_float
 
             else:
