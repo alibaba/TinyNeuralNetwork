@@ -190,7 +190,7 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     nn.ConstantPad3d: '1.7.0',
     nn.ZeroPad2d: '1.7.0',
     nn.RNN: None,
-    nn.GRU: None,
+    nn.GRU: '1.13.0',
     nn.LayerNorm: None,
     nn.InstanceNorm1d: None,
     nn.InstanceNorm2d: None,
@@ -919,10 +919,13 @@ class QATQuantizer(object):
                 qconfig_propagation_list = torch_q.get_default_qconfig_propagation_list()
 
                 from . import quantizable
+                from torch.ao.nn.quantizable.modules.rnn import _LSTMLayer
+                from quantizable.gru import _GRULayer
 
                 orig_from_float = torch.ao.nn.quantizable.LSTM.from_float
 
-                torch.ao.nn.quantizable.LSTM.from_float = quantizable.lstm.from_float
+                torch.ao.nn.quantizable.LSTM.from_float = quantizable.from_float(layer_type=_LSTMLayer)
+                GRU.from_float = quantizable.from_float(layer_type=_GRULayer)
 
                 torch_q.add_observer_(
                     model,
@@ -932,17 +935,6 @@ class QATQuantizer(object):
                 )
 
                 torch.ao.nn.quantizable.LSTM.from_float = orig_from_float
-
-                quantizable.gru.GRU.from_float = quantizable.gru.from_float
-
-                torch_q.add_observer_(
-                    model,
-                    qconfig_propagation_list,
-                    set(mapping.values()),
-                    custom_module_class_mapping=custom_module_class_mapping,
-                )
-
-                GRU.from_float = quantizable.gru.from_float
 
             else:
                 torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)

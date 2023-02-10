@@ -29,15 +29,13 @@ if LooseVersion(torch.__version__) >= '1.13.0':
         observed = torch.ao.quantization.prepare_qat(observed, inplace=True)
         return observed
 
-
     class GRUCell(torch.nn.Module):
         r"""A quantizable gated recurrent unit (GRU) cell.
         For the description and the argument types, please, refer to :class:`~torch.nn.GRUCell`
         """
         _FLOAT_MODULE = torch.nn.GRUCell
 
-        def __init__(self, input_dim: int, hidden_dim: int, bias: bool = True,
-                     device=None, dtype=None) -> None:
+        def __init__(self, input_dim: int, hidden_dim: int, bias: bool = True, device=None, dtype=None) -> None:
             factory_kwargs = {'device': device, 'dtype': dtype}
             super().__init__()
             self.input_size = input_dim
@@ -69,6 +67,7 @@ if LooseVersion(torch.__version__) >= '1.13.0':
                 hidden = self.initialize_hidden(x.shape[0], x.is_quantized)
 
             ri, zi, ni = self.igates(x).chunk(3, -1)
+
             if x.dim() > 2:
                 for k in range(x.size(0)):
                     hx = hidden
@@ -76,19 +75,24 @@ if LooseVersion(torch.__version__) >= '1.13.0':
                     rgate = self.act1(self.add1.add(ri[k, ...], rh))
                     zgate = self.act1(self.add2.add(zi[k, ...], zh))
                     ngate = self.act2(self.add3.add(ni[k, ...], self.mul1.mul(rgate, nh)))
-                    hidden = self.add4.add(self.mul2.mul(self.sub1.add_scalar(-zgate, 1), ngate),
-                                           self.mul3.mul(zgate, hx))
+                    hidden = self.add4.add(
+                        self.mul2.mul(self.sub1.add_scalar(self.mul4.mul_scalar(zgate, -1), 1), ngate),
+                        self.mul3.mul(zgate, hx),
+                    )
                     result.append(hidden)
                 result_tensor = torch.stack(result, 0)
                 return result_tensor, hidden
+
             else:
                 hx = hidden
                 rh, zh, nh = self.hgates(hx).chunk(3, -1)
                 rgate = self.act1(self.add1.add(ri, rh))
                 zgate = self.act1(self.add2.add(zi, zh))
                 ngate = self.act2(self.add3.add(ni, self.mul1.mul(rgate, nh)))
-                hidden = self.add4.add(self.mul2.mul(self.sub1.add_scalar(self.mul4.mul_scalar(zgate, -1), 1), ngate),
-                                       self.mul3.mul(zgate, hx))
+                hidden = self.add4.add(
+                    self.mul2.mul(self.sub1.add_scalar(self.mul4.mul_scalar(zgate, -1), 1), ngate),
+                    self.mul3.mul(zgate, hx),
+                )
                 result.append(hidden)
                 result_tensor = torch.stack(result, 0)
                 return result_tensor
@@ -113,8 +117,7 @@ if LooseVersion(torch.__version__) >= '1.13.0':
             assert (bi is None) == (bh is None)  # Either both None or both have values
             input_size = wi.shape[1]
             hidden_size = wh.shape[1]
-            cell = cls(input_dim=input_size, hidden_dim=hidden_size,
-                       bias=(bi is not None))
+            cell = cls(input_dim=input_size, hidden_dim=hidden_size, bias=(bi is not None))
             cell.igates.weight = torch.nn.Parameter(wi)
             if bi is not None:
                 cell.igates.bias = torch.nn.Parameter(bi)
@@ -127,21 +130,19 @@ if LooseVersion(torch.__version__) >= '1.13.0':
         def from_float(cls, other):
             assert type(other) == cls._FLOAT_MODULE
             assert hasattr(other, 'qconfig'), "The float module must have 'qconfig'"
-            observed = cls.from_params(other.weight_ih, other.weight_hh,
-                                       other.bias_ih, other.bias_hh)
+            observed = cls.from_params(other.weight_ih, other.weight_hh, other.bias_ih, other.bias_hh)
             observed.qconfig = other.qconfig
             observed.igates.qconfig = other.qconfig
             observed.hgates.qconfig = other.qconfig
             return observed
-
 
     class _GRUSingleLayer(torch.nn.Module):
         r"""A single one-directional GRU layer.
         The difference between a layer and a cell is that the layer can process a
         sequence, while the cell only expects an instantaneous value.
         """
-        def __init__(self, input_dim: int, hidden_dim: int, bias: bool = True,
-                     device=None, dtype=None) -> None:
+
+        def __init__(self, input_dim: int, hidden_dim: int, bias: bool = True, device=None, dtype=None) -> None:
             factory_kwargs = {'device': device, 'dtype': dtype}
             super().__init__()
             self.cell = GRUCell(input_dim, hidden_dim, bias=bias, **factory_kwargs)
@@ -157,12 +158,19 @@ if LooseVersion(torch.__version__) >= '1.13.0':
             layer.cell = cell
             return layer
 
-
     class _GRULayer(torch.nn.Module):
         r"""A single bi-directional GRU layer."""
-        def __init__(self, input_dim: int, hidden_dim: int, bias: bool = True,
-                     batch_first: bool = False, bidirectional: bool = False,
-                     device=None, dtype=None) -> None:
+
+        def __init__(
+            self,
+            input_dim: int,
+            hidden_dim: int,
+            bias: bool = True,
+            batch_first: bool = False,
+            bidirectional: bool = False,
+            device=None,
+            dtype=None,
+        ) -> None:
             factory_kwargs = {'device': device, 'dtype': dtype}
             super().__init__()
             self.batch_first = batch_first
@@ -214,7 +222,6 @@ if LooseVersion(torch.__version__) >= '1.13.0':
             layer.layer_fw = _GRUSingleLayer.from_params(wi, wh, bi, bh)
             return layer
 
-
     class GRU(torch.nn.Module):
         r"""A quantizable gated recurrent unit (GRU).
         For the description and the argument types, please, refer to :class:`~torch.nn.GRU`
@@ -226,11 +233,18 @@ if LooseVersion(torch.__version__) >= '1.13.0':
         """
         _FLOAT_MODULE = torch.nn.GRU
 
-        def __init__(self, input_size: int, hidden_size: int,
-                     num_layers: int = 1, bias: bool = True,
-                     batch_first: bool = False, dropout: float = 0.,
-                     bidirectional: bool = False,
-                     device=None, dtype=None) -> None:
+        def __init__(
+            self,
+            input_size: int,
+            hidden_size: int,
+            num_layers: int = 1,
+            bias: bool = True,
+            batch_first: bool = False,
+            dropout: float = 0.0,
+            bidirectional: bool = False,
+            device=None,
+            dtype=None,
+        ) -> None:
             factory_kwargs = {'device': device, 'dtype': dtype}
             super().__init__()
             self.input_size = input_size
@@ -240,33 +254,50 @@ if LooseVersion(torch.__version__) >= '1.13.0':
             self.batch_first = batch_first
             self.dropout = float(dropout)
             self.bidirectional = bidirectional
-            assert self.bidirectional == False, f'Note: bidirectional GRU is not supported yet'
+            assert self.bidirectional is False, 'Note: bidirectional GRU is not supported yet'
             self.training = False  # We don't want to train using this module
             num_directions = 2 if bidirectional else 1
+            assert num_directions == 1, 'Note: bidirectional GRU is not supported yet'
 
-            if not isinstance(dropout, numbers.Number) or not 0 <= dropout <= 1 or \
-                    isinstance(dropout, bool):
-                raise ValueError("dropout should be a number in range [0, 1] "
-                                 "representing the probability of an element being "
-                                 "zeroed")
+            if not isinstance(dropout, numbers.Number) or not 0 <= dropout <= 1 or isinstance(dropout, bool):
+                raise ValueError(
+                    "dropout should be a number in range [0, 1] representing the probability of an element being zeroed"
+                )
             if dropout > 0:
-                warnings.warn("dropout option for quantizable GRU is ignored. "
-                              "If you are training, please, use nn.GRU version "
-                              "followed by `prepare` step.")
+                warnings.warn(
+                    "dropout option for quantizable GRU is ignored. "
+                    "If you are training, please, use nn.GRU version "
+                    "followed by `prepare` step."
+                )
                 if num_layers == 1:
-                    warnings.warn("dropout option adds dropout after all but last "
-                                  "recurrent layer, so non-zero dropout expects "
-                                  "num_layers greater than 1, but got dropout={} "
-                                  "and num_layers={}".format(dropout, num_layers))
+                    warnings.warn(
+                        "dropout option adds dropout after all but last "
+                        "recurrent layer, so non-zero dropout expects "
+                        "num_layers greater than 1, but got dropout={} "
+                        "and num_layers={}".format(dropout, num_layers)
+                    )
 
-            layers = [_GRULayer(self.input_size, self.hidden_size,
-                                 self.bias, batch_first=False,
-                                 bidirectional=self.bidirectional, **factory_kwargs)]
+            layers = [
+                _GRULayer(
+                    self.input_size,
+                    self.hidden_size,
+                    self.bias,
+                    batch_first=False,
+                    bidirectional=self.bidirectional,
+                    **factory_kwargs,
+                )
+            ]
             for layer in range(1, num_layers):
-                layers.append(_GRULayer(self.hidden_size, self.hidden_size,
-                                         self.bias, batch_first=False,
-                                         bidirectional=self.bidirectional,
-                                         **factory_kwargs))
+                layers.append(
+                    _GRULayer(
+                        self.hidden_size,
+                        self.hidden_size,
+                        self.bias,
+                        batch_first=False,
+                        bidirectional=self.bidirectional,
+                        **factory_kwargs,
+                    )
+                )
             self.layers = torch.nn.ModuleList(layers)
 
         def forward(self, x: Tensor, hidden: Optional[Tensor] = None):
@@ -276,20 +307,21 @@ if LooseVersion(torch.__version__) >= '1.13.0':
             max_batch_size = x.size(1)
             num_directions = 2 if self.bidirectional else 1
             if hidden is None:
-                zeros = torch.zeros(num_directions, max_batch_size,
-                                    self.hidden_size, dtype=torch.float,
-                                    device=x.device)
+                zeros = torch.zeros(
+                    num_directions, max_batch_size, self.hidden_size, dtype=torch.float, device=x.device
+                )
                 zeros.squeeze_(0)
                 if x.is_quantized:
-                    zeros = torch.quantize_per_tensor(zeros, scale=1.0,
-                                                      zero_point=0, dtype=x.dtype)
+                    zeros = torch.quantize_per_tensor(zeros, scale=1.0, zero_point=0, dtype=x.dtype)
                 hx = [zeros for _ in range(self.num_layers)]
             else:
                 hidden_non_opt = torch.jit._unwrap_optional(hidden)
                 if isinstance(hidden_non_opt[0], Tensor):
-                    hx = hidden_non_opt[0].reshape(self.num_layers, num_directions,
-                                                   max_batch_size,
-                                                   self.hidden_size).unbind(0)
+                    hx = (
+                        hidden_non_opt[0]
+                        .reshape(self.num_layers, num_directions, max_batch_size, self.hidden_size)
+                        .unbind(0)
+                    )
                     hx = [(hx[idx].squeeze_(0)) for idx in range(self.num_layers)]
                 else:
                     hx = hidden_non_opt
@@ -315,14 +347,19 @@ if LooseVersion(torch.__version__) >= '1.13.0':
         @classmethod
         def from_float(cls, other, qconfig=None):
             assert isinstance(other, cls._FLOAT_MODULE)
-            assert (hasattr(other, 'qconfig') or qconfig)
-            observed = cls(other.input_size, other.hidden_size, other.num_layers,
-                           other.bias, other.batch_first, other.dropout,
-                           other.bidirectional)
+            assert hasattr(other, 'qconfig') or qconfig
+            observed = cls(
+                other.input_size,
+                other.hidden_size,
+                other.num_layers,
+                other.bias,
+                other.batch_first,
+                other.dropout,
+                other.bidirectional,
+            )
             observed.qconfig = getattr(other, 'qconfig', qconfig)
             for idx in range(other.num_layers):
-                observed.layers[idx] = _GRULayer.from_float(other, idx, qconfig,
-                                                             batch_first=False)
+                observed.layers[idx] = _GRULayer.from_float(other, idx, qconfig, batch_first=False)
             observed.eval()
             observed = torch.ao.quantization.prepare(observed, inplace=True)
             return observed
@@ -331,7 +368,8 @@ if LooseVersion(torch.__version__) >= '1.13.0':
         def from_observed(cls, other):
             # The whole flow is float -> observed -> quantized
             # This class does float -> observed only
-            raise NotImplementedError("It looks like you are trying to convert a "
-                                      "non-quantizable GRU module. Please, see "
-                                      "the examples on quantizable GRUs.")
-
+            raise NotImplementedError(
+                "It looks like you are trying to convert a "
+                "non-quantizable GRU module. Please, see "
+                "the examples on quantizable GRUs."
+            )
