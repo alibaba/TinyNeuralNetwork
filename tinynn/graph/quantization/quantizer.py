@@ -3124,7 +3124,10 @@ class QATQuantizer(object):
 
         visited_mods = set()
         for start_mod, end_mod, idx in self.swap_nodes:
-            acp = start_mod.activation_post_process
+            if inspect.isroutine(start_mod) and isinstance(start_mod.__self__, nnq.FloatFunctional):
+                acp = start_mod.__self__.activation_post_process
+            else:
+                acp = start_mod.activation_post_process
 
             if inspect.isroutine(end_mod) and isinstance(end_mod.__self__, nnq.FloatFunctional):
                 ff = end_mod.__self__
