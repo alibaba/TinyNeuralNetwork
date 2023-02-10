@@ -1,10 +1,10 @@
-from torch.ao.nn.quantizable.modules.rnn import _LSTMLayer
-
 from distutils.version import LooseVersion
 
 import torch
 
 if LooseVersion(torch.__version__) >= '1.13.0':
+
+    from torch.ao.nn.quantizable.modules.rnn import _LSTMLayer
 
     @classmethod
     def from_float(cls, other, qconfig=None):

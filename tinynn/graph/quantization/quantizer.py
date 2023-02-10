@@ -923,7 +923,7 @@ class QATQuantizer(object):
                 orig_from_float = torch.ao.nn.quantizable.LSTM.from_float
 
                 torch.ao.nn.quantizable.LSTM.from_float = quantizable.lstm.from_float
-                GRU.from_float = quantizable.gru.from_float()
+                GRU.from_float = quantizable.gru.from_float
 
                 torch_q.add_observer_(
                     model,
