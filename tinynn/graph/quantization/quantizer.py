@@ -36,6 +36,9 @@ from tinynn.graph.quantization.qat_modules import (
     ConvTransposeBn2d,
 )
 
+if LooseVersion(torch.__version__) >= '1.13.0':
+    from .quantizable.gru import GRU
+
 from tinynn.graph.tracer import (
     ConstantNode,
     TraceFunction,
@@ -109,8 +112,6 @@ FUSE_RULE_LIST_EXTRA = {
 }
 
 FUSE_FALLBACK_DICT = {'clamp_with_fusion': 'clamp'}
-
-from .quantizable.gru import GRU
 
 FUSE_QAT_MODULES = {
     nn.Conv1d: Conv1d,
@@ -919,12 +920,7 @@ class QATQuantizer(object):
 
                 from . import quantizable
 
-                torch_q.add_observer_(
-                    model,
-                    qconfig_propagation_list,
-                    set(mapping.values()),
-                    custom_module_class_mapping=custom_module_class_mapping,
-                )
+                orig_from_float = torch.ao.nn.quantizable.LSTM.from_float
 
                 torch.ao.nn.quantizable.LSTM.from_float = quantizable.lstm.from_float
 
@@ -935,7 +931,18 @@ class QATQuantizer(object):
                     custom_module_class_mapping=custom_module_class_mapping,
                 )
 
+                torch.ao.nn.quantizable.LSTM.from_float = orig_from_float
+
                 quantizable.gru.GRU.from_float = quantizable.gru.from_float
+
+                torch_q.add_observer_(
+                    model,
+                    qconfig_propagation_list,
+                    set(mapping.values()),
+                    custom_module_class_mapping=custom_module_class_mapping,
+                )
+
+                GRU.from_float = quantizable.gru.from_float
 
             else:
                 torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
