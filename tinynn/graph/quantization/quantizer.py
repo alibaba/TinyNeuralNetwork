@@ -919,13 +919,11 @@ class QATQuantizer(object):
                 qconfig_propagation_list = torch_q.get_default_qconfig_propagation_list()
 
                 from . import quantizable
-                from torch.ao.nn.quantizable.modules.rnn import _LSTMLayer
-                from quantizable.gru import _GRULayer
 
                 orig_from_float = torch.ao.nn.quantizable.LSTM.from_float
 
-                torch.ao.nn.quantizable.LSTM.from_float = quantizable.from_float(layer_type=_LSTMLayer)
-                GRU.from_float = quantizable.from_float(layer_type=_GRULayer)
+                torch.ao.nn.quantizable.LSTM.from_float = quantizable.lstm.from_float
+                GRU.from_float = quantizable.gru.from_float()
 
                 torch_q.add_observer_(
                     model,
