@@ -35,6 +35,7 @@ from tinynn.graph.quantization.qat_modules import (
     ConvTranspose2d,
     ConvTransposeBn2d,
 )
+
 from tinynn.graph.tracer import (
     ConstantNode,
     TraceFunction,
@@ -116,6 +117,11 @@ FUSE_QAT_MODULES = {
     fm.ConvTransposeBn2d: ConvTransposeBn2d,
 }
 
+if LooseVersion(torch.__version__) >= '1.13.0':
+    from .quantizable.gru import GRU
+
+    FUSE_QAT_MODULES.update({nn.GRU: GRU})
+
 FUSE_QAT_MODULES_CVT = {Conv1d: nnq.Conv1d}
 if hasattr(nnq, 'ConvTranspose1d'):
     FUSE_QAT_MODULES_CVT.update(
@@ -185,7 +191,7 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     nn.ConstantPad3d: '1.7.0',
     nn.ZeroPad2d: '1.7.0',
     nn.RNN: None,
-    nn.GRU: None,
+    nn.GRU: '1.13.0',
     nn.LayerNorm: None,
     nn.InstanceNorm1d: None,
     nn.InstanceNorm2d: None,
@@ -913,11 +919,12 @@ class QATQuantizer(object):
                 )
                 qconfig_propagation_list = torch_q.get_default_qconfig_propagation_list()
 
+                from . import quantizable
+
                 orig_from_float = torch.ao.nn.quantizable.LSTM.from_float
 
-                from .quantizable import from_float
-
-                torch.ao.nn.quantizable.LSTM.from_float = from_float
+                torch.ao.nn.quantizable.LSTM.from_float = quantizable.lstm.from_float
+                GRU.from_float = quantizable.gru.from_float
 
                 torch_q.add_observer_(
                     model,
@@ -927,6 +934,7 @@ class QATQuantizer(object):
                 )
 
                 torch.ao.nn.quantizable.LSTM.from_float = orig_from_float
+
             else:
                 torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
             for m in non_quantized_mods:
