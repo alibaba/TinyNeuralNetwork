@@ -1,11 +1,15 @@
 from distutils.version import LooseVersion
 
 import numbers
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 import warnings
 
 import torch
 from torch import Tensor
+
+from tinynn.util.train_util import get_logger
+
+log = get_logger(__name__, 'WARNING')
 
 if LooseVersion(torch.__version__) >= '1.13.0':
 
@@ -60,8 +64,7 @@ if LooseVersion(torch.__version__) >= '1.13.0':
             self.act2 = torch.nn.Tanh()
             self.hidden_state_dtype: torch.dtype = torch.quint8
 
-        def forward(self, x: Tensor, hidden: Optional[Tensor] = None) -> Optional[Tuple[Tensor, Tensor], Tensor]:
-
+        def forward(self, x: Tensor, hidden: Optional[Tensor] = None) -> Union[Tuple[Tensor, Tensor], Tensor]:
             result = []
             if hidden is None or hidden[0] is None:
                 hidden = self.initialize_hidden(x.shape[0], x.is_quantized)
@@ -84,6 +87,7 @@ if LooseVersion(torch.__version__) >= '1.13.0':
                 return result_tensor, hidden
 
             else:
+                log.warning('Make sure you are not passing unbatched input to GRU, which may yield errors.')
                 hx = hidden
                 rh, zh, nh = self.hgates(hx).chunk(3, -1)
                 rgate = self.act1(self.add1.add(ri, rh))

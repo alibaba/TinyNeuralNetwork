@@ -36,9 +36,6 @@ from tinynn.graph.quantization.qat_modules import (
     ConvTransposeBn2d,
 )
 
-if LooseVersion(torch.__version__) >= '1.13.0':
-    from .quantizable.gru import GRU
-
 from tinynn.graph.tracer import (
     ConstantNode,
     TraceFunction,
@@ -118,8 +115,12 @@ FUSE_QAT_MODULES = {
     nn.ConvTranspose1d: ConvTranspose1d,
     nn.ConvTranspose2d: ConvTranspose2d,
     fm.ConvTransposeBn2d: ConvTransposeBn2d,
-    nn.GRU: GRU,
 }
+
+if LooseVersion(torch.__version__) >= '1.13.0':
+    from .quantizable.gru import GRU
+
+    FUSE_QAT_MODULES.update({nn.GRU: GRU})
 
 FUSE_QAT_MODULES_CVT = {Conv1d: nnq.Conv1d}
 if hasattr(nnq, 'ConvTranspose1d'):
