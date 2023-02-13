@@ -87,8 +87,12 @@ def main_worker(args):
         qat_model.eval()
         qat_model.cpu()
 
+        if isinstance(qat_model, nn.DataParallel):
+            qat_model = qat_model.module
+
         # The step below performs some preparation work for exporting to ONNX
         quantizer.prepare_onnx_export(qat_model)
+        quantizer.freeze_weights(qat_model, dummy_input)
 
         # When converting quantized models, please ensure the quantization backend is set.
         torch.backends.quantized.engine = 'qnnpack'

@@ -121,6 +121,7 @@ FUSE_QAT_MODULES_CUSTOM = {}
 
 if LooseVersion(torch.__version__) >= '1.13.0':
     from .quantizable.gru import GRU
+
     FUSE_QAT_MODULES_CUSTOM.update({nn.GRU: GRU})
 
 FUSE_QAT_MODULES_CVT = {Conv1d: nnq.Conv1d}
@@ -930,9 +931,10 @@ class QATQuantizer(object):
 
                 def patch_observer_set(orig_func):
                     def new_no_observer_set():
-                         return set(FUSE_QAT_MODULES_CUSTOM.values()) | orig_func()
+                        return set(FUSE_QAT_MODULES_CUSTOM.values()) | orig_func()
+
                     return new_no_observer_set
- 
+
                 orig_no_observer_set = sys.modules['torch.ao.quantization.quantize'].no_observer_set
                 sys.modules['torch.ao.quantization.quantize'].no_observer_set = patch_observer_set(orig_no_observer_set)
 
@@ -3161,9 +3163,9 @@ class QATQuantizer(object):
                 ff.mul_scalar = get_hook_func(acp, idx, ff.mul_scalar)
                 ff.add_relu = get_hook_func(acp, idx, ff.add_relu)
             else:
-                if ff in visited_mods:
+                if end_mod in visited_mods:
                     continue
-                visited_mods.add(ff)
+                visited_mods.add(end_mod)
 
                 assert isinstance(
                     end_mod, nn.Module
@@ -3172,6 +3174,37 @@ class QATQuantizer(object):
                 end_mod.register_forward_pre_hook(get_pre_hook(acp, idx))
 
         q_model.apply(torch_q.disable_observer)
+
+    def freeze_weights(self, q_model, dummy_input):
+        """Freezes the weights before model export without `quantizer.convert`
+
+        Args:
+            q_model (nn.Module): The QAT/PTQ-prepared model
+
+        """
+        hooks = []
+        weights = {}
+
+        def collect_fake_quantize_hook(mod, inp, outp):
+            weights[mod] = outp
+
+        for n, m in q_model.named_modules():
+            if n.endswith('.weight_fake_quant'):
+                hooks.append(m.register_forward_hook(collect_fake_quantize_hook))
+
+        q_model(dummy_input)
+
+        for hook in hooks:
+            hook.remove()
+
+        hooks.clear()
+
+        def freeze_fake_quantize_hook(mod, inp):
+            return weights[mod]
+
+        for n, m in q_model.named_modules():
+            if n.endswith('.weight_fake_quant'):
+                hooks.append(m.register_forward_pre_hook(freeze_fake_quantize_hook))
 
 
 class BF16Quantizer(QATQuantizer):
