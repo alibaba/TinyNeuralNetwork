@@ -23,7 +23,7 @@ from tinynn.graph.quantization.fake_quantize import (
     FakeQuantizeBFloat16,
     FakeQuantizeTFLite,
 )
-from tinynn.graph.quantization.modules import QGLU, QPReLU, QSiLU
+from tinynn.graph.quantization.modules import QGLU, QPReLU, QSiLU, QGelu, QLayerNorm
 from tinynn.graph.quantization.observer import (
     HistogramObserverKL,
     MinMaxObserver,
@@ -212,12 +212,23 @@ FUNCTIONAL_MODULE_MAPPING = {
     'sigmoid': nn.Sigmoid,
     'tanh': nn.Tanh,
     'hardswish': nn.Hardswish,
+    # 'Gelu': nn.GELU,
 }
 
 if hasattr(nn, 'SiLU'):
     UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.update({nn.SiLU: None})
     Q_MODULES_MAPPING.update({nn.SiLU: QSiLU})
     FUNCTIONAL_MODULE_MAPPING.update({'silu': nn.SiLU})
+
+if hasattr(nn, 'Gelu'):
+    UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.update({nn.GELU: None})
+    Q_MODULES_MAPPING.update({nn.GELU: QGelu})
+    FUNCTIONAL_MODULE_MAPPING.update({'Gelu': nn.GELU})
+
+if hasattr(nn, 'layer_norm'):
+    UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.update({nn.LayerNorm: None})
+    Q_MODULES_MAPPING.update({nn.LayerNorm: QLayerNorm})
+    FUNCTIONAL_MODULE_MAPPING.update({'layer_norm': nn.LayerNorm})
 
 # Processed QAT fuse rules
 processed_qat_rules = {}
@@ -1952,6 +1963,8 @@ class QATQuantizer(object):
 
         func_nodes_to_rewrite = graph.filter_forward_nodes(_is_functional_rewrite_node)
         log.info(f'rewriting functional to module for {[node.unique_name for node in func_nodes_to_rewrite]}')
+        print(FUNCTIONAL_MODULE_MAPPING)
+        print(func_nodes_to_rewrite)
         for idx, node in enumerate(func_nodes_to_rewrite):
             kind = node.module.kind
             inplace = node.module.func_type == f'{kind}_' or 'True' in node.module.args_string
@@ -1959,7 +1972,7 @@ class QATQuantizer(object):
             arguments = getattr(klass, '__constants__', None)
             if arguments is None:
                 new_func = klass()
-            elif node.module.kind in ('relu', 'relu6', 'silu', 'hardswish'):
+            elif node.module.kind in ('relu', 'relu6', 'silu', 'hardswish', 'gelu', 'layer_norm'):
                 new_func = klass(inplace=inplace)
             elif node.module.kind in ('elu', 'leaky_relu'):
                 if hasattr(node.module, 'args_string_no_self'):

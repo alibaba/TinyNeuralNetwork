@@ -70,3 +70,106 @@ class QGLU(nn.Module):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         slices = torch.chunk(input, 2, self.dim)
         return self.f_mul.mul(slices[0], self.sigmoid(slices[1]))
+
+class QGelu(nn.Module):
+    def __init__(self, _: 'nn.SiLU') -> None:
+        super().__init__()
+
+        self.sigmoid = nn.Sigmoid()
+        self.mul = nnq.FloatFunctional()
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        return self.mul.mul(input, self.sigmoid(self.mul.mul_scalar(input,1.702)))
+
+class QLayerNorm(nn.Module):
+    def __init__(self, layernorm: nn.LayerNorm) -> None:
+        super().__init__()
+
+        # Copies weight and bias from existing LayerNorm object
+        self.weight = torch.nn.Parameter(layernorm.weight.data.detach().clone())
+        self.bias = torch.nn.Parameter(layernorm.bias.data.detach().clone())
+
+        # Other necessary modules for QAT preparation
+        # self.mean = torch.mean()
+        # self.var = torch.var()
+        self.add = nnq.FloatFunctional()
+        self.mul = nnq.FloatFunctional()
+        self.div = nnq.FloatFunctional()
+        # self.div = torch.div()
+        # self.sqrt = torch.sqrt()
+        self.quant = torch.quantization.QuantStub()
+        self.dequant = torch.quantization.DeQuantStub()
+
+
+    def qsrt(self, a):
+        # x = torch.pow(2, torch.ceil(torch.tensor(int.bit_length(a)/2)))
+        # x = a/2
+        # print(x)
+        
+        a1 = self.dequant(a)
+        x = a1
+        b = torch.div(a1, x, rounding_mode='trunc')
+        x2 = torch.div(b, 2, rounding_mode='trunc')
+
+        b = torch.div(a1, x2, rounding_mode='trunc')
+        x3 = torch.div(b, 2, rounding_mode='trunc')
+
+        b = torch.div(a1, x3, rounding_mode='trunc')
+        x4 = torch.div(b, 2, rounding_mode='trunc')
+
+        b = torch.div(a1, x4, rounding_mode='trunc')
+        x5 = torch.div(b, 2, rounding_mode='trunc')
+        x = self.quant(x5)
+        # print(x)
+        # x = torch.floor((x+torch.floor(a/x))/2)
+        return x
+
+    def loop(self, input, x):
+        dq_input = self.dequant(input)
+        x1 = self.dequant(x)
+        first = torch.div(dq_input, x1)
+        q_first = self.quant(first)
+        second = self.add.add(q_first, x)
+        # dq_second = self.dequant(second)
+        constant = torch.IntTensor([0.5])
+        # third = torch.div(dq_second, constant)
+        third = self.mul.mul_scalar(second, 0.5)
+        # q_third = self.quant(third)  
+        return third
+
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        
+        # eps = 1e-5
+        # mean = x.mean(dim=-1, keepdim=True)
+        # # print(mean)
+        # var = ((x - mean) ** 2).mean(dim=-1, keepdim=True)
+        # # print(var)
+        # std = (var + eps).sqrt()
+        # y = (x - mean) / std
+        # print(y-output_layernorm)
+        weight = self.weight.view(-1)
+        bias = self.bias.view(-1)
+        weight_q = self.quant(weight)
+        bias_q = self.quant(bias)
+
+        input_mean = torch.mean(input, dim=-1, keepdim=True)
+        input_mean_opp = self.mul.mul_scalar(input_mean, -1.0)
+        mean_sub = self.add.add(input, input_mean_opp)
+        mean_mul = self.mul.mul(mean_sub, mean_sub)
+        var = torch.mean(mean_mul, dim=-1, keepdim=True)
+        var_add = self.add.add_scalar(var, 0.00005)
+        # x1 = torch.div(input, var_add)
+        loop1 = self.loop(var_add, var_add)
+        loop2 = self.loop(loop1, var_add)
+        loop3 = self.loop(loop2, var_add)
+        std = self.loop(loop3, var_add)
+        # std = self.qsrt(var_add)
+        std1 = self.dequant(std)
+        mean_sub1 = self.dequant(mean_sub)
+        div1 = mean_sub1/std1
+        div = self.quant(div1)
+        x1 = self.mul.mul(div, weight_q)
+        x = self.add.add(x1, bias_q)
+
+        return x
