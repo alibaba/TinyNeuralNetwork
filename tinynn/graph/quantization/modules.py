@@ -135,16 +135,14 @@ class QLayerNorm(nn.Module):
         mean_mul = self.mul.mul(mean_sub, mean_sub)
         var = torch.mean(mean_mul, dim=-1, keepdim=True)
         var_add = self.add.add_scalar(var, 0.00005)
-        # x1 = torch.div(input, var_add)
         loop1 = self.loop(var_add, var_add)
         loop2 = self.loop(loop1, var_add)
         loop3 = self.loop(loop2, var_add)
         std = self.loop(loop3, var_add)
-        # std1 = self.dequant(std)
-        # mean_sub1 = self.dequant(mean_sub)
-        # div1 = mean_sub1/std1
-        div = mean_sub/std
-        # div = self.quant(div1)
+        std1 = self.dequant(std)
+        mean_sub1 = self.dequant(mean_sub)
+        div1 = mean_sub1/std1
+        div = self.quant(div1)
         x1 = self.mul.mul(div, weight_q)
         x = self.add.add(x1, bias_q)
 
