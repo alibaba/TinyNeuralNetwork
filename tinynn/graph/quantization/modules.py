@@ -100,30 +100,6 @@ class QLayerNorm(nn.Module):
         self.quant = torch.quantization.QuantStub()
         self.dequant = torch.quantization.DeQuantStub()
 
-
-    def qsrt(self, a):
-        # x = torch.pow(2, torch.ceil(torch.tensor(int.bit_length(a)/2)))
-        # x = a/2
-        # print(x)
-        
-        a1 = self.dequant(a)
-        x = a1
-        b = torch.div(a1, x, rounding_mode='trunc')
-        x2 = torch.div(b, 2, rounding_mode='trunc')
-
-        b = torch.div(a1, x2, rounding_mode='trunc')
-        x3 = torch.div(b, 2, rounding_mode='trunc')
-
-        b = torch.div(a1, x3, rounding_mode='trunc')
-        x4 = torch.div(b, 2, rounding_mode='trunc')
-
-        b = torch.div(a1, x4, rounding_mode='trunc')
-        x5 = torch.div(b, 2, rounding_mode='trunc')
-        x = self.quant(x5)
-        # print(x)
-        # x = torch.floor((x+torch.floor(a/x))/2)
-        return x
-
     def loop(self, input, x):
         dq_input = self.dequant(input)
         x1 = self.dequant(x)
@@ -164,11 +140,11 @@ class QLayerNorm(nn.Module):
         loop2 = self.loop(loop1, var_add)
         loop3 = self.loop(loop2, var_add)
         std = self.loop(loop3, var_add)
-        # std = self.qsrt(var_add)
-        std1 = self.dequant(std)
-        mean_sub1 = self.dequant(mean_sub)
-        div1 = mean_sub1/std1
-        div = self.quant(div1)
+        # std1 = self.dequant(std)
+        # mean_sub1 = self.dequant(mean_sub)
+        # div1 = mean_sub1/std1
+        div = mean_sub/std
+        # div = self.quant(div1)
         x1 = self.mul.mul(div, weight_q)
         x = self.add.add(x1, bias_q)
 

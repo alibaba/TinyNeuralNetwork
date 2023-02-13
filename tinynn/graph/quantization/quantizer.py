@@ -212,7 +212,6 @@ FUNCTIONAL_MODULE_MAPPING = {
     'sigmoid': nn.Sigmoid,
     'tanh': nn.Tanh,
     'hardswish': nn.Hardswish,
-    'Gelu': nn.GELU,
 }
 
 if hasattr(nn, 'SiLU'):
@@ -1963,8 +1962,6 @@ class QATQuantizer(object):
 
         func_nodes_to_rewrite = graph.filter_forward_nodes(_is_functional_rewrite_node)
         log.info(f'rewriting functional to module for {[node.unique_name for node in func_nodes_to_rewrite]}')
-        print(FUNCTIONAL_MODULE_MAPPING)
-        print(func_nodes_to_rewrite)
         for idx, node in enumerate(func_nodes_to_rewrite):
             kind = node.module.kind
             inplace = node.module.func_type == f'{kind}_' or 'True' in node.module.args_string

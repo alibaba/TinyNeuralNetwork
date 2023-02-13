@@ -1350,6 +1350,7 @@ class GraphOptimizer(object):
 
     @class_conditional(lambda self: self.rewrite_quantizable)
     def elementwise_op_quantize_passthrough_pass(self):
+        print("!!!!!!!!!!!!")
         edges = self.graph.graph.es.select(
             functools.partial(is_quantize_elementwise_op_edge, graph_converter=self.graph.graph)
         )
@@ -2702,7 +2703,7 @@ class GraphOptimizer(object):
 
             self.graph.try_restore_edges(mapping)
 
-    @class_conditional(lambda self: self.bmm_rewrite)
+    # @class_conditional(lambda self: self.bmm_rewrite)
     def bmm_rewrite_pass(self):
         vertices = self.graph.graph.vs.select(functools.partial(is_bmm_node, graph_converter=self.graph.graph, bmm_rewrite=self.bmm_rewrite))
 
@@ -3538,6 +3539,9 @@ class GraphOptimizer(object):
         # Group conv & deconv
         self.group_conv_rewrite_pass()
         self.group_deconv_rewrite_pass()
+
+        # Rewrite bmm op to make easily quantize
+        self.bmm_rewrite_pass()
 
         # TFLite micro specific
         self.cat_split_pass()
