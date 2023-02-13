@@ -480,7 +480,12 @@ class QuantizerTester(unittest.TestCase):
         model = Model()
         inputs = torch.randn(1, 3, 224)
 
-        check_quantize_rewrite(model, inputs)
+        skip_train = False
+        if LooseVersion(torch.__version__) >= LooseVersion('1.13.0'):
+            skip_train = True
+
+        check_quantize_rewrite(model, inputs, skip_train=skip_train)
+
 
     def test_avg_pool1d_with_one_kernel_size(self):
         class Model(nn.Module):
