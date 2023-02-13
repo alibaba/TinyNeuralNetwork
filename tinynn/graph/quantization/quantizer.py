@@ -212,7 +212,7 @@ FUNCTIONAL_MODULE_MAPPING = {
     'sigmoid': nn.Sigmoid,
     'tanh': nn.Tanh,
     'hardswish': nn.Hardswish,
-    # 'Gelu': nn.GELU,
+    'Gelu': nn.GELU,
 }
 
 if hasattr(nn, 'SiLU'):
@@ -220,12 +220,12 @@ if hasattr(nn, 'SiLU'):
     Q_MODULES_MAPPING.update({nn.SiLU: QSiLU})
     FUNCTIONAL_MODULE_MAPPING.update({'silu': nn.SiLU})
 
-if hasattr(nn, 'Gelu'):
+if hasattr(nn, 'GELU'):
     UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.update({nn.GELU: None})
     Q_MODULES_MAPPING.update({nn.GELU: QGelu})
-    FUNCTIONAL_MODULE_MAPPING.update({'Gelu': nn.GELU})
+    FUNCTIONAL_MODULE_MAPPING.update({'gelu': nn.GELU})
 
-if hasattr(nn, 'layer_norm'):
+if hasattr(nn, 'LayerNorm'):
     UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.update({nn.LayerNorm: None})
     Q_MODULES_MAPPING.update({nn.LayerNorm: QLayerNorm})
     FUNCTIONAL_MODULE_MAPPING.update({'layer_norm': nn.LayerNorm})
