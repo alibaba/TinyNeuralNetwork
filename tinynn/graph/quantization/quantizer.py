@@ -921,13 +921,12 @@ class QATQuantizer(object):
                 custom_module_class_mapping.update(FUSE_QAT_MODULES_CUSTOM)
                 qconfig_propagation_list = torch_q.get_default_qconfig_propagation_list()
 
-                from quantizable.lstm import from_float as from_float_lstm
+                from .quantizable import lstm, gru
 
                 orig_from_float = torch.ao.nn.quantizable.LSTM.from_float
 
-                # torch.ao.nn.quantizable.LSTM.from_float = quantizable.lstm.from_float
-                torch.ao.nn.quantizable.LSTM.from_float = from_float_lstm
-                GRU.from_float = quantizable.gru.from_float
+                torch.ao.nn.quantizable.LSTM.from_float = lstm.from_float
+                GRU.from_float = gru.from_float
 
                 def patch_observer_set(orig_func):
                     def new_no_observer_set():
