@@ -35,6 +35,7 @@ from tinynn.graph.quantization.qat_modules import (
     ConvTranspose2d,
     ConvTransposeBn2d,
 )
+
 from tinynn.graph.tracer import (
     ConstantNode,
     TraceFunction,
@@ -116,6 +117,12 @@ FUSE_QAT_MODULES = {
     fm.ConvTransposeBn2d: ConvTransposeBn2d,
 }
 
+FUSE_QAT_MODULES_CUSTOM = {}
+
+if LooseVersion(torch.__version__) >= '1.13.0':
+    from .quantizable.gru import GRU
+    FUSE_QAT_MODULES_CUSTOM.update({nn.GRU: GRU})
+
 FUSE_QAT_MODULES_CVT = {Conv1d: nnq.Conv1d}
 if hasattr(nnq, 'ConvTranspose1d'):
     FUSE_QAT_MODULES_CVT.update(
@@ -185,7 +192,7 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     nn.ConstantPad3d: '1.7.0',
     nn.ZeroPad2d: '1.7.0',
     nn.RNN: None,
-    nn.GRU: None,
+    nn.GRU: '1.13.0',
     nn.LayerNorm: None,
     nn.InstanceNorm1d: None,
     nn.InstanceNorm2d: None,
@@ -911,13 +918,23 @@ class QATQuantizer(object):
                 custom_module_class_mapping = prepare_custom_config_dict.get(
                     "float_to_observed_custom_module_class", {}
                 )
+                custom_module_class_mapping.update(FUSE_QAT_MODULES_CUSTOM)
                 qconfig_propagation_list = torch_q.get_default_qconfig_propagation_list()
+
+                from .quantizable import lstm, gru
 
                 orig_from_float = torch.ao.nn.quantizable.LSTM.from_float
 
-                from .quantizable import from_float
+                torch.ao.nn.quantizable.LSTM.from_float = lstm.from_float
+                GRU.from_float = gru.from_float
 
-                torch.ao.nn.quantizable.LSTM.from_float = from_float
+                def patch_observer_set(orig_func):
+                    def new_no_observer_set():
+                         return set(FUSE_QAT_MODULES_CUSTOM.values()) | orig_func()
+                    return new_no_observer_set
+ 
+                orig_no_observer_set = sys.modules['torch.ao.quantization.quantize'].no_observer_set
+                sys.modules['torch.ao.quantization.quantize'].no_observer_set = patch_observer_set(orig_no_observer_set)
 
                 torch_q.add_observer_(
                     model,
@@ -927,6 +944,8 @@ class QATQuantizer(object):
                 )
 
                 torch.ao.nn.quantizable.LSTM.from_float = orig_from_float
+                sys.modules['torch.ao.quantization.quantize'].no_observer_set = orig_no_observer_set
+
             else:
                 torch_q.prepare(model, observer_non_leaf_module_list=set(mapping.values()), inplace=True)
             for m in non_quantized_mods:

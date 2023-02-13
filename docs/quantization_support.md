@@ -37,7 +37,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `torch.nn.ConstantPad3d` | 1.7.0 |
 | `torch.nn.ConvTranspose2d` | 1.7.0 |
 | `torch.nn.GLU` | / |
-| `torch.nn.GRU` | / |
+| `torch.nn.GRU` | 1.13.0 |
 | `torch.nn.GroupNorm` | / |
 | `torch.nn.Hardsigmoid` | / |
 | `torch.nn.InstanceNorm1d` | / |
