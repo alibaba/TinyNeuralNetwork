@@ -3191,7 +3191,7 @@ class QATQuantizer(object):
         hooks = []
 
         def collect_fake_quantize_hook(mod, inp, outp):
-            mod.register_parameter('_tinynn_onnx_export_q_weight', nn.Parameter(outp))
+            mod.register_parameter('_tinynn_frozen_q_weight', nn.Parameter(outp))
 
         for n, m in q_model.named_modules():
             if n.endswith('.weight_fake_quant'):
@@ -3205,7 +3205,7 @@ class QATQuantizer(object):
         hooks.clear()
 
         def freeze_fake_quantize_hook(mod, inp):
-            return mod._tinynn_onnx_export_q_weight
+            return mod._tinynn_frozen_q_weight
 
         for n, m in q_model.named_modules():
             if n.endswith('.weight_fake_quant'):
