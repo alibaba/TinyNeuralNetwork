@@ -54,8 +54,6 @@ def main_worker(args):
         quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'asymmetric': False, 'backend': 'onnx'})
         qat_model = quantizer.quantize()
 
-    # print(qat_model)
-
     # Use DataParallel to speed up training when possible
     if torch.cuda.device_count() > 1:
         qat_model = nn.DataParallel(qat_model)
@@ -85,7 +83,7 @@ def main_worker(args):
 
     with torch.no_grad():
         qat_model.eval()
-        qat_model.cpu()
+        dummy_input = dummy_input.to(device=device)
 
         if isinstance(qat_model, nn.DataParallel):
             qat_model = qat_model.module
