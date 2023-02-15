@@ -1028,6 +1028,7 @@ class QATQuantizer(object):
             while not q.empty():
                 n, prev_q_mod, state, idx = q.get()
                 key = f'{n.unique_name}:{idx}'
+                print(key, state, type(prev_q_mod))
                 if key in visited:
                     continue
                 else:
@@ -3123,55 +3124,61 @@ class QATQuantizer(object):
                 m.bn.weight /= scale_factor
                 m.forward = conv_fused_wrapper(m, scale_factor)
 
-        def get_pre_hook(acp, idx):
+        def get_pre_hook(acps, indices):
             def pre_hook(module, input):
                 new_input = list(input)
-                new_input[idx] = acp(new_input[idx])
+                for acp, idx in zip(acps, indices):
+                    new_input[idx] = acp(new_input[idx])
                 return tuple(new_input)
 
             return pre_hook
 
-        def get_hook_func(acp, idx, orig_func):
+        def get_hook_func(acps, indices, orig_func):
             def pre_hook(*input, **kwargs):
                 new_input = list(input)
-                if orig_func.__name__ == 'cat':
-                    new_input[0][idx] = acp(new_input[0][idx])
-                else:
-                    new_input[idx] = acp(new_input[idx])
+                for acp, idx in zip(acps, indices):
+                    if orig_func.__name__ == 'cat':
+                        new_input[0][idx] = acp(new_input[0][idx])
+                    else:
+                        new_input[idx] = acp(new_input[idx])
                 input = tuple(new_input)
                 return orig_func(*input, **kwargs)
 
             return pre_hook
 
-        visited_mods = set()
+        end_mod_dict = {}
         for start_mod, end_mod, idx in self.swap_nodes:
-            if inspect.isroutine(start_mod) and isinstance(start_mod.__self__, nnq.FloatFunctional):
-                acp = start_mod.__self__.activation_post_process
-            else:
-                acp = start_mod.activation_post_process
+            end_mod_dict.setdefault(end_mod, ([], []))
+            end_mod_dict[end_mod][0].append(start_mod)
+            end_mod_dict[end_mod][1].append(idx)
+
+        for end_mod, (start_mods, indices) in end_mod_dict.items():
+            acps = []
+            for start_mod in start_mods:
+                if inspect.isroutine(start_mod) and isinstance(start_mod.__self__, nnq.FloatFunctional):
+                    acp = start_mod.__self__.activation_post_process
+                else:
+                    acp = start_mod.activation_post_process
+                acps.append(acp)
 
             if inspect.isroutine(end_mod) and isinstance(end_mod.__self__, nnq.FloatFunctional):
                 ff = end_mod.__self__
-                if ff in visited_mods:
-                    continue
-                visited_mods.add(ff)
 
-                ff.cat = get_hook_func(acp, idx, ff.cat)
-                ff.add = get_hook_func(acp, idx, ff.add)
-                ff.mul = get_hook_func(acp, idx, ff.mul)
-                ff.add_scalar = get_hook_func(acp, idx, ff.add_scalar)
-                ff.mul_scalar = get_hook_func(acp, idx, ff.mul_scalar)
-                ff.add_relu = get_hook_func(acp, idx, ff.add_relu)
+                for i in range(len(indices)):
+                    indices[i] -= 1
+
+                ff.cat = get_hook_func(acps, indices, ff.cat)
+                ff.add = get_hook_func(acps, indices, ff.add)
+                ff.mul = get_hook_func(acps, indices, ff.mul)
+                ff.add_scalar = get_hook_func(acps, indices, ff.add_scalar)
+                ff.mul_scalar = get_hook_func(acps, indices, ff.mul_scalar)
+                ff.add_relu = get_hook_func(acps, indices, ff.add_relu)
             else:
-                if end_mod in visited_mods:
-                    continue
-                visited_mods.add(end_mod)
-
                 assert isinstance(
                     end_mod, nn.Module
                 ), "Only end nodes with `nn.Module` are supported duing module swapping"
 
-                end_mod.register_forward_pre_hook(get_pre_hook(acp, idx))
+                end_mod.register_forward_pre_hook(get_pre_hook(acps, indices))
 
         q_model.apply(torch_q.disable_observer)
 
