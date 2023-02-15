@@ -1028,7 +1028,6 @@ class QATQuantizer(object):
             while not q.empty():
                 n, prev_q_mod, state, idx = q.get()
                 key = f'{n.unique_name}:{idx}'
-                print(key, state, type(prev_q_mod))
                 if key in visited:
                     continue
                 else:
