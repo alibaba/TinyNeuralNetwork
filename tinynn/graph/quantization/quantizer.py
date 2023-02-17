@@ -3028,10 +3028,30 @@ class QATQuantizer(object):
         for mod in self.leaf_nodes:
             torch.quantization.disable_fake_quant(mod.activation_post_process)
 
+        fq_base_cls = getattr(torch_q, 'FakeQuantizeBase', torch_q.FakeQuantize)
         for n, m in q_model.named_modules():
-            if isinstance(m, torch_q.FakeQuantize):
+            if isinstance(m, fq_base_cls):
                 if m.qscheme in (torch.per_channel_symmetric, torch.per_tensor_symmetric):
                     m.zero_point.fill_(0)
+                else:
+                    assert m.qscheme == torch.per_tensor_affine
+                    assert isinstance(m, torch_q.FixedQParamsFakeQuantize)
+
+                    m.qscheme = torch.per_tensor_symmetric
+                    if torch.all(m.zero_point == 128):
+                        m.zero_point.fill_(0)
+                    else:
+                        assert not torch.is_nonzero(m.zero_point)
+                        m.scale *= 2
+
+                m.quant_min = -128
+                m.quant_max = 127
+                m.dtype = torch.int8
+
+                if hasattr(m, 'activation_post_process'):
+                    m.activation_post_process.quant_min = -128
+                    m.activation_post_process.quant_max = 127
+                    m.activation_post_process.dtype = torch.int8
 
         if LooseVersion(torch.__version__) >= LooseVersion('1.12.0'):
 
