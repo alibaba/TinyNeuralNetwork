@@ -222,6 +222,26 @@ FUNCTIONAL_MODULE_MAPPING = {
     'hardswish': nn.Hardswish,
 }
 
+TENSORRT_OBSERVED_NODES = [
+    (torch.nn, "Conv1d"),
+    (torch.nn, "Conv2d"),
+    (torch.nn, "Conv3d"),
+    (torch.nn, "ConvTranspose1d"),
+    (torch.nn, "ConvTranspose2d"),
+    (torch.nn, "ConvTranspose3d"),
+    (torch.nn, "Linear"),
+    (torch.nn, "LSTM"),
+    (torch.nn, "LSTMCell"),
+    (torch.nn, "AvgPool1d"),
+    (torch.nn, "AvgPool2d"),
+    (torch.nn, "AvgPool3d"),
+    (torch.nn, "AdaptiveAvgPool1d"),
+    (torch.nn, "AdaptiveAvgPool2d"),
+    (torch.nn, "AdaptiveAvgPool3d"),
+    'avg_pool2d',
+    'adaptive_avg_pool2d',
+]
+
 if hasattr(nn, 'SiLU'):
     UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.update({nn.SiLU: None})
     Q_MODULES_MAPPING.update({nn.SiLU: QSiLU})
@@ -296,7 +316,7 @@ class QATQuantizer(object):
         if sys.platform == 'win32' and self.backend == 'qnnpack':
             log.error('Quantization backend qnnpack is likely unsupported on Windows. Please use fbgemm instead.')
 
-        if self.backend not in ('fbgemm', 'qnnpack', 'onnx'):
+        if self.backend not in ('fbgemm', 'qnnpack', 'onnx', 'tensorrt'):
             log.warning(f'Quantization backend {self.backend} is not tested. Please use at your risk.')
 
         if self.backend == 'fbgemm':
@@ -305,7 +325,7 @@ class QATQuantizer(object):
                 not self.per_tensor
             ), "Per-tensor quantizaton for FBGEMM not supported, please use per-channel quantization instead"
 
-        if self.backend == 'onnx':
+        if self.backend == 'tensorrt':
             if self.asymmetric:
                 log.warning('Asymmetric quantizaton for TensorRT not supported')
 
@@ -527,7 +547,12 @@ class QATQuantizer(object):
 
             if node in graph.output_nodes:
                 return
-            if type(node.module) is torch_q.QuantStub:
+
+            # TODO: Enable QAT analysis for TensorRT
+            if self.backend == 'tensorrt':
+                quantized = True
+                node.quantized = True
+            elif type(node.module) is torch_q.QuantStub:
                 quantized = True
                 node.quantized = quantized
             elif type(node.module) is torch_q.DeQuantStub:
@@ -654,23 +679,24 @@ class QATQuantizer(object):
             sys.modules['torch.quantization.fuse_modules'].fuse_known_modules
         )
 
-        for quant_nodes in quant_list:
-            if self.inplace:
-                quant_nodes = [re.sub('get_submodule\\("(.*?)"\\)', '\\1', x) for x in quant_nodes]
-                quant_nodes = [re.sub('\\[("|)(.*?)("|)\\]', '.\\2', x) for x in quant_nodes]
+        if self.backend != 'tensorrt':
+            for quant_nodes in quant_list:
+                if self.inplace:
+                    quant_nodes = [re.sub('get_submodule\\("(.*?)"\\)', '\\1', x) for x in quant_nodes]
+                    quant_nodes = [re.sub('\\[("|)(.*?)("|)\\]', '.\\2', x) for x in quant_nodes]
 
-            if type(self) != PostQuantizer and LooseVersion(torch.__version__) >= '1.11.0':
-                # See https://github.com/pytorch/pytorch/pull/88193
-                if LooseVersion(torch.__version__) < '1.14.0':
-                    sys.modules['torch.quantization.fuse_modules']._fuse_modules(
-                        graph.module, quant_nodes, is_qat=True, inplace=True, fuser_func=new_fuser_func
-                    )
+                if type(self) != PostQuantizer and LooseVersion(torch.__version__) >= '1.11.0':
+                    # See https://github.com/pytorch/pytorch/pull/88193
+                    if LooseVersion(torch.__version__) < '1.14.0':
+                        sys.modules['torch.quantization.fuse_modules']._fuse_modules(
+                            graph.module, quant_nodes, is_qat=True, inplace=True, fuser_func=new_fuser_func
+                        )
+                    else:
+                        torch.ao.quantization.fuse_modules_qat(
+                            graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True
+                        )
                 else:
-                    torch.ao.quantization.fuse_modules_qat(
-                        graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True
-                    )
-            else:
-                torch_q.fuse_modules(graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True)
+                    torch_q.fuse_modules(graph.module, quant_nodes, fuser_func=new_fuser_func, inplace=True)
 
         self.prepare_qconfig(graph, backend)
         self.override_qconfig(graph.module)
@@ -708,7 +734,7 @@ class QATQuantizer(object):
 
         log.info('setting qat backend and call prepare_qat')
         actual_backend = backend
-        if backend == 'onnx':
+        if backend in ('onnx', 'tensorrt'):
             actual_backend = 'qnnpack'
         if not self.legacy_fq:
             qconfig = torch_q.get_default_qat_qconfig(actual_backend)
@@ -765,7 +791,7 @@ class QATQuantizer(object):
                 reduce_range=False,
             )
             qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
-        elif backend == 'onnx':
+        elif backend in ('onnx', 'tensorrt'):
             if not self.asymmetric:
                 sym_fq = qconfig.activation.with_args(
                     observer=torch_q.MovingAverageMinMaxObserver,
@@ -884,6 +910,8 @@ class QATQuantizer(object):
         for n in graph.forward_nodes:
             if isinstance(n.module, nn.Module):
                 q_dict[n.module] = q_dict.get(n.module, False) or n.quantized
+
+        print(q_dict)
 
         non_quantized_mods = set(m for m, s in q_dict.items() if s is False)
 
@@ -1343,6 +1371,67 @@ class QATQuantizer(object):
                     observer.quant_min = quant_min
                     observer.quant_max = quant_max
 
+    def rewrite_quantize_graph_for_tensorrt(self, graph: TraceGraph) -> None:
+        """Rewrites the computation graph for TensorRT quantization"""
+
+        processed_types = set()
+        for types in TENSORRT_OBSERVED_NODES:
+            if isinstance(types, tuple):
+                if hasattr(types[0], types[1]):
+                    processed_types.add(getattr(types[0], types[1]))
+            else:
+                processed_types.add(types)
+
+        def _is_observed_nodes_for_tensorrt(node, custom_data):
+            return node.kind() in processed_types
+
+        observed_nodes = graph.filter_forward_nodes(_is_observed_nodes_for_tensorrt)
+        for idx, node in enumerate(observed_nodes):
+            fake_quant_cls = torch_q.QuantStub
+            assert node.rev_index is False
+            node_map = dict()
+            prev_nodes = {n.unique_name: n for n in node.prev_nodes}.values()
+            for inner_idx, prev_node in enumerate(prev_nodes):
+
+                if prev_node.kind() in ('shape', 'device', 'size', 'dtype'):
+                    continue
+
+                prev_tensor_ptrs = []
+                for pt in node.prev_tensors:
+                    for nt in prev_node.next_tensors:
+                        if isinstance(nt, (list, tuple)):
+                            for k, ntt in enumerate(nt):
+                                if id(pt) == id(ntt):
+                                    if id(pt) not in prev_tensor_ptrs:
+                                        prev_tensor_ptrs.append(id(pt))
+                                    break
+                        elif id(pt) == id(nt):
+                            if id(pt) not in prev_tensor_ptrs:
+                                prev_tensor_ptrs.append(id(pt))
+                            break
+
+                for ptr_idx, ptr in enumerate(prev_tensor_ptrs):
+                    if ptr in node_map:
+                        fake_quant = node_map[ptr]
+
+                        graph.insert_between(prev_node, node, fake_quant, move_idx=True, tensor_ptrs=set([ptr]))
+                    else:
+
+                        fake_quant = fake_quant_cls()
+
+                        fake_quant_name = f'fake_quant_inner_{idx}_{inner_idx}_{ptr_idx}'
+
+                        graph.module_unique_name_dict[id(fake_quant)] = fake_quant_name
+                        graph.module_original_name_dict[id(fake_quant)] = fake_quant_name
+
+                        module_constructor_lines[id(fake_quant)] = f'{qualified_name(fake_quant_cls)}()'
+
+                        graph.insert_between(prev_node, node, fake_quant, move_idx=True, tensor_ptrs=set([ptr]))
+                        node_map[ptr] = graph.nodes_map[fake_quant_name]
+
+        graph.quantized = True
+        graph.recompute_forward_order()
+
     def rewrite_quantize_graph(self, graph: TraceGraph) -> None:
         """Rewrites the computation graph for quantization"""
         if graph.quantized:
@@ -1364,7 +1453,9 @@ class QATQuantizer(object):
                 'Graph is quantized. No need to rewrite. Please pass in `config={"rewrite_graph": False}` to suppress'
                 ' this warning'
             )
-            return
+
+        if self.backend == 'tensorrt':
+            return self.rewrite_quantize_graph_for_tensorrt(graph)
 
         if self.layerwise_default is False:
             for n in graph.forward_nodes:
@@ -3025,8 +3116,9 @@ class QATQuantizer(object):
 
         """
 
-        for mod in self.leaf_nodes:
-            torch.quantization.disable_fake_quant(mod.activation_post_process)
+        if self.backend == 'onnx':
+            for mod in self.leaf_nodes:
+                torch.quantization.disable_fake_quant(mod.activation_post_process)
 
         fq_base_cls = getattr(torch_q, 'FakeQuantizeBase', torch_q.FakeQuantize)
         for n, m in q_model.named_modules():
@@ -3165,39 +3257,40 @@ class QATQuantizer(object):
 
             return pre_hook
 
-        end_mod_dict = {}
-        for start_mod, end_mod, idx in self.swap_nodes:
-            end_mod_dict.setdefault(end_mod, ([], []))
-            end_mod_dict[end_mod][0].append(start_mod)
-            end_mod_dict[end_mod][1].append(idx)
+        if self.backend == 'onnx':
+            end_mod_dict = {}
+            for start_mod, end_mod, idx in self.swap_nodes:
+                end_mod_dict.setdefault(end_mod, ([], []))
+                end_mod_dict[end_mod][0].append(start_mod)
+                end_mod_dict[end_mod][1].append(idx)
 
-        for end_mod, (start_mods, indices) in end_mod_dict.items():
-            acps = []
-            for start_mod in start_mods:
-                if inspect.isroutine(start_mod) and isinstance(start_mod.__self__, nnq.FloatFunctional):
-                    acp = start_mod.__self__.activation_post_process
+            for end_mod, (start_mods, indices) in end_mod_dict.items():
+                acps = []
+                for start_mod in start_mods:
+                    if inspect.isroutine(start_mod) and isinstance(start_mod.__self__, nnq.FloatFunctional):
+                        acp = start_mod.__self__.activation_post_process
+                    else:
+                        acp = start_mod.activation_post_process
+                    acps.append(acp)
+
+                if inspect.isroutine(end_mod) and isinstance(end_mod.__self__, nnq.FloatFunctional):
+                    ff = end_mod.__self__
+
+                    for i in range(len(indices)):
+                        indices[i] -= 1
+
+                    ff.cat = get_hook_func(acps, indices, ff.cat)
+                    ff.add = get_hook_func(acps, indices, ff.add)
+                    ff.mul = get_hook_func(acps, indices, ff.mul)
+                    ff.add_scalar = get_hook_func(acps, indices, ff.add_scalar)
+                    ff.mul_scalar = get_hook_func(acps, indices, ff.mul_scalar)
+                    ff.add_relu = get_hook_func(acps, indices, ff.add_relu)
                 else:
-                    acp = start_mod.activation_post_process
-                acps.append(acp)
+                    assert isinstance(
+                        end_mod, nn.Module
+                    ), "Only end nodes with `nn.Module` are supported duing module swapping"
 
-            if inspect.isroutine(end_mod) and isinstance(end_mod.__self__, nnq.FloatFunctional):
-                ff = end_mod.__self__
-
-                for i in range(len(indices)):
-                    indices[i] -= 1
-
-                ff.cat = get_hook_func(acps, indices, ff.cat)
-                ff.add = get_hook_func(acps, indices, ff.add)
-                ff.mul = get_hook_func(acps, indices, ff.mul)
-                ff.add_scalar = get_hook_func(acps, indices, ff.add_scalar)
-                ff.mul_scalar = get_hook_func(acps, indices, ff.mul_scalar)
-                ff.add_relu = get_hook_func(acps, indices, ff.add_relu)
-            else:
-                assert isinstance(
-                    end_mod, nn.Module
-                ), "Only end nodes with `nn.Module` are supported duing module swapping"
-
-                end_mod.register_forward_pre_hook(get_pre_hook(acps, indices))
+                    end_mod.register_forward_pre_hook(get_pre_hook(acps, indices))
 
         q_model.apply(torch_q.disable_observer)
 
@@ -3346,7 +3439,7 @@ class PostQuantizer(QATQuantizer):
         elif self.backend == 'fbgemm':
             sym_fq = torch_q.MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric)
             qconfig_c = torch_q.QConfig(qconfig.activation, sym_fq)
-        elif self.backend == 'onnx':
+        elif self.backend in ('onnx', 'tensorrt'):
             if not self.asymmetric:
                 sym_fq = torch_q.HistogramObserver.with_args(
                     dtype=torch.qint8, qscheme=torch.per_tensor_symmetric, reduce_range=False
