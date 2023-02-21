@@ -108,6 +108,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::instance_norm": ATenInstanceNormOperator,
     "aten::group_norm": ATenGroupNormOperator,
     "aten::index": ATenIndexOperator,
+    "aten::index_select": ATenIndexSelectOperator,
     "aten::clone": ATenCloneOperator,
     "aten::repeat": ATenRepeatOperator,
     "aten::hardswish": ATenHardswishOperator,

@@ -2032,6 +2032,30 @@ class ATenIndexOperator(ATenIndexSchema):
             actual_input = actual_output
 
 
+class ATenIndexSelectOperator(ATenIndexSelectSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        dim = self.input_tensors[1]
+        indices = self.input_tensors[2]
+
+        assert indices.dtype in (torch.int64, torch.int32)
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+
+        if dim < 0:
+            dim += len(input_tensor.shape)
+
+        new_indices = indices.to(dtype=torch.int32)
+        new_indices = new_indices + (new_indices < 0).int() * input_tensor.shape[dim]
+
+        indices_tensor = self.create_attr_tensor(new_indices)
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+
+        graph_converter.add_operator(tfl.GatherOperator([input_tensor, indices_tensor], outputs, axis=dim))
+
+
 class ATenLogSoftmaxOperator(ATenLogSoftmaxSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
