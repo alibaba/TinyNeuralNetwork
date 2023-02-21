@@ -911,8 +911,6 @@ class QATQuantizer(object):
             if isinstance(n.module, nn.Module):
                 q_dict[n.module] = q_dict.get(n.module, False) or n.quantized
 
-        print(q_dict)
-
         non_quantized_mods = set(m for m, s in q_dict.items() if s is False)
 
         if LooseVersion(torch.__version__) < LooseVersion("1.7.0"):
