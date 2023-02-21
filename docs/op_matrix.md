@@ -90,6 +90,7 @@ Operators that are implemented in Python
 | `aten::hardtanh_` |  |
 | `aten::im2col` | only 4-D input tensors (batched image-like tensors) are supported |
 | `aten::index` | Multiple indices for aten::index is not supported |
+| `aten::index_select` |  |
 | `aten::instance_norm` |  |
 | `aten::layer_norm` |  |
 | `aten::le` |  |
@@ -215,6 +216,7 @@ Non-tracking operators that are ignored during translation
 | `aten::new_zeros` |  |
 | `aten::ones` |  |
 | `aten::ones_like` |  |
+| `aten::scalarImplicit` |  |
 | `aten::size` |  |
 | `aten::zeros` |  |
 | `aten::zeros_like` |  |
