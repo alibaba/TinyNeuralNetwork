@@ -2050,7 +2050,11 @@ class ATenIndexSelectOperator(ATenIndexSelectSchema):
         new_indices = indices.to(dtype=torch.int32)
         new_indices = new_indices + (new_indices < 0).int() * input_tensor.shape[dim]
 
-        indices_tensor = self.create_attr_tensor(new_indices)
+        indices_tensor = self.to_tfl_tensors(
+            self.input_names[2:3], [new_indices], graph_converter=graph_converter, non_existent_as_buffer=True
+        )[0]
+
+        self.create_attr_tensor(new_indices)
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
         graph_converter.add_operator(tfl.GatherOperator([input_tensor, indices_tensor], outputs, axis=dim))

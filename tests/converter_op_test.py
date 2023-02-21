@@ -3325,6 +3325,24 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    def test_index_select_indices(self):
+        dummy_input_1 = torch.randn(10, 10, dtype=torch.float32)
+        dummy_input_2 = torch.randint(0, 10, size=(10,))
+
+        def model(x, y):
+            return x.index_select(-1, y)
+
+        model_path = get_model_path()
+
+        dummy_input = (dummy_input_1, dummy_input_2)
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_index(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
 
