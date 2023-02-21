@@ -51,8 +51,9 @@ def main_worker(args):
         #   d. Symmetric uint8. config={'asymmetric': False, 'per_tensor': True}
         #      The is same to (a) with no offsets. But it is rarely used, which just serves as a placeholder here.
 
-        # [IMPORTANT] This script doesn't target TensorRT. Please refer to `trt_qat.py` instead.
-        quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'asymmetric': False, 'backend': 'onnx'})
+        quantizer = QATQuantizer(
+            model, dummy_input, work_dir='out', config={'asymmetric': False, 'backend': 'tensorrt'}
+        )
         qat_model = quantizer.quantize()
 
     # Use DataParallel to speed up training when possible
@@ -97,6 +98,15 @@ def main_worker(args):
         torch.backends.quantized.engine = 'qnnpack'
 
         torch.onnx.export(qat_model, dummy_input, 'test.onnx', opset_version=13)
+
+        # In order to make the model usable on TensorRT, you may need to run the code below
+        import onnx
+        import onnxoptimizer
+
+        passes = ['eliminate_identity']
+        saved_onnx_model = onnx.load('test.onnx')
+        opted_saved_onnx_model = onnxoptimizer.optimize(saved_onnx_model, passes)
+        onnx.save(opted_saved_onnx_model, 'test.onnx')
 
 
 if __name__ == '__main__':
