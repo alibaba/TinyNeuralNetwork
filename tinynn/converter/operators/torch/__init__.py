@@ -212,4 +212,5 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::empty": NoTrackOperator,
     "aten::new_zeros": NoTrackOperator,
     "aten::new_ones": NoTrackOperator,
+    "aten::scalarImplicit": NoTrackOperator,
 }
