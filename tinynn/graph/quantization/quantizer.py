@@ -3025,7 +3025,7 @@ class QATQuantizer(object):
         """
 
         for acp, post_acp, dq_name, q_name, activ_name, activ_type in self.extra_qparams_mappings:
-            if backend != 'pytorch' and activ_type in ('relu6', torch.nn.ReLU6):
+            if backend != 'pytorch' and activ_type in ('relu', 'relu6', torch.ReLU, torch.nn.ReLU6):
                 continue
 
             acp.scale = post_acp.scale
