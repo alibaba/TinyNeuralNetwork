@@ -85,6 +85,9 @@ def check_quantizer_convert(model, inputs, skip_train=False):
         'ignore_layerwise_config': True,
     }
 
+    if sys.platform == 'win32':
+        config.update({'backend': 'fbgemm', 'per_tensor': False})
+
     with model_tracer():
         quantizer = QATQuantizer(model, inputs, work_dir='out', config=config)
         qat_model = quantizer.quantize()
