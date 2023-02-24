@@ -991,10 +991,11 @@ class QATQuantizer(object):
                     if n.endswith('.weight_fake_quant'):
                         observer = getattr(m, 'activation_post_process', None)
                         if observer is not None:
-                            m.quant_min = -127
-                            m.quant_max = 127
-                            observer.quant_min = -127
-                            observer.quant_max = 127
+                            if m.qscheme == torch.per_channel_symmetric:
+                                m.quant_min = -127
+                                m.quant_max = 127
+                                observer.quant_min = -127
+                                observer.quant_max = 127
 
         self.extra_qat_fusion_postprocess(graph)
 
@@ -3038,6 +3039,40 @@ class QATQuantizer(object):
             if activ_name is not None:
                 setattr(q_model, activ_name, nn.Identity())
 
+        def gen_wrapper(origin_quantize_weight):
+            def new_quantize_weight(float_wt, observer, *args, **kwargs):
+                q_weight = origin_quantize_weight(float_wt, observer)
+                # Do clamp using observer's quant_min and quant_max
+                if hasattr(observer, 'quant_min') and hasattr(observer, 'quant_max'):
+                    int_tensor = torch.int_repr(q_weight)
+                    int_tensor = torch.clamp(int_tensor, observer.quant_min, observer.quant_max)
+
+                    if observer.qscheme == torch.per_tensor_symmetric or observer.qscheme == torch.per_tensor_affine:
+                        q_weight = torch._make_per_tensor_quantized_tensor(
+                            int_tensor, q_weight.q_scale(), q_weight.q_zero_point()
+                        )
+                    elif (
+                        observer.qscheme == torch.per_channel_symmetric or observer.qscheme == torch.per_channel_affine
+                    ):
+                        q_weight = torch._make_per_channel_quantized_tensor(
+                            int_tensor,
+                            q_weight.q_per_channel_scales(),
+                            q_weight.q_per_channel_zero_points(),
+                            q_weight.q_per_channel_axis(),
+                        )
+                    else:
+                        log.warning('observer qscheme error')
+                else:
+                    log.warning('observer do not have quant_min and quant_max')
+
+                return q_weight
+
+            return new_quantize_weight
+
+        origin_quantize_weight = torch.nn.quantized.modules.utils._quantize_weight
+        torch.nn.quantized.modules.linear._quantize_weight = gen_wrapper(origin_quantize_weight)
+        torch.nn.quantized.modules.conv._quantize_weight = gen_wrapper(origin_quantize_weight)
+
         if type(self).__name__ == 'QATQuantizer':
 
             q = queue.Queue()
@@ -3076,6 +3111,9 @@ class QATQuantizer(object):
             float_mods.clear()
         else:
             q_model = torch.quantization.convert(q_model)
+
+        torch.nn.quantized.modules.linear._quantize_weight = origin_quantize_weight
+        torch.nn.quantized.modules.conv._quantize_weight = origin_quantize_weight
 
         return q_model
 
