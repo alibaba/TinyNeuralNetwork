@@ -28,6 +28,13 @@ def main_worker(args):
         # Provide a viable input for the model
         dummy_input = torch.rand((1, 3, 224, 224))
 
+        # For per-tensor quantization, if there are many outliers in the weight, CLE can significantly improve the
+        # quantization accuracy
+        if args.cle:
+            from tinynn.graph.quantization.algorithm.cross_layer_equalization import cross_layer_equalize
+
+            cross_layer_equalize(model, dummy_input, get_device())
+
         # TinyNeuralNetwork provides a PostQuantizer class that may rewrite the graph for and perform model fusion for
         # quantization. The model returned by the `quantize` function is ready for quantization calibration.
         # By default, the rewritten model (in the format of a single file) will be generated in the working directory.
@@ -102,6 +109,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default=os.path.join(CURRENT_PATH, 'config.yml'))
     parser.add_argument('--workers', type=int, default=8)
     parser.add_argument('--batch-size', type=int, default=128)
+    parser.add_argument('--cle', type=bool, default=False)
 
     args = parser.parse_args()
     main_worker(args)

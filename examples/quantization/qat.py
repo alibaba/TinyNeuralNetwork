@@ -14,7 +14,7 @@ from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
 from tinynn.converter import TFLiteConverter
 from tinynn.graph.quantization.quantizer import QATQuantizer
 from tinynn.graph.tracer import model_tracer
-from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate
+from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate, calibrate
 from tinynn.util.train_util import DLContext, get_device, train
 
 
@@ -25,6 +25,25 @@ def main_worker(args):
 
         # Provide a viable input for the model
         dummy_input = torch.rand((1, 3, 224, 224))
+
+        device = get_device()
+        context = DLContext()
+        context.device = device
+        context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
+
+        # For per-tensor quantization, if there are many outliers in the weight, CLE can significantly improve the
+        # quantization accuracy
+        if args.cle:
+            from tinynn.graph.quantization.algorithm.cross_layer_equalization import cross_layer_equalize
+
+            model = cross_layer_equalize(model, dummy_input, device)
+
+        # If your model do not have BatchNorm, for example, in the RepVGG-style deploy model,
+        # their BN fused to conv when doing model reparameter. We provide 'model_restore_bn' to restore BatchNorm.
+        if args.bn_restore:
+            from tinynn.util.bn_restore import model_restore_bn
+
+            model = model_restore_bn(model, get_device(), calibrate, context)
 
         # TinyNeuralNetwork provides a QATQuantizer class that may rewrite the graph for and perform model fusion for
         # quantization. The model returned by the `quantize` function is ready for QAT.
@@ -62,7 +81,6 @@ def main_worker(args):
         qat_model = nn.DataParallel(qat_model)
 
     # Move model to the appropriate device
-    device = get_device()
     qat_model.to(device=device)
 
     # When adapting our framework to the existing training code, please make sure that the optimizer and the
@@ -70,10 +88,6 @@ def main_worker(args):
     # e.g. If you use `get_optimizer` and `get_lr_scheduler` for constructing those objects, then you may write
     #   optimizer = get_optimizer(qat_model)
     #   lr_scheduler = get_lr_scheduler(optimizer)
-
-    context = DLContext()
-    context.device = device
-    context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
     context.max_epoch = 30
     context.criterion = nn.BCEWithLogitsLoss()
     context.optimizer = torch.optim.SGD(qat_model.parameters(), 0.01, momentum=0.9, weight_decay=5e-4)
@@ -107,6 +121,8 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default=os.path.join(CURRENT_PATH, 'config.yml'))
     parser.add_argument('--workers', type=int, default=8)
     parser.add_argument('--batch-size', type=int, default=192)
+    parser.add_argument('--cle', type=bool, default=False)
+    parser.add_argument('--bn-restore', type=bool, default=False)
 
     args = parser.parse_args()
     main_worker(args)
