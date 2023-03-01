@@ -820,6 +820,12 @@ class Modifier(object):
     def dim_change_forward(self, center, tensor, dim_changes_i: typing.List, dim_transform, tensor_constraint):
         # Leaf nodes require no additional computation
         if len(self.next_tensors()) == 0:
+            if len(self.pre_tensors()) > 1:
+                for dim_change_i in dim_changes_i:
+                    dims = [t.shape[dim_change_i] for t in self.pre_tensors()]
+                    if len(set(dims)) > 1:
+                        log.warning(f"Skip the {self.unique_name()} because the input shape is inconsistent")
+                        return True
             self.dim_changes_info.update_i(center, tensor, dim_changes_i, dim_transform)
             return True
 

@@ -2051,6 +2051,36 @@ class ModifierTester(unittest.TestCase):
 
         print(torch.allclose(output1, output2))
 
+    def test_list_output(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.fc = nn.Linear(8, 8)
+                self.fc0 = nn.Linear(8, 16)
+                self.fc1 = nn.Linear(8, 32)
+                self.fc2 = nn.Linear(8, 64)
+
+            def forward(self, x):
+                x = self.fc(x)
+                fc0 = self.fc0(x)
+                fc1 = self.fc1(x)
+                fc2 = self.fc2(x)
+                return fc0, [fc1, fc2]
+
+        model = TestModel()
+
+        dummy_input = torch.ones((1, 8))
+
+        model(dummy_input)
+
+        pruner = OneShotChannelPruner(model, dummy_input, {"sparsity": 0.5, "metrics": "l2_norm"})
+
+        pruner.prune()
+
+        model(dummy_input)
+
+        assert model.fc2.out_features == 64
+
 
 if __name__ == '__main__':
     unittest.main()
