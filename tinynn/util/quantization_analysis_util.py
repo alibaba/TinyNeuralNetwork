@@ -73,7 +73,7 @@ def parse_metric(metric):
     elif metric == 'cosine_similarity':
         metric_fn = torch_cosine_similarity
     else:
-        print(f'error, not support {metric}')
+        log.warning(f'error, not support {metric}')
     return metric_fn
 
 
@@ -92,90 +92,93 @@ def layer_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine_
     else:
         model = q_model
 
-    modules_list = {}
-    names_list = {}
-    float_results = {}
-    hooks = []
-
-    def forward_hook(module, input, output):
-        name = names_list[module]
-        float_results[name] = input
-
-    fake_quant_enabled_dict = {}
-    observer_enabled_dict = {}
-    for n, m in model.named_modules():
-        if isinstance(m, torch.quantization.FakeQuantize):
-            names_list[m] = n
-            modules_list[n] = m
-
-            fake_quant_enabled_dict[m] = m.fake_quant_enabled.clone()
-            observer_enabled_dict[m] = m.observer_enabled.clone()
-
-            hooks.append(m.register_forward_hook(forward_hook))
-
-    if len(modules_list) == 0:
-        log.warning('No FakeQuantize modules found. Are you sure you had prepared your model?')
-
-    model.apply(torch.quantization.disable_fake_quant)
-    model.apply(torch.quantization.disable_observer)
-
-    device = get_module_device(model)
-
-    if type(dummy_input) == torch.Tensor:
-        actual_input = [dummy_input]
-    elif isinstance(dummy_input, (tuple, list)):
-        actual_input = list(dummy_input)
-    else:
-        log.error(f'Unsupported type {type(dummy_input)} for dummy input')
-        assert False
-
-    for i in range(len(actual_input)):
-        dummy_input = actual_input[i]
-        if type(dummy_input) == torch.Tensor:
-            if dummy_input.device != device:
-                actual_input[i] = dummy_input.to(device)
+    train_flag = model.training
     model.eval()
-
     with torch.no_grad():
-        model(*actual_input)
+        modules_list = {}
+        names_list = {}
+        float_results = {}
+        hooks = []
 
-    for h in hooks:
-        h.remove()
-    hooks.clear()
+        def forward_hook(module, input, output):
+            name = names_list[module]
+            float_results[name] = input
 
-    for m, v in fake_quant_enabled_dict.items():
-        m.fake_quant_enabled = v
+        fake_quant_enabled_dict = {}
+        observer_enabled_dict = {}
+        for n, m in model.named_modules():
+            if isinstance(m, torch.quantization.FakeQuantize):
+                names_list[m] = n
+                modules_list[n] = m
 
-    metric_fn = parse_metric(metric)
-    if metric_fn is None:
-        return
+                fake_quant_enabled_dict[m] = m.fake_quant_enabled.clone()
+                observer_enabled_dict[m] = m.observer_enabled.clone()
 
-    q_errors_weight = []
-    q_errors_activ = []
-    while len(float_results) > 0:
-        n, f = float_results.popitem()
-        mod = modules_list[n]
-        with torch.no_grad():
-            q = mod(*f)
-            loss = metric_fn(f[0], q)
-        actual_n = '.'.join(n.split('.')[:-1])
-        if n.endswith('.weight_fake_quant'):
-            q_errors_weight.append((actual_n, mod, loss))
+                hooks.append(m.register_forward_hook(forward_hook))
+
+        if len(modules_list) == 0:
+            log.warning('No FakeQuantize modules found. Are you sure you had prepared your model?')
+
+        model.apply(torch.quantization.disable_fake_quant)
+        model.apply(torch.quantization.disable_observer)
+
+        device = get_module_device(model)
+
+        if type(dummy_input) == torch.Tensor:
+            actual_input = [dummy_input]
+        elif isinstance(dummy_input, (tuple, list)):
+            actual_input = list(dummy_input)
         else:
-            q_errors_activ.append((actual_n, mod, loss))
+            log.error(f'Unsupported type {type(dummy_input)} for dummy input')
+            assert False
 
-    q_errors_weight = sorted(q_errors_weight, key=lambda x: x[2])
-    q_errors_activ = sorted(q_errors_activ, key=lambda x: x[2])
+        for i in range(len(actual_input)):
+            dummy_input = actual_input[i]
+            if type(dummy_input) == torch.Tensor:
+                if dummy_input.device != device:
+                    actual_input[i] = dummy_input.to(device)
 
-    q_errors_weight = q_errors_weight[:sort_num]
-    q_errors_activ = q_errors_activ[:sort_num]
+        with torch.no_grad():
+            model(*actual_input)
 
-    error_print(metric, q_errors_activ, q_errors_weight, sort_num)
+        for h in hooks:
+            h.remove()
+        hooks.clear()
 
-    for m, v in observer_enabled_dict.items():
-        m.observer_enabled = v
+        for m, v in fake_quant_enabled_dict.items():
+            m.fake_quant_enabled = v
 
-    model.train()
+        metric_fn = parse_metric(metric)
+        if metric_fn is None:
+            return
+
+        q_errors_weight = []
+        q_errors_activ = []
+        while len(float_results) > 0:
+            n, f = float_results.popitem()
+            mod = modules_list[n]
+            with torch.no_grad():
+                q = mod(*f)
+                loss = metric_fn(f[0], q)
+            actual_n = '.'.join(n.split('.')[:-1])
+            if n.endswith('.weight_fake_quant'):
+                q_errors_weight.append((actual_n, mod, loss))
+            else:
+                q_errors_activ.append((actual_n, mod, loss))
+
+        q_errors_weight = sorted(q_errors_weight, key=lambda x: x[2])
+        q_errors_activ = sorted(q_errors_activ, key=lambda x: x[2])
+
+        q_errors_weight = q_errors_weight[:sort_num]
+        q_errors_activ = q_errors_activ[:sort_num]
+
+        error_print(metric, q_errors_activ, q_errors_weight, sort_num)
+
+        for m, v in observer_enabled_dict.items():
+            m.observer_enabled = v
+
+    if train_flag:
+        model.train()
 
 
 def graph_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine_similarity'):
@@ -191,82 +194,86 @@ def graph_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine_
     else:
         model = q_model
 
-    modules_list = {}
-    names_list = {}
-    results = {}
-    hooks = []
-
-    def forward_hook(module, input, output):
-        name = names_list[module]
-        results[name] = input
-
-    fake_quant_enabled_dict = {}
-    observer_enabled_dict = {}
-    for n, m in model.named_modules():
-        if isinstance(m, torch.quantization.FakeQuantize):
-            names_list[m] = n
-            modules_list[n] = m
-
-            fake_quant_enabled_dict[m] = m.fake_quant_enabled.clone()
-            observer_enabled_dict[m] = m.observer_enabled.clone()
-
-            hooks.append(m.register_forward_hook(forward_hook))
-
-    model.apply(torch.quantization.disable_fake_quant)
-    model.apply(torch.quantization.disable_observer)
-
-    if len(modules_list) == 0:
-        log.warning('No FakeQuantize modules found. Are you sure you had prepared your model?')
-
-    device = get_module_device(model)
-
-    if type(dummy_input) == torch.Tensor:
-        actual_input = [dummy_input]
-    elif isinstance(dummy_input, (tuple, list)):
-        actual_input = list(dummy_input)
-    else:
-        log.error(f'Unsupported type {type(dummy_input)} for dummy input')
-        assert False
-
-    for i in range(len(actual_input)):
-        dummy_input = actual_input[i]
-        if type(dummy_input) == torch.Tensor:
-            if dummy_input.device != device:
-                actual_input[i] = dummy_input.to(device)
+    train_flag = model.training
     model.eval()
 
     with torch.no_grad():
+        modules_list = {}
+        names_list = {}
+        results = {}
+        hooks = []
+
+        def forward_hook(module, input, output):
+            name = names_list[module]
+            results[name] = input
+
+        fake_quant_enabled_dict = {}
+        observer_enabled_dict = {}
+        for n, m in model.named_modules():
+            if isinstance(m, torch.quantization.FakeQuantize):
+                names_list[m] = n
+                modules_list[n] = m
+
+                fake_quant_enabled_dict[m] = m.fake_quant_enabled.clone()
+                observer_enabled_dict[m] = m.observer_enabled.clone()
+
+                hooks.append(m.register_forward_hook(forward_hook))
+
+        model.apply(torch.quantization.disable_fake_quant)
+        model.apply(torch.quantization.disable_observer)
+
+        if len(modules_list) == 0:
+            log.warning('No FakeQuantize modules found. Are you sure you had prepared your model?')
+
+        device = get_module_device(model)
+
+        if type(dummy_input) == torch.Tensor:
+            actual_input = [dummy_input]
+        elif isinstance(dummy_input, (tuple, list)):
+            actual_input = list(dummy_input)
+        else:
+            log.error(f'Unsupported type {type(dummy_input)} for dummy input')
+            assert False
+
+        for i in range(len(actual_input)):
+            dummy_input = actual_input[i]
+            if type(dummy_input) == torch.Tensor:
+                if dummy_input.device != device:
+                    actual_input[i] = dummy_input.to(device)
+
         model(*actual_input)
 
-    # Restore fake-quantize and record activation with quantization error.
-    for m, v in fake_quant_enabled_dict.items():
-        m.fake_quant_enabled = v
-    float_results = results
-    results = {}
+        # Restore fake-quantize and record activation with quantization error.
+        for m, v in fake_quant_enabled_dict.items():
+            m.fake_quant_enabled = v
+        float_results = results
+        results = {}
 
-    with torch.no_grad():
         model(*actual_input)
 
-    for h in hooks:
-        h.remove()
-    hooks.clear()
+        for h in hooks:
+            h.remove()
+        hooks.clear()
 
-    metric_fn = parse_metric(metric)
-    if metric_fn is None:
-        return
+        metric_fn = parse_metric(metric)
+        if metric_fn is None:
+            return
 
-    q_errors_activ = []
-    for name, f_tensor in float_results.items():
-        assert name in results, f'{name} not in results'
-        actual_n = '.'.join(name.split('.')[:-1])
-        loss = metric_fn(f_tensor[0], results[name][0])
-        if not name.endswith('.weight_fake_quant'):
-            q_errors_activ.append((actual_n, modules_list[name], loss))
+        q_errors_activ = []
+        for name, f_tensor in float_results.items():
+            assert name in results, f'{name} not in results'
+            actual_n = '.'.join(name.split('.')[:-1])
+            loss = metric_fn(f_tensor[0], results[name][0])
+            if not name.endswith('.weight_fake_quant'):
+                q_errors_activ.append((actual_n, modules_list[name], loss))
 
-    error_print(metric, q_errors_activ, [], '')
+        error_print(metric, q_errors_activ, [], '')
 
-    for m, v in observer_enabled_dict.items():
-        m.observer_enabled = v
+        for m, v in observer_enabled_dict.items():
+            m.observer_enabled = v
+
+    if train_flag:
+        model.train()
 
 
 def get_weight_dis(
