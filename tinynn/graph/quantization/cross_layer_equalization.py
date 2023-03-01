@@ -23,35 +23,15 @@ cls_support_type = (torch.nn.Conv2d, torch.nn.Conv1d)
 cls_scalable_type = (torch.nn.ReLU, torch.nn.LeakyReLU, torch.nn.PReLU, torch.nn.Identity)
 
 
-def is_dw_conv(layer: nn.Module) -> bool:
-    if isinstance(layer, cls_support_type) and layer.groups == layer.in_channels and layer.groups == layer.out_channels:
-        return True
-    else:
-        return False
-
-
-def is_normal_conv(layer: nn.Module) -> bool:
-    return isinstance(layer, cls_support_type) and layer.groups == 1
-
-
 def is_group_supported(current_group):
     """Currently Supported layer combinations for CLS are:
     1. [conv-conv]
-    2. [dw-conv]
-    3. [conv-dw-conv]
     """
     current_group_ = [mod for n, mod in current_group]
     if (
         len(current_group_) == 2
         and isinstance(current_group_[0], cls_support_type)
-        and is_normal_conv(current_group_[1])
-    ):
-        return True
-    elif (
-        len(current_group_) == 3
-        and is_normal_conv(current_group_[0])
-        and is_dw_conv(current_group_[1])
-        and is_normal_conv(current_group_[2])
+        and isinstance(current_group_[1], cls_support_type)
     ):
         return True
     else:
@@ -96,68 +76,52 @@ def get_cls_set(cur_graph):
     return layer_groups
 
 
-def equalize(weight1, bias1, weight2):
-    """Use the CLE algorithm mentioned in https://arxiv.org/abs/1906.04721"""
-    # Rearrange the second conv weight. used in Conv2d.
-    w2_p = weight2.permute(1, 0, 2, 3)
-    r1 = weight1.abs().amax([1, 2, 3]).double()
-    r2 = w2_p.abs().amax([1, 2, 3]).double()
+def equalize(weight_1, weight_2, group=1, threshold=0.5, s_min=1e-6, s_max=1e6):
+    """calculate scale for two layer according to their weights"""
+    shape_2 = weight_2.shape
+    # for group conv
+    weight_1_re = torch.reshape(weight_1, (weight_1.shape[0], -1))
+    weight_2_re = torch.reshape(
+        weight_2,
+        (
+            group,
+            shape_2[0] // group,
+        )
+        + shape_2[1:],
+    )
+    weight_2_re = torch.permute(weight_2_re, (2, 0, 1, 3, 4))
+    weight_2_re = torch.reshape(weight_2_re, (weight_2_re.shape[0] * weight_2_re.shape[1], -1))
+    r1 = weight_1_re.abs().amax([1]).double()
+    r2 = weight_2_re.abs().amax([1]).double()
     s = r1 / torch.sqrt(r1 * r2)
-    s_shape = [1] * len(weight1.shape)
-    s_shape[0] = -1
-    weight1.data.copy_(weight1 / s.reshape(s_shape))
-    weight2.data.copy_((w2_p * s.reshape(s_shape)).permute(1, 0, 2, 3))
-    bias1.data.copy_(bias1 / s)
+
+    # ignore too small scale
+    s = torch.clip(s, s_min, s_max)
+    # refuse to scale unnecessary layers pair
+    s = torch.where((r1 + r2) < threshold, torch.ones_like(s), s)
+
     return s
 
 
-def equalize_cdc(weight1, bias1, weight2, bias2, weight3, threshold):
-    """Use the CLE algorithm mentioned in https://arxiv.org/abs/1906.04721"""
-    w3_p = weight3.permute(1, 0, 2, 3)
-    r1 = weight1.abs().amax([1, 2, 3]).double()
-    r2 = weight2.abs().amax([1, 2, 3]).double()
-    r3 = w3_p.abs().amax([1, 2, 3]).double()
-    s1 = r1 / pow(r1 * r2 * r3, 1.0 / 3)
-    s2 = pow(r1 * r3 * r2, 1.0 / 3) / r3
-    s_shape = [1] * len(weight1.shape)
-    s_shape[0] = -1
-    s1 = torch.where(s1 / s2 > threshold, torch.ones(s1.shape).double(), s1)
-    s2 = torch.where(s1 / s2 > threshold, torch.ones(s2.shape).double(), s2)
-    weight1.data.copy_(weight1 * (1 / s1.reshape(s_shape)))
-    weight2.data.copy_(weight2 * s1.reshape(s_shape) / s2.reshape(s_shape))
-    weight3.data.copy_((w3_p * s2.reshape(s_shape)).permute(1, 0, 2, 3))
-    bias1.data.copy_(bias1 * (1 / s1))
-    bias2.data.copy_(bias2 * (1 / s2))
-
-    return s1, s2
-
-
-def bn_scale(conv, scale):
-    if hasattr(conv, 'fused_bn_'):
-        conv.fused_bn_.weight.data = conv.fused_bn_.weight.data * scale
-        conv.fused_bn_.bias.data = conv.fused_bn_.bias.data * scale
-
-
-def _weight_equal_helper(cls, threshold):
+def _weight_equal_helper(cls, threshold=0.5):
     layer_pair = [m for n, m in cls]
-    if len(layer_pair) == 3:
-        conv_0, conv_1, conv_2 = layer_pair
-        assert is_normal_conv(conv_0) and is_dw_conv(conv_1) and is_normal_conv(conv_2), 'not conv-dw-conv'
-        weight1, bias1, weight2, bias2, weight3 = conv_0.weight, conv_0.bias, conv_1.weight, conv_1.bias, conv_2.weight
-        s1, s2 = equalize_cdc(weight1, bias1, weight2, bias2, weight3, threshold)
-        bn_scale(conv_0, 1 / s1)
-        bn_scale(conv_1, 1 / s2)
-    elif len(layer_pair) == 2:
+    if len(layer_pair) == 2:
         conv_0, conv_1 = layer_pair
-        weight1, bias1, weight2 = conv_0.weight, conv_0.bias, conv_1.weight
-        s = equalize(weight1, bias1, weight2)
-        bn_scale(conv_0, 1 / s)
+        weight1, bias1, weight2, groups = conv_0.weight, conv_0.bias, conv_1.weight, conv_1.groups
+        s = equalize(weight1, weight2, group=groups, threshold=threshold)
+        weight_1 = weight1 / s.reshape([-1] + ([1] * (weight1.ndim - 1)))
+        weight_2 = torch.reshape(weight2, (groups, weight2.shape[0] // groups) + weight2.shape[1:])
+        weight_2 *= torch.reshape(s, [groups, 1, -1] + [1] * (weight_2.ndim - 3))
+        weight_2 = torch.reshape(weight_2, (weight_2.shape[1] * groups,) + weight_2.shape[2:])
+        conv_0.weight.data.copy_(weight_1)
+        conv_0.bias.data.copy_(bias1 / s)
+        conv_1.weight.data.copy_(weight_2)
     else:
-        log.warning(f'layer_pair nums != 2,3, do not support, current layer:{cls}.')
+        log.warning(f'layer_pair nums != 2, do not support, current layer:{cls}.')
 
 
-def _cross_layer_equalize(model: nn.Module, dummy_input, threshold=1000) -> Tuple[list, nn.Module]:
-    """perform Cross-Layer Equalization(CLE) on the given model.
+def equalize_model(model: nn.Module, dummy_input, threshold=0.5, iters=2) -> Tuple[list, nn.Module]:
+    """perform Cross-Layer Equalization(CLE) on the given model iters times.
 
     Args:
         model: The bn of model should be fused into conv.
@@ -178,8 +142,9 @@ def _cross_layer_equalize(model: nn.Module, dummy_input, threshold=1000) -> Tupl
                     param[k] = p.max()
 
             layer_groups = get_cls_set(cur_graph)
-            for cls in layer_groups:
-                _weight_equal_helper(cls, threshold)
+            for i in range(iters):
+                for cls in layer_groups:
+                    _weight_equal_helper(cls, threshold)
 
             stat_we = model.state_dict()
             for k, v in stat_we.items():
@@ -197,7 +162,7 @@ def _cross_layer_equalize(model: nn.Module, dummy_input, threshold=1000) -> Tupl
 
 
 def cross_layer_equalize(
-    model: nn.Module, dummy_input, device, threshold=1000, work_dir="out", cle_iters=2, hba_flag=True
+    model: nn.Module, dummy_input, device, threshold=0.5, work_dir="out", cle_iters=2, hba_flag=False
 ) -> nn.Module:
     """Higher-level API to perform Cross-Layer Equalization(CLE) and High Bias Abosrb (HBA) on the given model.
 
@@ -216,9 +181,8 @@ def cross_layer_equalize(
     model = model_rewrite(model, dummy_input, work_dir=work_dir)
     model = model_fuse_bn(model, dummy_input)
 
-    log.info("start to do Cross Layer Equalization. the range change of bias after CLE:")
-    for i in range(cle_iters):
-        layers_groups, model = _cross_layer_equalize(model, dummy_input, threshold)
+    log.info("start to do Cross Layer Equalization. the range change of weight/bias after CLE:")
+    layers_groups, model = equalize_model(model, dummy_input, threshold, iters=cle_iters)
 
     if hba_flag:
         log.info("start to do High Bias Absorbing. the range change of bias after HBA:")
@@ -273,17 +237,17 @@ def bias_absorb_helper_(layer1, layer2, model, origin_model):
 def bias_absorb_(model, layers_groups, origin_model):
     with torch.no_grad():
         for layer_group in layers_groups:
-            if len(layer_group) == 3:
+            if len(layer_group) == 2:
                 bias_absorb_helper_(layer_group[0], layer_group[1], model, origin_model)
-                bias_absorb_helper_(layer_group[1], layer_group[2], model, origin_model)
-            elif len(layer_group) == 2:
-                bias_absorb_helper_(layer_group[0], layer_group[1], model, origin_model)
+            else:
+                log.warning('Unsupported layer group')
 
 
-def __high_bias_absorb(
-    cle_model, device, layer_groups, use_origin_bn=True, cali_func=None, *cali_func_args, layers_fused_bn=None
+def high_bias_absorb_empirical(
+    cle_model, device, layer_groups, cali_func=None, *cali_func_args, use_origin_bn=True, layers_fused_bn=None
 ):
-    """The debug API which use to do bn_restore after CLE, then apply HBA."""
+    """Absorb bias value greater than 3 * sigma to next layer's bias, which use real data to get pre-bias
+    distribution."""
     cle_model.to(device)
     origin_model = copy.deepcopy(cle_model)
     if use_origin_bn:
@@ -308,7 +272,7 @@ def __high_bias_absorb(
 
 
 def high_bias_absorb(cle_model, device, layer_groups):
-    """Absorb bias value greater than 3 * sigma to next layer's bias.
+    """Absorb bias value greater than 3 * sigma to next layer's bias, which use origin BN to get pre-bias distribution.
 
     Args:
         cle_model: The model which has been done cle.
@@ -356,7 +320,7 @@ def model_fuse_bn(model: nn.Module, dummy_input):
             return fused_model
 
 
-def model_rewrite(model, dummy_input, work_dir='out'):
+def model_rewrite(model, dummy_input, work_dir='out') -> nn.Module:
     """rewrite model to non-block style"""
     with model_tracer():
         graph = trace(model, dummy_input)
