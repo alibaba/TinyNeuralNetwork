@@ -19,7 +19,7 @@ def sqnr(x: torch.Tensor, y: torch.Tensor):
     return (20 * torch.log10(Ps / Pn)).item()
 
 
-def torch_cosine_similarity(x: torch.Tensor, y: torch.Tensor, reduction: str = 'mean') -> torch.Tensor:
+def cosine_similarity(x: torch.Tensor, y: torch.Tensor, reduction: str = 'mean') -> torch.Tensor:
     """calulate the cosine similarity between x and y"""
     if x.shape != y.shape:
         raise ValueError(f'Can not compute loss for tensors with different shape. ({x.shape} and {y.shape})')
@@ -42,6 +42,12 @@ def torch_cosine_similarity(x: torch.Tensor, y: torch.Tensor, reduction: str = '
         return cosine_sim
     else:
         raise ValueError(f'Cosine similarity do not supported {reduction} method.')
+
+
+METRIC_DICT = {
+    'cosine_similarity': cosine_similarity,
+    'sqnr': sqnr,
+}
 
 
 def error_print(metric, q_errors_activ, q_errors_weight, sort_num):
@@ -67,16 +73,6 @@ def error_print(metric, q_errors_activ, q_errors_weight, sort_num):
         log.warning(full_log)
 
 
-def parse_metric(metric):
-    if metric == 'sqnr':
-        metric_fn = sqnr
-    elif metric == 'cosine_similarity':
-        metric_fn = torch_cosine_similarity
-    else:
-        log.warning(f'error, not support {metric}')
-    return metric_fn
-
-
 def layer_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine_similarity', sort_num: float = 20):
     """Generates the layerwise quant error report using the given metric, the q_model need to be qat_prepared.
 
@@ -91,6 +87,7 @@ def layer_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine_
         model = q_model.module
     else:
         model = q_model
+    metric_fn = METRIC_DICT[metric]
 
     train_flag = model.training
     model.eval()
@@ -148,10 +145,6 @@ def layer_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine_
         for m, v in fake_quant_enabled_dict.items():
             m.fake_quant_enabled = v
 
-        metric_fn = parse_metric(metric)
-        if metric_fn is None:
-            return
-
         q_errors_weight = []
         q_errors_activ = []
         while len(float_results) > 0:
@@ -193,6 +186,7 @@ def graph_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine_
         model = q_model.module
     else:
         model = q_model
+    metric_fn = METRIC_DICT[metric]
 
     train_flag = model.training
     model.eval()
@@ -254,10 +248,6 @@ def graph_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine_
         for h in hooks:
             h.remove()
         hooks.clear()
-
-        metric_fn = parse_metric(metric)
-        if metric_fn is None:
-            return
 
         q_errors_activ = []
         for name, f_tensor in float_results.items():
