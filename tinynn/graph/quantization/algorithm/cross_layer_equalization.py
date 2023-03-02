@@ -338,6 +338,7 @@ def model_rewrite(model, dummy_input, work_dir='out') -> nn.Module:
         # Import the new model
         rewritten_model = import_from_path(model_ns, model_code_path, model_rewrite)()
         rewritten_model.load_state_dict(torch.load(model_weights_path))
+        os.unlink(model_weights_path)
         return rewritten_model
 
 

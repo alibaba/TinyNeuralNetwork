@@ -69,6 +69,7 @@ jobs:
           python quantizer_test.py -v
           python modifier_prune_test.py -v
           python modifier_test.py -v
+          python cross_layer_equalization_test.py -v
       - name: Run integration tests
         run: |
           source activate.sh
