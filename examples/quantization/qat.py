@@ -16,6 +16,8 @@ from tinynn.graph.quantization.quantizer import QATQuantizer
 from tinynn.graph.tracer import model_tracer
 from tinynn.util.cifar10 import get_dataloader, train_one_epoch, validate, calibrate
 from tinynn.util.train_util import DLContext, get_device, train
+from tinynn.graph.quantization.algorithm.cross_layer_equalization import cross_layer_equalize
+from tinynn.util.bn_restore import model_restore_bn
 
 
 def main_worker(args):
@@ -34,15 +36,12 @@ def main_worker(args):
         # For per-tensor quantization, if there are many outliers in the weight, CLE can significantly improve the
         # quantization accuracy
         if args.cle:
-            from tinynn.graph.quantization.algorithm.cross_layer_equalization import cross_layer_equalize
-
             model = cross_layer_equalize(model, dummy_input, device)
 
-        # If your model do not have BatchNorm, for example, in the RepVGG-style deploy model,
-        # their BN fused to conv when doing model reparameter. We provide 'model_restore_bn' to restore BatchNorm.
+        # If your model do not have BatchNorm, but you want to add bn after conv. For example:
+        # 1. In the RepVGG-style deploy model, their BN has fused to conv when doing model reparameter.
+        # 2. QAT train after cle. As cle will fuse bn to the pre conv, so you should restore bn for qat training.
         if args.bn_restore:
-            from tinynn.util.bn_restore import model_restore_bn
-
             model = model_restore_bn(model, get_device(), calibrate, context)
 
         # TinyNeuralNetwork provides a QATQuantizer class that may rewrite the graph for and perform model fusion for

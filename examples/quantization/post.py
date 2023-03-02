@@ -15,6 +15,7 @@ from tinynn.graph.quantization.quantizer import PostQuantizer
 from tinynn.graph.tracer import model_tracer
 from tinynn.util.cifar10 import get_dataloader, calibrate
 from tinynn.util.train_util import DLContext, get_device
+from tinynn.graph.quantization.algorithm.cross_layer_equalization import cross_layer_equalize
 
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
@@ -31,8 +32,6 @@ def main_worker(args):
         # For per-tensor quantization, if there are many outliers in the weight, CLE can significantly improve the
         # quantization accuracy
         if args.cle:
-            from tinynn.graph.quantization.algorithm.cross_layer_equalization import cross_layer_equalize
-
             cross_layer_equalize(model, dummy_input, get_device())
 
         # TinyNeuralNetwork provides a PostQuantizer class that may rewrite the graph for and perform model fusion for
