@@ -1,4 +1,5 @@
 # 量化算法：
+[English](algorithm.md)
 1. [x] 跨层均衡算法([cross layer equalization](https://arxiv.org/abs/1906.04721))
 2. [ ] 偏置修正算法([bias correction](https://arxiv.org/abs/1906.04721))
 3. [ ] 激活值平滑算法([smooth quant](https://arxiv.org/abs/2211.10438))

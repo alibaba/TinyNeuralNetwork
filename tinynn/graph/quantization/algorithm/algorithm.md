@@ -1,7 +1,9 @@
 # Quantization Algorithm
-2. [x] 跨层均衡算法([cross layer equalization](https://arxiv.org/abs/1906.04721))
-3. [ ] 偏置修正算法([bias correction](https://arxiv.org/abs/1906.04721))
-4. [ ] 激活值平滑算法([smooth quant](https://arxiv.org/abs/2211.10438))
+[简体中文](algorithm_zh-CN.md)
+
+1. [x] [cross layer equalization](https://arxiv.org/abs/1906.04721)
+2. [ ] [bias correction](https://arxiv.org/abs/1906.04721)
+3. [ ] [smooth quant](https://arxiv.org/abs/2211.10438)
 ## Corss Layer Equalization, CLE
 
 In some models, the weight distribution across channels is very different, and for per-tensor quantization, using a single quantization parameter to quantize all weights will produce significant quantization error.
