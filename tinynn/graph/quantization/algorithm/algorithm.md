@@ -10,7 +10,7 @@ In some models, the weight distribution across channels is very different, and f
 For example, in the case where one channel has weights in the range [−128, 128] and another channel has weights in the range (−0.5, 0.5),
 the weights in the latter channel will all be quantized to 0 when quantizing to 8-bits.
 
-We call this type of weights have "outlier phenomenon", especially in models that heavily use DW convolution and REP parameter methods (such as MobileOne), the outlier phenomenon is more significant.
+We call this type of weights have "outlier phenomenon", especially in models that heavily use DW convolution and reparametering methods (such as MobileOne), the outlier phenomenon is more significant.
 
 We followed the cross-layer-equalization algorithm proposed by [Qualcomm](https://arxiv.org/abs/1906.04721), and integrated the CLE algorithm in TinyNeuralNetwork:
 ```python
@@ -45,7 +45,7 @@ However, according to the experimental results, small cle_iters is enough to get
 The current default value is 2, and 1 to 5 times of CLE is recommended.
 * hba_flag (bool):
 
-Whether to perform HBA operation, which is used to eliminate the problem of bias amplification introduced by CLE at model with BatchNorm. Default to be False.
+Whether to perform HBA operation.HBA was proposed by [Qualcomm](https://arxiv.org/abs/1906.04721) which is used to eliminate the problem of bias amplification introduced by CLE at model with BatchNorm. Default to be False.
 
 ### Usage and Experimental Results
 CLE can well solve the problem of per-tensor quantization accuracy degradation due to weight outliers.
