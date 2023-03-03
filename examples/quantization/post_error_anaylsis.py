@@ -33,11 +33,11 @@ def main_worker(args):
         device = get_device()
 
         # --------weight visualization usage-------------
-        # Draw weight distribution for all layers of model.
+        # Draw the weight distribution for all layers of model.
         get_weight_dis(model, save_path='out')
         # -----------------------------------------------
 
-        # Apply CLE. If the weights of model have some outliers which is hard to quantize, trying CLE.
+        # When the weight distributions fluctuates greatly, CLE may significantly increase the quantization accuracy.
         if args.cle:
             model = cross_layer_equalize(model, dummy_input, device, cle_iters=2)
 
@@ -67,25 +67,25 @@ def main_worker(args):
     ptq_model.apply(torch.quantization.enable_observer)
     calibrate(ptq_model, context)
 
-    # Disable observer and enable fake-quant to validate model with quantization error
+    # Disable observer and enable fake quantization to validate model with quantization error
     ptq_model.apply(torch.quantization.disable_observer)
     ptq_model.apply(torch.quantization.enable_fake_quant)
     dummy_input.to(device)
     ptq_model(dummy_input)
     print(ptq_model)
 
-    # use real dummy_input to do quantization error analysis
+    # Perform quantization error analysis with real dummy input
     dummy_input_real = next(iter(context.train_loader))[0][:1]
 
     # --------quantization error analysis usage-------------
-    # Directly give the difference of layer output between quantized model and floating model, the error is accumulated.
-    # If you want a quantized model with high acc, then those layers close to the final output should less than 10%,
-    # which means the cosine_similarity of final layer should be greater than 90%.
+    # The error is accumulated by directly giving the difference in layer output between the quantized model and the floating model.
+    # If you want a quantized model with high accuracy, the layers closest to the final output should be less than 10%,
+    # which means the final layer's cosine similarity should be greater than 90%.
     graph_error_analysis(ptq_model, dummy_input_real, metric='cosine')
 
-    # We quantize each layer individually, and directly compare the difference
+    # We quantize each layer separately and compare the difference
     # between the original output and the output with quantization error for each layer,
-    # which is used to measure the quantization sensitivity of the every layer.
+    # which is used to calculate the quantization sensitivity of each layer.
     layer_error_analysis(ptq_model, dummy_input_real, metric='cosine')
     # -----------------------------------------------
 
