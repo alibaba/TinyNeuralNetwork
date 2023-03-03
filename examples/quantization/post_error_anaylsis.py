@@ -34,7 +34,7 @@ def main_worker(args):
         device = get_device()
 
         # --------weight visualization usage-------------
-        # Draw weight distribution for all layer of model.
+        # Draw weight distribution for all layers of model.
         get_weight_dis(model, save_path='out')
         # -----------------------------------------------
 
