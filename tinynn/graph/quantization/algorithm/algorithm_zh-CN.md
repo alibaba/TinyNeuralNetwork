@@ -7,6 +7,7 @@
 ## 跨层均衡算法（Corss Layer Equalization, CLE）
 
 在某些模型中，其输出通道之间的权重分布存在极大差异，而对于per-tensor量化而言，使用单独一个量化参数来量化所有权重，会产生显著的量化误差。例如，如果一个通道的权重分布在[-128,128],而另一个通道分布在[-0.5,0.5]之间，那么在INT8量化时，后者将被全部量化为0
+
 我们称之为这类权重存在"离群点现象"，尤其是在大量使用DW卷积和重参数方法的模型中(例如MobileOne)，离群点现象更加显著。
 
 我们根据[Qualcomm](https://arxiv.org/abs/1906.04721)提出的跨层均衡算法，在代码中集成了CLE算法：
@@ -28,9 +29,15 @@ model = cross_layer_equalize(model, dummy_input, device)
 当前使用的设备
 * threshold (float):
 
-不进行CLE的权重范围阈值。对于给定的通道，使用```scale=sqrt(abs_max(weight1_cn)/abs_max(weight2_cn))```计算缩放系数scale，
-当weight1的最大值为2e-20，且weight2的最大值为0.5时，scale为1e-10，会将conv1对应的bias放大1e10倍，导致数值失效。
-所以设置threshold，如果 ```abs_max(weight1_cn)+abs_max(weight2_cn) < threshold```，则将scale设置为1，不进行均衡操作。
+不进行CLE的权重范围阈值。
+
+对于给定的通道 $c_i$ ，相邻的卷积的权重为 $w_1$ 和 $w_2$，使用 $scale=sqrt(\frac {\lvert max({w_1}_{c_i}) \rvert} {\lvert max({w_2}_{c_i}) \rvert})$计算缩放系数scale，
+
+使用CLE进行均衡化时，bias可能会出现数值失真的情况。
+
+例如，当 ${w_1}_{c_i}$最大值为 $2e-20$，且 ${w_2}_{c_i}$的最大值为$0.5$时，scale为$1e-10$，会将conv1对应的bias放大 $1e10$倍，导致数值失效。
+
+为了避免出现这种情况，设置参数 `threshold`，如果 $\lvert max({w_1}_{c_i}) \rvert + \lvert max({w_2}_{c_i}) \rvert < threshold$，则将scale设置为1，不进行均衡操作。
 默认设置为0.5。
 * work_dir (str):
 
