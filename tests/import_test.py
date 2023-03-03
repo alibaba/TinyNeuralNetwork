@@ -42,7 +42,7 @@ class ImportTester(unittest.TestCase):
         from tinynn.util.bn_restore import model_restore_bn
 
     def test_cle(self):
-        from tinynn.graph.quantization.cross_layer_equalization import cross_layer_equalize
+        from tinynn.graph.quantization.algorithm.cross_layer_equalization import cross_layer_equalize
 
 
 if __name__ == '__main__':
