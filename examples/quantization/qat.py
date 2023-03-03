@@ -33,14 +33,14 @@ def main_worker(args):
         context.device = device
         context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
 
-        # For per-tensor quantization, if there are many outliers in the weight, CLE can significantly improve the
-        # quantization accuracy
+        # When the weight distributions fluctuates greatly, CLE may significantly increase the quantization accuracy.
         if args.cle:
             model = cross_layer_equalize(model, dummy_input, device)
 
-        # If your model do not have BatchNorm, but you want to add bn after conv. For example:
-        # 1. In the RepVGG-style deploy model, their BN has fused to conv when doing model reparameter.
-        # 2. QAT train after cle. As cle will fuse bn to the pre conv, so you should restore bn for qat training.
+        # You may want to insert `BatchNorm` layers after `Conv` layers for the following case.
+        # 1. For RepVGG-like model. With reparameterization, the model is hard to train without `BatchNorm` layers.
+        # 2. For QAT with models that applied CLE. Since CLE tries to fuse `Conv` and `BatchNorm` layers, it would
+        #    better to restore it to the original state.
         if args.bn_restore:
             model = model_restore_bn(model, get_device(), calibrate, context)
 
