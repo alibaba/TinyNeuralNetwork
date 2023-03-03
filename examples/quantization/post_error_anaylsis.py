@@ -62,9 +62,6 @@ def main_worker(args):
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
     context.max_iteration = 100
 
-    # use real dummy_input to do quantization error analysis
-    dummy_input_real = next(iter(context.train_loader))[0][:1]
-
     # Post quantization calibration
     ptq_model.apply(torch.quantization.disable_fake_quant)
     ptq_model.apply(torch.quantization.enable_observer)
@@ -73,9 +70,12 @@ def main_worker(args):
     # Disable observer and enable fake-quant to validate model with quantization error
     ptq_model.apply(torch.quantization.disable_observer)
     ptq_model.apply(torch.quantization.enable_fake_quant)
-    dummy_input_real.to(device)
-    ptq_model(dummy_input_real)
+    dummy_input.to(device)
+    ptq_model(dummy_input)
     print(ptq_model)
+
+    # use real dummy_input to do quantization error analysis
+    dummy_input_real = next(iter(context.train_loader))[0][:1]
 
     # --------quantization error analysis usage-------------
     # Directly give the difference of layer output between quantized model and floating model, the error is accumulated.
