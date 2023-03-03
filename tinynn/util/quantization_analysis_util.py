@@ -19,7 +19,7 @@ def sqnr(x: torch.Tensor, y: torch.Tensor):
     return (20 * torch.log10(Ps / Pn)).item()
 
 
-def cosine_similarity(x: torch.Tensor, y: torch.Tensor, reduction: str = 'mean') -> torch.Tensor:
+def cosine(x: torch.Tensor, y: torch.Tensor, reduction: str = 'mean') -> torch.Tensor:
     """calulate the cosine similarity between x and y"""
     if x.shape != y.shape:
         raise ValueError(f'Can not compute loss for tensors with different shape. ({x.shape} and {y.shape})')
@@ -45,7 +45,7 @@ def cosine_similarity(x: torch.Tensor, y: torch.Tensor, reduction: str = 'mean')
 
 
 METRIC_DICT = {
-    'cosine_similarity': cosine_similarity,
+    'cosine': cosine,
     'sqnr': sqnr,
 }
 
@@ -73,13 +73,14 @@ def error_print(metric, q_errors_activ, q_errors_weight, sort_num):
         log.warning(full_log)
 
 
-def layer_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine_similarity', sort_num: float = 20):
+def layer_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine', sort_num: float = 20):
     """Generates the layerwise quant error report using the given metric, the q_model need to be qat_prepared.
 
     Args:
         q_model: The quant prepared model
         dummy_input: A viable input to the model
         metric: Metrics for measuring the error of floating point tensor and quantized tensor.
+                Default to be 'cosine', optional 'sqnr'.
         sort_num : The smallest sort_num layer0 on given metric. Defaults to 20
     """
 
@@ -174,13 +175,14 @@ def layer_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine_
         model.train()
 
 
-def graph_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine_similarity'):
+def graph_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine'):
     """Generates the cumulative quant error report using the given metric, the q_model need to be qat_prepared.
 
     Args:
         q_model: The quant prepared model.
         dummy_input: A viable input to the model
         metric: Metrics for measuring the error of floating point tensor and quantized tensor.
+                Default to be 'cosine', optional 'sqnr'.
     """
     if isinstance(q_model, DataParallel) or isinstance(q_model, DistributedDataParallel):
         model = q_model.module

@@ -10,10 +10,9 @@ import torch
 import torch.nn as nn
 
 from examples.models.cifar10.mobilenet import DEFAULT_STATE_DICT, Mobilenet
-from tinynn.converter import TFLiteConverter
 from tinynn.graph.quantization.quantizer import QATQuantizer
 from tinynn.graph.tracer import model_tracer
-from tinynn.util.cifar10 import get_dataloader, calibrate, validate
+from tinynn.util.cifar10 import get_dataloader, calibrate
 from tinynn.util.train_util import DLContext, get_device
 from tinynn.graph.quantization.algorithm.cross_layer_equalization import cross_layer_equalize
 from tinynn.graph.quantization.fake_quantize import set_ptq_fake_quantize
@@ -62,6 +61,8 @@ def main_worker(args):
     context.device = device
     context.train_loader, context.val_loader = get_dataloader(args.data_path, 224, args.batch_size, args.workers)
     context.max_iteration = 100
+
+    # use real dummy_input to do quantization error analysis
     dummy_input_real = next(iter(context.train_loader))[0][:1]
 
     # Post quantization calibration
@@ -76,34 +77,17 @@ def main_worker(args):
     ptq_model(dummy_input_real)
     print(ptq_model)
 
-    # --------weight visualization usage-------------
+    # --------quantization error analysis usage-------------
     # Directly give the difference of layer output between quantized model and floating model, the error is accumulated.
     # If you want a quantized model with high acc, then those layers close to the final output should less than 10%,
     # which means the cosine_similarity of final layer should be greater than 90%.
-    graph_error_analysis(ptq_model, dummy_input_real, metric='cosine_similarity')
+    graph_error_analysis(ptq_model, dummy_input_real, metric='cosine')
+
     # We quantize each layer individually, and directly compare the difference
     # between the original output and the output with quantization error for each layer,
     # which is used to measure the quantization sensitivity of the every layer.
-    layer_error_analysis(ptq_model, dummy_input_real)
+    layer_error_analysis(ptq_model, dummy_input_real, metric='cosine')
     # -----------------------------------------------
-
-    # validate the ptq_model with quantization error
-    validate(ptq_model, context)
-
-    with torch.no_grad():
-        ptq_model.eval()
-        ptq_model.cpu()
-
-        if torch.cuda.device_count() > 1:
-            ptq_model = ptq_model.module
-        ptq_model = torch.quantization.convert(ptq_model)
-        context.device = torch.device('cpu')
-        # validate the real quantized model
-        validate(ptq_model, context)
-
-        torch.backends.quantized.engine = quantizer.backend
-        converter = TFLiteConverter(model, dummy_input, tflite_path='out/post.tflite')
-        converter.convert()
 
 
 if __name__ == '__main__':
