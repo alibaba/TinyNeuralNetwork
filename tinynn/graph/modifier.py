@@ -289,7 +289,10 @@ def calc_dim_changes(node, tensors_i, tensors_o=None) -> typing.List[typing.Tupl
 
         for i in range(len(tensor_o.shape)):
             reduce_dim = [j for j in range(len(tensor_o.shape)) if j != i]
-            value = set(torch.sum(tensor_o, dim=reduce_dim).detach().tolist())
+            if not reduce_dim:
+                value = set(tensor_o.detach().tolist())
+            else:
+                value = set(torch.sum(tensor_o, dim=reduce_dim).detach().tolist())
             if len(value) > 1:
                 if i not in dim_change:
                     dim_change.append(i)
