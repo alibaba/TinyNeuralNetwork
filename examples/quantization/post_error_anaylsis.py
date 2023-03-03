@@ -78,9 +78,10 @@ def main_worker(args):
     dummy_input_real = next(iter(context.train_loader))[0][:1]
 
     # --------quantization error analysis usage-------------
-    # The error is accumulated by directly giving the difference in layer output between the quantized model and the floating model.
-    # If you want a quantized model with high accuracy, the layers closest to the final output should be less than 10%,
-    # which means the final layer's cosine similarity should be greater than 90%.
+    # The error is accumulated by directly giving the difference in layer output
+    # between the quantized model and the floating model. If you want a quantized model with high accuracy,
+    # the layers closest to the final output should be less than 10%, which means the final
+    # layer's cosine similarity should be greater than 90%.
     graph_error_analysis(ptq_model, dummy_input_real, metric='cosine')
 
     # We quantize each layer separately and compare the difference
