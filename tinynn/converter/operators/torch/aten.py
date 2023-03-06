@@ -735,7 +735,7 @@ class ATenGruOperator(ATenGruSchema):
                         stacked_hs.append(h)
                         
                     tf_out_state_tensors[0].append(h)
-                    print(h.tensor)
+                    # print(h.tensor)
                     output_ts.extend(stacked_hs[::stride])
 
                 if layer_idx != num_layers - 1:
@@ -746,8 +746,8 @@ class ATenGruOperator(ATenGruSchema):
                     ops.append(tfl.PackOperator(output_ts, outputs, len(output_ts), axis=ts_axis))
 
             current_input = outputs[0]
-            print(current_input.tensor)
-            exit()
+            #print(current_input.tensor)
+            #exit()
             params_offset += params_step * num_directions
 
         if self.unroll_rnn:
