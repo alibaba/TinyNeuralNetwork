@@ -293,11 +293,16 @@ def get_weight_dis(
             os.makedirs(save_dir)
         warning_layer = dict()
         for name, mod in model.named_modules():
-            if not hasattr(mod, 'weight'):
+            if (not hasattr(mod, 'weight')) or isinstance(mod, nn.BatchNorm2d):
                 continue
             if unique_name_list is None or name in unique_name_list:
                 op_type = type(mod).__name__
                 x = mod.weight.cpu()
+                if op_type in dir(torch.nn.intrinsic.qat) and hasattr(mod, 'bn'):
+                    # Use torch.nn.util.fusion.fuse_conv_bn_weights to caculate bn_fused conv's weight.
+                    bn_var_rsqrt = torch.rsqrt(mod.bn.running_var + mod.bn.eps)
+                    x = mod.weight * (mod.bn.weight * bn_var_rsqrt).reshape([-1] + [1] * (len(mod.weight.shape) - 1))
+                    x = x.cpu()
                 y = torch.histc(x, nbins)
                 x_min = torch.min(x)
                 x_max = torch.max(x)

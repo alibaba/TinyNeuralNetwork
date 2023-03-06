@@ -32,11 +32,6 @@ def main_worker(args):
 
         device = get_device()
 
-        # --------weight visualization usage-------------
-        # Draw the weight distribution for all layers of model.
-        get_weight_dis(model, save_path='out')
-        # -----------------------------------------------
-
         # When the weight distributions fluctuates greatly, CLE may significantly increase the quantization accuracy.
         if args.cle:
             model = cross_layer_equalize(model, dummy_input, device, cle_iters=2)
@@ -56,6 +51,7 @@ def main_worker(args):
 
     # Move model to the appropriate device
     ptq_model.to(device=device)
+    ptq_model.eval()
 
     context = DLContext()
     context.device = device
@@ -76,6 +72,10 @@ def main_worker(args):
 
     # Perform quantization error analysis with real dummy input
     dummy_input_real = next(iter(context.train_loader))[0][:1]
+
+    # --------weight visualization usage-------------
+    # Draw the weight distribution for all layers of model.
+    get_weight_dis(ptq_model, save_path='out')
 
     # --------quantization error analysis usage-------------
     # The error is accumulated by directly giving the difference in layer output
