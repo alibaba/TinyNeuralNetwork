@@ -457,8 +457,7 @@ class ATenGruOperator(ATenGruSchema):
     def gru_input_helper(
         self, input_tensors, params_tensors, has_biases, param_start_index, input_start_index, layer_idx, suffix
     ):
-        hybrid = False
-        
+        # hybrid = False
         # gates = ["reset", "update", "new"]
 
         wir, wiz, win = torch.chunk(params_tensors[param_start_index], 3, 0)
@@ -703,10 +702,12 @@ class ATenGruOperator(ATenGruSchema):
                         zgate_in = self.create_transform_tensor(input_mm_list[1].tensor + hidden_mm_list[1].tensor)
                         ops.append(tfl.AddOperator([input_mm_list[1], hidden_mm_list[1]], [zgate_in]))
 
-                        rgate_out = self.create_transform_tensor(torch.sigmoid(torch.from_numpy(rgate_in.tensor)).numpy())
+                        rgate_out = self.create_transform_tensor(torch.sigmoid( \
+                            torch.from_numpy(rgate_in.tensor)).numpy())
                         ops.append(tfl.LogisticOperator([rgate_in], [rgate_out]))
 
-                        zgate_out = self.create_transform_tensor(torch.sigmoid(torch.from_numpy(zgate_in.tensor)).numpy())
+                        zgate_out = self.create_transform_tensor(torch.sigmoid( \
+                            torch.from_numpy(zgate_in.tensor)).numpy())
                         ops.append(tfl.LogisticOperator([zgate_in], [zgate_out]))
 
                         ngate_in_hside = self.create_transform_tensor(rgate_out.tensor * hidden_mm_list[2].tensor)
