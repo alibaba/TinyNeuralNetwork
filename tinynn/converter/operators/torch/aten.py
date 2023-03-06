@@ -64,7 +64,7 @@ class ATenLstmOperator(ATenLstmSchema):
             input_tensors[input_index] = self.create_attr_tensor(hidden_state_tensor[slice_idx])
             input_tensors[input_index].is_variable = True
         else:
-            assert self.unroll_lstm, "Input state tensors are only supported when unroll_lstm=True is specified"
+            assert self.unroll_rnn, "Input state tensors are only supported when unroll_rnn=True is specified"
             input_tensors[input_index] = tf_state_tensor[slice_idx]
 
     def parse_common(
@@ -114,7 +114,7 @@ class ATenLstmOperator(ATenLstmSchema):
         tf_state_tensors = []
         unpacked_tensors = {}
         for t in tf_in_state_tensors:
-            if t is not None and self.unroll_lstm:
+            if t is not None and self.unroll_rnn:
                 tensors = [
                     self.create_transform_tensor(np.squeeze(x, 0))
                     for x in np.split(t.tensor, num_directions * num_layers, 0)
@@ -166,7 +166,7 @@ class ATenLstmOperator(ATenLstmSchema):
                 layer_output = self.create_transform_tensor(np.empty(output_shape, dtype=inputs[0].dtype))
             outputs = [layer_output]
 
-            if self.unroll_lstm:
+            if self.unroll_rnn:
                 ts_axis = 1 if batch_first else 0
                 num_timestep = inputs[0].shape[ts_axis]
                 if inputs[0].name in unpacked_tensors:
@@ -413,7 +413,7 @@ class ATenLstmOperator(ATenLstmSchema):
             current_input = outputs[0]
             params_offset += params_step * num_directions
 
-        if self.unroll_lstm:
+        if self.unroll_rnn:
             state_outputs = self.to_tfl_tensors(self.output_names[1:], self.output_tensors[1:])
             for i, (orig, new) in enumerate(zip(tf_in_state_tensors, tf_out_state_tensors)):
                 if orig is not None:
@@ -424,7 +424,7 @@ class ATenLstmOperator(ATenLstmSchema):
             common_names = set(self.output_names[1:]) & set(graph_converter.outputs)
             assert len(common_names) == 0, (
                 f"Please remove the LSTM state outputs ({common_names}) from the model. Alternatively, you can try"
-                " unroll_lstm=True"
+                " unroll_rnn=True"
             )
 
         for op in ops:
@@ -457,9 +457,6 @@ class ATenGruOperator(ATenGruSchema):
     def gru_input_helper(
         self, input_tensors, params_tensors, has_biases, param_start_index, input_start_index, layer_idx, suffix
     ):
-        # hybrid = False
-        # gates = ["reset", "update", "new"]
-
         wir, wiz, win = torch.chunk(params_tensors[param_start_index], 3, 0)
         whr, whz, whn = torch.chunk(params_tensors[param_start_index + 1], 3, 0)
 
@@ -664,11 +661,6 @@ class ATenGruOperator(ATenGruSchema):
                         input_mm_list = []
                         for j, (w_i, b_i) in enumerate(zip(w_i_list, b_i_list)):
 
-                            # 4th TODO
-                            # if j == 1 and i == 0:
-                            #     input_mm_list.append(None)
-                            #     continue
-
                             input_mm = self.create_transform_tensor(
                                 np.matmul(t.tensor, np.transpose(w_i.tensor, [1, 0])) + b_i.tensor
                             )
@@ -681,10 +673,6 @@ class ATenGruOperator(ATenGruSchema):
                             hidden_mm_list = []
                             for j, (w_r, b_r) in enumerate(zip(w_r_list, b_r_list)):
 
-                                # if j == 1 and i == 0:
-                                #     hidden_mm_list.append(None)
-                                #     continue
-
                                 hidden_mm = self.create_transform_tensor(
                                     np.matmul(h.tensor, np.transpose(w_r.tensor, [1, 0])) + b_r.tensor
                                 )
@@ -693,22 +681,21 @@ class ATenGruOperator(ATenGruSchema):
                         else:
                             hidden_mm_list = b_r_list
 
-
                         # calculate r,z,n gates
-
                         rgate_in = self.create_transform_tensor(input_mm_list[0].tensor + hidden_mm_list[0].tensor)
                         ops.append(tfl.AddOperator([input_mm_list[0], hidden_mm_list[0]], [rgate_in]))
 
                         zgate_in = self.create_transform_tensor(input_mm_list[1].tensor + hidden_mm_list[1].tensor)
                         ops.append(tfl.AddOperator([input_mm_list[1], hidden_mm_list[1]], [zgate_in]))
 
+                        zgate_out = self.create_transform_tensor(torch.sigmoid( \
+                            torch.from_numpy(zgate_in.tensor)).numpy())
+                        
+                        ops.append(tfl.LogisticOperator([zgate_in], [zgate_out]))
+
                         rgate_out = self.create_transform_tensor(torch.sigmoid( \
                             torch.from_numpy(rgate_in.tensor)).numpy())
                         ops.append(tfl.LogisticOperator([rgate_in], [rgate_out]))
-
-                        zgate_out = self.create_transform_tensor(torch.sigmoid( \
-                            torch.from_numpy(zgate_in.tensor)).numpy())
-                        ops.append(tfl.LogisticOperator([zgate_in], [zgate_out]))
 
                         ngate_in_hside = self.create_transform_tensor(rgate_out.tensor * hidden_mm_list[2].tensor)
                         ops.append(tfl.MulOperator([rgate_out, hidden_mm_list[2]], [ngate_in_hside]))
@@ -720,22 +707,26 @@ class ATenGruOperator(ATenGruSchema):
                         ops.append(tfl.TanhOperator([ngate_in], [ngate_out]))
 
                         constant_tensor = self.create_attr_tensor(torch.tensor(1, dtype=torch.float32))
-
+                        
                         h_left_0 = self.create_transform_tensor(constant_tensor.tensor - zgate_out.tensor)
                         ops.append(tfl.SubOperator([constant_tensor, zgate_out], [h_left_0]))
 
                         h_left = self.create_transform_tensor(h_left_0.tensor * ngate_out.tensor)
                         ops.append(tfl.MulOperator([h_left_0, ngate_out], [h_left]))
 
-                        h_right = self.create_transform_tensor(zgate_out.tensor * h.tensor)
-                        ops.append(tfl.MulOperator([zgate_out, h], [h_right]))
-                    
-                        h = self.create_transform_tensor(h_left.tensor + h_right.tensor)
-                        ops.append(tfl.AddOperator([h_left, h_right], [h]))
+                        if i != 0 or compute_h:
+                                h_right = self.create_transform_tensor(zgate_out.tensor * h.tensor)
+                                ops.append(tfl.MulOperator([zgate_out, h], [h_right]))
+                        
+                                h = self.create_transform_tensor(h_left.tensor + h_right.tensor)
+                                ops.append(tfl.AddOperator([h_left, h_right], [h]))
+                        
+                        elif i == 0 and not compute_h:
+                            h = h_left
+
                         stacked_hs.append(h)
                         
                     tf_out_state_tensors[0].append(h)
-                    # print(h.tensor)
                     output_ts.extend(stacked_hs[::stride])
 
                 if layer_idx != num_layers - 1:
@@ -746,8 +737,6 @@ class ATenGruOperator(ATenGruSchema):
                     ops.append(tfl.PackOperator(output_ts, outputs, len(output_ts), axis=ts_axis))
 
             current_input = outputs[0]
-            #print(current_input.tensor)
-            #exit()
             params_offset += params_step * num_directions
 
         if self.unroll_rnn:

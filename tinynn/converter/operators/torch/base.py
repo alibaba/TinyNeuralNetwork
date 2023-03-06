@@ -27,7 +27,7 @@ class OperatorConverter(ABC):
         map_bilstm_to_lstm=False,
         enable_mtk_ops=False,
         hybrid_asymmetric_inputs=False,
-        unroll_lstm=False,
+        unroll_rnn=False,
         separated_rnn_gate_calc=False,
     ) -> None:
         self.input_names = self.get_input_names(node)
@@ -44,7 +44,7 @@ class OperatorConverter(ABC):
         self.map_bilstm_to_lstm = map_bilstm_to_lstm
         self.enable_mtk_ops = enable_mtk_ops
         self.hybrid_asymmetric_inputs = hybrid_asymmetric_inputs
-        self.unroll_lstm = unroll_lstm
+        self.unroll_rnn = unroll_rnn
         self.separated_rnn_gate_calc = separated_rnn_gate_calc
 
     @abstractmethod

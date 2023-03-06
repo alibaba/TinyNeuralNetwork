@@ -51,7 +51,7 @@ class TFLiteConverter(object):
         enable_mtk_ops: bool = False,
         max_transpose_dims: int = -1,
         hybrid_conv: bool = True,
-        unroll_lstm: bool = False,
+        unroll_rnn: bool = False,
         separated_rnn_gate_calc: bool = False,
         bypass_elementwise_passthrough_constraint: bool = False,
         hybrid_gen_single_op_models: bool = False,
@@ -100,9 +100,9 @@ class TFLiteConverter(object):
             enable_mtk_ops (bool): Translating with custom MTK operators. Defaults to False
             max_transpose_dims (int): Max dimensions for the `Transpose` op. Defaults to -1, which means unlimited
             hybrid_conv (bool): Enable hybrid quantization for Conv2d and DepthwiseConv2d. Defaults to True
-            unroll_lstm (bool): Unrolling LSTM (translate LSTM to seperate ops). Defaults to False
+            unroll_rnn (bool): Unrolling LSTM (translate LSTM to seperate ops). Defaults to False
             separated_rnn_gate_calc (bool): Separated calculation for every gate in RNN. Effective only when \
-                `unroll_lstm=True`. Defaults to False
+                `unroll_rnn=True`. Defaults to False
             bypass_elementwise_passthrough_constraint (bool): Bypass constraints in elementwise passthrough passes. \
                 Defaults to False
             hybrid_gen_single_op_models: Generate both floating point and quantized version of the model for hybrid \
@@ -155,7 +155,7 @@ class TFLiteConverter(object):
         self.enable_mtk_ops = enable_mtk_ops
         self.max_transpose_dims = max_transpose_dims
         self.hybrid_conv = hybrid_conv
-        self.unroll_lstm = unroll_lstm
+        self.unroll_rnn = unroll_rnn
         self.separated_rnn_gate_calc = separated_rnn_gate_calc
         self.bypass_elementwise_passthrough_constraint = bypass_elementwise_passthrough_constraint
         self.hybrid_gen_single_op_models = hybrid_gen_single_op_models
@@ -399,7 +399,7 @@ class TFLiteConverter(object):
                 self.map_bilstm_to_lstm,
                 self.enable_mtk_ops,
                 self.hybrid_asymmetric_inputs,
-                self.unroll_lstm,
+                self.unroll_rnn,
                 self.separated_rnn_gate_calc,
             )
             # Don't track the operator if all the input nodes are not tracked unless it has custom implementation
