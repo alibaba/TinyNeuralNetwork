@@ -81,6 +81,7 @@ Operators that are implemented in Python
 | `aten::glu` |  |
 | `aten::glu_` |  |
 | `aten::group_norm` |  |
+| `aten::gru` |  |
 | `aten::gt` |  |
 | `aten::hardsigmoid` |  |
 | `aten::hardsigmoid_` |  |

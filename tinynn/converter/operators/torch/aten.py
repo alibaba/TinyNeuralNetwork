@@ -715,11 +715,11 @@ class ATenGruOperator(ATenGruSchema):
                         ops.append(tfl.MulOperator([h_left_0, ngate_out], [h_left]))
 
                         if i != 0 or compute_h:
-                                h_right = self.create_transform_tensor(zgate_out.tensor * h.tensor)
-                                ops.append(tfl.MulOperator([zgate_out, h], [h_right]))
-                        
-                                h = self.create_transform_tensor(h_left.tensor + h_right.tensor)
-                                ops.append(tfl.AddOperator([h_left, h_right], [h]))
+                            h_right = self.create_transform_tensor(zgate_out.tensor * h.tensor)
+                            ops.append(tfl.MulOperator([zgate_out, h], [h_right]))
+                    
+                            h = self.create_transform_tensor(h_left.tensor + h_right.tensor)
+                            ops.append(tfl.AddOperator([h_left, h_right], [h]))
                         
                         elif i == 0 and not compute_h:
                             h = h_left
