@@ -3006,7 +3006,7 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
-    def test_bigru_multi_layer_as_gru(self):
+    def test_bigru_multi_layer_no_bias_as_gru(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
 
         class Model(nn.Module):

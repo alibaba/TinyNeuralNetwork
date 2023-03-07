@@ -462,9 +462,10 @@ class ATenGruOperator(ATenGruSchema):
 
         wr = torch.cat((wir, whr), -1)
         wz = torch.cat((wiz, whz), -1)
-
-        input_tensors[input_start_index] = self.create_attr_tensor(torch.cat((wr, wz), 0))  # [2*n_output, n_input+n_output]
-        input_tensors[input_start_index + 2] = self.create_attr_tensor(torch.cat((win, whn), -1))  # [n_output, n_input+n_output]
+        # [2*n_output, n_input+n_output]
+        input_tensors[input_start_index] = self.create_attr_tensor(torch.cat((wr, wz), 0))
+        # [n_output, n_input+n_output]
+        input_tensors[input_start_index + 2] = self.create_attr_tensor(torch.cat((win, whn), -1))
 
         w_i_list = [self.create_attr_tensor(wir), self.create_attr_tensor(wiz), self.create_attr_tensor(win)]
         w_r_list = [self.create_attr_tensor(whr), self.create_attr_tensor(whz), self.create_attr_tensor(whn)]
