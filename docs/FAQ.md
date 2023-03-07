@@ -191,8 +191,8 @@ Since TFLite does not officially support grouped (de)convolution, we have extend
 #### What if `BidirectionalLSTM` is unsupported while `UnidirectionalLSTM` is supported?
 You may add the parameter `map_bilstm_to_lstm=True` when defining TFLiteConverter.
 
-#### How to convert a model with LSTM?
-The easy way is to pass in `unroll_lstm=True` when defining TFLiteConverter, so that everything works just like in PyTorch. But the `LSTM`s will be translated to a bunch of ops, which makes the computation graph complicated. Alternatively, if you need a single op for each `LSTM`, then you may refer to the content below.
+#### How to convert a model with LSTM or GRU?
+The easy way is to pass in `unroll_rnn=True` when defining TFLiteConverter, so that everything works just like in PyTorch. But the `LSTM/GRU`s will be translated to a bunch of ops, which makes the computation graph complicated. Alternatively, if you need a single op for each `LSTM`(GRU is not supported yet), then you may refer to the content below.
 
 Since the target format of our conversion is TFLite, we need to understand how LSTM works in PyTorch and Tensorflow respectively.
 
@@ -225,10 +225,10 @@ You may also try out static quantization for LSTMs when you have PyTorch 1.13+. 
 #### What if my model runs slower when dynamic quantization is enabled?
 Please refer to [dynamic_with_selection.py](../examples/converter/dynamic_with_selection.py) for selective dynamic quantization.
 
-#### I need LSTMs with separated gate calculation when `unroll_lstm=True`.
+#### I need LSTMs with separated gate calculation when `unroll_rnn=True`.
 Please set `separated_rnn_gate_calc=True`.
 
-#### How to add state inputs and outputs for LSTMs/GRUs/RNNs with `unroll_lstm=True`?
+#### How to add state inputs and outputs for LSTMs/GRUs/RNNs with `unroll_rnn=True`?
 It is possible to rewrite the model using the Graph Tracer and Code Generator of TinyNN. Please use the following code.
 ```py
 from tinynn.graph.tracer import trace

@@ -64,7 +64,7 @@ class ATenLstmOperator(ATenLstmSchema):
             input_tensors[input_index] = self.create_attr_tensor(hidden_state_tensor[slice_idx])
             input_tensors[input_index].is_variable = True
         else:
-            assert self.unroll_lstm, "Input state tensors are only supported when unroll_lstm=True is specified"
+            assert self.unroll_rnn, "Input state tensors are only supported when unroll_rnn=True is specified"
             input_tensors[input_index] = tf_state_tensor[slice_idx]
 
     def parse_common(
@@ -114,7 +114,7 @@ class ATenLstmOperator(ATenLstmSchema):
         tf_state_tensors = []
         unpacked_tensors = {}
         for t in tf_in_state_tensors:
-            if t is not None and self.unroll_lstm:
+            if t is not None and self.unroll_rnn:
                 tensors = [
                     self.create_transform_tensor(np.squeeze(x, 0))
                     for x in np.split(t.tensor, num_directions * num_layers, 0)
@@ -156,7 +156,7 @@ class ATenLstmOperator(ATenLstmSchema):
                         suffixes[direction_idx],
                         state_kinds[state_kind_idx],
                         tf_state_tensors,
-                    )
+                    ) 
 
             if layer_idx == num_layers - 1:
                 layer_output = lstm_output
@@ -166,7 +166,7 @@ class ATenLstmOperator(ATenLstmSchema):
                 layer_output = self.create_transform_tensor(np.empty(output_shape, dtype=inputs[0].dtype))
             outputs = [layer_output]
 
-            if self.unroll_lstm:
+            if self.unroll_rnn:
                 ts_axis = 1 if batch_first else 0
                 num_timestep = inputs[0].shape[ts_axis]
                 if inputs[0].name in unpacked_tensors:
@@ -413,7 +413,7 @@ class ATenLstmOperator(ATenLstmSchema):
             current_input = outputs[0]
             params_offset += params_step * num_directions
 
-        if self.unroll_lstm:
+        if self.unroll_rnn:
             state_outputs = self.to_tfl_tensors(self.output_names[1:], self.output_tensors[1:])
             for i, (orig, new) in enumerate(zip(tf_in_state_tensors, tf_out_state_tensors)):
                 if orig is not None:
@@ -424,7 +424,7 @@ class ATenLstmOperator(ATenLstmSchema):
             common_names = set(self.output_names[1:]) & set(graph_converter.outputs)
             assert len(common_names) == 0, (
                 f"Please remove the LSTM state outputs ({common_names}) from the model. Alternatively, you can try"
-                " unroll_lstm=True"
+                " unroll_rnn=True"
             )
 
         for op in ops:
@@ -451,6 +451,355 @@ class ATenLstmOperator(ATenLstmSchema):
             graph_converter,
         )
 
+
+class ATenGruOperator(ATenGruSchema):
+
+    def gru_input_helper(
+        self, input_tensors, params_tensors, has_biases, param_start_index, input_start_index, layer_idx, suffix
+    ):
+        wir, wiz, win = torch.chunk(params_tensors[param_start_index], 3, 0)
+        whr, whz, whn = torch.chunk(params_tensors[param_start_index + 1], 3, 0)
+
+        wr = torch.cat((wir, whr), -1)
+        wz = torch.cat((wiz, whz), -1)
+        # [2*n_output, n_input+n_output]
+        input_tensors[input_start_index] = self.create_attr_tensor(torch.cat((wr, wz), 0))
+        # [n_output, n_input+n_output]
+        input_tensors[input_start_index + 2] = self.create_attr_tensor(torch.cat((win, whn), -1))
+
+        w_i_list = [self.create_attr_tensor(wir), self.create_attr_tensor(wiz), self.create_attr_tensor(win)]
+        w_r_list = [self.create_attr_tensor(whr), self.create_attr_tensor(whz), self.create_attr_tensor(whn)]
+
+        if has_biases:
+
+            assert params_tensors[param_start_index + 2].dtype == torch.float32
+            assert params_tensors[param_start_index + 3].dtype == torch.float32
+
+            bir, biz, bin = torch.chunk(params_tensors[param_start_index + 2], 3, 0)
+            bhr, bhz, bhn = torch.chunk(params_tensors[param_start_index + 3], 3, 0)
+
+            br = torch.cat((bir, bhr), -1)
+            bz = torch.cat((biz, bhz), -1)
+            
+            input_tensors[input_start_index + 1] = self.create_attr_tensor(torch.cat((br, bz), -1))  # [2*n_output]
+            input_tensors[input_start_index + 3] = self.create_attr_tensor(torch.cat((bin, bhn), -1))  # [n_output]
+
+            b_i_list = [self.create_attr_tensor(bir), self.create_attr_tensor(biz), self.create_attr_tensor(bin)]
+            b_r_list = [self.create_attr_tensor(bhr), self.create_attr_tensor(bhz), self.create_attr_tensor(bhn)]
+
+        else:
+
+            bir = torch.zeros(input_tensors[input_start_index + 2].shape[0])
+            biz = torch.zeros_like(bir)
+            bin = torch.zeros_like(biz)
+            bhr = torch.zeros_like(bin)
+            bhz = torch.zeros_like(bhr)
+            bhn = torch.zeros_like(bhz)
+            input_tensors[input_start_index + 1] = self.create_attr_tensor(torch.zeros(
+                input_tensors[input_start_index].shape[0], dtype=torch.float32))
+            input_tensors[input_start_index + 3] = self.create_attr_tensor(torch.zeros(
+                input_tensors[input_start_index + 2].shape[0], dtype=torch.float32))
+
+            b_i_list = [self.create_attr_tensor(bir), self.create_attr_tensor(biz), self.create_attr_tensor(bin)]
+            b_r_list = [self.create_attr_tensor(bhr), self.create_attr_tensor(bhz), self.create_attr_tensor(bhn)]
+        
+        return w_i_list, w_r_list, b_i_list, b_r_list
+
+    def gru_hidden_state_helper(
+        self,
+        input_tensors,
+        hidden_state_tensor,
+        input_index,
+        num_directions,
+        direction_idx,
+        num_layers,
+        layer_idx,
+        suffix,
+        state_type,
+        tf_state_tensors,
+    ):
+        
+        tf_state_tensor = tf_state_tensors[0]
+        assert hidden_state_tensor.dim() == 3
+        slice_idx = layer_idx * num_directions + direction_idx
+        if tf_state_tensor[slice_idx] is None:
+            input_tensors[input_index] = self.create_attr_tensor(hidden_state_tensor[slice_idx])
+            input_tensors[input_index].is_variable = True
+        else:
+            assert self.unroll_rnn, "Input state tensors are only supported when unroll_rnn=True is specified"
+            input_tensors[input_index] = tf_state_tensor[slice_idx]
+
+    def parse_common(
+        self,
+        input_tensor,
+        hidden_state_tensor,
+        params_tensors,
+        has_biases,
+        num_layers,
+        dropout,
+        is_train,
+        bidirectional,
+        batch_first,
+        graph_converter,
+    ):
+        assert is_train in (False, 0)
+        self.unroll_rnn = True
+        self.separated_rnn_gate_calc = True
+
+        expected_num_params = 2 * num_layers
+        params_step = 2
+        if has_biases:
+            expected_num_params *= 2
+            params_step *= 2
+        if bidirectional:
+            expected_num_params *= 2
+
+        assert (
+            len(params_tensors) == expected_num_params
+        ), f'num of params in GRU is wrong. got: {len(params_tensors)}, expected: {expected_num_params}'
+
+        num_input_tensors = 7
+        num_directions = 1
+        state_start_index = [1, 8]
+
+        if bidirectional:
+            num_input_tensors *= 2
+            num_directions *= 2
+
+        suffixes = ["_fw", "_bw"]
+        state_kinds = ["hidden"]
+        param_start_indices = [0, params_step]
+        input_start_indices = [2, 9]
+
+        ops = []
+
+        name = self.input_names[1]
+        tf_in_state_tensors = [graph_converter.tensor_map.get(n, None) for n in name]
+        tf_in_state_tensors = [self.find_or_create_input(1, graph_converter) if
+                               name in graph_converter.tensor_map else None]
+
+        tf_state_tensors = []
+        unpacked_tensors = {}
+
+        for t in tf_in_state_tensors:
+            if t is not None and self.unroll_rnn:
+                tensors = [
+                    self.create_transform_tensor(np.squeeze(x, 0))
+                    for x in np.split(t.tensor, num_directions * num_layers, 0)
+                ]
+                tf_state_tensors.append(tensors)
+                ops.append(tfl.UnpackOperator([t], tensors, len(tensors), 0))
+            else:
+                tf_state_tensors.append([None] * num_directions * num_layers)
+
+        current_input = self.find_or_create_input(0, graph_converter)
+        gru_output = self.to_tfl_tensors(self.output_names[:1], self.output_tensors[:1])[0]
+
+        params_offset = 0
+        tf_out_state_tensors = [[]]
+
+        for layer_idx in range(num_layers):
+            inputs = [current_input] + [tfl.OptionalTensorInstance] * (num_input_tensors - 1)
+
+            for direction_idx in range(num_directions):
+                w_i_list, w_r_list, b_i_list, b_r_list = \
+                    self.gru_input_helper(
+                        inputs,
+                        params_tensors,
+                        has_biases,
+                        params_offset + param_start_indices[direction_idx],
+                        input_start_indices[direction_idx],
+                        layer_idx,
+                        suffixes[direction_idx],
+                    )
+
+                self.gru_hidden_state_helper(
+                    inputs,
+                    hidden_state_tensor,
+                    state_start_index[direction_idx] ,
+                    num_directions,
+                    direction_idx,
+                    num_layers,
+                    layer_idx,
+                    suffixes[direction_idx],
+                    state_kinds[0],
+                    tf_state_tensors,
+                )
+
+            if layer_idx == num_layers - 1:
+                layer_output = gru_output
+            else:
+                output_shape = list(input_tensor.shape)
+                output_shape[-1] = inputs[4].shape[0] * num_directions
+                layer_output = self.create_transform_tensor(np.empty(output_shape, dtype=inputs[0].dtype))
+            
+            outputs = [layer_output]
+
+            if self.unroll_rnn:
+                ts_axis = 1 if batch_first else 0
+                num_timestep = inputs[0].shape[ts_axis]
+                if inputs[0].name in unpacked_tensors:
+                    input_ts = unpacked_tensors[inputs[0].name]
+                else:
+                    input_ts = [
+                        self.create_transform_tensor(np.squeeze(x, ts_axis))
+                        for x in np.split(inputs[0].tensor, num_timestep, ts_axis)
+                    ]
+                    ops.append(tfl.UnpackOperator([inputs[0]], input_ts, num_timestep, ts_axis))
+                strides = [1, -1]
+
+                output_ts = []
+
+                for direction_idx in range(num_directions):
+
+                    w_i_list, w_r_list, b_i_list, b_r_list = \
+                        self.gru_input_helper(
+                            inputs,
+                            params_tensors,
+                            has_biases,
+                            params_offset + param_start_indices[direction_idx],
+                            input_start_indices[direction_idx],
+                            layer_idx,
+                            suffixes[direction_idx],
+                        )
+
+                    state_start = state_start_index[direction_idx]
+                    h = inputs[state_start]
+
+                    stride = strides[direction_idx]
+
+                    # Skip some computations for the first timestep
+                    compute_h = h.buffer is None or np.any(h.tensor)
+
+                    stacked_hs = []
+
+                    for i, t in enumerate(input_ts[::stride]):
+
+                        input_mm_list = []
+                        for j, (w_i, b_i) in enumerate(zip(w_i_list, b_i_list)):
+
+                            input_mm = self.create_transform_tensor(
+                                np.matmul(t.tensor, np.transpose(w_i.tensor, [1, 0])) + b_i.tensor
+                            )
+                            ops.append(tfl.FullyConnectedOperator([t, w_i, b_i], [input_mm]))
+                            input_mm_list.append(input_mm)
+                        
+                        
+                        if i != 0 or compute_h:
+
+                            hidden_mm_list = []
+                            for j, (w_r, b_r) in enumerate(zip(w_r_list, b_r_list)):
+
+                                hidden_mm = self.create_transform_tensor(
+                                    np.matmul(h.tensor, np.transpose(w_r.tensor, [1, 0])) + b_r.tensor
+                                )
+                                ops.append(tfl.FullyConnectedOperator([h, w_r, b_r], [hidden_mm]))
+                                hidden_mm_list.append(hidden_mm)
+                        else:
+                            hidden_mm_list = b_r_list
+
+                        # calculate r,z,n gates
+                        rgate_in = self.create_transform_tensor(input_mm_list[0].tensor + hidden_mm_list[0].tensor)
+                        ops.append(tfl.AddOperator([input_mm_list[0], hidden_mm_list[0]], [rgate_in]))
+
+                        zgate_in = self.create_transform_tensor(input_mm_list[1].tensor + hidden_mm_list[1].tensor)
+                        ops.append(tfl.AddOperator([input_mm_list[1], hidden_mm_list[1]], [zgate_in]))
+
+                        zgate_out = self.create_transform_tensor(torch.sigmoid( \
+                            torch.from_numpy(zgate_in.tensor)).numpy())
+                        
+                        ops.append(tfl.LogisticOperator([zgate_in], [zgate_out]))
+
+                        rgate_out = self.create_transform_tensor(torch.sigmoid( \
+                            torch.from_numpy(rgate_in.tensor)).numpy())
+                        ops.append(tfl.LogisticOperator([rgate_in], [rgate_out]))
+
+                        ngate_in_hside = self.create_transform_tensor(rgate_out.tensor * hidden_mm_list[2].tensor)
+                        ops.append(tfl.MulOperator([rgate_out, hidden_mm_list[2]], [ngate_in_hside]))
+
+                        ngate_in = self.create_transform_tensor(input_mm_list[2].tensor + ngate_in_hside.tensor)
+                        ops.append(tfl.AddOperator([input_mm_list[2], ngate_in_hside], [ngate_in]))
+
+                        ngate_out = self.create_transform_tensor(torch.tanh(torch.from_numpy(ngate_in.tensor)).numpy())
+                        ops.append(tfl.TanhOperator([ngate_in], [ngate_out]))
+
+                        constant_tensor = self.create_attr_tensor(torch.tensor(1, dtype=torch.float32))
+                        
+                        h_left_0 = self.create_transform_tensor(constant_tensor.tensor - zgate_out.tensor)
+                        ops.append(tfl.SubOperator([constant_tensor, zgate_out], [h_left_0]))
+
+                        h_left = self.create_transform_tensor(h_left_0.tensor * ngate_out.tensor)
+                        ops.append(tfl.MulOperator([h_left_0, ngate_out], [h_left]))
+
+                        if i != 0 or compute_h:
+                            h_right = self.create_transform_tensor(zgate_out.tensor * h.tensor)
+                            ops.append(tfl.MulOperator([zgate_out, h], [h_right]))
+                    
+                            h = self.create_transform_tensor(h_left.tensor + h_right.tensor)
+                            ops.append(tfl.AddOperator([h_left, h_right], [h]))
+                        
+                        elif i == 0 and not compute_h:
+                            h = h_left
+
+                        stacked_hs.append(h)
+                        
+                    tf_out_state_tensors[0].append(h)
+                    output_ts.extend(stacked_hs[::stride])
+                
+                if bidirectional:
+                    fw_out = self.create_transform_tensor(
+                        np.stack([x.tensor for x in output_ts[:num_timestep]], ts_axis)
+                    )
+                    ops.append(tfl.PackOperator(output_ts[:num_timestep], [fw_out], num_timestep, axis=ts_axis))
+
+                    bw_out = self.create_transform_tensor(
+                        np.stack([x.tensor for x in output_ts[:num_timestep]], ts_axis)
+                    )
+                    ops.append(tfl.PackOperator(output_ts[num_timestep:], [bw_out], num_timestep, axis=ts_axis))
+
+                    ops.append(tfl.ConcatenationOperator([fw_out, bw_out], outputs, axis=2))
+
+                elif layer_idx != num_layers - 1:
+                    # Reusing unpacked tensors for the logic in the next layer
+                    unpacked_tensors[outputs[0].name] = output_ts
+                else:
+                    # For the last layer, we have to pack the together
+                    ops.append(tfl.PackOperator(output_ts, outputs, len(output_ts), axis=ts_axis))
+
+            current_input = outputs[0]
+            params_offset += params_step * num_directions
+
+        if self.unroll_rnn:
+            state_outputs = self.to_tfl_tensors(self.output_names[1:], self.output_tensors[1:])
+            for i, (orig, new) in enumerate(zip(tf_in_state_tensors, tf_out_state_tensors)):
+                if orig is not None:
+                    pack_op = tfl.PackOperator(new, state_outputs[i : i + 1], len(new), 0)
+                    pack_op.extra_hints['warn_on_unused'] = False
+                    ops.append(pack_op)
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        input_tensor, hidden_state_tensor, params_tensors = self.input_tensors[:3]
+        has_biases, num_layers, dropout, is_train, bidirectional, batch_first = self.input_tensors[3:]
+
+        self.parse_common(
+            input_tensor,
+            hidden_state_tensor,
+            params_tensors,
+            has_biases,
+            num_layers,
+            dropout,
+            is_train,
+            bidirectional,
+            batch_first,
+            graph_converter,
+        )
 
 class ATenBatchNormOperator(ATenBatchNormSchema):
     def parse(self, node, attrs, args, graph_converter):

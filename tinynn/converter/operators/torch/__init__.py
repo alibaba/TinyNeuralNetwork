@@ -85,6 +85,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::embedding": ATenEmbeddingOperator,
     "aten::linear": ATenLinearOperator,
     "aten::lstm": ATenLstmOperator,
+    "aten::gru": ATenGruOperator,
     "aten::transpose": ATenTransposeOperator,
     "aten::hardtanh": ATenHardtanhOperator,
     "aten::hardtanh_": ATenHardtanhOperator,
