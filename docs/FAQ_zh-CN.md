@@ -191,8 +191,8 @@ export_converter_files(model, dummy_input, export_dir, export_name)
 #### 如果我的部署平台只支持`UnidirectionalLSTM`，不支持`BidirectionalLSTM`怎么办？
 可以在定义TFLiteConverter时加上`map_bilstm_to_lstm=True`这个参数。
 
-#### 如何转换带LSTM的模型？
-最简单的方式是在定义TFLiteConverter时加上`unroll_rnn=True`这个参数，这样转换后LSTM的行为和PyTorch中一致，当然这样LSTM就会被翻译成很多算子，让计算图看起来很复杂。所以，如果你想将每个LSTM转成单个算子，那么你需要参考下面的内容。
+#### 如何转换带LSTM或者GRU的模型？
+最简单的方式是在定义TFLiteConverter时加上`unroll_rnn=True`这个参数，这样转换后LSTM/GRU的行为和PyTorch中一致，当然这样LSTM/GRU就会被翻译成很多算子，让计算图看起来很复杂。所以，如果你想将每个LSTM转成单个算子(GRU转成单个算子暂不支持)，那么你需要参考下面的内容。
 
 由于我们转换的目标为TFLite，因此需要先了解一下在PyTorch和Tensorflow中LSTM分别是如何运行的。
 

@@ -64,11 +64,6 @@ if LooseVersion(torch.__version__) >= '1.13.0':
             self.act2 = torch.nn.Tanh()
             self.hidden_state_dtype: torch.dtype = torch.quint8
 
-            self.act1.apply(torch.quantization.disable_fake_quant)
-            self.act1.apply(torch.quantization.disable_observer)
-            self.act2.apply(torch.quantization.disable_fake_quant)
-            self.act2.apply(torch.quantization.disable_observer)
-
         def forward(self, x: Tensor, hidden: Optional[Tensor] = None) -> Union[Tuple[Tensor, Tensor], Tensor]:
             result = []
             if hidden is None or hidden[0] is None:

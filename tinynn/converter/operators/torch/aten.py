@@ -613,7 +613,6 @@ class ATenGruOperator(ATenGruSchema):
                         suffixes[direction_idx],
                     )
 
-            for direction_idx in range(num_directions):
                 self.gru_hidden_state_helper(
                     inputs,
                     hidden_state_tensor,
