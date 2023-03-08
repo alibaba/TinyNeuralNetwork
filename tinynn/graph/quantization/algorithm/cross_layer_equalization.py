@@ -114,7 +114,8 @@ def _weight_equal_helper(cls, threshold=0.5):
         weight_2 *= torch.reshape(s, [groups, 1, -1] + [1] * (weight_2.ndim - 3))
         weight_2 = torch.reshape(weight_2, (weight_2.shape[1] * groups,) + weight_2.shape[2:])
         conv_0.weight.data.copy_(weight_1)
-        conv_0.bias.data.copy_(bias1 / s)
+        if conv_0.bias is not None:
+            conv_0.bias.data.copy_(bias1 / s)
         conv_1.weight.data.copy_(weight_2)
     else:
         log.warning(f'layer_pair nums != 2, do not support, current layer:{cls}.')
