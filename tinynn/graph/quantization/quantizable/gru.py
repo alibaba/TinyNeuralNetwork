@@ -180,12 +180,23 @@ if LooseVersion(torch.__version__) >= '1.13.0':
             self.batch_first = batch_first
             self.bidirectional = bidirectional
             self.layer_fw = _GRUSingleLayer(input_dim, hidden_dim, bias=bias, **factory_kwargs)
+            if self.bidirectional:
+                self.layer_bw = _GRUSingleLayer(input_dim, hidden_dim, bias=bias, **factory_kwargs)
 
         def forward(self, x: Tensor, hidden: Optional[Tensor] = None):
             if self.batch_first:
                 x = x.transpose(0, 1)
 
             hx_fw = hidden
+            hidden_bw: Optional[Tensor] = None
+            if self.bidirectional:
+                if hx_fw is None:
+                    hx_bw = None
+                else:
+                    hx_bw = hx_fw[1]
+                    hx_fw = hx_fw[0]
+                if hx_bw is not None:
+                    hidden_bw = hx_bw
 
             if hx_fw is None:
                 hidden_fw = None
@@ -193,8 +204,24 @@ if LooseVersion(torch.__version__) >= '1.13.0':
                 hidden_fw = torch.jit._unwrap_optional(hx_fw)
             result_fw, hidden_fw = self.layer_fw(x, hidden_fw)
 
-            result = result_fw
-            h = torch.jit._unwrap_optional(hidden_fw)  # type: ignore[assignment]
+            if hasattr(self, "layer_bw") and self.bidirectional:
+                x_reversed = x.flip(0)
+                result_bw, hidden_bw = self.layer_bw(x_reversed, hidden_bw)
+                result_bw = result_bw.flip(0)
+
+                result = torch.cat([result_fw, result_bw], result_fw.dim() - 1)
+
+                if hidden_fw is None and hidden_bw is None:
+                    h = None
+                elif hidden_fw is None:
+                    h = torch.jit._unwrap_optional(hidden_fw)
+                elif hidden_bw is None:
+                    h = torch.jit._unwrap_optional(hidden_bw)
+                else:
+                    h = torch.stack([hidden_fw[0], hidden_bw[0]], 0)  # type: ignore[list-item]
+            else:
+                result = result_fw
+                h = torch.jit._unwrap_optional(hidden_fw)  # type: ignore[assignment]
 
             if self.batch_first:
                 result.transpose_(0, 1)
@@ -224,6 +251,13 @@ if LooseVersion(torch.__version__) >= '1.13.0':
             bh = getattr(other, f'bias_hh_l{layer_idx}', None)
 
             layer.layer_fw = _GRUSingleLayer.from_params(wi, wh, bi, bh)
+
+            if other.bidirectional:
+                wi = getattr(other, f'weight_ih_l{layer_idx}_reverse')
+                wh = getattr(other, f'weight_hh_l{layer_idx}_reverse')
+                bi = getattr(other, f'bias_ih_l{layer_idx}_reverse', None)
+                bh = getattr(other, f'bias_hh_l{layer_idx}_reverse', None)
+                layer.layer_bw = _GRUSingleLayer.from_params(wi, wh, bi, bh)
             return layer
 
     class GRU(torch.nn.Module):
@@ -258,10 +292,7 @@ if LooseVersion(torch.__version__) >= '1.13.0':
             self.batch_first = batch_first
             self.dropout = float(dropout)
             self.bidirectional = bidirectional
-            assert self.bidirectional is False, 'Note: bidirectional GRU is not supported yet'
             self.training = False  # We don't want to train using this module
-            num_directions = 2 if bidirectional else 1
-            assert num_directions == 1, 'Note: bidirectional GRU is not supported yet'
 
             if not isinstance(dropout, numbers.Number) or not 0 <= dropout <= 1 or isinstance(dropout, bool):
                 raise ValueError(

@@ -471,7 +471,7 @@ class QuantizerTester(unittest.TestCase):
         class Model(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
-                self.rnn = torch.nn.GRU(224, 10, 1)
+                self.rnn = torch.nn.GRU(224, 10, 2, bidirectional=True)
 
             def forward(self, x):
                 y = torch.split(x, 1, 1)
@@ -485,7 +485,6 @@ class QuantizerTester(unittest.TestCase):
             skip_train = True
 
         check_quantize_rewrite(model, inputs, skip_train=skip_train)
-
 
     def test_avg_pool1d_with_one_kernel_size(self):
         class Model(nn.Module):
