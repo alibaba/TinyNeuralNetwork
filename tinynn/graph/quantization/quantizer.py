@@ -1012,6 +1012,27 @@ class QATQuantizer(object):
         if self.quantized_op_stats is not None:
             self.prepare_quantized_ops_pass(graph)
 
+        if self.backend == 'tensorrt':
+            q = queue.Queue()
+            q.put(('', graph.module))
+
+            while not q.empty():
+                s, m = q.get()
+                if isinstance(m, torch_q.QuantStub):
+                    m.apply(torch.quantization.enable_fake_quant)
+                    m.apply(torch.quantization.enable_observer)
+
+                elif hasattr(m, 'activation_post_process'):
+                    m.activation_post_process.apply(torch.quantization.disable_fake_quant)
+                    m.activation_post_process.apply(torch.quantization.disable_observer)
+
+                    if hasattr(m, 'weight_fake_quant'):
+                        m.weight_fake_quant.apply(torch.quantization.enable_fake_quant)
+                        m.weight_fake_quant.apply(torch.quantization.enable_observer)
+                else:
+                    for n, c in m.named_children():
+                        q.put((f'{s}{n}', c))
+
         if self.backend == 'onnx':
             self.leaf_nodes = []
             self.swap_nodes = []
