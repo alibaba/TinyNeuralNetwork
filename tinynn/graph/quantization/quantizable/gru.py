@@ -196,7 +196,7 @@ if LooseVersion(torch.__version__) >= '1.13.0':
                     hx_bw = hx_fw[1]
                     hx_fw = hx_fw[0]
                 if hx_bw is not None:
-                    hidden_bw = hx_bw    
+                    hidden_bw = hx_bw
 
             if hx_fw is None:
                 hidden_fw = None
@@ -292,10 +292,7 @@ if LooseVersion(torch.__version__) >= '1.13.0':
             self.batch_first = batch_first
             self.dropout = float(dropout)
             self.bidirectional = bidirectional
-            # assert self.bidirectional is False, 'Note: bidirectional GRU is not supported yet'
             self.training = False  # We don't want to train using this module
-            num_directions = 2 if bidirectional else 1
-            # assert num_directions == 1, 'Note: bidirectional GRU is not supported yet'
 
             if not isinstance(dropout, numbers.Number) or not 0 <= dropout <= 1 or isinstance(dropout, bool):
                 raise ValueError(
