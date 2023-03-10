@@ -3329,7 +3329,10 @@ class QATQuantizer(object):
             if n.endswith('.weight_fake_quant'):
                 hooks.append(m.register_forward_hook(collect_fake_quantize_hook))
 
-        q_model(dummy_input)
+        if isinstance(dummy_input, (list, tuple)):
+            q_model(*dummy_input)
+        else:
+            q_model(dummy_input)
 
         for hook in hooks:
             hook.remove()
