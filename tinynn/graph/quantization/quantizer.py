@@ -1405,10 +1405,10 @@ class QATQuantizer(object):
             return node.kind() in processed_types
 
         observed_nodes = graph.filter_forward_nodes(_is_observed_nodes_for_tensorrt)
+        node_map = dict()
         for idx, node in enumerate(observed_nodes):
             fake_quant_cls = torch_q.QuantStub
             assert node.rev_index is False
-            node_map = dict()
             prev_nodes = {n.unique_name: n for n in node.prev_nodes}.values()
             for inner_idx, prev_node in enumerate(prev_nodes):
 
