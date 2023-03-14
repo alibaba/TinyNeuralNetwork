@@ -156,7 +156,7 @@ class ATenLstmOperator(ATenLstmSchema):
                         suffixes[direction_idx],
                         state_kinds[state_kind_idx],
                         tf_state_tensors,
-                    ) 
+                    )
 
             if layer_idx == num_layers - 1:
                 layer_output = lstm_output
@@ -453,7 +453,6 @@ class ATenLstmOperator(ATenLstmSchema):
 
 
 class ATenGruOperator(ATenGruSchema):
-
     def gru_input_helper(
         self, input_tensors, params_tensors, has_biases, param_start_index, input_start_index, layer_idx, suffix
     ):
@@ -480,7 +479,7 @@ class ATenGruOperator(ATenGruSchema):
 
             br = torch.cat((bir, bhr), -1)
             bz = torch.cat((biz, bhz), -1)
-            
+
             input_tensors[input_start_index + 1] = self.create_attr_tensor(torch.cat((br, bz), -1))  # [2*n_output]
             input_tensors[input_start_index + 3] = self.create_attr_tensor(torch.cat((bin, bhn), -1))  # [n_output]
 
@@ -495,14 +494,16 @@ class ATenGruOperator(ATenGruSchema):
             bhr = torch.zeros_like(bin)
             bhz = torch.zeros_like(bhr)
             bhn = torch.zeros_like(bhz)
-            input_tensors[input_start_index + 1] = self.create_attr_tensor(torch.zeros(
-                input_tensors[input_start_index].shape[0], dtype=torch.float32))
-            input_tensors[input_start_index + 3] = self.create_attr_tensor(torch.zeros(
-                input_tensors[input_start_index + 2].shape[0], dtype=torch.float32))
+            input_tensors[input_start_index + 1] = self.create_attr_tensor(
+                torch.zeros(input_tensors[input_start_index].shape[0], dtype=torch.float32)
+            )
+            input_tensors[input_start_index + 3] = self.create_attr_tensor(
+                torch.zeros(input_tensors[input_start_index + 2].shape[0], dtype=torch.float32)
+            )
 
             b_i_list = [self.create_attr_tensor(bir), self.create_attr_tensor(biz), self.create_attr_tensor(bin)]
             b_r_list = [self.create_attr_tensor(bhr), self.create_attr_tensor(bhz), self.create_attr_tensor(bhn)]
-        
+
         return w_i_list, w_r_list, b_i_list, b_r_list
 
     def gru_hidden_state_helper(
@@ -518,7 +519,7 @@ class ATenGruOperator(ATenGruSchema):
         state_type,
         tf_state_tensors,
     ):
-        
+
         tf_state_tensor = tf_state_tensors[0]
         assert hidden_state_tensor.dim() == 3
         slice_idx = layer_idx * num_directions + direction_idx
@@ -575,8 +576,9 @@ class ATenGruOperator(ATenGruSchema):
 
         name = self.input_names[1]
         tf_in_state_tensors = [graph_converter.tensor_map.get(n, None) for n in name]
-        tf_in_state_tensors = [self.find_or_create_input(1, graph_converter) if
-                               name in graph_converter.tensor_map else None]
+        tf_in_state_tensors = [
+            self.find_or_create_input(1, graph_converter) if name in graph_converter.tensor_map else None
+        ]
 
         tf_state_tensors = []
         unpacked_tensors = {}
@@ -602,21 +604,20 @@ class ATenGruOperator(ATenGruSchema):
             inputs = [current_input] + [tfl.OptionalTensorInstance] * (num_input_tensors - 1)
 
             for direction_idx in range(num_directions):
-                w_i_list, w_r_list, b_i_list, b_r_list = \
-                    self.gru_input_helper(
-                        inputs,
-                        params_tensors,
-                        has_biases,
-                        params_offset + param_start_indices[direction_idx],
-                        input_start_indices[direction_idx],
-                        layer_idx,
-                        suffixes[direction_idx],
-                    )
+                w_i_list, w_r_list, b_i_list, b_r_list = self.gru_input_helper(
+                    inputs,
+                    params_tensors,
+                    has_biases,
+                    params_offset + param_start_indices[direction_idx],
+                    input_start_indices[direction_idx],
+                    layer_idx,
+                    suffixes[direction_idx],
+                )
 
                 self.gru_hidden_state_helper(
                     inputs,
                     hidden_state_tensor,
-                    state_start_index[direction_idx] ,
+                    state_start_index[direction_idx],
                     num_directions,
                     direction_idx,
                     num_layers,
@@ -632,7 +633,7 @@ class ATenGruOperator(ATenGruSchema):
                 output_shape = list(input_tensor.shape)
                 output_shape[-1] = inputs[4].shape[0] * num_directions
                 layer_output = self.create_transform_tensor(np.empty(output_shape, dtype=inputs[0].dtype))
-            
+
             outputs = [layer_output]
 
             if self.unroll_rnn:
@@ -652,16 +653,15 @@ class ATenGruOperator(ATenGruSchema):
 
                 for direction_idx in range(num_directions):
 
-                    w_i_list, w_r_list, b_i_list, b_r_list = \
-                        self.gru_input_helper(
-                            inputs,
-                            params_tensors,
-                            has_biases,
-                            params_offset + param_start_indices[direction_idx],
-                            input_start_indices[direction_idx],
-                            layer_idx,
-                            suffixes[direction_idx],
-                        )
+                    w_i_list, w_r_list, b_i_list, b_r_list = self.gru_input_helper(
+                        inputs,
+                        params_tensors,
+                        has_biases,
+                        params_offset + param_start_indices[direction_idx],
+                        input_start_indices[direction_idx],
+                        layer_idx,
+                        suffixes[direction_idx],
+                    )
 
                     state_start = state_start_index[direction_idx]
                     h = inputs[state_start]
@@ -683,8 +683,7 @@ class ATenGruOperator(ATenGruSchema):
                             )
                             ops.append(tfl.FullyConnectedOperator([t, w_i, b_i], [input_mm]))
                             input_mm_list.append(input_mm)
-                        
-                        
+
                         if i != 0 or compute_h:
 
                             hidden_mm_list = []
@@ -705,13 +704,15 @@ class ATenGruOperator(ATenGruSchema):
                         zgate_in = self.create_transform_tensor(input_mm_list[1].tensor + hidden_mm_list[1].tensor)
                         ops.append(tfl.AddOperator([input_mm_list[1], hidden_mm_list[1]], [zgate_in]))
 
-                        zgate_out = self.create_transform_tensor(torch.sigmoid( \
-                            torch.from_numpy(zgate_in.tensor)).numpy())
-                        
+                        zgate_out = self.create_transform_tensor(
+                            torch.sigmoid(torch.from_numpy(zgate_in.tensor)).numpy()
+                        )
+
                         ops.append(tfl.LogisticOperator([zgate_in], [zgate_out]))
 
-                        rgate_out = self.create_transform_tensor(torch.sigmoid( \
-                            torch.from_numpy(rgate_in.tensor)).numpy())
+                        rgate_out = self.create_transform_tensor(
+                            torch.sigmoid(torch.from_numpy(rgate_in.tensor)).numpy()
+                        )
                         ops.append(tfl.LogisticOperator([rgate_in], [rgate_out]))
 
                         ngate_in_hside = self.create_transform_tensor(rgate_out.tensor * hidden_mm_list[2].tensor)
@@ -724,7 +725,7 @@ class ATenGruOperator(ATenGruSchema):
                         ops.append(tfl.TanhOperator([ngate_in], [ngate_out]))
 
                         constant_tensor = self.create_attr_tensor(torch.tensor(1, dtype=torch.float32))
-                        
+
                         h_left_0 = self.create_transform_tensor(constant_tensor.tensor - zgate_out.tensor)
                         ops.append(tfl.SubOperator([constant_tensor, zgate_out], [h_left_0]))
 
@@ -734,18 +735,18 @@ class ATenGruOperator(ATenGruSchema):
                         if i != 0 or compute_h:
                             h_right = self.create_transform_tensor(zgate_out.tensor * h.tensor)
                             ops.append(tfl.MulOperator([zgate_out, h], [h_right]))
-                    
+
                             h = self.create_transform_tensor(h_left.tensor + h_right.tensor)
                             ops.append(tfl.AddOperator([h_left, h_right], [h]))
-                        
+
                         elif i == 0 and not compute_h:
                             h = h_left
 
                         stacked_hs.append(h)
-                        
+
                     tf_out_state_tensors[0].append(h)
                     output_ts.extend(stacked_hs[::stride])
-                
+
                 if bidirectional:
                     fw_out = self.create_transform_tensor(
                         np.stack([x.tensor for x in output_ts[:num_timestep]], ts_axis)
@@ -800,6 +801,7 @@ class ATenGruOperator(ATenGruSchema):
             batch_first,
             graph_converter,
         )
+
 
 class ATenBatchNormOperator(ATenBatchNormSchema):
     def parse(self, node, attrs, args, graph_converter):
@@ -2992,7 +2994,7 @@ class ATenScatterOperator(ATenScatterSchema):
             indices_tensor = self.create_attr_tensor(indices)
 
         if isinstance(self.input_tensors[3], (int, float)):
-            fill_arr = np.squeeze(indices_tensor.tensor.copy().astype(input_tensor.dtype), -1)
+            fill_arr = np.zeros(indices_tensor.shape[:-1], dtype=input_tensor.dtype)
             fill_arr.fill(self.input_tensors[3])
             fill_tensor = self.create_attr_tensor(fill_arr)
         else:

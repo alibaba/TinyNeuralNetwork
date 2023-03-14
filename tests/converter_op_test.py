@@ -2524,6 +2524,7 @@ class ConverterOPTester(unittest.TestCase):
 
     def test_gru(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
+
         class Model(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
@@ -2545,6 +2546,7 @@ class ConverterOPTester(unittest.TestCase):
 
     def test_gru_no_bias(self):
         dummy_input = torch.rand(9, 1, 10, dtype=torch.float32)
+
         class Model(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
@@ -2563,7 +2565,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
-    
+
     def test_gru_batch_first(self):
         dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
 
@@ -2588,6 +2590,7 @@ class ConverterOPTester(unittest.TestCase):
 
     def test_gru_multi_layer(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
+
         class Model(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
@@ -2609,6 +2612,7 @@ class ConverterOPTester(unittest.TestCase):
 
     def test_gru_multi_layer_no_bias(self):
         dummy_input = torch.ones(1, 1, 2, dtype=torch.float32)
+
         class Model(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
@@ -2649,7 +2653,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
-    
+
     def test_gru_batch_first_unroll(self):
         dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
 
@@ -3071,7 +3075,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
-    
+
     def test_bigru_unroll_separated(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
 
@@ -3119,7 +3123,6 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
-
 
     def test_lstm(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
@@ -4082,6 +4085,21 @@ class ConverterOPTester(unittest.TestCase):
 
         def model(x):
             return torch.zeros(10, dtype=torch.float32).scatter_(0, x, 1)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_scatter_scalar_2d(self):
+        dummy_input = torch.randint(0, 1024, size=(256, 1))
+
+        def model(x):
+            return torch.zeros(256, 1024, dtype=torch.float32).scatter_(1, x, 1)
 
         model_path = get_model_path()
 
