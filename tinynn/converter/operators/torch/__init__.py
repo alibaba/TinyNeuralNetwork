@@ -10,6 +10,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "prim::Constant": PrimConstantConverter,
     "prim::TupleConstruct": PrimTupleConstructConverter,
     "prim::ListConstruct": PrimListConstructConverter,
+    "prim::DictConstruct": PrimDictConstructConverter,
     "prim::ListUnpack": PrimListUnpackConverter,
     "prim::GetAttr": PrimGetAttrConverter,
     "prim::ConstantChunk": PrimConstantChunkConverter,
