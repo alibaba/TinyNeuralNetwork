@@ -210,6 +210,7 @@ Non-tracking operators that are ignored during translation
 | Operator                  | Limitations  |
 |---------------------------|--------------|
 | `aten::Int` |  |
+| `aten::ScalarImplicit` |  |
 | `aten::arange` |  |
 | `aten::detach` |  |
 | `aten::empty` |  |
@@ -217,7 +218,6 @@ Non-tracking operators that are ignored during translation
 | `aten::new_zeros` |  |
 | `aten::ones` |  |
 | `aten::ones_like` |  |
-| `aten::scalarImplicit` |  |
 | `aten::size` |  |
 | `aten::zeros` |  |
 | `aten::zeros_like` |  |
