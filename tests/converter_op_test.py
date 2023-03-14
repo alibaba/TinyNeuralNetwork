@@ -4095,6 +4095,16 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.1.0'), 'scatter_nd is not supported')
+    @unittest.skipIf(
+        LooseVersion(torch.__version__) < LooseVersion('1.7.0'),
+        "torch.Tensor.scatter_ cannot take scalar inputs",
+    )
+    @unittest.skipIf(
+        LooseVersion(torch.__version__) >= LooseVersion('1.12.0')
+        and LooseVersion(torch.__version__) < LooseVersion('1.13.0'),
+        "https://github.com/pytorch/pytorch/issues/80508",
+    )
     def test_scatter_scalar_2d(self):
         dummy_input = torch.randint(0, 1024, size=(256, 1))
 
