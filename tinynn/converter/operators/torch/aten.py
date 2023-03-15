@@ -3713,7 +3713,7 @@ class ATenNormOperator(ATenNormSchema):
 
         input_t = self.find_or_create_input(0, graph_converter)
 
-        if 'dim' in args and 'keepdim' in args:
+        if 'dim' in args and 'keepdim' in args and self.input_tensors[args['dim']] is not None:
             dims, keep_dim = self.input_tensors[2:4]
             if type(dims) not in (list, tuple):
                 dims = [dims]
