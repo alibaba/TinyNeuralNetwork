@@ -1111,7 +1111,7 @@ def new_handle_func_gen(orig_func, key: str, is_class: bool):
         if lock():
             return orig_func(func, tracked_args, *args, **kwargs)
         else:
-            with no_catch_handle_func() as res:
+            with no_catch_handle_func():
                 return func(*args, **kwargs)
 
     return new_func
