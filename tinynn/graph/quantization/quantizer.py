@@ -964,7 +964,10 @@ class QATQuantizer(object):
                 orig_no_observer_set = sys.modules['torch.ao.quantization.quantize'].no_observer_set
                 sys.modules['torch.ao.quantization.quantize'].no_observer_set = patch_observer_set(orig_no_observer_set)
 
-                torch_q.add_observer_(
+                add_observer_func = getattr(
+                    torch_q, 'add_observer_', sys.modules['torch.ao.quantization.quantize']._add_observer_
+                )
+                add_observer_func(
                     model,
                     qconfig_propagation_list,
                     set(mapping.values()),
