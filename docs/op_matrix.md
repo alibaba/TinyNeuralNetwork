@@ -8,6 +8,7 @@ Operators that are implemented in Python
 | `aten::len` |  |
 | `prim::Constant` |  |
 | `prim::ConstantChunk` |  |
+| `prim::DictConstruct` |  |
 | `prim::GetAttr` |  |
 | `prim::If` |  |
 | `prim::ListConstruct` |  |
