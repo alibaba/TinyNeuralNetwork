@@ -160,7 +160,7 @@ ver = torch.__version__
 ver = '_'.join(ver.split('.')[:2])
 
 # Stage 7: Functions in new versions may exist in current version
-latest = '1_11'
+latest = '2_0'
 if ver != latest:
     with open(f'torch_func_override_{latest}.yml', 'r') as f:
         d = yaml.load(f, yaml.SafeLoader)
