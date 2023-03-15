@@ -97,6 +97,7 @@ Operators that are implemented in Python
 | `aten::le` |  |
 | `aten::leaky_relu` |  |
 | `aten::leaky_relu_` |  |
+| `aten::linalg_vector_norm` |  |
 | `aten::linear` |  |
 | `aten::log` |  |
 | `aten::log_softmax` |  |
@@ -116,7 +117,7 @@ Operators that are implemented in Python
 | `aten::mul_` |  |
 | `aten::ne` |  |
 | `aten::neg` |  |
-| `aten::norm` | only torch.norm with p=1,2 is supported |
+| `aten::norm` |  |
 | `aten::pad` |  |
 | `aten::permute` |  |
 | `aten::pixel_shuffle` |  |

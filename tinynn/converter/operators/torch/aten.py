@@ -3707,11 +3707,7 @@ class ATenRoundOperator(ATenRoundSchema):
 
 
 class ATenNormOperator(ATenNormSchema):
-    def parse(self, node, attrs, args, graph_converter):
-        super().parse(node, attrs, args, graph_converter)
-
-        self.run(node)
-
+    def parse_common(self, node, attrs, args, graph_converter):
         p = self.input_tensors[1]
         assert p in (1, 2), "only torch.norm with p=1,2 is supported"
 
@@ -3758,6 +3754,20 @@ class ATenNormOperator(ATenNormSchema):
 
         for op in ops:
             graph_converter.add_operator(op)
+
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.parse_common(node, attrs, args, graph_converter)
+
+
+class ATenLinalgVectorNormOperator(ATenLinalgVectorNormSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenNormOperator.parse_common(self, node, attrs, args, graph_converter)
 
 
 class ATenAbsOperator(ATenAbsSchema):
