@@ -56,8 +56,6 @@ def main_worker(args):
     pruner.prune()  # Get the pruned model
 
     print("Validation accuracy of the pruned model")
-    model(torch.ones(1, 3, 224, 224))
-    exit(0)
     validate(model, context)
     ed_flops = pruner.calc_flops()
     print(f"Pruning over, reduced FLOPS {100 * (st_flops - ed_flops) / st_flops:.2f}%  ({st_flops} -> {ed_flops})")
