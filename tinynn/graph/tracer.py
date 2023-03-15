@@ -137,6 +137,7 @@ tracking_modules_overrided = GlobalData(False)
 
 # Lock for tracing
 lock = GlobalData(False)
+handle_func_lock = GlobalData(False)
 
 # Whether the constructors get traced
 module_constructor_traced = set()
@@ -732,6 +733,17 @@ def no_catch():
         lock(False)
 
 
+@contextlib.contextmanager
+def no_catch_handle_func():
+    """Context manager for tracing nodes. Use it to avoid hacking into handle_torch_function recursively."""
+    if handle_func_lock():
+        yield False
+    else:
+        handle_func_lock(True)
+        yield True
+        handle_func_lock(False)
+
+
 def args_as_string(args, kwargs):
     """String representation of the args and the keyword args"""
     cleaned_args = [f'"{arg}"' if type(arg) == str else str(arg) for arg in args]
@@ -1085,7 +1097,8 @@ def new_has_torch_func_gen(orig_func, key: str, is_class: bool):
     log.debug(f'registered has torch func wrapper: {key}')
 
     def new_func(*args, **kwargs):
-        return (not lock()) or orig_func(*args, **kwargs)
+        with no_catch_handle_func() as res:
+            return (res and not lock()) or orig_func(*args, **kwargs)
 
     return new_func
 
@@ -1098,7 +1111,8 @@ def new_handle_func_gen(orig_func, key: str, is_class: bool):
         if lock():
             return orig_func(func, tracked_args, *args, **kwargs)
         else:
-            return func(*args, **kwargs)
+            with no_catch_handle_func():
+                return func(*args, **kwargs)
 
     return new_func
 
@@ -1150,10 +1164,17 @@ def fetch_funcs(config: typing.Optional[str] = None):
     """Fetches the functions from the config."""
     if config is None:
         version_parts = torch.__version__.split('.')
-        if int(version_parts[1]) < 6:
-            version_parts[1] = '6'
-        if int(version_parts[1]) > 12:
-            version_parts[1] = '12'
+        if int(version_parts[0]) == '1':
+            if int(version_parts[1]) < 6:
+                version_parts[1] = '6'
+            if int(version_parts[1]) > 12:
+                version_parts[1] = '12'
+        elif int(version_parts[0]) == '2':
+            if int(version_parts[1]) > 0:
+                version_parts[1] = '0'
+        else:
+            log.warning(f'Your PyTorch version is unsupported: {torch.__version__}')
+            version_parts = ['1', '6']
         version_str = '_'.join(version_parts[:2])
         config = os.path.join(current_dir, f'configs/torch_func_override_{version_str}.yml')
     modules = []

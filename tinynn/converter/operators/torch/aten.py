@@ -3707,17 +3707,13 @@ class ATenRoundOperator(ATenRoundSchema):
 
 
 class ATenNormOperator(ATenNormSchema):
-    def parse(self, node, attrs, args, graph_converter):
-        super().parse(node, attrs, args, graph_converter)
-
-        self.run(node)
-
+    def parse_common(self, node, attrs, args, graph_converter):
         p = self.input_tensors[1]
         assert p in (1, 2), "only torch.norm with p=1,2 is supported"
 
         input_t = self.find_or_create_input(0, graph_converter)
 
-        if 'dim' in args and 'keepdim' in args:
+        if 'dim' in args and 'keepdim' in args and self.input_tensors[args['dim']] is not None:
             dims, keep_dim = self.input_tensors[2:4]
             if type(dims) not in (list, tuple):
                 dims = [dims]
@@ -3758,6 +3754,20 @@ class ATenNormOperator(ATenNormSchema):
 
         for op in ops:
             graph_converter.add_operator(op)
+
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.parse_common(node, attrs, args, graph_converter)
+
+
+class ATenLinalgVectorNormOperator(ATenLinalgVectorNormSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenNormOperator.parse_common(self, node, attrs, args, graph_converter)
 
 
 class ATenAbsOperator(ATenAbsSchema):
