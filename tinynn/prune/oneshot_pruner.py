@@ -24,6 +24,7 @@ class OneShotChannelPruner(BasePruner):
     skip_last_fc: bool
     bn_compensation: bool
     exclude_ops: list
+    multiple: int
 
     def __init__(self, model, dummy_input, config):
         """Constructs a new OneShotPruner (including random, l1_norm, l2_norm, fpgm)
@@ -96,6 +97,7 @@ class OneShotChannelPruner(BasePruner):
         sparsity = self.config['sparsity']
         metrics = self.config['metrics']
         self.skip_last_fc = self.config.get('skip_last_fc', True)
+        self.multiple = self.config.get('multiple', None)
         self.bn_compensation = self.config.get('bn_compensation', self.bn_compensation)
         self.exclude_ops = self.config.get('exclude_ops', [])
 

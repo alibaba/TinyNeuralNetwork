@@ -25,6 +25,11 @@ class IdentityChannelPruner(OneShotChannelPruner):
         self.bn_compensation = True
         if config is None:
             config = {"metrics": "l2_norm", "sparsity": 0.5}
+        if "metrics" not in config:
+            config["metrics"] = "l2_norm"
+
+        config["sparsity"] = 1.0
+
         super(IdentityChannelPruner, self).__init__(model, dummy_input, config)
 
     def register_mask(self):
@@ -36,7 +41,7 @@ class IdentityChannelPruner(OneShotChannelPruner):
                 log.info(f"skip subgraph {sub_graph.center}")
                 continue
 
-            sub_graph.calc_prune_idx(None, self.sparsity)
+            sub_graph.calc_prune_idx(None, self.sparsity, multiple=self.multiple)
             log.info(f"subgraph [{sub_graph.center}] compute over")
 
         for m in self.graph_modifier.modifiers.values():

@@ -49,12 +49,15 @@ def main_worker(args):
     print("Validation accuracy of the original model")
     validate(model, context)
 
-    pruner = IdentityChannelPruner(model, torch.ones(1, 3, 224, 224))
+    # You can specify that the pruned channel is a multiple of n by configuring config={"multiple":n}
+    pruner = IdentityChannelPruner(model, torch.ones(1, 3, 224, 224), config={"multiple": 8})
 
     st_flops = pruner.calc_flops()
     pruner.prune()  # Get the pruned model
 
     print("Validation accuracy of the pruned model")
+    model(torch.ones(1, 3, 224, 224))
+    exit(0)
     validate(model, context)
     ed_flops = pruner.calc_flops()
     print(f"Pruning over, reduced FLOPS {100 * (st_flops - ed_flops) / st_flops:.2f}%  ({st_flops} -> {ed_flops})")

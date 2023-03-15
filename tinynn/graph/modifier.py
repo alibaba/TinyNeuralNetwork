@@ -2531,7 +2531,14 @@ class SubGraph(object):
         return result
 
     def calc_prune_idx_by_bn_variance(
-        self, center_list, center_to_leaf_all, leaf_to_center_all, importance, center_to_center_all, sparsity
+        self,
+        center_list,
+        center_to_leaf_all,
+        leaf_to_center_all,
+        importance,
+        center_to_center_all,
+        sparsity,
+        multiple,
     ):
         pruned_leaf_constraint_all = {}
         pruned_center_constraint_all = {}
@@ -2626,6 +2633,12 @@ class SubGraph(object):
             for idx, state in invalid_center_idx_dict.items():
                 if state:
                     invalid_center_idx_set.add(idx)
+
+            if multiple is not None:
+                invalid_center_idx_lst = list(invalid_center_idx_set)
+                remainder = len(invalid_center_idx_lst) % multiple
+                invalid_center_idx_lst = invalid_center_idx_lst[:-remainder]
+                invalid_center_idx_set = set(invalid_center_idx_lst)
 
             pruned_center_constraint_all[center_name] = invalid_center_idx_set
 
@@ -2829,7 +2842,7 @@ class SubGraph(object):
 
         return pruned_center_constraint_all, pruned_leaf_constraint_all
 
-    def calc_prune_idx(self, importance, sparsity):
+    def calc_prune_idx(self, importance, sparsity, multiple=None):
         """
         Calculate the dependence of index in the process of pruning. For convolutional pruning, it is the dependence
         between channels. For more complex unstructured/semi-structured pruning, it may have a finer granularity.
@@ -3075,7 +3088,13 @@ class SubGraph(object):
             )
         else:
             pruned_center_constraint_all, pruned_leaf_constraint_all = self.calc_prune_idx_by_bn_variance(
-                center_list, center_to_leaf_all, leaf_to_center_all, importance, center_to_center_all, sparsity
+                center_list,
+                center_to_leaf_all,
+                leaf_to_center_all,
+                importance,
+                center_to_center_all,
+                sparsity,
+                multiple,
             )
 
         for center_name, constraint in pruned_center_constraint_all.items():
