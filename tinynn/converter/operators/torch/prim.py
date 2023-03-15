@@ -26,6 +26,15 @@ class PrimTupleConstructConverter(PrimOperatorConverter):
         self.output_tensors.append(tuple(self.input_tensors))
 
 
+class PrimDictConstructConverter(PrimOperatorConverter):
+    def parse(self, node, attrs, args, graph_converter):
+        assert len(self.input_tensors) % 2 == 0
+        result = {}
+        for key, value in zip(self.input_tensors[::2], self.input_tensors[1::2]):
+            result[key] = value
+        self.output_tensors.append(result)
+
+
 class PrimListConstructConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         self.output_tensors.append(list(self.input_tensors))
