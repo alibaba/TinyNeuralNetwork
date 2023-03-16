@@ -1164,12 +1164,12 @@ def fetch_funcs(config: typing.Optional[str] = None):
     """Fetches the functions from the config."""
     if config is None:
         version_parts = torch.__version__.split('.')
-        if int(version_parts[0]) == '1':
+        if int(version_parts[0]) == 1:
             if int(version_parts[1]) < 6:
                 version_parts[1] = '6'
             if int(version_parts[1]) > 12:
                 version_parts[1] = '12'
-        elif int(version_parts[0]) == '2':
+        elif int(version_parts[0]) == 2:
             if int(version_parts[1]) > 0:
                 version_parts[1] = '0'
         else:
