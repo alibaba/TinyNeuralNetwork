@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.quantization as torch_q
 
-from ..util.imagenet_util import get_dataloader, train_one_epoch, validate, calibrate
+from examples.quantization.specific.util.imagenet_util import get_dataloader, train_one_epoch, validate, calibrate
 from mobileone_origin import get_model
 
 from tinynn.util.train_util import DLContext, train, get_device

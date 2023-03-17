@@ -18,7 +18,7 @@ import torch
 import torch.nn as nn
 import torch.quantization as torch_q
 
-from ..util.imagenet_util import get_dataloader, validate, calibrate
+from examples.quantization.specific.util.imagenet_util import get_dataloader, validate, calibrate
 from mobileone_origin import get_model
 from tinynn.util.train_util import DLContext, get_device
 from tinynn.graph.quantization.quantizer import QATQuantizer
