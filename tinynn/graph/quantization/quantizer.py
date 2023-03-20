@@ -598,7 +598,7 @@ class QATQuantizer(object):
         param_nodes = graph.filter_forward_nodes(_is_params_in_module)
 
         for n in graph.constant_nodes + extra_constant_nodes:
-            qat_analysis_queue.put((n, not n.next_tensors[0].dtype == torch.float32))
+            qat_analysis_queue.put((n, not torch.is_floating_point(n.next_tensors[0])))
 
         while not qat_analysis_queue.empty():
             node, quantized = qat_analysis_queue.get()
@@ -634,7 +634,7 @@ class QATQuantizer(object):
                     graph.module_original_name_dict[id(mod)] = graph.module_original_name_dict[id(orig_mod)]
                     graph.module_unique_name_dict[id(mod)] = graph.module_unique_name_dict[id(orig_mod)]
                 continue
-            qat_analysis_queue.put((n, not n.next_tensors[0].dtype == torch.float32))
+            qat_analysis_queue.put((n, not torch.is_floating_point(n.next_tensors[0])))
 
         while not qat_analysis_queue.empty():
             node, quantized = qat_analysis_queue.get()
@@ -1503,7 +1503,7 @@ class QATQuantizer(object):
                     if (
                         isinstance(node.prev_tensors[0], torch.Tensor)
                         and node.prev_tensors[0].dtype in (torch.int32, torch.int64)
-                        and node.next_tensors[0].dtype == torch.float32
+                        and torch.is_floating_point(node.next_tensors[0])
                     ):
                         return True
             else:
@@ -1601,7 +1601,7 @@ class QATQuantizer(object):
             if cur_class == TraceFunction:
                 return (
                     cur_module.kind == 'neg'
-                    and cur_module.prev_tensors[0].dtype == torch.float32
+                    and torch.is_floating_point(cur_module.prev_tensors[0])
                     and self.layerwise_config.get(node.unique_name, True)
                 )
 
@@ -1628,9 +1628,9 @@ class QATQuantizer(object):
                 return (
                     (cur_module.kind == 'truediv' or cur_module.func_type in ('div', 'div_'))
                     and len(cur_module.prev_tensors) == 1
-                    and cur_module.prev_tensors[0].dtype == torch.float32
+                    and torch.is_floating_point(cur_module.prev_tensors[0])
                     and cur_module.func_type != '__rtruediv__'
-                    and node.next_tensors[0].dtype == torch.float32
+                    and torch.is_floating_point(node.next_tensors[0])
                     and node.prev_nodes[0].kind() not in ('size', 'shape')
                     and self.layerwise_config.get(node.unique_name, True)
                 )
@@ -1669,8 +1669,8 @@ class QATQuantizer(object):
             if cur_class == TraceFunction:
                 return (
                     cur_module.kind == 'sub'
-                    and cur_module.prev_tensors[0].dtype == torch.float32
-                    and node.next_tensors[0].dtype == torch.float32
+                    and torch.is_floating_point(cur_module.prev_tensors[0])
+                    and torch.is_floating_point(node.next_tensors[0])
                     and self.layerwise_config.get(node.unique_name, True)
                 )
 
@@ -1749,7 +1749,7 @@ class QATQuantizer(object):
             if cur_class == TraceFunction:
                 return (
                     cur_module.kind == 'stack'
-                    and node.next_tensors[0].dtype == torch.float32
+                    and torch.is_floating_point(node.next_tensors[0])
                     and self.layerwise_config.get(node.unique_name, True)
                 )
 
@@ -1801,7 +1801,7 @@ class QATQuantizer(object):
             if cur_class == TraceFunction:
                 return (
                     cur_module.kind in ('add', 'mul', 'cat')
-                    and node.next_tensors[0].dtype == torch.float32
+                    and torch.is_floating_point(node.next_tensors[0])
                     and self.layerwise_config.get(node.unique_name, True)
                 )
 
@@ -1890,7 +1890,7 @@ class QATQuantizer(object):
             if cur_class == TraceFunction:
                 return (
                     cur_module.kind in ('clamp_min', 'clamp_max')
-                    and node.next_tensors[0].dtype == torch.float32
+                    and torch.is_floating_point(node.next_tensors[0])
                     and self.layerwise_config.get(node.unique_name, True)
                 )
 
@@ -1926,7 +1926,7 @@ class QATQuantizer(object):
             if cur_class == TraceFunction:
                 return (
                     cur_module.kind == 'clamp'
-                    and node.next_tensors[0].dtype == torch.float32
+                    and torch.is_floating_point(node.next_tensors[0])
                     and self.layerwise_config.get(node.unique_name, True)
                 )
 
@@ -2716,7 +2716,7 @@ class QATQuantizer(object):
             if cur_class == TraceFunction:
                 return (
                     cur_module.kind == 'clamp_with_fusion'
-                    and node.next_tensors[0].dtype == torch.float32
+                    and torch.is_floating_point(node.next_tensors[0])
                     and node.unique_name not in fused_clamps
                 )
             return False
