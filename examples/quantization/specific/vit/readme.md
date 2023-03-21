@@ -1,7 +1,7 @@
 # Vision Transformer quantization
-Original full precision checkpoints without downstream training were downloaded through [hugging face](https://huggingface.co/google/vit-base-patch16-224).
+Original full precision checkpoints without downstream training were downloaded through [HuggingFace](https://huggingface.co/google/vit-base-patch16-224).
 
-- Additional Setup Dependencies
+- Install Additional Dependencies
 ```shell
 pip install transformers==4.26.0
 ```
@@ -26,12 +26,12 @@ train/
 ```
 
 # Usage
-see [ptq example](vit_post.py).
+see [code examples for Post Quantization](vit_post.py).
 
 
 # Quantization Accuracy Results
 
-We use post quantization to get a real INT8 VIT, the accuracy@1 result is as below:
+We use the aforementioned Post Quantization code example to get a real INT8-quantized VIT, the results are as below:
 
 | Model         | Top1 Acc (%) | Mixed Quantization Configuration                                         |
 |---------------|--------------|--------------------------------------------------------------------------|
@@ -40,11 +40,11 @@ We use post quantization to get a real INT8 VIT, the accuracy@1 result is as bel
 | INT8(Mixed_1) | 78.49(-2.94) | all, except residual additions                                           |
 | INT8(Mixed_2) | 80.94(-0.49) | all, except residual additions , <br/>two most quantization-sensitive fc |
 
-1. We used [per-layer quantization analysis tool](../../layerwise_ptq_analysis.py) and observed that residual additions have a notable impact on quantization accuracy,
+1. We used the [per-layer quantization analysis tool](../../layerwise_ptq_analysis.py) and observed that residual additions have a notable impact on quantization accuracy,
 leading to a significant drop in accuracy. To address this, we maintained floating-point calculation for all residual additions.
 While this helped to restore some accuracy, we found that there was still a considerable drop in accuracy.(-2.94).
 
-2. When using [quantization error analysis tools](../../post_error_anaylsis.py), We noticed that the output activation of the MLP contains numerous outliers, which can considerably reduce the accuracy of quantization.
+2. With the help of the [quantization error analysis tools](../../post_error_anaylsis.py), we noticed that the output activation of the MLP contains numerous outliers, which can considerably reduce the accuracy of quantization.
 Consequently, we identified the two most sensitive fully connected layers and maintained floating-point calculations for them. As a result, the accuracy was further improved(-0.49).
 
 3. Apart from the mixed-precision quantized operators for floating-point computations mentioned above,

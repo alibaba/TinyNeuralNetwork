@@ -1,14 +1,17 @@
 import argparse
+import os
+import sys
+
+CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../../../'))
 
 try:
     import ruamel_yaml as yaml
 except ModuleNotFoundError:
     import ruamel.yaml as yaml
-import os
 
 yaml_ = yaml.YAML()
-
-CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 
 import torch
 import torch.nn as nn
