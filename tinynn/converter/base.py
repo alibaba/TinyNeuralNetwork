@@ -49,6 +49,7 @@ class TFLiteConverter(object):
         map_bilstm_to_lstm: bool = False,
         float16_quantization: bool = False,
         enable_mtk_ops: bool = False,
+        conv_transpose_with_bias: bool = True,
         max_transpose_dims: int = -1,
         hybrid_conv: bool = True,
         unroll_rnn: bool = False,
@@ -98,6 +99,7 @@ class TFLiteConverter(object):
                 Defaults to False
             float16_quantization (bool): Quantize constants with float32 dtype to floa16 dtype. Defaults to False
             enable_mtk_ops (bool): Translating with custom MTK operators. Defaults to False
+            conv_transpose_with_bias (bool): ConvTranspose ops with bias. Defaults to True
             max_transpose_dims (int): Max dimensions for the `Transpose` op. Defaults to -1, which means unlimited
             hybrid_conv (bool): Enable hybrid quantization for Conv2d and DepthwiseConv2d. Defaults to True
             unroll_rnn (bool): Unrolling LSTM (translate LSTM to seperate ops). Defaults to False
@@ -153,6 +155,7 @@ class TFLiteConverter(object):
         self.map_bilstm_to_lstm = map_bilstm_to_lstm
         self.float16_quantization = float16_quantization
         self.enable_mtk_ops = enable_mtk_ops
+        self.conv_transpose_with_bias = conv_transpose_with_bias
         self.max_transpose_dims = max_transpose_dims
         self.hybrid_conv = hybrid_conv
         self.unroll_rnn = unroll_rnn

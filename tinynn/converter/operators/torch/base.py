@@ -29,6 +29,7 @@ class OperatorConverter(ABC):
         hybrid_asymmetric_inputs=False,
         unroll_rnn=False,
         separated_rnn_gate_calc=False,
+        conv_transpose_with_bias=True,
     ) -> None:
         self.input_names = self.get_input_names(node)
         self.output_names = self.get_output_names(node)
@@ -46,6 +47,7 @@ class OperatorConverter(ABC):
         self.hybrid_asymmetric_inputs = hybrid_asymmetric_inputs
         self.unroll_rnn = unroll_rnn
         self.separated_rnn_gate_calc = separated_rnn_gate_calc
+        self.conv_transpose_with_bias = conv_transpose_with_bias
 
     @abstractmethod
     def parse(self, node, attrs, args, graph_converter):

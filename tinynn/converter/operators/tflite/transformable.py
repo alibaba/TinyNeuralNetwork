@@ -425,6 +425,7 @@ class GenericTransposeConvOperator(TransformableOperator):
     groups: int
 
     enable_mtk_ops: bool
+    conv_transpose_with_bias: bool
 
     def __init__(
         self,
@@ -436,6 +437,7 @@ class GenericTransposeConvOperator(TransformableOperator):
         output_padding: typing.List[int],
         groups: int,
         enable_mtk_ops: bool = False,
+        conv_transpose_with_bias: bool = True,
     ):
         super().__init__(ExtendedOperator.GENERIC_DECONV, inputs, outputs, 1)
         self.stride = stride
@@ -444,6 +446,7 @@ class GenericTransposeConvOperator(TransformableOperator):
         self.output_padding = output_padding
         self.groups = groups
         self.enable_mtk_ops = enable_mtk_ops
+        self.conv_transpose_with_bias = conv_transpose_with_bias
 
     def transform(self, graph_converter, mapping):
         input_tensor = self.inputs[0]
@@ -611,26 +614,26 @@ class GenericTransposeConvOperator(TransformableOperator):
         ops.insert(1, reorder_op)
 
         # Bias handling
-        if self.enable_mtk_ops:
-            kernel_num = self.inputs[1].shape[0]
+        if self.enable_mtk_ops or self.conv_transpose_with_bias:
+            kernel_num = output_tensor.shape[1]
 
             if len(self.inputs) > 2 and self.inputs[2].shape[0] != kernel_num and self.inputs[2].shape[0] == 1:
-                if conv_op.inputs[0].dtype == np.float32:
-                    bias = torch.tensor([conv_op.inputs[2][0]] * kernel_num, dtype='float32')
+                if conv_op.inputs[-1].dtype == np.float32:
+                    bias = torch.tensor([self.inputs[2][0]] * kernel_num, dtype='float32')
                 else:
-                    bias = torch.tensor([conv_op.inputs[2][0]] * kernel_num, dtype='int32')
+                    bias = torch.tensor([self.inputs[2][0]] * kernel_num, dtype='int32')
 
                 conv_op.inputs.append(self.create_attr_tensor(bias))
 
             else:
                 if len(self.inputs) == 2 or self.inputs[2] is None:
-                    if conv_op.inputs[0].dtype == np.dtype('float32'):
+                    if conv_op.inputs[-1].dtype == np.dtype('float32'):
                         bias = np.zeros((kernel_num,), dtype='float32')
                         q_args = None
                     else:
                         bias = np.zeros((kernel_num,), dtype='int32')
                 else:
-                    bias = self.inputs[2]
+                    bias = self.inputs[2].tensor
 
                 q_args = None
                 if bias.dtype != np.dtype('float32'):
