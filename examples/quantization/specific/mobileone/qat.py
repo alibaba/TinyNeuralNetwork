@@ -1,21 +1,24 @@
 import argparse
+import os
+import sys
+
+CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../../../'))
 
 try:
     import ruamel_yaml as yaml
 except ModuleNotFoundError:
     import ruamel.yaml as yaml
-import os
 
 yaml_ = yaml.YAML()
-
-CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.quantization as torch_q
 
-from imagenet_util import get_dataloader, train_one_epoch, validate, calibrate
+from examples.quantization.specific.util.imagenet_util import get_dataloader, train_one_epoch, validate, calibrate
 from mobileone_origin import get_model
 
 from tinynn.util.train_util import DLContext, train, get_device

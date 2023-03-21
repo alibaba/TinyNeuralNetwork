@@ -18,9 +18,6 @@ from tinynn.util.train_util import DLContext, get_device
 from tinynn.graph.quantization.algorithm.cross_layer_equalization import cross_layer_equalize
 
 
-CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
-
-
 def main_worker(args):
     with model_tracer():
         model = Mobilenet()

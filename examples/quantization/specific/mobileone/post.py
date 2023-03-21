@@ -2,23 +2,25 @@
 # so that we can validate model with quantization error using PyTorch backend on gpu.
 # Currently, Pytorch quantization backend only support for interface on cpu.
 import argparse
+import os
+import sys
+
+CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(CURRENT_PATH, '../../../../'))
 
 try:
     import ruamel_yaml as yaml
 except ModuleNotFoundError:
     import ruamel.yaml as yaml
-import os
 
 yaml_ = yaml.YAML()
-
-CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
-
 
 import torch
 import torch.nn as nn
 import torch.quantization as torch_q
 
-from imagenet_util import get_dataloader, validate, calibrate
+from examples.quantization.specific.util.imagenet_util import get_dataloader, validate, calibrate
 from mobileone_origin import get_model
 from tinynn.util.train_util import DLContext, get_device
 from tinynn.graph.quantization.quantizer import QATQuantizer
