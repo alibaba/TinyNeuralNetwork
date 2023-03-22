@@ -1512,7 +1512,7 @@ class QATQuantizer(object):
 
         int_to_float_nodes = graph.filter_forward_nodes(_is_int_to_float_nodes)
 
-        # When user want to convert float-tensor's type to int16/int32/int64, we need to add dq before 'to'.
+        # When converting float-tensor to int16/int32/int64, we need to add 'fake_dequant' node before convert-node.
         def _is_float_to_unquantized_type_nodes(node, custom_data):
             if (
                 len(node.next_tensors) == 1
@@ -1609,7 +1609,7 @@ class QATQuantizer(object):
                 module_constructor_lines[id(fake_dequant)] = f'{qualified_name(fake_dequant_cls)}()'
 
                 if len(node.prev_nodes) > 1:
-                    # insert dq before type conversion operators
+                    # Insert 'fake_dequant' node before type conversion operators
                     graph.insert_between(node.prev_nodes[0], node, fake_dequant, move_idx=True)
                 else:
                     graph.insert_before(node, fake_dequant, move_idx=True)
