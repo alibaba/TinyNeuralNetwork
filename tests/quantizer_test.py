@@ -1399,6 +1399,34 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_type_conversion_to_int_tensor(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.data = torch.zeros((1, 256), dtype=torch.int64)
+
+            def forward(self, x):
+                return x.to(self.data)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 256, 256)
+
+        check_quantize_rewrite(model, inputs)
+
+    def test_type_conversion_to_int_dtype(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.data = torch.zeros((1, 256), dtype=torch.int64)
+
+            def forward(self, x):
+                return x.to(self.data.dtype)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 256, 256)
+
+        check_quantize_rewrite(model, inputs)
+
 
 class DeQuantizerTester(unittest.TestCase):
     def test_simple_q_model(self):

@@ -1502,6 +1502,7 @@ class QATQuantizer(object):
                         return False
                     if (
                         isinstance(node.prev_tensors[0], torch.Tensor)
+                        and isinstance(node.next_tensors[0], torch.Tensor)
                         and node.prev_tensors[0].dtype in (torch.int32, torch.int64)
                         and torch.is_floating_point(node.next_tensors[0])
                     ):
@@ -1510,6 +1511,21 @@ class QATQuantizer(object):
                 return False
 
         int_to_float_nodes = graph.filter_forward_nodes(_is_int_to_float_nodes)
+
+        # When user want to convert float-tensor's type to int16/int32/int64, we need to add dq before 'to'.
+        def _is_float_to_unquantized_type_nodes(node, custom_data):
+            if (
+                len(node.next_tensors) == 1
+                and isinstance(node.prev_tensors[0], torch.Tensor)
+                and isinstance(node.next_tensors[0], torch.Tensor)
+                and torch.is_floating_point(node.prev_tensors[0])
+                and node.next_tensors[0].dtype in (torch.int16, torch.int32, torch.int64)
+                and node.prev_tensors[0].shape == node.next_tensors[0].shape
+            ):
+                return True
+            return False
+
+        float_to_unquantized_type_nodes = graph.filter_forward_nodes(_is_float_to_unquantized_type_nodes)
 
         def _is_params_in_module(node, custom_data):
             if len(node.prev_nodes) == 1 and len(node.next_nodes) == 1:
@@ -1564,7 +1580,7 @@ class QATQuantizer(object):
             graph.insert_after(node, fake_quant)
 
         # Second, we insert the DeQuantStub nodes for every output node
-        for idx, node in enumerate(graph.output_nodes):
+        for idx, node in enumerate(graph.output_nodes + float_to_unquantized_type_nodes):
             fake_dequant_cls = torch_q.DeQuantStub
             if node.rev_index:
                 modules = []
@@ -1592,7 +1608,11 @@ class QATQuantizer(object):
 
                 module_constructor_lines[id(fake_dequant)] = f'{qualified_name(fake_dequant_cls)}()'
 
-                graph.insert_before(node, fake_dequant, move_idx=True)
+                if len(node.prev_nodes) > 1:
+                    # insert dq before type conversion operators
+                    graph.insert_between(node.prev_nodes[0], node, fake_dequant, move_idx=True)
+                else:
+                    graph.insert_before(node, fake_dequant, move_idx=True)
 
         # Third, we rewrite neg/sub/div using supported functions(e.g add, mul)
         def _is_neg_node(node: TraceNode, custom_data):
