@@ -929,7 +929,7 @@ class QATQuantizer(object):
                     if len(graph.module._forward_hooks) > 0:
                         graph.module._forward_hooks.popitem()
                 delattr(graph.module, "activation_post_process")
-            
+
             torch_q.convert(model, mapping, inplace=True)
         else:
             torch_q.propagate_qconfig_(graph.module, qconfig_dict=None)
@@ -1520,19 +1520,18 @@ class QATQuantizer(object):
         int_to_float_nodes = graph.filter_forward_nodes(_is_int_to_float_nodes)
 
         # When converting float-tensor to int16/int32/int64, we need to add 'fake_dequant' node before convert-node.
-        def _is_float_to_unquantized_type_nodes(node, custom_data):
-            if (
+        def _is_float_to_non_float_nodes(node, custom_data):
+            if isinstance(node.module, TraceFunction) and node.module.kind in ('shape', 'size'):
+                return False
+            return (
                 len(node.next_tensors) == 1
                 and isinstance(node.prev_tensors[0], torch.Tensor)
                 and isinstance(node.next_tensors[0], torch.Tensor)
                 and torch.is_floating_point(node.prev_tensors[0])
-                and node.next_tensors[0].dtype in (torch.int16, torch.int32, torch.int64)
-                and node.prev_tensors[0].shape == node.next_tensors[0].shape
-            ):
-                return True
-            return False
+                and not torch.is_floating_point(node.next_tensors[0])
+            )
 
-        float_to_unquantized_type_nodes = graph.filter_forward_nodes(_is_float_to_unquantized_type_nodes)
+        float_to_non_float_nodes = graph.filter_forward_nodes(_is_float_to_non_float_nodes)
 
         def _is_params_in_module(node, custom_data):
             if len(node.prev_nodes) == 1 and len(node.next_nodes) == 1:
@@ -1587,7 +1586,7 @@ class QATQuantizer(object):
             graph.insert_after(node, fake_quant)
 
         # Second, we insert the DeQuantStub nodes for every output node
-        for idx, node in enumerate(graph.output_nodes + float_to_unquantized_type_nodes):
+        for idx, node in enumerate(graph.output_nodes + float_to_non_float_nodes):
             fake_dequant_cls = torch_q.DeQuantStub
             if node.rev_index:
                 modules = []
