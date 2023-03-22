@@ -923,6 +923,13 @@ class QATQuantizer(object):
                     delattr(m, "qconfig")
                 if hasattr(m, "activation_post_process"):
                     delattr(m, "activation_post_process")
+
+            if hasattr(graph.module, 'activation_post_process'):
+                if hasattr(graph.module, "_forward_hooks"):
+                    if len(graph.module._forward_hooks) > 0:
+                        graph.module._forward_hooks.popitem()
+                delattr(graph.module, "activation_post_process")
+            
             torch_q.convert(model, mapping, inplace=True)
         else:
             torch_q.propagate_qconfig_(graph.module, qconfig_dict=None)
@@ -3604,6 +3611,12 @@ class PostQuantizer(QATQuantizer):
 
         if LooseVersion(torch.__version__) < LooseVersion("1.7.0"):
             torch_q.prepare(graph.module, inplace=True)
+
+            if hasattr(graph.module, 'activation_post_process'):
+                if hasattr(graph.module, "_forward_hooks"):
+                    if len(graph.module._forward_hooks) > 0:
+                        graph.module._forward_hooks.popitem()
+                delattr(graph.module, "activation_post_process")
         else:
             torch_q.propagate_qconfig_(graph.module, qconfig_dict=None)
             for n in graph.forward_nodes:
