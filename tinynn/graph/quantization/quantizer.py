@@ -2489,7 +2489,7 @@ class QATQuantizer(object):
         for n, t in type_dict.items():
             self.layerwise_config.yaml_add_eol_comment(f'type: {t}', n)
 
-        skip_types = set(k for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) == 1)
+        skip_types = set(k[0] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) == 1)
         if self.set_quantizable_op_stats:
             skip_types |= set(KNOWN_QSTATS.keys())
         skip_types_prev = skip_types | set(k[-1] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) > 1)
