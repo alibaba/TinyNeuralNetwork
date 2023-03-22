@@ -76,6 +76,45 @@ def check_dequantize_rewrite(model, inputs, show_rewritten=True, skip_train=Fals
                     float_model(inputs)
 
 
+def check_quantizer_convert(model, inputs, skip_train=False):
+    # TODO: we need check tflite uint8->quant[0,255], int8->quant[-127, 127] for weight.
+    config = {
+        'asymmetric': True,
+        'per_tensor': False,
+        'remove_weights_after_load': True,
+        'ignore_layerwise_config': True,
+    }
+
+    if sys.platform == 'win32':
+        config.update({'backend': 'fbgemm', 'per_tensor': False})
+
+    with model_tracer():
+        quantizer = QATQuantizer(model, inputs, work_dir='out', config=config)
+        qat_model = quantizer.quantize()
+
+        quant_minmax_dict = {}
+        for name, mod in model.named_modules():
+            if hasattr(mod, 'weight_fake_quant'):
+                quant_minmax_dict[name] = [mod.weight_fake_quant.quant_min, mod.weight_fake_quant.quant_max]
+
+        if not skip_train:
+            for _ in range(3):
+                if isinstance(inputs, (list, tuple)):
+                    qat_model(*inputs)
+                else:
+                    qat_model(inputs)
+
+        with torch.no_grad():
+            qat_model.eval()
+
+            qat_model = quantizer.convert(qat_model)
+            for name, mod in qat_model.named_modules():
+                if name in quant_minmax_dict:
+                    int_weight = torch.int_repr(mod.weight())
+                    assert int_weight.min() >= quant_minmax_dict[name][0]
+                    assert int_weight.max() <= quant_minmax_dict[name][1]
+
+
 class QuantizerTester(unittest.TestCase):
     def test_simple_float_model(self):
         class Model(nn.Module):
@@ -1398,6 +1437,48 @@ class QuantizerTester(unittest.TestCase):
         inputs = torch.randn(1, 3, 224, 224)
 
         check_quantize_rewrite(model, inputs)
+
+    def test_quantizer_convert_fc(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.fc = nn.Linear(3, 1)
+
+            def forward(self, x):
+                return self.fc(x)
+
+        model = Model()
+        inputs = torch.randn(1, 3)
+
+        check_quantizer_convert(model, inputs)
+
+    def test_quantizer_convert_conv(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.Conv2d(3, 1, 1, 1)
+
+            def forward(self, x):
+                return self.conv(x)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantizer_convert(model, inputs)
+
+    def test_quantizer_convert_transpose(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.conv = nn.ConvTranspose2d(3, 5, 2, 2, 1)
+
+            def forward(self, x):
+                return self.conv(x)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantizer_convert(model, inputs)
 
 
 class DeQuantizerTester(unittest.TestCase):
