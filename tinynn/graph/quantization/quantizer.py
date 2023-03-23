@@ -923,6 +923,13 @@ class QATQuantizer(object):
                     delattr(m, "qconfig")
                 if hasattr(m, "activation_post_process"):
                     delattr(m, "activation_post_process")
+
+            if hasattr(graph.module, 'activation_post_process'):
+                if hasattr(graph.module, "_forward_hooks"):
+                    if len(graph.module._forward_hooks) > 0:
+                        graph.module._forward_hooks.popitem()
+                delattr(graph.module, "activation_post_process")
+
             torch_q.convert(model, mapping, inplace=True)
         else:
             torch_q.propagate_qconfig_(graph.module, qconfig_dict=None)
@@ -1502,6 +1509,7 @@ class QATQuantizer(object):
                         return False
                     if (
                         isinstance(node.prev_tensors[0], torch.Tensor)
+                        and isinstance(node.next_tensors[0], torch.Tensor)
                         and node.prev_tensors[0].dtype in (torch.int32, torch.int64)
                         and torch.is_floating_point(node.next_tensors[0])
                     ):
@@ -1510,6 +1518,20 @@ class QATQuantizer(object):
                 return False
 
         int_to_float_nodes = graph.filter_forward_nodes(_is_int_to_float_nodes)
+
+        # When converting float-tensor to int16/int32/int64, we need to add 'fake_dequant' node before convert-node.
+        def _is_float_to_non_float_nodes(node, custom_data):
+            if isinstance(node.module, TraceFunction) and node.module.kind in ('shape', 'size'):
+                return False
+            return (
+                len(node.next_tensors) == 1
+                and isinstance(node.prev_tensors[0], torch.Tensor)
+                and isinstance(node.next_tensors[0], torch.Tensor)
+                and torch.is_floating_point(node.prev_tensors[0])
+                and not torch.is_floating_point(node.next_tensors[0])
+            )
+
+        float_to_non_float_nodes = graph.filter_forward_nodes(_is_float_to_non_float_nodes)
 
         def _is_params_in_module(node, custom_data):
             if len(node.prev_nodes) == 1 and len(node.next_nodes) == 1:
@@ -1564,7 +1586,7 @@ class QATQuantizer(object):
             graph.insert_after(node, fake_quant)
 
         # Second, we insert the DeQuantStub nodes for every output node
-        for idx, node in enumerate(graph.output_nodes):
+        for idx, node in enumerate(graph.output_nodes + float_to_non_float_nodes):
             fake_dequant_cls = torch_q.DeQuantStub
             if node.rev_index:
                 modules = []
@@ -1592,7 +1614,11 @@ class QATQuantizer(object):
 
                 module_constructor_lines[id(fake_dequant)] = f'{qualified_name(fake_dequant_cls)}()'
 
-                graph.insert_before(node, fake_dequant, move_idx=True)
+                if len(node.prev_nodes) > 1:
+                    # Insert 'fake_dequant' node before type conversion operators
+                    graph.insert_between(node.prev_nodes[0], node, fake_dequant, move_idx=True)
+                else:
+                    graph.insert_before(node, fake_dequant, move_idx=True)
 
         # Third, we rewrite neg/sub/div using supported functions(e.g add, mul)
         def _is_neg_node(node: TraceNode, custom_data):
@@ -3584,6 +3610,12 @@ class PostQuantizer(QATQuantizer):
 
         if LooseVersion(torch.__version__) < LooseVersion("1.7.0"):
             torch_q.prepare(graph.module, inplace=True)
+
+            if hasattr(graph.module, 'activation_post_process'):
+                if hasattr(graph.module, "_forward_hooks"):
+                    if len(graph.module._forward_hooks) > 0:
+                        graph.module._forward_hooks.popitem()
+                delattr(graph.module, "activation_post_process")
         else:
             torch_q.propagate_qconfig_(graph.module, qconfig_dict=None)
             for n in graph.forward_nodes:
