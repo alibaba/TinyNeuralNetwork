@@ -1772,12 +1772,12 @@ class QATQuantizer(object):
         def _is_stack_node(node: TraceNode, custom_data):
             cur_module = node.module
             cur_class = type(cur_module)
-            if cur_class == TraceFunction:
-                return (
-                    cur_module.kind == 'stack'
-                    and torch.is_floating_point(node.next_tensors[0])
-                    and self.layerwise_config.get(node.unique_name, True)
-                )
+            return (
+                cur_class == TraceFunction
+                and cur_module.kind == 'stack'
+                and torch.is_floating_point(node.next_tensors[0])
+                and self.layerwise_config.get(node.unique_name, True)
+            )
 
         stack_nodes = graph.filter_forward_nodes(_is_stack_node)
 
@@ -1799,18 +1799,17 @@ class QATQuantizer(object):
                     dim = int(args)
             else:
                 dim = 0
-            for n in node.prev_nodes:
+            unique_prev_nodes = {n.unique_name: n for n in node.prev_nodes}.values()
+            for n in unique_prev_nodes:
                 shared_tensors = list(set(node.prev_tensors).intersection(set(n.next_tensors)))
                 if len(shared_tensors) == 0:
                     log.debug('tensor rewrite already done, skipping')
                     continue
-                if len(shared_tensors) > 1:
-                    log.error('rewrite supports torch.stack with nodes with exact one input')
-                    assert False
-                with override_current_trace_graph(graph):
-                    trace_func = TraceFunction('torch.unsqueeze', prefix='fuse_').parse_args(shared_tensors[0], dim)
-                next_tensors = [torch.unsqueeze(x, dim) for x in shared_tensors]
-                graph.insert_between(n, node, trace_func, next_tensors, move_idx=True)
+                for t in shared_tensors:
+                    with override_current_trace_graph(graph):
+                        trace_func = TraceFunction('torch.unsqueeze', prefix='fuse_').parse_args(t, dim)
+                    next_tensors = [torch.unsqueeze(t, dim)]
+                    graph.insert_between(n, node, trace_func, next_tensors, move_idx=True, tensor_ptrs=set([id(t)]))
 
             node.module.func_type = 'cat'
             node.module.kind = 'cat'

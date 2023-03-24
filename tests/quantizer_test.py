@@ -709,6 +709,17 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_stack_with_shared_tensors(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                tensors = x.split(1, 1)
+                return torch.stack(tensors)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
     def test_stack_with_dim(self):
         class Model(nn.Module):
             def forward(self, x, y):
