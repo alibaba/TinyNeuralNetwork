@@ -1525,6 +1525,7 @@ class QATQuantizer(object):
                 return False
             return (
                 len(node.next_tensors) == 1
+                and len(node.prev_tensors) > 0
                 and isinstance(node.prev_tensors[0], torch.Tensor)
                 and isinstance(node.next_tensors[0], torch.Tensor)
                 and torch.is_floating_point(node.prev_tensors[0])
