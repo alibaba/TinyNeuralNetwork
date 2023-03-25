@@ -167,11 +167,13 @@ Operators that are implemented in Python
 | `aten::sum` |  |
 | `aten::t` |  |
 | `aten::tanh` |  |
+| `aten::tanh_` |  |
 | `aten::to` |  |
 | `aten::topk` | tflite topk only support last dim<br>tflite topk only support largest=True and sorted=True |
 | `aten::transpose` |  |
 | `aten::type_as` |  |
 | `aten::unbind` |  |
+| `aten::unsafe_chunk` |  |
 | `aten::unsqueeze` |  |
 | `aten::unsqueeze_` |  |
 | `aten::upsample_bilinear2d` |  |
