@@ -56,7 +56,7 @@ jobs:
         run: python setup.py install
       - name: Install test dependencies
         run: |
-          if [ "$RUNNER_OS" == "Linux" && "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]; then
+          if [[ "$RUNNER_OS" == "Linux" && "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
             pip install black 'ruff<0.0.234' 'tensorflow<2.12' scipy interval
           else
             pip install black 'ruff<0.0.234' tensorflow scipy interval
