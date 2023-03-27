@@ -404,6 +404,7 @@ class TFLiteConverter(object):
                 self.hybrid_asymmetric_inputs,
                 self.unroll_rnn,
                 self.separated_rnn_gate_calc,
+                self.conv_transpose_with_bias,
             )
             # Don't track the operator if all the input nodes are not tracked unless it has custom implementation
             # (e.g prim::* ops)
