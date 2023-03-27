@@ -55,6 +55,9 @@ jobs:
       - name: Install TinyNeuralNetwork
         run: python setup.py install
       - name: Install test dependencies
+        env:
+          PYTORCH_VER: ${{ matrix.vers.pt_ver }}
+          TORCHVISION_VER: ${{ matrix.vers.tv_ver }}
         run: |
           if [[ "$RUNNER_OS" == "Linux" && "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
             pip install black 'ruff<0.0.234' 'tensorflow<2.12' scipy interval
