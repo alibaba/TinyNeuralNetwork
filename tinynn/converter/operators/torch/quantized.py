@@ -93,7 +93,7 @@ class QuantizedConv2dOperator(QuantizedConv2dSchema):
 
         inputs = [input_tensor, weight_tensor]
         if bias is not None:
-            if transpose and not self.enable_mtk_ops and not conv_transpose_with_bias:
+            if transpose and not self.enable_mtk_ops and not self.conv_transpose_with_bias:
                 if self.q_type == np.uint8:
                     bias = self.quantize(bias, bias_scale, bias_zero_point, dtype=torch.uint8)
                 elif self.q_type == np.int8:
