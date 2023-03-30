@@ -427,6 +427,8 @@ class GenericTransposeConvOperator(TransformableOperator):
     enable_mtk_ops: bool
     conv_transpose_with_bias: bool
 
+    fusedActivationFunction: tflite.ActivationFunctionType
+
     def __init__(
         self,
         inputs: typing.List['Tensor'],
@@ -438,6 +440,7 @@ class GenericTransposeConvOperator(TransformableOperator):
         groups: int,
         enable_mtk_ops: bool = False,
         conv_transpose_with_bias: bool = True,
+        fusedActivationFunction=tflite.ActivationFunctionType.NONE,
     ):
         super().__init__(ExtendedOperator.GENERIC_DECONV, inputs, outputs, 1)
         self.stride = stride
@@ -447,6 +450,8 @@ class GenericTransposeConvOperator(TransformableOperator):
         self.groups = groups
         self.enable_mtk_ops = enable_mtk_ops
         self.conv_transpose_with_bias = conv_transpose_with_bias
+
+        self.fusedActivationFunction = fusedActivationFunction
 
     def transform(self, graph_converter, mapping):
         input_tensor = self.inputs[0]
@@ -546,6 +551,7 @@ class GenericTransposeConvOperator(TransformableOperator):
                     strideH=self.stride[0],
                     strideW=self.stride[1],
                     padding=tflite.Padding.VALID,
+                    fusedActivationFunction=self.fusedActivationFunction,
                 )
         else:
             conv_op = tfl_ops.Conv3dTransposeOperator(
@@ -558,6 +564,7 @@ class GenericTransposeConvOperator(TransformableOperator):
                 dilationHFactor=self.dilation[1],
                 dilationWFactor=self.dilation[2],
                 padding=tflite.Padding.VALID,
+                fusedActivationFunction=self.fusedActivationFunction,
             )
 
         ops = self.wrap_ops_with_nhwc_nchw_transposes([conv_op], input_idx=1)
