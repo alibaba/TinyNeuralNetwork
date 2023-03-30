@@ -1383,6 +1383,41 @@ class ConverterOptimizerTester(unittest.TestCase):
             tflite.BuiltinOperator.CONCATENATION,
         )
         self.assertEqual(tfl_model.Subgraphs(0).Operators(5).OutputsLength(), 1)
+    
+    def test_fuse_transposeconv_relu(self):
+        class TestModel(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+
+                self.transposeconv = nn.ConvTranspose2d(3, 5, 3, bias=True)
+                self.act = nn.ReLU()
+
+            def forward(self, x):
+                y = self.act(self.transposeconv(x))
+                return  y
+
+        model = TestModel()
+        model.eval()
+        dummy_input = torch.randn([1, 3, 224, 224])
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path)
+        converter.convert()
+        
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.TRANSPOSE_CONV)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
+        builtin_opts = tfl_model.Subgraphs(0).Operators(0).BuiltinOptions()
+        self.assertIsNotNone(builtin_opts)
+
+        opts = tflite.TransposeConvOptions()
+        opts.Init(builtin_opts.Bytes, builtin_opts.Pos)
+        self.assertEqual(opts.FusedActivationFunction(), tflite.ActivationFunctionType.RELU)
 
     def test_fuse_activation(self):
         class TestModel(nn.Module):
