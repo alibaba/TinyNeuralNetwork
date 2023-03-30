@@ -3282,6 +3282,7 @@ class GraphOptimizer(object):
         self.fuse_conv2d_gather()
 
         # Remove consecutive dequantize and quantize nodes
+        # return
         self.fuse_dequant_quant_pass(q_first=True)
 
         # Fuse reciprocal and sqrt
@@ -3421,6 +3422,7 @@ def is_activ_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
             ExtendedOperator.DIV,
             ExtendedOperator.MAX_POOL_2D,
             ExtendedOperator.AVERAGE_POOL_2D,
+            ExtendedOperator.TRANSPOSE_CONV,
         )
         and target_vertex['node_type'] in (ExtendedOperator.RELU, ExtendedOperator.RELU6)
         and source_vertex['op'].fusedActivationFunction == ActivationFunctionType.NONE

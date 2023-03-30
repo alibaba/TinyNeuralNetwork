@@ -1384,6 +1384,28 @@ class ConverterOptimizerTester(unittest.TestCase):
         )
         self.assertEqual(tfl_model.Subgraphs(0).Operators(5).OutputsLength(), 1)
 
+    def test_fuse_transposeconv_relu(self):
+        class TestModel(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+
+                self.transposeconv = nn.ConvTranspose2d(3, 5, 3, bias=True)
+                self.act = nn.ReLU()
+        
+            def forward(self, x):
+                y = self.act(self.transposeconv(x))
+                return  y
+        
+        model = TestModel()
+        model.eval()
+        dummy_input = torch.randn([1, 3, 32, 32])
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+        tfl_model = parse_model(model_path)
+
+
     def test_fuse_activation(self):
         class TestModel(nn.Module):
             def forward(self, x):
