@@ -38,6 +38,9 @@ from tinynn.graph.quantization.qat_modules import (
 if LooseVersion(torch.__version__) >= LooseVersion("1.13.0"):
     from tinynn.graph.quantization.quantizable.gru import GRU as QuantizableGRU
     from torch.ao.nn.quantizable.modules.rnn import LSTM as QuantizableLSTM
+else:
+    QuantizableGRU = None
+    QuantizableLSTM = None
 
 from tinynn.graph.tracer import (
     ConstantNode,
@@ -1217,24 +1220,30 @@ class QATQuantizer(object):
                     orig_name = graph.module_original_name_dict.get(id(n.module))
                     new_mod, parent = graph.get_submodule_with_parent_from_name(orig_name, self.inplace)
                     prop = orig_name.split('.')[-1]
-                    if isinstance(new_mod, QuantizableLSTM):
+                    if QuantizableLSTM is not None and isinstance(new_mod, QuantizableLSTM):
                         if new_fq_count == 0:
                             if new_mod.bidirectional is False:
                                 parents.append(new_mod.layers[-1].layer_fw.cell.ogate_cy)
                                 names.append(f'{orig_name}.layer_fw.cell.ogate_cy.activation_post_process')
                                 props.append('activation_post_process')
                             else:
+                                parents.append(new_mod.layers[-1].layer_fw.cell.ogate_cy)
+                                names.append(f'{orig_name}.layer_fw.cell.ogate_cy.activation_post_process')
+                                props.append('activation_post_process')
                                 parents.append(new_mod.layers[-1].layer_bw.cell.ogate_cy)
                                 names.append(f'{orig_name}.layer_bw.cell.ogate_cy.activation_post_process')
                                 props.append('activation_post_process')
                         new_fq_count += 1
-                    elif isinstance(new_mod, QuantizableGRU):
+                    elif QuantizableGRU is not None and isinstance(new_mod, QuantizableGRU):
                         if new_fq_count == 0:
                             if new_mod.bidirectional is False:
                                 parents.append(new_mod.layers[-1].layer_fw.cell.add4)
                                 names.append(f'{orig_name}.layer_fw.cell.add4.activation_post_process')
                                 props.append('activation_post_process')
                             else:
+                                parents.append(new_mod.layers[-1].layer_fw.cell.add4)
+                                names.append(f'{orig_name}.layer_bw.cell.add4.activation_post_process')
+                                props.append('activation_post_process')
                                 parents.append(new_mod.layers[-1].layer_bw.cell.add4)
                                 names.append(f'{orig_name}.layer_bw.cell.add4.activation_post_process')
                                 props.append('activation_post_process')
