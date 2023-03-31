@@ -35,9 +35,9 @@ from tinynn.graph.quantization.qat_modules import (
     ConvTranspose2d,
     ConvTransposeBn2d,
 )
-
-from tinynn.graph.quantization.quantizable.gru import GRU as QuantizableGRU
-from torch.ao.nn.quantizable.modules.rnn import LSTM as QuantizableLSTM
+if LooseVersion(torch.__version__) >= LooseVersion("1.13.0"):
+    from tinynn.graph.quantization.quantizable.gru import GRU as QuantizableGRU
+    from torch.ao.nn.quantizable.modules.rnn import LSTM as QuantizableLSTM
 
 from tinynn.graph.tracer import (
     ConstantNode,
