@@ -1217,7 +1217,6 @@ class QATQuantizer(object):
                     orig_name = graph.module_original_name_dict.get(id(n.module))
                     new_mod, parent = graph.get_submodule_with_parent_from_name(orig_name, self.inplace)
                     prop = orig_name.split('.')[-1]
-                    
                     if isinstance(new_mod, QuantizableLSTM):
                         if new_fq_count == 0:
                             if new_mod.bidirectional is False:
