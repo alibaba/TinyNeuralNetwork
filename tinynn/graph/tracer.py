@@ -24,6 +24,7 @@ from torch.nn.parallel.distributed import DistributedDataParallel
 from tinynn.util.train_util import get_module_device
 from tinynn.util.util import get_logger, import_from_path, tensors2ndarray
 from ._utils import patch_getitem, revert_getitem, patch_new, revert_new
+from . import interop  # noqa: F401
 
 # Basic types
 
