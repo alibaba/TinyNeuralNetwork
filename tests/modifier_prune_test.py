@@ -151,6 +151,79 @@ class ModifierTester(unittest.TestCase):
         for i in range(20):
             test_func()
 
+    def test_padding(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv0 = nn.Conv2d(3, 8, (3, 3), padding=(1, 1))
+                self.conv1 = nn.Conv2d(3, 8, (3, 3), padding=(1, 1))
+                self.conv2 = nn.Conv2d(3, 16, (3, 3), padding=(1, 1))
+                self.conv3 = nn.Conv2d(16, 32, (3, 3))
+
+            def forward(self, x):
+                x0 = self.conv0(x)
+                x1 = self.conv1(x)
+                x2 = self.conv2(x)
+
+                cat0 = torch.cat([x0, x1], dim=1)
+                add0 = torch.add(cat0, x2)
+                add0 = F.pad(add0, (1, 1, 1, 1), "constant")
+                return self.conv3(add0)
+
+        def test_func():
+            model = TestModel()
+
+            while True:
+                ch_8 = get_rd_lst(8)
+                ch_16 = get_rd_lst(16)
+                ch_32 = get_rd_lst(32)
+
+                init_conv_by_list(model.conv0, ch_8)
+                init_conv_by_list(model.conv1, ch_8)
+                init_conv_by_list(model.conv2, ch_16)
+                init_conv_by_list(model.conv3, ch_32)
+
+                importance_conv0 = l2_norm(model.conv0.weight, model.conv0).tolist()
+                importance_conv1 = l2_norm(model.conv1.weight, model.conv1).tolist()
+                importance_conv2 = l2_norm(model.conv2.weight, model.conv2).tolist()
+                importance_conv3 = l2_norm(model.conv3.weight, model.conv3).tolist()
+
+                importance_add0 = list(map(add, importance_conv0 + importance_conv1, importance_conv2))
+
+                # Duplicate values may lead to multiple possibilities for remove idx
+                if len(set(importance_add0)) == len(importance_add0):
+                    break
+
+            conv0_idxes = get_topk(importance_add0[:8], 4)
+            conv1_idxes = get_topk(importance_add0[8:], 4)
+            conv3_idxes = get_topk(importance_conv3, 16)
+
+            pruner = OneShotChannelPruner(model, torch.ones(1, 3, 9, 9), {"sparsity": 0.5, "metrics": "l2_norm"})
+            pruner.register_mask()
+
+            m_conv0 = pruner.graph_modifier.get_modifier(model.conv0)
+            m_conv1 = pruner.graph_modifier.get_modifier(model.conv1)
+            m_conv2 = pruner.graph_modifier.get_modifier(model.conv2)
+            m_conv3 = pruner.graph_modifier.get_modifier(model.conv3)
+
+            assert m_conv0.dim_changes_info.pruned_idx_o == conv0_idxes
+            assert m_conv1.dim_changes_info.pruned_idx_o == conv1_idxes
+            assert m_conv2.dim_changes_info.pruned_idx_o == conv0_idxes + [8 + i for i in conv1_idxes]
+            assert m_conv3.dim_changes_info.pruned_idx_o == conv3_idxes
+
+            pruner.apply_mask()
+
+            model(torch.ones(1, 3, 9, 9))
+
+            assert model.conv0.out_channels == 4
+            assert model.conv1.out_channels == 4
+            assert model.conv2.out_channels == 8
+            assert model.conv3.in_channels == 8
+            assert model.conv3.out_channels == 16
+
+        for i in range(20):
+            test_func()
+
     def test_cat_add_graph(self):
         class TestModel(nn.Module):
             def __init__(self):
@@ -1429,7 +1502,6 @@ class ModifierTester(unittest.TestCase):
 
         for num_layers in (1, 2):
             for bidirectional in (False, True):
-
                 kwargs = {
                     'num_layers': num_layers,
                     'bidirectional': bidirectional,

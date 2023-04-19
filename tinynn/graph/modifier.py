@@ -1069,24 +1069,26 @@ class Modifier(object):
 
 class PaddingModifier(Modifier):
     def dim_change_forward(self, center, tensor, dim_changes_i, dim_transform, tensor_constraint):
-        args_split = self.module().args_template.split(",")
-        args_split[-1] = "-1"
-        args_template = ",".join(args_split)
-        self.module().args_template = args_template
-
         changes = self.calc_dim_changes()
+
+        tensor_o = changes[0][1]
 
         self.dim_changes_info.update_i(
             center, tensor, dim_changes_i, dim_transform, tensor_constraint=tensor_constraint
         )
 
-        for change in changes:
-            dim_change_o, tensor_o = change
+        self.dim_changes_info.update_o(center, tensor_o, dim_changes_i)
 
-            if dim_change_o:
-                self.dim_changes_info.update_o(center, tensor_o, dim_change_o)
-                for m in self.next_modifiers(tensor_o):
-                    m.dim_change_forward(center, tensor_o, dim_change_o, dim_transform, None)
+        # padding will change index info
+        fill_tensor_by_dim_changes(self.next_tensors()[0], dim_changes_i)
+
+        constraint_i = self.dim_changes_info.constraints_i[dim_changes_i[0]][center.unique_name()][0]
+        transform = OrderedDict()
+        for i in range(len(constraint_i)):
+            transform[i] = constraint_i[i]
+
+        for m in self.next_modifiers(tensor_o):
+            m.dim_change_forward(center, tensor_o, dim_changes_i, transform, None)
 
 
 class PoolingModifier(Modifier):
