@@ -134,7 +134,11 @@ class OperatorConverter(ABC):
         raise NotImplementedError
 
     def run(self, node):
-        func = torch._C._jit_get_operation(node.kind())
+        kind = node.kind()
+        inplace = kind.endswith('_')
+        func = torch._C._jit_get_operation(kind)
+        if inplace:
+            tmp_inputs = [x.detach().clone() if isinstance(x, torch.Tensor) else x for x in self.input_tensors]
         if isinstance(func, tuple):
             func = func[0]
         with torch.no_grad():
@@ -157,6 +161,10 @@ class OperatorConverter(ABC):
                         o = func(**kwargs)
                     else:
                         raise e
+
+        if inplace:
+            self.input_tensors.clear()
+            self.input_tensors.extend(tmp_inputs)
 
         if len(self.output_names) == 1:
             self.output_tensors.append(o)
