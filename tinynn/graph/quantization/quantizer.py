@@ -3657,6 +3657,11 @@ class PostQuantizer(QATQuantizer):
                     if hasattr(n.module, "qconfig"):
                         delattr(n.module, "qconfig")
 
+            if hasattr(torch_q, 'add_observer_'):
+                add_observer_func = torch_q.add_observer_
+            else:
+                add_observer_func = sys.modules['torch.ao.quantization.quantize']._add_observer_
+                    
             if LooseVersion(torch.__version__) >= LooseVersion("1.8.0"):
                 if LooseVersion(torch.__version__) >= LooseVersion("1.13.0"):
                     prepare_custom_config_dict = torch.ao.quantization.get_default_custom_config_dict()
@@ -3667,13 +3672,13 @@ class PostQuantizer(QATQuantizer):
                     "float_to_observed_custom_module_class", {}
                 )
 
-                torch_q.add_observer_(
+                add_observer_func(
                     graph.module,
                     qconfig_propagation_list=whitelist,
                     custom_module_class_mapping=custom_module_class_mapping,
                 )
             else:
-                torch_q.add_observer_(
+                add_observer_func(
                     graph.module,
                     qconfig_propagation_list=whitelist,
                 )
