@@ -369,6 +369,7 @@ class QATQuantizer(object):
         if hasattr(yaml, 'CommentedMap'):
             commented_map_cls = yaml.CommentedMap
         else:
+            import yaml.comments
             commented_map_cls = yaml.comments.CommentedMap
 
         self.layerwise_config = commented_map_cls()
