@@ -1,3 +1,5 @@
+import sys
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,10 +9,15 @@ from transformers.models.llama.modeling_llama import LlamaAttention
 from tinynn.llm_quant.llama import LlamaAttentionFused
 from tinynn.util.util import get_logger
 
+from .util import _init_patch_easyquant, get_submodule_with_parent_from_name
+
 log = get_logger(__name__, 'INFO')
 SPEEDUP = True
 
 try:
+    if sys.platform == "win32":
+        _init_patch_easyquant()
+
     from easyquant import (
         decompress_int4,
         decompress_int8,
@@ -19,27 +26,9 @@ try:
         dequantize_bias_per_token,
         dequantize_per_token,
     )
-except ImportError:
+except (ImportError, OSError):
     log.warning('easyquant is not installed, the inference performance may be degraded')
     SPEEDUP = False
-
-
-def get_submodule_with_parent_from_name(model, module_name):
-    """Gets the submodule with its parent and sub_name using the name given"""
-    module_name_parts = module_name.split('.')
-    cur_obj = model
-    last_obj = None
-
-    for ns in module_name_parts:
-        last_obj = cur_obj
-        if type(cur_obj) == nn.ModuleList:
-            cur_obj = cur_obj[int(ns)]
-        elif type(cur_obj) == nn.ModuleDict:
-            cur_obj = cur_obj[ns]
-        else:
-            cur_obj = getattr(cur_obj, ns)
-
-    return cur_obj, last_obj, module_name_parts[-1]
 
 
 def compress_int(data_tensor, bit_width, per_channel=True, per_token=False):
