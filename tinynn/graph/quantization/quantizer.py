@@ -61,6 +61,7 @@ from . import fused_modules as fm
 try:
     import ruamel_yaml as yaml
 except ModuleNotFoundError:
+    import ruamel
     import ruamel.yaml as yaml
 
 
@@ -363,6 +364,8 @@ class QATQuantizer(object):
 
         self.train_mode_dict = {}
 
+        print(dir(ruamel))
+        print(dir(yaml))
         if hasattr(yaml, 'CommentedMap'):
             commented_map_cls = yaml.CommentedMap
         else:
