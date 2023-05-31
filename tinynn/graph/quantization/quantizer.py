@@ -363,7 +363,12 @@ class QATQuantizer(object):
 
         self.train_mode_dict = {}
 
-        self.layerwise_config = yaml.comments.CommentedMap()
+        if hasattr(yaml, 'CommentedMap'):
+            commented_map_cls = yaml.CommentedMap
+        else:
+            commented_map_cls = yaml.comments.CommentedMap
+
+        self.layerwise_config = commented_map_cls()
         self.effective_layers = []
         self.layerwise_default = True
         if config is not None and 'layerwise_config' in config:
