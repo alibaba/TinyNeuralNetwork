@@ -5,14 +5,14 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from tinynn.llm_quant.modules import quant_fc
 
 
-def basic_usage(model_path='decapoda-research/llama-7b-hf', quant_mod='dynamic'):
+def basic_usage(model_path='huggyllama/llama-7b', quant_mod='dynamic'):
     device = torch.device('cuda')
 
     # load LLM model from huggingface or local path
     model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16, low_cpu_mem_usage=True)
     tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
 
-    # Do qujantization.
+    # Do quantization.
     if quant_mod != 'fp16':
         # If your LLM model is Llama-family, you can set fuse_qkv to fuse qkv linear and scaled-dot-product-attention.
         quant_fc(model, quant_mod=quant_mod, fuse_qkv=True)
