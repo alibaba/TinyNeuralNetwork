@@ -7,9 +7,7 @@ from easyquant import (
     quantize_per_token,
     gemm,
     dequantize_bias_per_token,
-    dequantize_bias,
     dequantize_per_token,
-    dequantize,
 )
 
 batch_seq = 128
@@ -64,17 +62,6 @@ class TestOps(unittest.TestCase):
         torch.testing.assert_close(actual_scale, ref_scale)
         torch.testing.assert_close(actual_tensor_q, ref_out)
 
-    def test_dequantize_cuda(self):
-        tensor1 = torch.randint(-128, 128, (batch_seq, out_fea), dtype=torch.int32).cuda()
-        weight_scale = torch.rand(out_fea).cuda()
-        input_scale = torch.rand(1).cuda()
-        out = torch.empty(batch_seq, out_fea, dtype=torch.float16).cuda()
-
-        dequantize(out, tensor1, input_scale, weight_scale)
-        ref_out = (tensor1.to(dtype=torch.float32) * (weight_scale * input_scale)).to(dtype=torch.float16)
-
-        torch.testing.assert_close(out, ref_out)
-
     def test_dequantze_token_cuda(self):
         tensor1 = torch.randint(-128, 128, (batch_seq, out_fea), dtype=torch.int32).cuda()
         weight_scale = torch.rand(out_fea).cuda()
@@ -83,20 +70,6 @@ class TestOps(unittest.TestCase):
 
         dequantize_per_token(out, tensor1, input_scale, weight_scale)
         ref_out = (tensor1.to(dtype=torch.float32) * (weight_scale * input_scale.view(-1, 1))).to(dtype=torch.float16)
-
-        torch.testing.assert_close(out, ref_out)
-
-    def test_dequantize_bias_cuda(self):
-        tensor1 = torch.randint(-128, 128, (batch_seq, out_fea), dtype=torch.int32).cuda()
-        weight_scale = torch.rand(out_fea).cuda()
-        input_scale = torch.rand(1).cuda()
-        bias = torch.rand(out_fea).to(dtype=torch.float16).cuda()
-        out = torch.empty(batch_seq, out_fea, dtype=torch.float16).cuda()
-
-        dequantize_bias(out, tensor1, input_scale, weight_scale, bias)
-        ref_out = (tensor1.to(dtype=torch.float32) * (weight_scale * input_scale) + bias.float()).to(
-            dtype=torch.float16
-        )
 
         torch.testing.assert_close(out, ref_out)
 
