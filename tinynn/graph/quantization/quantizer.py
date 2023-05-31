@@ -60,10 +60,10 @@ from . import fused_modules as fm
 
 try:
     import ruamel_yaml as yaml
+    from ruamel_yaml.comments import CommentedMap
 except ModuleNotFoundError:
     import ruamel.yaml as yaml
-
-from yaml.comments import CommentedMap
+    from ruamel.yaml.comments import CommentedMap
 
 
 # Fusable OPs for Quantize Aware Training
