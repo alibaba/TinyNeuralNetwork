@@ -60,8 +60,10 @@ from . import fused_modules as fm
 
 try:
     import ruamel_yaml as yaml
+    from ruamel_yaml import CommentedMap
 except ModuleNotFoundError:
     import ruamel.yaml as yaml
+    from ruamel.yaml import CommentedMap
 
 
 # Fusable OPs for Quantize Aware Training
@@ -363,7 +365,7 @@ class QATQuantizer(object):
 
         self.train_mode_dict = {}
 
-        self.layerwise_config = yaml.comments.CommentedMap()
+        self.layerwise_config = CommentedMap()
         self.effective_layers = []
         self.layerwise_default = True
         if config is not None and 'layerwise_config' in config:

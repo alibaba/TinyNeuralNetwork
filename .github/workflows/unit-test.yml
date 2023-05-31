@@ -53,7 +53,7 @@ jobs:
             fi
          fi
       - name: Install TinyNeuralNetwork
-        run: python setup.py install
+        run: pip install .
       - name: Install test dependencies
         env:
           PYTORCH_VER: ${{ matrix.vers.pt_ver }}
@@ -105,7 +105,7 @@ jobs:
       - name: Install PyTorch
         run: conda install pytorch torchvision cpuonly -c pytorch
       - name: Install TinyNeuralNetwork
-        run: python setup.py install
+        run: pip install .
       - name: Check op matrix
         run: |
           python scripts/gen_op_docs.py
