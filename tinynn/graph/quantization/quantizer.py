@@ -63,6 +63,8 @@ try:
 except ModuleNotFoundError:
     import ruamel.yaml as yaml
 
+from yaml.comments import CommentedMap
+
 
 # Fusable OPs for Quantize Aware Training
 FUSE_RULE_LIST = {
@@ -363,13 +365,7 @@ class QATQuantizer(object):
 
         self.train_mode_dict = {}
 
-        if hasattr(yaml, 'CommentedMap'):
-            commented_map_cls = yaml.CommentedMap
-        else:
-            import yaml.comments
-            commented_map_cls = yaml.comments.CommentedMap
-
-        self.layerwise_config = commented_map_cls()
+        self.layerwise_config = CommentedMap()
         self.effective_layers = []
         self.layerwise_default = True
         if config is not None and 'layerwise_config' in config:
