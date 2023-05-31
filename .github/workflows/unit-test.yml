@@ -53,7 +53,7 @@ jobs:
             fi
          fi
       - name: Install TinyNeuralNetwork
-        run: python setup.py install
+        run: pip install .
       - name: Install test dependencies
         env:
           PYTORCH_VER: ${{ matrix.vers.pt_ver }}

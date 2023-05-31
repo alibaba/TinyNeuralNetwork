@@ -60,9 +60,11 @@ from . import fused_modules as fm
 
 try:
     import ruamel_yaml as yaml
+    import ruamel_yaml.comments
     from ruamel_yaml.comments import CommentedMap
 except ModuleNotFoundError:
     import ruamel.yaml as yaml
+    import ruamel.yaml.comments
     from ruamel.yaml.comments import CommentedMap
 
 
