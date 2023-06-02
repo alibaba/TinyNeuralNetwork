@@ -77,9 +77,10 @@ class LlamaAttentionFused(nn.Module):
                 )
         elif LooseVersion(torch.__version__) >= LooseVersion('2.0.0'):
             with torch.backends.cuda.sdp_kernel(enable_math=False):
-                attn_output, attn_weights = F.scaled_dot_product_attention(
+                attn_output = F.scaled_dot_product_attention(
                     query_states, key_states, value_states, is_causal=is_causal
                 )
+                attn_weights = None
         else:
             attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
