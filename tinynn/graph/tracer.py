@@ -2782,6 +2782,7 @@ class TraceGraph(object):
         module,
         next_tensors: typing.Optional[typing.List[torch.Tensor]] = None,
         move_idx: bool = False,
+        next_indices: typing.Optional[typing.List[int]] = None,
     ):
         """Insert a module or an existing node before a node in the computation graph"""
         # Create a new node and connects it to the previous node/tensors
@@ -2827,6 +2828,7 @@ class TraceGraph(object):
                 new_node.prev_nodes.append(node.prev_nodes[idx])
             new_node.next_nodes.append(node)
 
+        index_mapping = []
         for idx, new_node in enumerate(new_nodes):
             if not rev_mode:
                 prev_tensors = node.prev_tensors
@@ -2841,13 +2843,16 @@ class TraceGraph(object):
 
             if next_tensors is None:
                 next_tensors = [None] * len(prev_tensors)
-            for t, new_t, ind in zip(prev_tensors, next_tensors, prev_indices):
+            if next_indices is None:
+                next_indices = [None] * len(prev_tensors)
+            for t, new_t, ind, n_ind in zip(prev_tensors, next_tensors, prev_indices, next_indices):
                 if new_t is None:
                     new_t = t.clone()
                 self.tensor_pre_node_dict[id(new_t)] = new_node.unique_name
                 new_node.prev_tensors.append(t)
                 new_node.next_tensors.append(new_t)
-                new_node.prev_indices.append(ind if move_idx else None)
+                new_node.prev_indices.append(ind if move_idx else n_ind)
+                index_mapping.append((ind, new_node.prev_indices[-1]))
 
         # Make output nodes connects to the new node
         node.prev_nodes.clear()
@@ -2879,14 +2884,21 @@ class TraceGraph(object):
         # Update previous node name for next nodes (TraceFunction)
         if type(node.module) == TraceFunction and node not in self.output_nodes:
             new_node = new_nodes[0]
-            old_unique_name = new_node.prev_nodes[0].unique_name
-            is_constant_node = type(new_node.prev_nodes[0].module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
-            is_next_constant_node = type(new_node.module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
-            prev_unique_name = tensor_name_from_parts(old_unique_name, is_constant_node=is_constant_node)
-            next_unique_name = tensor_name_from_parts(new_node.unique_name, is_constant_node=is_next_constant_node)
-            log.debug('node rename: ', prev_unique_name, '->', next_unique_name)
-            n.module.replace_tensor_name(prev_unique_name, next_unique_name)
-            n.module.update_args_string()
+            for i in range(len(new_node.prev_nodes)):
+                old_unique_name = new_node.prev_nodes[i].unique_name
+                is_constant_node = type(new_node.prev_nodes[i].module) in (
+                    ConstantNode,
+                    torch.nn.quantized.FloatFunctional,
+                )
+                is_next_constant_node = type(new_node.module) in (ConstantNode, torch.nn.quantized.FloatFunctional)
+                old_idx, new_idx = index_mapping[i]
+                prev_unique_name = tensor_name_from_parts(old_unique_name, old_idx, is_constant_node=is_constant_node)
+                next_unique_name = tensor_name_from_parts(
+                    new_node.unique_name, new_idx, is_constant_node=is_next_constant_node
+                )
+                log.debug('node rename: ', prev_unique_name, '->', next_unique_name)
+                node.module.replace_tensor_name(prev_unique_name, next_unique_name)
+                node.module.update_args_string()
 
     def __call__(self, *args, **kwargs):
         """Calls the function with a list of tensor inputs"""
