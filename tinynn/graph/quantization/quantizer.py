@@ -35,6 +35,7 @@ from tinynn.graph.quantization.qat_modules import (
     ConvTranspose2d,
     ConvTransposeBn2d,
 )
+
 if LooseVersion(torch.__version__) >= LooseVersion("1.13.0"):
     from tinynn.graph.quantization.quantizable.gru import GRU as QuantizableGRU
     from torch.ao.nn.quantizable.modules.rnn import LSTM as QuantizableLSTM
@@ -2807,36 +2808,61 @@ class QATQuantizer(object):
             assert len(node.prev_nodes) == 2
             assert len(node.prev_tensors) == 2
 
-            l_shape = node.prev_tensors[0].shape
-            r_shape = node.prev_tensors[1].shape
+            l_shape = list(node.prev_tensors[0].shape)
+            r_shape = list(node.prev_tensors[1].shape)
 
+            ref_index = None
             if len(l_shape) > len(r_shape):
                 ref_index = 0
+                r_shape = [1] * (len(l_shape) - len(r_shape)) + r_shape
             elif len(l_shape) < len(r_shape):
                 ref_index = 1
-            else:
-                for l_dim, r_dim in zip(l_shape, r_shape):
-                    if l_dim > r_dim:
+                l_shape = [1] * (len(r_shape) - len(l_shape)) + l_shape
+
+            for l_dim, r_dim in zip(l_shape, r_shape):
+                if l_dim > r_dim:
+                    if ref_index in (None, 0):
                         ref_index = 0
-                        break
-                    elif l_dim < r_dim:
+                    else:
+                        ref_index = -1
+                    break
+                elif l_dim < r_dim:
+                    if ref_index in (None, 1):
                         ref_index = 1
-                        break
+                    else:
+                        ref_index = -1
+                    break
 
-            src_index = 1 - ref_index
+            if ref_index >= 0:
+                src_index = 1 - ref_index
 
-            with override_current_trace_graph(graph):
-                trace_func = TraceFunction('torch.Tensor.expand_as', True, prefix='fuse_').parse_args(
-                    node.prev_tensors[src_index], node.prev_tensors[ref_index]
-                )
-            next_tensors = [node.prev_tensors[src_index].expand_as(node.prev_tensors[ref_index])]
-            graph.insert_between(node.prev_nodes[src_index], node, trace_func, next_tensors)
+                with override_current_trace_graph(graph):
+                    trace_func = TraceFunction('torch.Tensor.expand_as', True, prefix='fuse_').parse_args(
+                        node.prev_tensors[src_index], node.prev_tensors[ref_index]
+                    )
+                next_tensors = [node.prev_tensors[src_index].expand_as(node.prev_tensors[ref_index])]
+                graph.insert_between(node.prev_nodes[src_index], node, trace_func, next_tensors)
 
-            new_node = graph.nodes_map[trace_func.unique_name]
-            new_node.prev_nodes.append(node.prev_nodes[ref_index])
-            new_node.prev_tensors.append(node.prev_tensors[ref_index])
-            new_node.prev_indices.append(node.prev_indices[ref_index])
-            node.prev_nodes[ref_index].next_nodes.append(new_node)
+                new_node = graph.nodes_map[trace_func.unique_name]
+                new_node.prev_nodes.append(node.prev_nodes[ref_index])
+                new_node.prev_tensors.append(node.prev_tensors[ref_index])
+                new_node.prev_indices.append(node.prev_indices[ref_index])
+                node.prev_nodes[ref_index].next_nodes.append(new_node)
+            else:
+                new_indices = []
+                for i in range(2):
+                    if node.prev_indices[i] is None:
+                        new_indices.append(i)
+                    elif isinstance(node.prev_indices[i], (tuple, list)):
+                        new_indices.push(node.prev_indices[i] + [i])
+                    else:
+                        new_indices.push([node.prev_indices[i], i])
+                with override_current_trace_graph(graph):
+                    trace_func = TraceFunction('torch.broadcast_tensors', False, prefix='fuse_').parse_args(
+                        node.prev_tensors[0], node.prev_tensors[1]
+                    )
+                next_tensors = torch.broadcast_tensors(node.prev_tensors[0], node.prev_tensors[1])
+                graph.insert_before(node, trace_func, next_tensors, False, new_indices)
 
         for name in fuse_mapping:
             if name in self.layerwise_config:
@@ -3663,7 +3689,7 @@ class PostQuantizer(QATQuantizer):
                 add_observer_func = torch_q.add_observer_
             else:
                 add_observer_func = sys.modules['torch.ao.quantization.quantize']._add_observer_
-                    
+
             if LooseVersion(torch.__version__) >= LooseVersion("1.8.0"):
                 if LooseVersion(torch.__version__) >= LooseVersion("1.13.0"):
                     prepare_custom_config_dict = torch.ao.quantization.get_default_custom_config_dict()
