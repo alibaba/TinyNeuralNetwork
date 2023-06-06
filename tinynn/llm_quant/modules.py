@@ -43,7 +43,6 @@ def compress_int(data_tensor, bit_width, per_channel=True, per_token=False):
         quantized_tensor = torch.clamp(torch.round(data_tensor.float() / scale[:, None]), q_min, q_max).to(torch.int8)
     elif per_token:
         # per-token quantization
-        # scales = 2 * (data_tensor.abs().max(dim=-1).values.float() / (2**bit_width - 1))
         scales = data_tensor.abs().max(dim=-1).values.float() / q_max
         if len(data_tensor.shape) == 3:
             scales = scales[:, :, None]
