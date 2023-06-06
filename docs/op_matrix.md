@@ -41,6 +41,7 @@ Operators that are implemented in Python
 | `aten::bitwise_not` | Only bools are supported in aten::bitwise_not |
 | `aten::bitwise_or` |  |
 | `aten::bmm` |  |
+| `aten::broadcast_tensors` |  |
 | `aten::cat` |  |
 | `aten::chunk` |  |
 | `aten::clamp` |  |
