@@ -31,8 +31,7 @@ class OpCode(object):
         tflite.OperatorCodeStart(builder)
         if self.code < tflite.BuiltinOperator.PLACEHOLDER_FOR_GREATER_OP_CODES:
             tflite.OperatorCodeAddDeprecatedBuiltinCode(builder, self.code)
-        else:
-            tflite.OperatorCodeAddBuiltinCode(builder, self.code)
+        tflite.OperatorCodeAddBuiltinCode(builder, self.code)
         tflite.OperatorCodeAddVersion(builder, self.version)
 
         if custom_code is not None:
