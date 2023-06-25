@@ -41,7 +41,6 @@ Operators that are implemented in Python
 | `aten::bitwise_not` | Only bools are supported in aten::bitwise_not |
 | `aten::bitwise_or` |  |
 | `aten::bmm` |  |
-| `aten::broadcast_tensors` |  |
 | `aten::cat` |  |
 | `aten::chunk` |  |
 | `aten::clamp` |  |
@@ -76,6 +75,7 @@ Operators that are implemented in Python
 | `aten::flip` |  |
 | `aten::floor` |  |
 | `aten::floor_divide` | floor_divide for floats is not supported<br>floor_divide for negative numbers is not supported |
+| `aten::frobenius_norm` |  |
 | `aten::gather` |  |
 | `aten::ge` |  |
 | `aten::gelu` |  |
