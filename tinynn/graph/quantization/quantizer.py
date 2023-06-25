@@ -447,6 +447,7 @@ class QATQuantizer(object):
 
         # We need a model in training mode so that QAT could take place
         self.set_model_mode(preserve=True)
+        # self.model.eval()
 
         if self.rewrite_graph:
             # Retrives the name of the model from type info

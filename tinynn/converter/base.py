@@ -313,7 +313,7 @@ class TFLiteConverter(object):
         self.graph = graph
 
         log.debug('Lowered graph:')
-        log.debug(self.graph)
+        log.warning(self.graph)
 
     def init_flatten_inputs(self):
         self.flatten_inputs.clear()
@@ -481,6 +481,7 @@ class TFLiteConverter(object):
 
         unsupported_ops = self.unsupported_operations()
         if len(unsupported_ops) > 0:
+            print(unsupported_ops)
             log.error(f'Unsupported ops: {", ".join(unsupported_ops)}')
             raise Exception("Cannot continue due to fatal error")
         else:

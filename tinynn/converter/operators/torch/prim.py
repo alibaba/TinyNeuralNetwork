@@ -43,6 +43,8 @@ class PrimListConstructConverter(PrimOperatorConverter):
 
 class PrimListUnpackConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
+        print(node)
+        print(self.input_tensors[0].shape)
         assert type(self.input_tensors[0]) in (list, tuple)
         assert len(self.input_tensors[0]) == len(self.output_names)
         self.output_tensors.extend(self.input_tensors[0])
