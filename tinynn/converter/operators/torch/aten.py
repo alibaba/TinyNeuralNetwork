@@ -3770,6 +3770,64 @@ class ATenNormOperator(ATenNormSchema):
         self.parse_common(node, attrs, args, graph_converter)
 
 
+class ATenFrobeniusNormOperator(ATenNormSchema):
+    def parse_common(self, node, attrs, args, graph_converter):
+
+        if 'p' not in args:
+            self.input_tensors.insert(1, 2)
+            p = 2
+
+        input_t = self.find_or_create_input(0, graph_converter)
+
+        if 'dim' in args and 'keepdim' in args and self.input_tensors[args['dim']] is not None:
+            dims, keep_dim = self.input_tensors[2:4]
+            if type(dims) not in (list, tuple):
+                dims = [dims]
+            if len(dims) == 0:
+                dims = list(range(input_t.tensor.ndim))
+                self.output_tensors[0] = self.output_tensors[0].view(1)
+            elif len(dims) == input_t.tensor.ndim:
+                self.output_tensors[0] = self.output_tensors[0].view(1)
+        else:
+            dims = list(range(input_t.tensor.ndim))
+            keep_dim = False
+            self.output_tensors[0] = self.output_tensors[0].view(1)
+
+        for idx, dim in enumerate(dims):
+            if dim < 0:
+                dims[idx] += input_t.tensor.ndim
+
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+        dim_t = self.create_attr_tensor(np.array(dims, dtype='int32'))
+
+        ops = []
+        if p == 1:
+            tgt_t = self.create_transform_tensor(np.abs(input_t.tensor))
+            ops.append(tfl.AbsOperator([input_t], [tgt_t]))
+            actual_output = outputs[0]
+        else:
+            tgt_t = self.create_transform_tensor(np.power(input_t.tensor, 2))
+            two_t = self.create_attr_tensor(np.array([2.0], dtype='float32'))
+            ops.append(tfl.PowOperator([input_t, two_t], [tgt_t]))
+
+            actual_output = self.create_transform_tensor(outputs[0].tensor)
+
+        ops.append(tfl.SumOperator([tgt_t, dim_t], [actual_output], keepDims=keep_dim))
+
+        if actual_output != outputs[0]:
+            half_t = self.create_attr_tensor(np.array([0.5], dtype='float32'))
+            ops.append(tfl.PowOperator([actual_output, half_t], outputs))
+
+        for op in ops:
+            graph_converter.add_operator(op)
+
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.parse_common(node, attrs, args, graph_converter)
+
+        
 class ATenLinalgVectorNormOperator(ATenLinalgVectorNormSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
