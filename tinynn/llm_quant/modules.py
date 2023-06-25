@@ -43,7 +43,7 @@ def compress_int(data_tensor, bit_width, per_channel=True, per_token=False):
         quantized_tensor = torch.clamp(torch.round(data_tensor.float() / scale[:, None]), q_min, q_max).to(torch.int8)
     elif per_token:
         # per-token quantization
-        scales = 2 * (data_tensor.abs().max(dim=-1).values.float() / (2**bit_width - 1))
+        scales = data_tensor.abs().max(dim=-1).values.float() / q_max
         if len(data_tensor.shape) == 3:
             scales = scales[:, :, None]
         elif len(data_tensor.shape) == 2:
@@ -77,6 +77,9 @@ class QLinear(nn.Module):
         bias = None if fc.bias is None else fc.bias.data
         # compress weight by given bit, use per-channel and [-127,127]/[-7,7] to clamp
         scale, weight_q = compress_int(fc.weight.data, weight_bit_width)
+        if self.in_features % 4 != 0 and quant_mode == 'dynamic':
+            weight_q = F.pad(weight_q, (0, 4 - self.in_features % 4))
+
         if self.weight_bit_width == 4:
             weight_shape = weight_q.shape
             assert len(weight_shape) == 2
@@ -107,15 +110,16 @@ class QLinear(nn.Module):
                 else:
                     weight_fp = (
                         torch.stack((self.weight >> 4, self.weight << 4 >> 4), -1)
-                        .view(self.in_features, -1)
+                        .view(self.out_features, self.in_features)
                         .to(dtype=torch.float32)
                         * self.weight_scale[:, None]
                     ).to(dtype=torch.half)
-            elif not SPEEDUP:
-                weight_fp = (self.weight.to(dtype=torch.float32) * self.weight_scale[:, None]).to(dtype=torch.half)
-            elif 'dynamic' not in self.quant_mod:
-                weight_fp = torch.empty_like(self.weight.data, dtype=input_dtype, device=input_device)
-                decompress_int8(weight_fp, self.weight, self.weight_scale)
+            elif self.quant_mod == 'weight8':
+                if SPEEDUP:
+                    weight_fp = torch.empty_like(self.weight.data, dtype=input_dtype, device=input_device)
+                    decompress_int8(weight_fp, self.weight, self.weight_scale)
+                else:
+                    weight_fp = (self.weight.to(dtype=torch.float32) * self.weight_scale[:, None]).to(dtype=torch.half)
 
             if 'dynamic' in self.quant_mod:
                 if SPEEDUP:
@@ -123,8 +127,15 @@ class QLinear(nn.Module):
                     # and finally dequantize the output to float
                     input_viewed = input.view(-1, input_shape[-1])
 
+                    # pad self.weight to 4x
+                    padding_num = 4 - self.in_features % 4 if self.in_features % 4 != 0 else 0
+
                     # init easyquant kernels' output
-                    input_q = torch.empty_like(input_viewed, dtype=torch.int8, device=input_device)
+                    input_q = torch.empty(
+                        (input_viewed.shape[0], input_viewed.shape[1] + padding_num),
+                        dtype=torch.int8,
+                        device=input_device,
+                    )
                     scale_shape = input_viewed.shape[0] if 'token' in self.quant_mod else 1
                     input_scale = torch.zeros(scale_shape, device=input_device)
                     out_q = torch.empty(
@@ -144,11 +155,14 @@ class QLinear(nn.Module):
                     output = output.view(input_shape[:-1] + (output.shape[-1],))
                 else:
                     # simulate quantization
-                    input_scale, input_q = compress_int(
-                        input, 8, per_channel=False, per_token=('token' in self.quant_mod)
-                    )
-                    input_fq = (input_q * input_scale).to(input.dtype).to(input.device)
-                    output = F.linear(input_fq, weight_fp, self.bias)
+                    input_scale, input_q = compress_int(input, 8, per_channel=False, per_token=True)
+                    if self.in_features % 4 != 0:
+                        output = F.linear(
+                            input_q.float(), self.weight[:, : self.in_features % 4 - 4].float(), self.bias
+                        )
+                    else:
+                        output = F.linear(input_q.float(), self.weight.float(), self.bias)
+                    output = (output.float() * (self.weight_scale * input_scale.view(-1, 1))).half()
             else:
                 input_fq = input
                 output = F.linear(input_fq, weight_fp, self.bias)
@@ -162,8 +176,12 @@ class TDQLinear_noinit(QLinear):
         bs, seq, _ = input_shape
         input_device = input.device
         input_viewed = input.view(-1, self.in_features)
+        # pad self.weight to 4x
+        padding_num = 4 - self.in_features % 4 if self.in_features % 4 != 0 else 0
 
-        input_q = torch.empty_like(input_viewed, dtype=torch.int8, device=input_device)
+        input_q = torch.empty(
+            (input_viewed.shape[0], self.in_features + padding_num), dtype=torch.int8, device=input_device
+        )
         input_scale = torch.empty(bs * seq, device=input_device)
         out_q = torch.empty((bs * seq, self.out_features), dtype=torch.int32, device=input_device)
         output = torch.empty_like(out_q, dtype=torch.float16, device=input_device)

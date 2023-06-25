@@ -23,9 +23,8 @@ class TestOps(unittest.TestCase):
         actual = torch.empty((tensor1.shape[0], out_fea), dtype=torch.int32, device=torch.device('cuda'))
 
         gemm(actual, tensor1, tensor2)
-        expected = torch.mm(
-            tensor1.cpu().to(dtype=torch.int32),
-            tensor2.cpu().transpose(0, 1).to(dtype=torch.int32),
+        expected = torch.nn.functional.linear(
+            tensor1.cpu().to(torch.int32), tensor2.cpu().to(torch.int32), bias=None
         ).cuda()
 
         torch.testing.assert_close(actual, expected)
