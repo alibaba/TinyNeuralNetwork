@@ -3770,6 +3770,20 @@ class ATenNormOperator(ATenNormSchema):
         self.parse_common(node, attrs, args, graph_converter)
 
 
+class ATenFrobeniusNormOperator(ATenFrobeniusNormSchema):
+    def parse_common(self, node, attrs, args, graph_converter):
+
+        assert 'p' not in args
+        self.input_tensors.insert(1, 2)
+        ATenNormOperator.parse_common(self, node, attrs, args, graph_converter)
+
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.parse_common(node, attrs, args, graph_converter)
+
+        
 class ATenLinalgVectorNormOperator(ATenLinalgVectorNormSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
