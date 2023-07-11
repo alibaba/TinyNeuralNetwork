@@ -497,6 +497,7 @@ class TFLiteConverter(object):
                 self.max_transpose_dims,
                 self.bypass_elementwise_passthrough_constraint,
                 self.group_tensors,
+                self.conv_transpose_with_bias,
             )
             optimizer.optimize()
 

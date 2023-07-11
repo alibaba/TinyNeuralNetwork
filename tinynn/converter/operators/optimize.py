@@ -50,6 +50,7 @@ class GraphOptimizer(object):
         max_transpose_dims: int = -1,
         bypass_elementwise_passthrough_constraint: bool = False,
         group_tensors: bool = False,
+        conv_transpose_with_bias: bool = True,
     ) -> None:
         self.graph = graph
         self.fuse_tensor_count = 0
@@ -65,6 +66,7 @@ class GraphOptimizer(object):
         self.max_transpose_dims = max_transpose_dims
         self.bypass_elementwise_passthrough_constraint = bypass_elementwise_passthrough_constraint
         self.group_tensors = group_tensors
+        self.conv_transpose_with_bias = conv_transpose_with_bias
 
     def create_attr_tensor(
         self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
@@ -173,6 +175,9 @@ class GraphOptimizer(object):
 
         remove_ids = []
         for pre_activ, activ, tensor in filtered_pairs:
+            if not self.conv_transpose_with_bias and pre_activ['node_type'] == ExtendedOperator.GENERIC_DECONV:
+                continue
+
             # Find out the output of the batch-norm nodes
             new_output = activ['outputs'][0]
             assert new_output in self.graph.tensor_map
