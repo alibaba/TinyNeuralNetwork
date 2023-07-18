@@ -2821,17 +2821,17 @@ class QATQuantizer(object):
 
             for l_dim, r_dim in zip(l_shape, r_shape):
                 if l_dim > r_dim:
-                    if ref_index in (None, 0):
+                    if ref_index in (None, 0) and r_dim == 1:
                         ref_index = 0
                     else:
                         ref_index = -1
-                    break
+                        break
                 elif l_dim < r_dim:
-                    if ref_index in (None, 1):
+                    if ref_index in (None, 1) and l_dim == 1:
                         ref_index = 1
                     else:
                         ref_index = -1
-                    break
+                        break
 
             if ref_index >= 0:
                 src_index = 1 - ref_index
