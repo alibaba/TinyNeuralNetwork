@@ -1293,6 +1293,16 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_quantized_mul_different_shape_complex(self):
+        class Model(nn.Module):
+            def forward(self, x):
+                return x.transpose(0, 1) * x
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs)
+
     def test_quantized_add_relu_different_shape(self):
         class Model(nn.Module):
             def forward(self, x):
