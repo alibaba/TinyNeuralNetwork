@@ -1152,6 +1152,20 @@ class GraphOptimizer(object):
 
             # TODO: Support multi-multi mappings
             if mode == '?':
+                # reset hints if passthrough is not possible
+                for i in input_indices:
+                    prev_node_name = op.inputs[i].name
+                    prev_node = self.graph.graph.vs.find(name=self.graph.tensor_node_map[prev_node_name])
+                    if prev_node['node_type'] == ExtendedOperator.TRANSPOSE:
+                        if 'direction' in prev_node['op'].extra_hints:
+                            prev_node['op'].extra_hints.pop('direction')
+                for edge in node.out_edges():
+                    if edge.index in remove_edges:
+                        continue
+                    next_node = self.graph.graph.vs[edge.target]
+
+                    if 'direction' in next_node['op'].extra_hints:
+                        next_node['op'].extra_hints.pop('direction')
                 continue
 
             check_consecutive_indices = []
@@ -3278,6 +3292,7 @@ class GraphOptimizer(object):
         # Transpose and reshape cleanup
         for _ in range(2):
             self.transpose_to_reshape_pass()
+            self.branch_reshape_expand_pass()
             self.fuse_simple_reshape_pass()
             self.fuse_simple_transpose_pass()
 
