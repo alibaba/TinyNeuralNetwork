@@ -351,7 +351,12 @@ if LooseVersion(torch.__version__) >= '1.13.0':
                 hx = [zeros for _ in range(self.num_layers)]
             else:
                 hidden_non_opt = torch.jit._unwrap_optional(hidden)
-                if isinstance(hidden_non_opt[0], Tensor):
+                if isinstance(hidden_non_opt, Tensor):
+                    hx = hidden_non_opt.reshape(
+                        self.num_layers, num_directions, max_batch_size, self.hidden_size
+                    ).unbind(0)
+                    hx = [(hx[idx].squeeze_(0)) for idx in range(self.num_layers)]
+                elif isinstance(hidden_non_opt[0], Tensor):
                     hx = (
                         hidden_non_opt[0]
                         .reshape(self.num_layers, num_directions, max_batch_size, self.hidden_size)

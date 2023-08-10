@@ -127,11 +127,13 @@ FUSE_QAT_MODULES = {
 }
 
 FUSE_QAT_MODULES_CUSTOM = {}
+FUSE_PTQ_MODULES_CUSTOM = {}
 
 if LooseVersion(torch.__version__) >= '1.13.0':
     from .quantizable.gru import GRU
 
     FUSE_QAT_MODULES_CUSTOM.update({nn.GRU: GRU})
+    FUSE_PTQ_MODULES_CUSTOM.update({nn.GRU: GRU})
 
 FUSE_QAT_MODULES_CVT = {Conv1d: nnq.Conv1d}
 if hasattr(nnq, 'ConvTranspose1d'):
@@ -3699,6 +3701,17 @@ class PostQuantizer(QATQuantizer):
                 custom_module_class_mapping = prepare_custom_config_dict.get(
                     "float_to_observed_custom_module_class", {}
                 )
+
+                custom_module_class_mapping.update(FUSE_PTQ_MODULES_CUSTOM)
+
+                def patch_observer_set(orig_func):
+                    def new_no_observer_set():
+                        return set(FUSE_PTQ_MODULES_CUSTOM.values()) | orig_func()
+
+                    return new_no_observer_set
+
+                orig_no_observer_set = sys.modules['torch.ao.quantization.quantize'].no_observer_set
+                sys.modules['torch.ao.quantization.quantize'].no_observer_set = patch_observer_set(orig_no_observer_set)
 
                 add_observer_func(
                     graph.module,
