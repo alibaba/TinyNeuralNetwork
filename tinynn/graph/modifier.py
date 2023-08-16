@@ -2379,6 +2379,13 @@ class Conv2dChannelModifier(Modifier):
         return True
 
     def dim_change_forward(self, center, tensor, dim_changes_i, dim_transform, tensor_constraint):
+        # "Conv2d don't support change wh dimensions."
+        if self.dim_h in dim_changes_i:
+            dim_changes_i.remove(self.dim_h)
+
+        if self.dim_w in dim_changes_i:
+            dim_changes_i.remove(self.dim_w)
+
         tensor_constraint = self.dim_changes_info.update_i(
             center, tensor, dim_changes_i, dim_transform, tensor_constraint=tensor_constraint
         )
