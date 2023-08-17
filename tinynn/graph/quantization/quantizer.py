@@ -2394,6 +2394,7 @@ class QATQuantizer(object):
             check_node_quantized=False,
             graph=graph,
             layerwise_config_default=True,
+            use_original_name=False
         )
         custom_data = ([], set())
         graph.filter_forward_nodes(is_rewrite_to_fuse, custom_data, reverse=True)
