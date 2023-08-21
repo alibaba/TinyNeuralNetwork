@@ -151,6 +151,7 @@ Operators that are implemented in Python
 | `aten::select` |  |
 | `aten::sigmoid` |  |
 | `aten::sigmoid_` |  |
+| `aten::sign` |  |
 | `aten::silu` |  |
 | `aten::silu_` |  |
 | `aten::sin` |  |

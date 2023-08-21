@@ -13,6 +13,15 @@ from .. import tflite as tfl
 log = get_logger(__name__, 'INFO')
 
 
+class AtenSignOperator(ATenSignSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        self.elementwise_unary(tfl.SignOperator, graph_converter)
+
+
 class ATenLstmOperator(ATenLstmSchema):
     def lstm_input_helper(
         self, input_tensors, params_tensors, has_biases, param_start_index, input_start_index, layer_idx, suffix
