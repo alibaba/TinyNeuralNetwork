@@ -81,6 +81,20 @@ def u8_to_s8(t):
 
 
 class ConverterOPTester(unittest.TestCase):
+    def test_sign(self):
+        dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
+
+        def model(x):
+            return torch.sign(x)
+        
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output) 
+
     def test_masked_fill(self):
         class TestModel(nn.Module):
             def forward(self, x):
