@@ -23,6 +23,31 @@ def fuse_conv_bn_weights(conv_w, conv_b, bn_rm, bn_rv, bn_eps, bn_w, bn_b, trans
     )
 
 
+def fuse_bn_conv_weights(conv_w, conv_b, bn_rm, bn_rv, bn_eps, bn_w, bn_b):
+    if conv_b is None:
+        conv_b = torch.zeros(conv_w.shape[0], dtype=conv_w.dtype, device=conv_w.device)
+    if bn_w is None:
+        bn_w = torch.ones_like(bn_rm)
+    if bn_b is None:
+        bn_b = torch.zeros_like(bn_rm)
+    bn_var_rsqrt = torch.rsqrt(bn_rv + bn_eps)
+
+    shape = [1, -1] + [1] * (len(conv_w.shape) - 2)
+    reduced_dims = [i for i in range(len(conv_w.shape)) if i > 1]
+
+    if conv_w.shape[1] == 1 and bn_rm.shape[0] > 1:
+        offset_b = (conv_w.sum(dim=reduced_dims) * bn_b.reshape(-1, 1)).reshape(-1)
+    else:
+        offset_b = conv_w.sum(dim=reduced_dims).matmul(bn_b.reshape(-1, 1)).reshape(-1)
+
+    fused_conv_w = conv_w * (bn_w * bn_var_rsqrt).reshape(shape)
+    fused_conv_b = conv_b + offset_b
+
+    return torch.nn.Parameter(fused_conv_w, conv_w.requires_grad), torch.nn.Parameter(
+        fused_conv_b, conv_b.requires_grad
+    )
+
+
 def get_parameter(mod: torch.nn.Module, param: str) -> torch.nn.Parameter:
     if param == 'weight':
         if isinstance(mod, torch.nn.Sequential):

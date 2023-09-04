@@ -33,7 +33,7 @@ jobs:
         run: |
          if [ "$RUNNER_OS" == "macOS" ]; then
             if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
-              conda install pytorch torchvision -c pytorch
+              conda install pytorch::pytorch torchvision -c pytorch
             elif [[ "$TORCHVISION_VER" == "0.9."* || "$TORCHVISION_VER" == "0.10."* ]]; then
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER pillow=6 -c pytorch
             else
