@@ -81,6 +81,8 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `{add, relu6}` |  |
 | `{add, torch.nn.ReLU6}` |  |
 | `{torch.nn.BatchNorm2d, clamp}` |  |
+| `{torch.nn.BatchNorm2d, torch.nn.Conv2d}` | PTQ only. |
+| `{torch.nn.BatchNorm2d, torch.nn.Conv2d, torch.nn.ReLU}` | PTQ only. |
 | `{torch.nn.BatchNorm2d, torch.nn.ReLU}` |  |
 | `{torch.nn.BatchNorm2d, torch.nn.ReLU6}` |  |
 | `{torch.nn.BatchNorm3d, torch.nn.ReLU}` |  |

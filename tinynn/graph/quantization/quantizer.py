@@ -88,6 +88,8 @@ FUSE_RULE_LIST_PTQ_ONLY = {
     (nn.Linear, nn.BatchNorm1d): '1.8.0',
     (nn.ConvTranspose1d, nn.BatchNorm1d): '1.11.0',
     (nn.ConvTranspose3d, nn.BatchNorm3d): '1.11.0',
+    (nn.BatchNorm2d, nn.Conv2d): None,
+    (nn.BatchNorm2d, nn.Conv2d, nn.ReLU): None,
 }
 
 FUSE_RULE_LIST_EXTRA = {
@@ -2394,7 +2396,7 @@ class QATQuantizer(object):
             check_node_quantized=False,
             graph=graph,
             layerwise_config_default=True,
-            use_original_name=False
+            use_original_name=False,
         )
         custom_data = ([], set())
         graph.filter_forward_nodes(is_rewrite_to_fuse, custom_data, reverse=True)
@@ -4016,9 +4018,11 @@ def load_processed_qat_rules():
 
 def load_processed_ptq_rules():
     if len(processed_ptq_rules) == 0:
-        # Constructor a prefix tree for the QAT rules
+        # Constructor a prefix tree for the PTQ rules
         filtered_ptq_rules = {
-            k for k, v in FUSE_RULE_LIST_PTQ_ONLY.items() if LooseVersion(torch.__version__) >= LooseVersion(v)
+            k
+            for k, v in FUSE_RULE_LIST_PTQ_ONLY.items()
+            if v is None or LooseVersion(torch.__version__) >= LooseVersion(v)
         }
         ptq_rules = set(FUSE_RULE_LIST).union(set(filtered_ptq_rules))
         fuse_rules = sorted(ptq_rules, key=lambda x: len(x), reverse=True)
@@ -4059,7 +4063,9 @@ def load_processed_all_ptq_rules():
     if len(processed_all_ptq_rules) == 0:
         # Constructor a prefix tree for the QAT rules
         filtered_ptq_rules = {
-            k for k, v in FUSE_RULE_LIST_PTQ_ONLY.items() if LooseVersion(torch.__version__) >= LooseVersion(v)
+            k
+            for k, v in FUSE_RULE_LIST_PTQ_ONLY.items()
+            if v is None or LooseVersion(torch.__version__) >= LooseVersion(v)
         }
         ptq_rules = set(FUSE_RULE_LIST).union(set(filtered_ptq_rules)).union(set(FUSE_RULE_LIST_EXTRA))
         fuse_rules = sorted(ptq_rules, key=lambda x: len(x), reverse=True)
