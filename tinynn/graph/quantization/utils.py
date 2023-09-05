@@ -35,10 +35,12 @@ def fuse_bn_conv_weights(conv_w, conv_b, bn_rm, bn_rv, bn_eps, bn_w, bn_b):
     shape = [1, -1] + [1] * (len(conv_w.shape) - 2)
     reduced_dims = [i for i in range(len(conv_w.shape)) if i > 1]
 
+    fused_b = bn_b - bn_rm * bn_var_rsqrt * bn_w
+
     if conv_w.shape[1] == 1 and bn_rm.shape[0] > 1:
-        offset_b = (conv_w.sum(dim=reduced_dims) * bn_b.reshape(-1, 1)).reshape(-1)
+        offset_b = (conv_w.sum(dim=reduced_dims) * fused_b.reshape(-1, 1)).reshape(-1)
     else:
-        offset_b = conv_w.sum(dim=reduced_dims).matmul(bn_b.reshape(-1, 1)).reshape(-1)
+        offset_b = conv_w.sum(dim=reduced_dims).matmul(fused_b.reshape(-1, 1)).reshape(-1)
 
     fused_conv_w = conv_w * (bn_w * bn_var_rsqrt).reshape(shape)
     fused_conv_b = conv_b + offset_b
