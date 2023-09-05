@@ -1592,6 +1592,42 @@ class DeQuantizerTester(unittest.TestCase):
 
         check_dequantize_rewrite(model, inputs)
 
+    def test_simple_q_add_scalar(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+                self.q = torch.quantization.QuantStub()
+                self.dq = torch.quantization.DeQuantStub()
+                self.f = torch.nn.quantized.FloatFunctional()
+
+            def forward(self, x):
+                x = self.q(x)
+                return self.f.add_scalar(x, 0.5)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_dequantize_rewrite(model, inputs)
+
+    def test_simple_q_mul_scalar(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+                self.q = torch.quantization.QuantStub()
+                self.dq = torch.quantization.DeQuantStub()
+                self.f = torch.nn.quantized.FloatFunctional()
+
+            def forward(self, x):
+                x = self.q(x)
+                return self.f.mul_scalar(x, 0.5)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_dequantize_rewrite(model, inputs)
+
     def test_conv_transpose_bn_fusion(self):
         class Model(nn.Module):
             def __init__(self):
