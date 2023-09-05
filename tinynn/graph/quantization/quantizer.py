@@ -3948,6 +3948,25 @@ class DeQuantizer(object):
             next_out = torch.relu(n.next_tensors[0])
             graph.insert_after(n, next_func, [next_out])
 
+        # Replace FloatFunctional.{add_scalar, mul_scalar} with torch.{add, mul}
+        def _is_add_mul_scalar_node(node: TraceNode, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if cur_class == TraceFunction:
+                return (
+                    cur_module.kind in ('add_scalar', 'mul_scalar')
+                    and len(node.prev_nodes) > 1
+                    and node.prev_nodes[0].type() == nnq.FloatFunctional
+                )
+
+        add_mul_scalar_nodes = graph.filter_forward_nodes(_is_add_mul_scalar_node)
+        for n in add_mul_scalar_nodes:
+            n.module.kind = n.module.kind.split('_')[0]
+            n.module.func_type = n.module.kind
+
+            parts = n.module.full_name.split('.')[:-1] + [n.module.func_type]
+            n.module.full_name = '.'.join(parts)
+
         # Replace FloatFunctional.{add, mul, cat} with torch.{add, mul, cat}
         def _is_add_mul_cat_node(node: TraceNode, custom_data):
             cur_module = node.module
