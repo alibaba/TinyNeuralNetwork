@@ -1870,6 +1870,7 @@ class QATQuantizer(object):
                     cur_module.kind in ('add', 'mul', 'cat')
                     and torch.is_floating_point(node.next_tensors[0])
                     and self.layerwise_config.get(node.unique_name, True)
+                    and all((torch.is_floating_point(pt) for pt in node.prev_tensors))
                 )
 
         convertible_nodes = graph.filter_forward_nodes(_is_convertible_node)
