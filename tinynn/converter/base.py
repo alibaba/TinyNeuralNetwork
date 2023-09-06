@@ -414,10 +414,10 @@ class TFLiteConverter(object):
                     if self.common_graph.has_nested_names(n):
                         nested_names = self.common_graph.get_list_expanded_names(n)
                         for x in nested_names:
-                            if x in self.common_graph.tensor_map:
+                            if x in self.common_graph.tensor_map and self.common_graph.tensor_map[x].buffer is None:
                                 no_track_flag = False
                                 break
-                    elif n in self.common_graph.tensor_map:
+                    elif n in self.common_graph.tensor_map and self.common_graph.tensor_map[n].buffer is None:
                         no_track_flag = False
                         break
                 if no_track_flag:
