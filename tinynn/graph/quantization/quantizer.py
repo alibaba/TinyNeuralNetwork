@@ -1525,6 +1525,7 @@ class QATQuantizer(object):
                 'Graph is quantized. No need to rewrite. Please pass in `config={"rewrite_graph": False}` to suppress'
                 ' this warning'
             )
+            return
 
         if self.backend == 'tensorrt':
             return self.rewrite_quantize_graph_for_tensorrt(graph)
