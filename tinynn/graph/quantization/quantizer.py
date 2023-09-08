@@ -88,6 +88,8 @@ FUSE_RULE_LIST_PTQ_ONLY = {
     (nn.Linear, nn.BatchNorm1d): '1.8.0',
     (nn.ConvTranspose1d, nn.BatchNorm1d): '1.11.0',
     (nn.ConvTranspose3d, nn.BatchNorm3d): '1.11.0',
+    (nn.BatchNorm2d, nn.Conv2d): None,
+    (nn.BatchNorm2d, nn.Conv2d, nn.ReLU): None,
 }
 
 FUSE_RULE_LIST_EXTRA = {
@@ -1523,6 +1525,7 @@ class QATQuantizer(object):
                 'Graph is quantized. No need to rewrite. Please pass in `config={"rewrite_graph": False}` to suppress'
                 ' this warning'
             )
+            return
 
         if self.backend == 'tensorrt':
             return self.rewrite_quantize_graph_for_tensorrt(graph)
@@ -1868,6 +1871,7 @@ class QATQuantizer(object):
                     cur_module.kind in ('add', 'mul', 'cat')
                     and torch.is_floating_point(node.next_tensors[0])
                     and self.layerwise_config.get(node.unique_name, True)
+                    and all((torch.is_floating_point(pt) for pt in node.prev_tensors))
                 )
 
         convertible_nodes = graph.filter_forward_nodes(_is_convertible_node)
@@ -2394,7 +2398,7 @@ class QATQuantizer(object):
             check_node_quantized=False,
             graph=graph,
             layerwise_config_default=True,
-            use_original_name=False
+            use_original_name=False,
         )
         custom_data = ([], set())
         graph.filter_forward_nodes(is_rewrite_to_fuse, custom_data, reverse=True)
@@ -3946,6 +3950,25 @@ class DeQuantizer(object):
             next_out = torch.relu(n.next_tensors[0])
             graph.insert_after(n, next_func, [next_out])
 
+        # Replace FloatFunctional.{add_scalar, mul_scalar} with torch.{add, mul}
+        def _is_add_mul_scalar_node(node: TraceNode, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            if cur_class == TraceFunction:
+                return (
+                    cur_module.kind in ('add_scalar', 'mul_scalar')
+                    and len(node.prev_nodes) > 1
+                    and node.prev_nodes[0].type() == nnq.FloatFunctional
+                )
+
+        add_mul_scalar_nodes = graph.filter_forward_nodes(_is_add_mul_scalar_node)
+        for n in add_mul_scalar_nodes:
+            n.module.kind = n.module.kind.split('_')[0]
+            n.module.func_type = n.module.kind
+
+            parts = n.module.full_name.split('.')[:-1] + [n.module.func_type]
+            n.module.full_name = '.'.join(parts)
+
         # Replace FloatFunctional.{add, mul, cat} with torch.{add, mul, cat}
         def _is_add_mul_cat_node(node: TraceNode, custom_data):
             cur_module = node.module
@@ -4016,9 +4039,11 @@ def load_processed_qat_rules():
 
 def load_processed_ptq_rules():
     if len(processed_ptq_rules) == 0:
-        # Constructor a prefix tree for the QAT rules
+        # Constructor a prefix tree for the PTQ rules
         filtered_ptq_rules = {
-            k for k, v in FUSE_RULE_LIST_PTQ_ONLY.items() if LooseVersion(torch.__version__) >= LooseVersion(v)
+            k
+            for k, v in FUSE_RULE_LIST_PTQ_ONLY.items()
+            if v is None or LooseVersion(torch.__version__) >= LooseVersion(v)
         }
         ptq_rules = set(FUSE_RULE_LIST).union(set(filtered_ptq_rules))
         fuse_rules = sorted(ptq_rules, key=lambda x: len(x), reverse=True)
@@ -4059,7 +4084,9 @@ def load_processed_all_ptq_rules():
     if len(processed_all_ptq_rules) == 0:
         # Constructor a prefix tree for the QAT rules
         filtered_ptq_rules = {
-            k for k, v in FUSE_RULE_LIST_PTQ_ONLY.items() if LooseVersion(torch.__version__) >= LooseVersion(v)
+            k
+            for k, v in FUSE_RULE_LIST_PTQ_ONLY.items()
+            if v is None or LooseVersion(torch.__version__) >= LooseVersion(v)
         }
         ptq_rules = set(FUSE_RULE_LIST).union(set(filtered_ptq_rules)).union(set(FUSE_RULE_LIST_EXTRA))
         fuse_rules = sorted(ptq_rules, key=lambda x: len(x), reverse=True)

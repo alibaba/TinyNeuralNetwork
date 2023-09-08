@@ -79,10 +79,16 @@ def prepare_fusion_rules(lines):
     full_dict = {k: None for k in set((*FUSE_RULE_LIST, *FUSE_RULE_LIST_EXTRA, *REWRITE_TO_FUSE_RULE_LIST))}
     for r, v in FUSE_RULE_LIST_PTQ_ONLY.items():
         s = full_dict.get(r, False)
-        if s is None:
-            full_dict[r] = f'for PTQ, only PyTorch {v}+ is supported'
+        if v is None:
+            if s is None:
+                assert False, "Should not happen"
+            else:
+                full_dict[r] = 'PTQ only.'
         else:
-            full_dict[r] = f'PTQ only. Only PyTorch {v}+ is supported'
+            if s is None:
+                full_dict[r] = f'for PTQ, only PyTorch {v}+ is supported'
+            else:
+                full_dict[r] = f'PTQ only. Only PyTorch {v}+ is supported'
 
     transformed_ops = {}
     for k, v in full_dict.items():

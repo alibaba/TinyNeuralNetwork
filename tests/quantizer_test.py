@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from tinynn.graph.quantization.quantizer import DeQuantizer, QATQuantizer
+from tinynn.graph.quantization.quantizer import DeQuantizer, QATQuantizer, PostQuantizer
 from tinynn.graph.tracer import model_tracer
 
 
@@ -24,13 +24,18 @@ def show_source(model, title, reload_cache=True):
     print(source)
 
 
-def check_quantize_rewrite(model, inputs, show_rewritten=True, skip_train=False, skip_trace=False):
+def check_quantize_rewrite(model, inputs, show_rewritten=True, skip_train=False, skip_trace=False, is_qat=True):
     with model_tracer():
         config = {'remove_weights_after_load': True, 'ignore_layerwise_config': True}
         if sys.platform == 'win32':
             config.update({'backend': 'fbgemm', 'per_tensor': False})
 
-        quantizer = QATQuantizer(model, inputs, work_dir='out', config=config)
+        if is_qat:
+            quantizer_cls = QATQuantizer
+        else:
+            quantizer_cls = PostQuantizer
+
+        quantizer = quantizer_cls(model, inputs, work_dir='out', config=config)
         qat_model = quantizer.quantize()
 
         if show_rewritten:
@@ -1458,6 +1463,42 @@ class QuantizerTester(unittest.TestCase):
 
         check_quantize_rewrite(model, inputs)
 
+    def test_bn_conv_fusion(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv = nn.Conv2d(3, 3, 1)
+                self.bn = nn.BatchNorm2d(3)
+
+            def forward(self, x):
+                x = self.bn(x)
+                x = self.conv(x)
+                return x
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs, is_qat=False)
+
+    def test_bn_conv_relu_fusion(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv = nn.Conv2d(3, 3, 1)
+                self.bn = nn.BatchNorm2d(3)
+                self.relu = nn.ReLU()
+
+            def forward(self, x):
+                x = self.bn(x)
+                x = self.conv(x)
+                x = self.relu(x)
+                return x
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_quantize_rewrite(model, inputs, is_qat=False)
+
 
 class DeQuantizerTester(unittest.TestCase):
     def test_simple_q_model(self):
@@ -1545,6 +1586,42 @@ class DeQuantizerTester(unittest.TestCase):
             def forward(self, x):
                 x = self.q(x)
                 return self.f.cat([x, x], -1)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_dequantize_rewrite(model, inputs)
+
+    def test_simple_q_add_scalar(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+                self.q = torch.quantization.QuantStub()
+                self.dq = torch.quantization.DeQuantStub()
+                self.f = torch.nn.quantized.FloatFunctional()
+
+            def forward(self, x):
+                x = self.q(x)
+                return self.f.add_scalar(x, 0.5)
+
+        model = Model()
+        inputs = torch.randn(1, 3, 224, 224)
+
+        check_dequantize_rewrite(model, inputs)
+
+    def test_simple_q_mul_scalar(self):
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+                self.q = torch.quantization.QuantStub()
+                self.dq = torch.quantization.DeQuantStub()
+                self.f = torch.nn.quantized.FloatFunctional()
+
+            def forward(self, x):
+                x = self.q(x)
+                return self.f.mul_scalar(x, 0.5)
 
         model = Model()
         inputs = torch.randn(1, 3, 224, 224)

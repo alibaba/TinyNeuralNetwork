@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.intrinsic as nni
 
-from .utils import fuse_conv_bn_weights
+from .utils import fuse_conv_bn_weights, fuse_bn_conv_weights
 
 _FusedModule = getattr(nni, '_FusedModule', nn.Sequential)
 
@@ -56,11 +56,54 @@ def fuse_convtranspose_bn(is_qat, convt, bn):
             return fused_conv
 
 
+def fuse_bn_conv(is_qat, bn, conv):
+    assert conv.training == bn.training, "Conv and BN both must be in the same mode (train or eval)."
+
+    if is_qat is None:
+        is_qat = conv.training
+
+    assert not is_qat, "BN Conv fusion for QAT is not yet supported"
+
+    fused_conv = copy.deepcopy(conv)
+
+    fused_conv.weight, fused_conv.bias = fuse_bn_conv_weights(
+        fused_conv.weight, fused_conv.bias, bn.running_mean, bn.running_var, bn.eps, bn.weight, bn.bias
+    )
+
+    return fused_conv
+
+
+def fuse_bn_conv_relu(is_qat, bn, conv, relu):
+    assert conv.training == bn.training == relu.training, "Conv, BN and ReLU must be in the same mode (train or eval)."
+
+    if is_qat is None:
+        is_qat = conv.training
+
+    assert not is_qat, "BN Conv fusion for QAT is not yet supported"
+
+    fused_conv = copy.deepcopy(conv)
+
+    fused_conv.weight, fused_conv.bias = fuse_bn_conv_weights(
+        fused_conv.weight, fused_conv.bias, bn.running_mean, bn.running_var, bn.eps, bn.weight, bn.bias
+    )
+
+    return nni.ConvReLU2d(fused_conv, relu)
+
+
 PATCH_MOD_MAPPING = {
     (
         nn.ConvTranspose2d,
         nn.BatchNorm2d,
-    ): fuse_convtranspose_bn
+    ): fuse_convtranspose_bn,
+    (
+        nn.BatchNorm2d,
+        nn.Conv2d,
+    ): fuse_bn_conv,
+    (
+        nn.BatchNorm2d,
+        nn.Conv2d,
+        nn.ReLU,
+    ): fuse_bn_conv_relu,
 }
 
 
