@@ -10,12 +10,6 @@ except ImportError:
     pass
 
 
-class Atan2Operator(CustomOperator):
-    def __init__(self, inputs, outputs) -> None:
-        super().__init__(inputs, outputs)
-        self.op.custom_code = "Atan2"
-
-
 class TFLiteDetectionPostprocessOperator(CustomOperator):
     def __init__(
         self,
