@@ -3279,7 +3279,6 @@ class GraphOptimizer(object):
         self.fuse_simple_reshape_pass()
 
         # Branch transpose & reshape cleanup
-        # return
         for i in range(11):
             t_count = self.elementwise_op_transpose_passthrough_pass()
             self.branch_transpose_expand_pass()
@@ -3290,7 +3289,6 @@ class GraphOptimizer(object):
             self.fuse_simple_reshape_pass()
 
             c_count = self.elementwise_reshape_transpose_passthrough_pass()
-            # return
             self.branch_transpose_expand_pass()
             self.fuse_simple_transpose_pass()
 
