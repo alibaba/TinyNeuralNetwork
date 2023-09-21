@@ -1811,9 +1811,13 @@ class GraphOptimizer(object):
                 tensor_node_dict[op_out.name] = self.graph.graph.vs.find(name=self.graph.tensor_node_map[op_out.name])
 
             # OP specific dim handling logic
-            if node['node_type'] in (ExtendedOperator.CONCATENATION, ExtendedOperator.GATHER):
+            if node['node_type'] in (ExtendedOperator.CONCATENATION, ExtendedOperator.GATHER, ExtendedOperator.UNPACK):
                 old_axis = op.axis
                 new_axis = np.where(inv_perm_arr == old_axis)[0][0]
+                op.axis = new_axis
+            elif node['node_type'] == ExtendedOperator.PACK:
+                old_axis = op.axis
+                new_axis = np.where(inv_perm_arr_post == old_axis)[0][0]
                 op.axis = new_axis
             elif node['node_type'] == ExtendedOperator.SPLIT_V:
                 old_dim = op.inputs[2].tensor
