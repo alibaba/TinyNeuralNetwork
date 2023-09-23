@@ -1115,8 +1115,11 @@ class GraphOptimizer(object):
         actions = []
         remove_edges = []
         remove_vertices = []
+        processed_nodes = set()
         num_actions = 0
         for node in unique_nodes:
+            pending_processed_nodes = set()
+
             op = node['op']
             input_indices = op_input_indices(op)
             l_shape = op.inputs[0].shape
@@ -1195,6 +1198,7 @@ class GraphOptimizer(object):
             prev_output_indices = []
             num_constant_nodes = 0
             prev_hints = set()
+            skip = False
             for i in input_indices:
                 prev_node_name = op.inputs[i].name
                 prev_node = self.graph.graph.vs.find(name=self.graph.tensor_node_map[prev_node_name])
@@ -1202,6 +1206,10 @@ class GraphOptimizer(object):
                 prev_output_indices.append(prev_node['outputs'].index(prev_node_name))
 
                 if prev_node['node_type'] == ExtendedOperator.TRANSPOSE:
+                    if prev_node['name'] in processed_nodes:
+                        skip = True
+                        break
+                    pending_processed_nodes.add(prev_node['name'])
                     if mode == 'down':
                         perm = tuple(prev_node['op'].inputs[1].tensor.tolist())
                         cand_perms.setdefault(perm, 0)
@@ -1216,7 +1224,7 @@ class GraphOptimizer(object):
                 if prev_node['node_type'] == ExtendedOperator.CONSTANT_NODE:
                     num_constant_nodes += 1
 
-            if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED and 'up' in prev_hints:
+            if skip or (self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED and 'up' in prev_hints):
                 continue
 
             next_nodes = []
@@ -1231,6 +1239,10 @@ class GraphOptimizer(object):
                 if next_node['node_type'] == ExtendedOperator.OUTPUT_NODE:
                     out_nodes.append(next_node)
                 else:
+                    if next_node['name'] in processed_nodes:
+                        skip = True
+                        break
+                    pending_processed_nodes.add(next_node['name'])
                     next_nodes.append(next_node)
                     next_edges.append(edge)
 
@@ -1246,7 +1258,7 @@ class GraphOptimizer(object):
                     if 'direction' in next_node['op'].extra_hints:
                         next_hints.add(next_node['op'].extra_hints['direction'])
 
-            if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED and 'down' in next_hints:
+            if skip or (self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED and 'down' in next_hints):
                 continue
 
             cur_transpose_size = sum(cand_perms.values()) + sum(cand_rev_perms.values())
@@ -1260,6 +1272,9 @@ class GraphOptimizer(object):
                 if self.level >= GraphOptimizer.BRANCH_OPTIMIZE_EXTENDED:
                     if 'down' in prev_hints or 'up' in next_hints:
                         skip = False
+
+            if skip:
+                continue
 
             perm = max(cand_perms.items(), key=lambda x: x[1])[0]
             perm_arr = np.array(perm, dtype='int32')
@@ -1284,6 +1299,9 @@ class GraphOptimizer(object):
 
             remove_edges.extend([x.index for x in next_edges])
             remove_vertices.extend([x.index for x in out_nodes])
+
+            for pending_processed_node in pending_processed_nodes:
+                processed_nodes.add(pending_processed_node)
 
             for n in out_nodes:
                 del self.graph.tensor_map[n['outputs'][0]]
@@ -1811,9 +1829,13 @@ class GraphOptimizer(object):
                 tensor_node_dict[op_out.name] = self.graph.graph.vs.find(name=self.graph.tensor_node_map[op_out.name])
 
             # OP specific dim handling logic
-            if node['node_type'] in (ExtendedOperator.CONCATENATION, ExtendedOperator.GATHER):
+            if node['node_type'] in (ExtendedOperator.CONCATENATION, ExtendedOperator.GATHER, ExtendedOperator.UNPACK):
                 old_axis = op.axis
                 new_axis = np.where(inv_perm_arr == old_axis)[0][0]
+                op.axis = new_axis
+            elif node['node_type'] == ExtendedOperator.PACK:
+                old_axis = op.axis
+                new_axis = np.where(inv_perm_arr_post == old_axis)[0][0]
                 op.axis = new_axis
             elif node['node_type'] == ExtendedOperator.SPLIT_V:
                 old_dim = op.inputs[2].tensor
