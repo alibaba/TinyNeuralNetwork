@@ -42,6 +42,8 @@ c. For embedded devices, you can use TFLite Micro or other hardware-related infe
 
 d. Generic inference engines with support of importing from the TFLite format (e.g MNN) can also be used
 
+e. TFjs via [tflite2tf](../../contrib/tflite2tf/README.md)
+
 ## Frequently Asked Questions
 
 Because of the high complexity and frequent updates of PyTorch, we cannot ensure that all cases are covered through automated testing. When you encounter problems
