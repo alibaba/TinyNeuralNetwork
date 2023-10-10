@@ -119,8 +119,9 @@ def parse_depthwiseconv2d(op: tflite.Operator, transform_tensors: typing.Set[int
     dilations = [opt.DilationHFactor(), opt.DilationWFactor()]
 
     data_line = (
-        f'tf.nn.bias_add(tf.nn.depthwise_conv2d({input_name(op, 0, transform_tensors)}, {input_name(op, 1, transform_tensors)},'
-        f' strides={strides}, padding="{padding}", dilations={dilations}), {input_name(op, 2, transform_tensors)})'
+        f'tf.nn.bias_add(tf.nn.depthwise_conv2d({input_name(op, 0, transform_tensors)},'
+        f' {input_name(op, 1, transform_tensors)}, strides={strides}, padding="{padding}", dilations={dilations}),'
+        f' {input_name(op, 2, transform_tensors)})'
     )
     data_line = handle_fused_act(opt.FusedActivationFunction(), data_line)
     line = f'{output_name(op, 0, transform_tensors)} = {data_line}'
