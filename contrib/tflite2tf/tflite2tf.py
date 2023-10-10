@@ -97,7 +97,7 @@ def parse_conv2d(op: tflite.Operator, transform_tensors: typing.Set[int]):
     dilations = [opt.DilationHFactor(), opt.DilationWFactor()]
 
     data_line = (
-        f'tf.nn.bias_add(tf.nn.depthwise_conv2d({input_name(op, 0, transform_tensors)},'
+        f'tf.nn.bias_add(tf.nn.conv2d({input_name(op, 0, transform_tensors)},'
         f' {input_name(op, 1, transform_tensors)}, strides={strides}, padding="{padding}", dilations={dilations}),'
         f' {input_name(op, 2, transform_tensors)})'
     )
@@ -119,8 +119,9 @@ def parse_depthwiseconv2d(op: tflite.Operator, transform_tensors: typing.Set[int
     dilations = [opt.DilationHFactor(), opt.DilationWFactor()]
 
     data_line = (
-        f'tf.nn.bias_add(tf.nn.conv2d({input_name(op, 0, transform_tensors)}, {input_name(op, 1, transform_tensors)},'
-        f' strides={strides}, padding="{padding}", dilations={dilations}), {input_name(op, 2, transform_tensors)})'
+        f'tf.nn.bias_add(tf.nn.depthwise_conv2d({input_name(op, 0, transform_tensors)},'
+        f' {input_name(op, 1, transform_tensors)}, strides={strides}, padding="{padding}", dilations={dilations}),'
+        f' {input_name(op, 2, transform_tensors)})'
     )
     data_line = handle_fused_act(opt.FusedActivationFunction(), data_line)
     line = f'{output_name(op, 0, transform_tensors)} = {data_line}'
@@ -194,7 +195,7 @@ def parse_slice(op: tflite.Operator, transform_tensors: typing.Set[int]):
 
     line = (
         f'{output_name(op, 0, transform_tensors)} = tf.slice({input_name(op, 0, transform_tensors)},'
-        f' {input_name(op, 1, transform_tensors)}, {input_name(op, 2, transform_tensors)}'
+        f' {input_name(op, 1, transform_tensors)}, {input_name(op, 2, transform_tensors)})'
     )
     return line
 
@@ -314,7 +315,7 @@ def parse_tflite(path):
         if opcode.BuiltinCode() in (tflite.BuiltinOperator.CONV_2D, tflite.BuiltinOperator.DEPTHWISE_CONV_2D):
             buffer_transform_dict[op.Inputs(1)] = 1
         elif opcode.BuiltinCode() == tflite.BuiltinOperator.TRANSPOSE_CONV:
-            buffer_transform_dict[op.Inputs(2)] = 2
+            buffer_transform_dict[op.Inputs(1)] = 2
 
     # Generate buffer definitions in TF
     transform_tensors = set()
