@@ -39,7 +39,7 @@ jobs:
         run: |
          if [ "$RUNNER_OS" == "macOS" ]; then
             if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
-              conda install pytorch torchvision -c pytorch
+              conda install pytorch::pytorch torchvision -c pytorch
             elif [[ "$TORCHVISION_VER" == "0.9."* || "$TORCHVISION_VER" == "0.10."* ]]; then
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER pillow=6 -c pytorch
             else
@@ -61,7 +61,15 @@ jobs:
       - name: Install TinyNeuralNetwork
         run: python setup.py install
       - name: Install test dependencies
-        run: pip install ruff tensorflow pytest interval scipy
+        env:
+          PYTORCH_VER: ${{ matrix.vers.pt_ver }}
+          TORCHVISION_VER: ${{ matrix.vers.tv_ver }}
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" && "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
+            pip install black 'ruff<0.0.234' 'tensorflow<2.12' pytest scipy interval
+          else
+            pip install black 'ruff<0.0.234' tensorflow pytest scipy interval
+          fi
       - name: Lint checks
         run: python -m ruff .
       - name: Run tests
