@@ -43,6 +43,8 @@ c. 对于嵌入式设备，可以使用 TFLite Micro 或者其他硬件相关的
 
 d. 也可以使用 MNN 等支持从 TFLite 格式导入的通用推理引擎
 
+e. 通过 [tflite2tf](../../contrib/tflite2tf/README.md) 转换到TFjs
+
 ## 常见问题
 
 由于PyTorch具有极高的编码自由度，我们无法确保所有的Case都能自动化覆盖，当你遇到问题时，

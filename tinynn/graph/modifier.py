@@ -2495,6 +2495,7 @@ CHANNEL_MODIFIERS = {
     'mean': ReIndexModifier,
     'sum': ReIndexModifier,
     'getitem': ReIndexModifier,
+    nn.PixelShuffle: ReIndexModifier,
     nn.RNN: RNNChannelModifier,
     nn.GRU: RNNChannelModifier,
     nn.LSTM: RNNChannelModifier,
