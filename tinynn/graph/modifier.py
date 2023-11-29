@@ -2486,6 +2486,7 @@ CHANNEL_MODIFIERS = {
     'cat': CatModifier,
     'view': ReshapeModifier,
     "flatten": ReIndexModifier,
+    "squeeze": ReIndexModifier,
     nn.Flatten: ReIndexModifier,
     'reshape': ReshapeModifier,
     'transpose': ReIndexModifier,
