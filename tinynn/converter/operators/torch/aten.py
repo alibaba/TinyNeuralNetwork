@@ -15,7 +15,7 @@ log = get_logger(__name__, 'INFO')
 
 class AtenSignOperator(ATenSignSchema):
     def parse(self, node, attrs, args, graph_converter):
-        
+
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
@@ -3453,6 +3453,28 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
             graph_converter.add_operator(op)
 
 
+class ATenMaximumOperator(ATenMaximumSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        if type(self.input_tensors[1]) != torch.Tensor:
+            self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
+
+        self.elementwise_binary(tfl.MaximumOperator, graph_converter, True)
+
+
+class ATenMinimumOperator(ATenMinimumSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        if type(self.input_tensors[1]) != torch.Tensor:
+            self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
+
+        self.elementwise_binary(tfl.MinimumOperator, graph_converter, True)
+
+
 class ATenGtOperator(ATenGtSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
@@ -3792,7 +3814,7 @@ class ATenFrobeniusNormOperator(ATenFrobeniusNormSchema):
         self.run(node)
         self.parse_common(node, attrs, args, graph_converter)
 
-        
+
 class ATenLinalgVectorNormOperator(ATenLinalgVectorNormSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
