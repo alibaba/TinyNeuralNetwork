@@ -545,6 +545,7 @@ class OperatorConverter(ABC):
 
     def handle_reduce(self, converter_class, input_args, graph_converter, transpose_opt, *args, **kwargs):
         input_tensor = self.find_or_create_input(0, graph_converter)
+        print(input_args)
 
         if 'dim' in input_args and 'keepdim' in input_args:
             dims, keep_dim = self.input_tensors[1:3]

@@ -179,6 +179,8 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::baddbmm": ATenBaddbmmOperator,
     "aten::linalg_vector_norm": ATenLinalgVectorNormOperator,
     "aten::broadcast_tensors": ATenBroadcastTensorsOperator,
+    "aten::maximum": ATenMaximumOperator,
+    "aten::minimum": ATenMinimumOperator,
     # quantized
     "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,
     "aten::fake_quantize_per_tensor_affine": ATenFakeQuantizePerTensorAffineOperator,
