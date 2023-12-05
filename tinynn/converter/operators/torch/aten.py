@@ -1562,7 +1562,7 @@ class ATenPreluOperator(ATenPreluSchema):
         alpha_tensor = self.find_or_create_input(1, graph_converter)
         shape_tensor = self.create_attr_tensor(np.array(new_shape, dtype='int32'))
 
-        update_name = True
+        update_name = None
         if weight_c == input_c:
             new_alpha = self.create_transform_tensor(np.reshape(alpha_tensor.tensor, new_shape))
             graph_converter.add_operator(tfl.ReshapeOperator([alpha_tensor, shape_tensor], [new_alpha], new_shape))
@@ -1571,12 +1571,19 @@ class ATenPreluOperator(ATenPreluSchema):
             if alpha_tensor.buffer is None:
                 graph_converter.add_operator(tfl.TileOperator([alpha_tensor, shape_tensor], [new_alpha]))
             else:
-                update_name = False
-                new_alpha = new_alpha.tensor
+                store = graph_converter.get_transform_store(alpha_tensor.name, str(input_c))
+                if store is None:
+                    graph_converter.add_transform_store(alpha_tensor.name, str(input_c), new_alpha.name)
+                    update_name = new_alpha.name
+                    new_alpha = new_alpha.tensor
+                else:
+                    update_name = store
 
         self.input_tensors[1] = new_alpha
-        if update_name:
+        if update_name is None:
             self.input_names[1] = new_alpha.name
+        else:
+            self.input_names[1] = update_name
 
         self.elementwise_binary(tfl.PreluOperator, graph_converter, False)
 
