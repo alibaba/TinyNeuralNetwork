@@ -111,9 +111,11 @@ Operators that are implemented in Python
 | `aten::matmul` |  |
 | `aten::max` |  |
 | `aten::max_pool2d` | Only dilation == 1 is supported |
+| `aten::maximum` |  |
 | `aten::mean` |  |
 | `aten::meshgrid` | aten::meshgrid for dynamic tensors is not supported |
 | `aten::min` |  |
+| `aten::minimum` |  |
 | `aten::mish` |  |
 | `aten::mm` |  |
 | `aten::mul` |  |
