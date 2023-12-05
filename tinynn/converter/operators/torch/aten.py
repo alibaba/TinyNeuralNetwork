@@ -3288,7 +3288,11 @@ class ATenMinOperator(ATenMinSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.handle_reduce(tfl.ReduceMinOperator, args, graph_converter, False)
+
+        if 'other' in args:
+            self.elementwise_binary(tfl.MinimumOperator, graph_converter, True)
+        else:
+            self.handle_reduce(tfl.ReduceMinOperator, args, graph_converter, False)
 
 
 class ATenMaxOperator(ATenMaxSchema):
@@ -3296,7 +3300,11 @@ class ATenMaxOperator(ATenMaxSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.handle_reduce(tfl.ReduceMaxOperator, args, graph_converter, False)
+
+        if 'other' in args:
+            self.elementwise_binary(tfl.MaximumOperator, graph_converter, True)
+        else:
+            self.handle_reduce(tfl.ReduceMaxOperator, args, graph_converter, False)
 
 
 class ATenAminOperator(ATenAminSchema):
