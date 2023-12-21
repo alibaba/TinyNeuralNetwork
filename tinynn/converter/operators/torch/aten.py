@@ -15,7 +15,7 @@ log = get_logger(__name__, 'INFO')
 
 class AtenSignOperator(ATenSignSchema):
     def parse(self, node, attrs, args, graph_converter):
-        
+
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
@@ -1562,7 +1562,7 @@ class ATenPreluOperator(ATenPreluSchema):
         alpha_tensor = self.find_or_create_input(1, graph_converter)
         shape_tensor = self.create_attr_tensor(np.array(new_shape, dtype='int32'))
 
-        update_name = True
+        update_name = None
         if weight_c == input_c:
             new_alpha = self.create_transform_tensor(np.reshape(alpha_tensor.tensor, new_shape))
             graph_converter.add_operator(tfl.ReshapeOperator([alpha_tensor, shape_tensor], [new_alpha], new_shape))
@@ -1571,12 +1571,19 @@ class ATenPreluOperator(ATenPreluSchema):
             if alpha_tensor.buffer is None:
                 graph_converter.add_operator(tfl.TileOperator([alpha_tensor, shape_tensor], [new_alpha]))
             else:
-                update_name = False
-                new_alpha = new_alpha.tensor
+                store = graph_converter.get_transform_store(alpha_tensor.name, str(input_c))
+                if store is None:
+                    graph_converter.add_transform_store(alpha_tensor.name, str(input_c), new_alpha.name)
+                    update_name = new_alpha.name
+                    new_alpha = new_alpha.tensor
+                else:
+                    update_name = store
 
         self.input_tensors[1] = new_alpha
-        if update_name:
+        if update_name is None:
             self.input_names[1] = new_alpha.name
+        else:
+            self.input_names[1] = update_name
 
         self.elementwise_binary(tfl.PreluOperator, graph_converter, False)
 
@@ -3288,7 +3295,11 @@ class ATenMinOperator(ATenMinSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.handle_reduce(tfl.ReduceMinOperator, args, graph_converter, False)
+
+        if 'other' in args:
+            self.elementwise_binary(tfl.MinimumOperator, graph_converter, True)
+        else:
+            self.handle_reduce(tfl.ReduceMinOperator, args, graph_converter, False)
 
 
 class ATenMaxOperator(ATenMaxSchema):
@@ -3296,7 +3307,11 @@ class ATenMaxOperator(ATenMaxSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        self.handle_reduce(tfl.ReduceMaxOperator, args, graph_converter, False)
+
+        if 'other' in args:
+            self.elementwise_binary(tfl.MaximumOperator, graph_converter, True)
+        else:
+            self.handle_reduce(tfl.ReduceMaxOperator, args, graph_converter, False)
 
 
 class ATenAminOperator(ATenAminSchema):
@@ -3451,6 +3466,28 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
 
         for op in ops:
             graph_converter.add_operator(op)
+
+
+class ATenMaximumOperator(ATenMaximumSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        if type(self.input_tensors[1]) != torch.Tensor:
+            self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
+
+        self.elementwise_binary(tfl.MaximumOperator, graph_converter, True)
+
+
+class ATenMinimumOperator(ATenMinimumSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        if type(self.input_tensors[1]) != torch.Tensor:
+            self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
+
+        self.elementwise_binary(tfl.MinimumOperator, graph_converter, True)
 
 
 class ATenGtOperator(ATenGtSchema):
@@ -3792,7 +3829,7 @@ class ATenFrobeniusNormOperator(ATenFrobeniusNormSchema):
         self.run(node)
         self.parse_common(node, attrs, args, graph_converter)
 
-        
+
 class ATenLinalgVectorNormOperator(ATenLinalgVectorNormSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)

@@ -86,14 +86,14 @@ class ConverterOPTester(unittest.TestCase):
 
         def model(x):
             return torch.sign(x)
-        
+
         model_path = get_model_path()
         converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
         converter.convert()
 
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
-        assert_close(dummy_output, tfl_output) 
+        assert_close(dummy_output, tfl_output)
 
     def test_masked_fill(self):
         class TestModel(nn.Module):
@@ -188,6 +188,8 @@ class ConverterOPTester(unittest.TestCase):
             (torch, 'eq'),
             (torch, 'ne'),
             (torch, 'rsub'),
+            (torch, 'maximum'),
+            (torch, 'minimum'),
         ]
 
         funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
@@ -224,6 +226,8 @@ class ConverterOPTester(unittest.TestCase):
             (torch, 'eq'),
             (torch, 'ne'),
             (torch, 'rsub'),
+            (torch, 'maximum'),
+            (torch, 'minimum'),
         ]
 
         funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
@@ -259,6 +263,8 @@ class ConverterOPTester(unittest.TestCase):
             (torch, 'eq'),
             (torch, 'ne'),
             (torch, 'rsub'),
+            (torch, 'maximum'),
+            (torch, 'minimum'),
         ]
 
         funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
@@ -295,6 +301,8 @@ class ConverterOPTester(unittest.TestCase):
             (torch, 'eq'),
             (torch, 'ne'),
             (torch, 'rsub'),
+            (torch, 'maximum'),
+            (torch, 'minimum'),
         ]
 
         funcs = [getattr(ns, attr) for ns, attr in func_names if hasattr(ns, attr)]
@@ -776,6 +784,28 @@ class ConverterOPTester(unittest.TestCase):
 
             with self.assertRaisesRegex(AssertionError, r'.* (are not close!|exceeded the margin of error).*'):
                 assert_close(dummy_output, tfl_output)
+
+    def test_same_prelu_for_different_channels(self):
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.prelu = nn.PReLU()
+
+            def forward(self, x):
+                return self.prelu(x), self.prelu(x[:, 0:1])
+
+        model = Model()
+        model.eval()
+
+        dummy_input = torch.rand(1, 3, 224, 224)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
 
     def test_prelu(self):
         class Model(nn.Module):
@@ -5294,7 +5324,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output, atol=256.0, rtol=256.0)
-        
+
     @unittest.skipIf(not hasattr(torch, 'norm'), "Norm is not supported")
     def test_norm_p1(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)

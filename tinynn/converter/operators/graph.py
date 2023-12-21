@@ -36,6 +36,16 @@ class CommonGraph(object):
         self.output_transpose = None
         self.node_op_counter = 0
         self.q_mapping = {}
+        self.transform_store = {}
+
+    def add_transform_store(self, tensor_name: str, transform_name: str, new_tensor_name: str):
+        self.transform_store.setdefault(tensor_name, {})
+        self.transform_store[tensor_name][transform_name] = new_tensor_name
+
+    def get_transform_store(self, tensor_name: str, transform_name: str) -> typing.Optional[tfl.Tensor]:
+        if tensor_name not in self.transform_store:
+            return None
+        return self.transform_store[tensor_name].get(transform_name, None)
 
     def add_iterable_pair(
         self, input_names: typing.List[str], output_names: typing.List[str], key: typing.Optional[str] = None
