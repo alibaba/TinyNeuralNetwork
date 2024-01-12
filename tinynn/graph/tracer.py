@@ -594,10 +594,11 @@ class TraceFunction(object):
                 elif type(a) in (int, bool, torch.dtype):
                     new_arg.append(str(a))
                 elif type(a) is float:
-                    if str(a) in ('nan', 'inf', '-inf'):
-                        new_arg.append(f"float('{str(a)}')")
+                    str_arg = str(a)
+                    if str_arg in ('nan', 'inf', '-inf'):
+                        new_arg.append(f"float('{str_arg}')")
                     else:
-                        new_arg.append(str(a))
+                        new_arg.append(str_arg)
                 elif a is None:
                     new_arg.append('None')
                 elif a is Ellipsis:
