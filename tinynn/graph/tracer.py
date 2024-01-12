@@ -594,7 +594,7 @@ class TraceFunction(object):
                 elif type(a) in (int, bool, torch.dtype):
                     new_arg.append(str(a))
                 elif type(a) is float:
-                    if a in (float('inf'), float('-inf'), float('nan')):
+                    if str(a) in ('nan', 'inf', '-inf'):
                         new_arg.append(f"float('{str(a)}')")
                     else:
                         new_arg.append(str(a))
