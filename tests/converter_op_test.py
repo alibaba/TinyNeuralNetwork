@@ -4197,6 +4197,79 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.1.0'), 'scatter_nd is not supported')
+    def test_index_put(self):
+        dummy_input = torch.randn(3, dtype=torch.float32)
+
+        def model(x):
+            return torch.ones(10, dtype=torch.float32).index_put_((torch.tensor([1, 2, 3]),), x)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.1.0'), 'scatter_nd is not supported')
+    def test_index_put_tensor(self):
+        dummy_input = torch.randn(3, dtype=torch.float32)
+        dummy_input_1 = torch.tensor([1, 2, 3])
+
+        dummy_input = (dummy_input, dummy_input_1)
+
+        def model(x, y):
+            return torch.ones(10, dtype=torch.float32).index_put_((y,), x)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.1.0'), 'scatter_nd is not supported')
+    def test_index_put_tensor_2d(self):
+        dummy_input = torch.randn(3, dtype=torch.float32)
+        dummy_input_1 = torch.tensor([1, 2, 3])
+
+        dummy_input = (dummy_input, dummy_input_1)
+
+        def model(x, y):
+            return torch.ones(10, 10, dtype=torch.float32).index_put_((y, y), x)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    @unittest.skipIf(LooseVersion(tf.__version__) < LooseVersion('2.1.0'), 'scatter_nd is not supported')
+    def test_index_put_tensor_2d_complex(self):
+        dummy_input = torch.randn(1, dtype=torch.float32)
+        dummy_input_1 = torch.tensor([1, 2, 3])
+
+        dummy_input = (dummy_input, dummy_input_1)
+
+        def model(x, y):
+            return torch.ones(10, 10, dtype=torch.float32).index_put_((y,), x)
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_var_std_no_dim(self):
         dummy_input = torch.randn(1, 3, 224, 224, dtype=torch.float32)
 

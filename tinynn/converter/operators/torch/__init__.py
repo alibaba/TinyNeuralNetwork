@@ -181,6 +181,8 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::broadcast_tensors": ATenBroadcastTensorsOperator,
     "aten::maximum": ATenMaximumOperator,
     "aten::minimum": ATenMinimumOperator,
+    "aten::index_put": ATenIndexPutOperator,
+    "aten::index_put_": ATenIndexPutOperator,
     # quantized
     "aten::quantize_per_tensor": ATenQuantizePerTensorOperator,
     "aten::fake_quantize_per_tensor_affine": ATenFakeQuantizePerTensorAffineOperator,
