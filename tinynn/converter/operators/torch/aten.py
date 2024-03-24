@@ -3077,7 +3077,10 @@ class ATenIndexPutOperator(ATenIndexPutSchema):
                 input_names, self.input_tensors[1], graph_converter=graph_converter, non_existent_as_buffer=True
             )
         else:
-            indices_tensors = [self.find_or_create_input(1, graph_converter)]
+            if type(self.input_tensors[1]) in (tuple, list):
+                indices_tensors = [self.create_attr_tensor(x) for x in self.input_tensors[1]]
+            else:
+                indices_tensors = [self.find_or_create_input(1, graph_converter)]
 
         dim = input_tensor.tensor.ndim
 
