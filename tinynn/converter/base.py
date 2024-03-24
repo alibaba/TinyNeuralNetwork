@@ -313,7 +313,7 @@ class TFLiteConverter(object):
         self.graph = graph
 
         log.debug('Lowered graph:')
-        log.debug(self.graph)
+        log.warning(self.graph)
 
     def init_flatten_inputs(self):
         self.flatten_inputs.clear()
