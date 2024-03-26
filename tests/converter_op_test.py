@@ -3868,6 +3868,36 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    def test_slice_dyn_start(self):
+        dummy_input = [torch.randn(10, 10, dtype=torch.float32), torch.tensor(2)]
+
+        def model(x, y):
+            return x[y:4]
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_slice_dyn_end(self):
+        dummy_input = [torch.randn(10, 10, dtype=torch.float32), torch.tensor(4)]
+
+        def model(x, y):
+            return x[2:y]
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(*dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_slice_no_end(self):
         dummy_input = torch.randn(10, 10, dtype=torch.float32)
 

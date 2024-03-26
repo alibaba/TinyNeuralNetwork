@@ -1817,7 +1817,7 @@ class ATenSliceOperator(ATenSliceSchema):
             start_tensor = self.create_attr_tensor(starts)
 
         ends = np.array(input_tensor.tensor.shape, dtype='int32')
-        if step != 1 or start_tensor.buffer is None:
+        if step != 1 or start_tensor.buffer is None or self.input_names[3] in graph_converter.constant_mapping:
             ends[dim] = end
         else:
             ends[dim] = end - start
@@ -1855,7 +1855,7 @@ class ATenSliceOperator(ATenSliceSchema):
         else:
             end_tensor = self.create_attr_tensor(ends)
 
-        if step != 1 or start_tensor.buffer is None:
+        if step != 1 or start_tensor.buffer is None or end_tensor.buffer is None:
             strides = np.ones(input_tensor.tensor.ndim, dtype='int32')
             strides[dim] = step
 
