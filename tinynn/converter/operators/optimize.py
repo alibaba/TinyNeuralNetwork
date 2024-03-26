@@ -1867,7 +1867,12 @@ class GraphOptimizer(object):
                     actions.append((self.graph.replace_operator_input, (node, 1, new_weight, True)))
             elif node['node_type'] in (ExtendedOperator.SLICE, ExtendedOperator.STRIDED_SLICE):
                 for i, t in enumerate(op.inputs[1:]):
-                    new_t = self.create_attr_tensor(t.tensor[inv_perm_arr])
+                    if t.buffer is None:
+                        new_perm_t = self.create_attr_tensor(np.array(inv_perm_arr, dtype='int32'))
+                        new_t = self.create_transform_tensor(t.tensor[inv_perm_arr])
+                        self.graph.add_operator(tfl.TransposeOperator([t, new_perm_t], [new_t]))
+                    else:
+                        new_t = self.create_attr_tensor(t.tensor[inv_perm_arr])
                     actions.append((self.graph.replace_operator_input, (node, i + 1, new_t, True)))
             elif node['node_type'] in (
                 ExtendedOperator.SUM,
@@ -2240,11 +2245,63 @@ class GraphOptimizer(object):
 
                 new_start = np.zeros(len(prev_shape), dtype='int32')
                 new_start[new_dim] = op.inputs[1].tensor[old_dim]
-                new_start_t = self.create_attr_tensor(new_start)
+                if op.inputs[1].buffer is None:
+                    new_start_t = self.create_transform_tensor(new_start)
+                    starts_mid = new_start[new_dim : new_dim + 1]
+                    starts_mid_tensor = self.create_transform_tensor(starts_mid)
+
+                    slice_inputs = [
+                        op.inputs[1],
+                        self.create_attr_tensor(np.array([old_dim], dtype='int32')),
+                        self.create_attr_tensor(np.array([1], dtype='int32')),
+                    ]
+
+                    self.graph.add_operator(tfl.SliceOperator(slice_inputs, [starts_mid_tensor]))
+
+                    starts_left = new_start[:new_dim]
+                    starts_right = new_start[new_dim + 1 :]
+                    starts_tensors = []
+                    if len(starts_left) > 0:
+                        starts_tensors.append(self.create_attr_tensor(starts_left))
+                    starts_tensors.append(starts_mid_tensor)
+                    if len(starts_right) > 0:
+                        starts_tensors.append(self.create_attr_tensor(starts_right))
+                    if len(starts_tensors) > 1:
+                        self.graph.add_operator(tfl.ConcatenationOperator(starts_tensors, [new_start_t], 0))
+                    else:
+                        new_start_t = starts_tensors[0]
+                else:
+                    new_start_t = self.create_attr_tensor(new_start)
 
                 new_end = np.array(prev_shape, dtype='int32')
                 new_end[new_dim] = op.inputs[2].tensor[old_dim]
-                new_end_t = self.create_attr_tensor(new_end)
+                if op.inputs[2].buffer is None:
+                    new_end_t = self.create_transform_tensor(new_end)
+                    ends_mid = new_end[new_dim : new_dim + 1]
+                    ends_mid_tensor = self.create_transform_tensor(ends_mid)
+
+                    slice_inputs = [
+                        op.inputs[2],
+                        self.create_attr_tensor(np.array([old_dim], dtype='int32')),
+                        self.create_attr_tensor(np.array([1], dtype='int32')),
+                    ]
+
+                    self.graph.add_operator(tfl.SliceOperator(slice_inputs, [ends_mid_tensor]))
+
+                    ends_left = new_end[:new_dim]
+                    ends_right = new_end[new_dim + 1 :]
+                    ends_tensors = []
+                    if len(ends_left) > 0:
+                        ends_tensors.append(self.create_attr_tensor(ends_left))
+                    ends_tensors.append(ends_mid_tensor)
+                    if len(ends_right) > 0:
+                        ends_tensors.append(self.create_attr_tensor(ends_right))
+                    if len(ends_tensors) > 1:
+                        self.graph.add_operator(tfl.ConcatenationOperator(ends_tensors, [new_end_t], 0))
+                    else:
+                        new_end_t = ends_tensors[0]
+                else:
+                    new_end_t = self.create_attr_tensor(new_end)
 
                 new_stride = np.ones(len(prev_shape), dtype='int32')
                 new_stride[new_dim] = op.inputs[3].tensor[old_dim]
@@ -3826,6 +3883,8 @@ def is_slice_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
         and target_vertex['node_type'] in (ExtendedOperator.SLICE, ExtendedOperator.STRIDED_SLICE)
         and target_vertex.outdegree() >= 1
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+        and source_vertex['op'].inputs[1].buffer is not None
+        and source_vertex['op'].inputs[2].buffer is not None
     )
 
 
