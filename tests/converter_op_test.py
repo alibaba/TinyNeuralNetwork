@@ -1663,6 +1663,20 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    def test_unbind_int64_scalar(self):
+        dummy_input = torch.randint(0, 1000, size=(1,))
+
+        def model(x):
+            return x.unbind(0)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_embedding_3d_with_padding_idx(self):
         dummy_input = torch.randint(0, 1000, size=(10, 10, 10))
 

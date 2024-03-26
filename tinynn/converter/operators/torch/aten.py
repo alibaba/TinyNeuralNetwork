@@ -3833,7 +3833,11 @@ class ATenUnbindOperator(ATenUnbindSchema):
         graph_converter.add_iterable_pair(self.output_names, output_names, 'input')
         outputs = self.to_tfl_tensors(output_names, self.output_tensors[0])
 
-        graph_converter.add_operator(tfl.UnpackOperator([input_tensor], outputs, chunks, dim))
+        if str(input_tensor.dtype) == 'int64' and input_tensor.tensor.ndim == 1 and input_tensor.tensor.size == 1:
+            shape_tensor = self.create_attr_tensor(np.array((), dtype='int32'))
+            graph_converter.add_operator(tfl.ReshapeOperator([input_tensor, shape_tensor], outputs, []))
+        else:
+            graph_converter.add_operator(tfl.UnpackOperator([input_tensor], outputs, chunks, dim))
 
 
 class ATenRollOperator(ATenRollSchema):
