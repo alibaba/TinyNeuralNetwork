@@ -3,7 +3,7 @@ import inspect
 import re
 
 from tinynn.converter.operators.torch import OPERATOR_CONVERTER_DICT
-from tinynn.converter.operators.torch.base import NoTrackOperator, PrimOperatorConverter
+from tinynn.converter.operators.torch.base import NoTrackOperator, PrimOperatorConverter, TrackConstantOperator
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 
@@ -12,6 +12,7 @@ aten_ops = []
 quantized_ops = []
 torchvision_ops = []
 passthrough_ops = []
+track_constant_ops = []
 
 limitation_dict = {}
 
@@ -22,13 +23,15 @@ def main():
 
 
 def collect_ops():
-    global prim_ops, aten_ops, quantized_ops, torchvision_ops, passthrough_ops, limitation_dict
+    global prim_ops, aten_ops, quantized_ops, torchvision_ops, passthrough_ops, track_constant_ops, limitation_dict
 
     for k, v in OPERATOR_CONVERTER_DICT.items():
         if issubclass(v, PrimOperatorConverter):
             prim_ops.append(k)
         elif issubclass(v, NoTrackOperator):
             passthrough_ops.append(k)
+        elif issubclass(v, TrackConstantOperator):
+            track_constant_ops.append(k)
         else:
             if v.__module__ == 'tinynn.converter.operators.torch.aten':
                 aten_ops.append(k)
@@ -50,6 +53,7 @@ def collect_ops():
     quantized_ops = sorted(quantized_ops)
     torchvision_ops = sorted(torchvision_ops)
     passthrough_ops = sorted(passthrough_ops)
+    track_constant_ops = sorted(track_constant_ops)
 
 
 def print_operators(topic, ops, f, desc=None, eol=True):
@@ -89,6 +93,12 @@ def update_file():
             passthrough_ops,
             f,
             'Non-tracking operators that are ignored during translation',
+        )
+        print_operators(
+            'Constant Tracking Operators',
+            track_constant_ops,
+            f,
+            'Tracking operators that produce a dynamic constant',
             False,
         )
 
