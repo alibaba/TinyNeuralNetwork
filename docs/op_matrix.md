@@ -220,8 +220,6 @@ Operators that are implemented in Python
 Non-tracking operators that are ignored during translation
 | Operator                  | Limitations  |
 |---------------------------|--------------|
-| `aten::Int` |  |
-| `aten::ScalarImplicit` |  |
 | `aten::arange` |  |
 | `aten::detach` |  |
 | `aten::empty` |  |
@@ -232,3 +230,10 @@ Non-tracking operators that are ignored during translation
 | `aten::size` |  |
 | `aten::zeros` |  |
 | `aten::zeros_like` |  |
+
+## Constant Tracking Operators
+Tracking operators that produce a dynamic constant
+| Operator                  | Limitations  |
+|---------------------------|--------------|
+| `aten::Int` |  |
+| `aten::ScalarImplicit` |  |
