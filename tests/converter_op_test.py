@@ -4127,6 +4127,51 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
 
+    def test_index_multi_dim_complex(self):
+        dummy_input = torch.randn(10, 10, dtype=torch.float32)
+
+        def model(x):
+            return x[[3, 4], [2, 3]]
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_index_multi_dim_complex_1(self):
+        dummy_input = torch.randn(10, 10, 10, dtype=torch.float32)
+
+        def model(x):
+            return x[[3, 4], [2, 3]]
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_index_multi_dim_complex_2(self):
+        dummy_input = torch.randn(10, 10, 10, dtype=torch.float32)
+
+        def model(x):
+            return x[[3, 4], [2], [1, 5]]
+
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_gather(self):
         dummy_input = torch.randn(10, dtype=torch.float32)
 

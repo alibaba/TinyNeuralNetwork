@@ -93,7 +93,7 @@ Operators that are implemented in Python
 | `aten::hardtanh` |  |
 | `aten::hardtanh_` |  |
 | `aten::im2col` | only 4-D input tensors (batched image-like tensors) are supported |
-| `aten::index` | Multiple indices for aten::index is not supported |
+| `aten::index` |  |
 | `aten::index_put` | aten::index_put_ with accumulate=True is not supported |
 | `aten::index_put_` | aten::index_put_ with accumulate=True is not supported |
 | `aten::index_select` |  |
