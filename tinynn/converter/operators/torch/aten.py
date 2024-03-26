@@ -1781,17 +1781,84 @@ class ATenSliceOperator(ATenSliceSchema):
         starts = np.zeros(input_tensor.tensor.ndim, dtype='int32')
         starts[dim] = start
 
-        start_tensor = self.create_attr_tensor(starts)
+        if self.input_names[2] in graph_converter.constant_mapping:
+            start_t = graph_converter.constant_mapping[self.input_names[2]]
+            new_shape_arr = np.array((1,), dtype='int32')
+            new_shape_tensor = self.create_attr_tensor(new_shape_arr)
+            start_reshaped = self.create_transform_tensor(np.reshape(start_t.tensor, new_shape_arr))
+            graph_converter.add_operator(
+                tfl.ReshapeOperator([start_t, new_shape_tensor], [start_reshaped], new_shape_arr)
+            )
 
-        if step != 1:
-            # if True:
-            ends = np.array(input_tensor.tensor.shape, dtype='int32')
+            start_casted = self.create_transform_tensor(start_reshaped.tensor.astype('int32'))
+            graph_converter.add_operator(
+                tfl.CastOperator(
+                    [start_reshaped],
+                    [start_casted],
+                    tfl.numpy_tflite_dtype_mappings[str(start_reshaped.dtype)],
+                    tfl.numpy_tflite_dtype_mappings[str(start_casted.dtype)],
+                )
+            )
+
+            start_tensor = self.create_transform_tensor(starts)
+            starts_left = starts[:dim]
+            starts_right = starts[dim + 1 :]
+            starts_tensors = []
+            if len(starts_left) > 0:
+                starts_tensors.append(self.create_attr_tensor(starts_left))
+            starts_tensors.append(start_casted)
+            if len(starts_right) > 0:
+                starts_tensors.append(self.create_attr_tensor(starts_right))
+            if len(starts_tensors) > 1:
+                graph_converter.add_operator(tfl.ConcatenationOperator(starts_tensors, [start_tensor], 0))
+            else:
+                start_tensor = starts_tensors[0]
+        else:
+            start_tensor = self.create_attr_tensor(starts)
+
+        ends = np.array(input_tensor.tensor.shape, dtype='int32')
+        if step != 1 or start_tensor.buffer is None:
             ends[dim] = end
+        else:
+            ends[dim] = end - start
 
+        if self.input_names[3] in graph_converter.constant_mapping:
+            end_t = graph_converter.constant_mapping[self.input_names[3]]
+            new_shape_arr = np.array((1,), dtype='int32')
+            new_shape_tensor = self.create_attr_tensor(new_shape_arr)
+            end_reshaped = self.create_transform_tensor(np.reshape(end_t.tensor, new_shape_arr))
+            graph_converter.add_operator(tfl.ReshapeOperator([end_t, new_shape_tensor], [end_reshaped], new_shape_arr))
+
+            end_casted = self.create_transform_tensor(end_reshaped.tensor.astype('int32'))
+            graph_converter.add_operator(
+                tfl.CastOperator(
+                    [end_reshaped],
+                    [end_casted],
+                    tfl.numpy_tflite_dtype_mappings[str(end_reshaped.dtype)],
+                    tfl.numpy_tflite_dtype_mappings[str(end_casted.dtype)],
+                )
+            )
+
+            end_tensor = self.create_transform_tensor(ends)
+            ends_left = ends[:dim]
+            ends_right = ends[dim + 1 :]
+            ends_tensors = []
+            if len(ends_left) > 0:
+                ends_tensors.append(self.create_attr_tensor(ends_left))
+            ends_tensors.append(end_casted)
+            if len(ends_right) > 0:
+                ends_tensors.append(self.create_attr_tensor(ends_right))
+            if len(ends_tensors) > 1:
+                graph_converter.add_operator(tfl.ConcatenationOperator(ends_tensors, [end_tensor], 0))
+            else:
+                end_tensor = ends_tensors[0]
+        else:
+            end_tensor = self.create_attr_tensor(ends)
+
+        if step != 1 or start_tensor.buffer is None:
             strides = np.ones(input_tensor.tensor.ndim, dtype='int32')
             strides[dim] = step
 
-            end_tensor = self.create_attr_tensor(ends)
             stride_tensor = self.create_attr_tensor(strides)
 
             inputs = [input_tensor, start_tensor, end_tensor, stride_tensor]
@@ -1799,10 +1866,7 @@ class ATenSliceOperator(ATenSliceSchema):
 
             graph_converter.add_operator(tfl.StridedSliceOperator(inputs, outputs))
         else:
-            sizes = np.array(input_tensor.tensor.shape, dtype='int32')
-            sizes[dim] = end - start
-
-            size_tensor = self.create_attr_tensor(sizes)
+            size_tensor = end_tensor
             inputs = [input_tensor, start_tensor, size_tensor]
             outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 

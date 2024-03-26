@@ -37,6 +37,7 @@ class CommonGraph(object):
         self.node_op_counter = 0
         self.q_mapping = {}
         self.transform_store = {}
+        self.constant_mapping = {}
 
     def add_transform_store(self, tensor_name: str, transform_name: str, new_tensor_name: str):
         self.transform_store.setdefault(tensor_name, {})

@@ -757,6 +757,16 @@ class TrackQParamsOperator(OperatorConverter):
         graph_converter.q_mapping[self.output_names[0]] = t
 
 
+class TrackConstantOperator(OperatorConverter):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        t = self.find_or_create_input(0, graph_converter)
+        graph_converter.constant_mapping[self.output_names[0]] = t
+
+
 class PrimOperatorConverter(OperatorConverter):
     # prim::* ops needs custom implementation
     def run(self, node):

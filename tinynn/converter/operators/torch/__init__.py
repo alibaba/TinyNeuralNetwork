@@ -213,7 +213,7 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "quantized::linear_relu_dynamic": QuantizedLinearReluDynamicOperator,
     "quantized::elu": QuantizedEluOperator,
     # non tracking
-    "aten::Int": NoTrackOperator,
+    "aten::Int": TrackConstantOperator,
     "aten::zeros": NoTrackOperator,
     "aten::detach": NoTrackOperator,
     "aten::size": NoTrackOperator,
@@ -224,5 +224,5 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "aten::empty": NoTrackOperator,
     "aten::new_zeros": NoTrackOperator,
     "aten::new_ones": NoTrackOperator,
-    "aten::ScalarImplicit": NoTrackOperator,
+    "aten::ScalarImplicit": TrackConstantOperator,
 }
