@@ -2632,6 +2632,67 @@ class ATenRepeatOperator(ATenRepeatSchema):
             graph_converter.add_operator(op)
 
 
+class ATenRepeatInterleaveOperator(ATenRepeatInterleaveSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        input_tensor = self.find_or_create_input(0, graph_converter)
+        outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
+
+        if 'dim' in args:
+            dim = self.input_tensors[args['dim']]
+        else:
+            dim = None
+
+        if 'repeats' in args:
+            repeats = self.input_tensors[args['repeats']]
+        else:
+            repeats = None
+
+        if repeats is None:
+            size_repeats = input_tensor.tensor.size
+            raw_indices = torch.arange(size_repeats, dtype=torch.int32)
+            repeats_tensor = input_tensor
+        elif type(repeats) is int:
+            if dim is None:
+                size_repeats = input_tensor.tensor.size
+            else:
+                size_repeats = input_tensor.shape[dim]
+            raw_indices = torch.arange(size_repeats, dtype=torch.int32)
+            repeats_arr = torch.tensor(repeats, dtype=torch.int32)
+            repeats_tensor = self.create_attr_tensor(repeats_arr)
+        else:
+            if dim is None:
+                size_repeats = input_tensor.tensor.size
+            else:
+                size_repeats = input_tensor.shape[dim]
+            raw_indices = torch.arange(size_repeats, dtype=torch.int32)
+            repeats_tensor = self.find_or_create_input(args['repeats'], graph_converter)
+
+        assert repeats_tensor.buffer is not None, "dynamic repeats_tensor is not supported"
+
+        actual_indices = self.create_attr_tensor(
+            torch.repeat_interleave(raw_indices, torch.from_numpy(repeats_tensor.tensor).long())
+        )
+
+        actual_input = input_tensor
+        if dim is None and len(input_tensor.shape) > 1:
+            new_shape = (input_tensor.tensor.size,)
+            shape_tensor = self.create_attr_tensor(np.array(new_shape, dtype='int32'))
+            actual_input = self.create_transform_tensor(np.reshape(input_tensor.tensor, new_shape))
+            graph_converter.add_operator(tfl.ReshapeOperator([input_tensor, shape_tensor], [actual_input], new_shape))
+
+        inputs = [actual_input, actual_indices]
+        gather_dim = dim
+        if gather_dim is None:
+            gather_dim = 0
+        if gather_dim < 0:
+            gather_dim += input_tensor.tensor.ndim
+        graph_converter.add_operator(tfl.GatherOperator(inputs, outputs, gather_dim))
+
+
 class ATenMmOperator(ATenMmSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)

@@ -1814,6 +1814,90 @@ class ConverterOPTester(unittest.TestCase):
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output, check_stride=False)
 
+    def test_repeat_interleave_single_dim(self):
+        dummy_input = torch.randn(10, dtype=torch.float32)
+
+        def model(x):
+            return torch.repeat_interleave(x, 4)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_repeat_interleave_single_dim_repeats(self):
+        dummy_input = torch.randn(10, dtype=torch.float32)
+
+        def model(x):
+            return torch.repeat_interleave(x, torch.tensor([1, 2, 3, 2, 1, 2, 3, 4, 1, 2]))
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_repeat_interleave_multi_dim(self):
+        dummy_input = torch.randn(5, 2, dtype=torch.float32)
+
+        def model(x):
+            return torch.repeat_interleave(x, 4)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_repeat_interleave_multi_dim_repeats(self):
+        dummy_input = torch.randn(5, 2, dtype=torch.float32)
+
+        def model(x):
+            return torch.repeat_interleave(x, torch.tensor([1, 2, 3, 2, 1, 2, 3, 4, 1, 2]))
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_repeat_interleave_multi_dim_index(self):
+        dummy_input = torch.randn(5, 2, dtype=torch.float32)
+
+        def model(x):
+            return torch.repeat_interleave(x, torch.tensor([1, 2, 1, 3, 2]), 0)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
+    def test_repeat_interleave_multi_dim_negative_index(self):
+        dummy_input = torch.randn(5, 2, dtype=torch.float32)
+
+        def model(x):
+            return torch.repeat_interleave(x, torch.tensor([3, 2]), -1)
+
+        model_path = get_model_path()
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_repeat_single_dim(self):
         dummy_input = torch.randn(10, dtype=torch.float32)
 
