@@ -144,6 +144,7 @@ Operators that are implemented in Python
 | `aten::relu_` |  |
 | `aten::remainder` |  |
 | `aten::repeat` |  |
+| `aten::repeat_interleave` | dynamic repeats_tensor is not supported |
 | `aten::reshape` |  |
 | `aten::roll` |  |
 | `aten::round` |  |
