@@ -2674,7 +2674,7 @@ class ATenRepeatInterleaveOperator(ATenRepeatInterleaveSchema):
         assert repeats_tensor.buffer is not None, "dynamic repeats_tensor is not supported"
 
         actual_indices = self.create_attr_tensor(
-            torch.repeat_interleave(raw_indices, torch.from_numpy(repeats_tensor.tensor))
+            torch.repeat_interleave(raw_indices, torch.from_numpy(repeats_tensor.tensor).long())
         )
 
         actual_input = input_tensor
