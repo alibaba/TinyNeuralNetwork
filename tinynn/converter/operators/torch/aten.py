@@ -1130,6 +1130,9 @@ class ATenConvolutionOperator(ATenConvolutionSchema):
         inputs = [self.find_or_create_input(i, graph_converter) for i in range(end_index)]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
+        if len(stride) != len(padding) and len(stride) == 1:
+            stride = stride * len(padding)
+
         if transpose == 0:
             graph_converter.add_operator(
                 tfl.GenericConvOperator(inputs, outputs, stride, padding, dilation, output_padding, groups)
