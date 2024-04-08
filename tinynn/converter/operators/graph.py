@@ -643,9 +643,9 @@ class CommonGraph(object):
         if not self.missing_outputs_as_constants:
             assert len(missing_outputs) == 0, f'Some output nodes are missing: {missing_outputs}'
 
-        missing_vars_dict = {'input': (missing_inputs, self.inputs), 'output': (missing_outputs, self.outputs)}
+        missing_vars_dict = {'input': (missing_inputs, inputs, input_idx), 'output': (missing_outputs, outputs, output_idx)}
 
-        for key, (missing_vars, var_indices) in missing_vars_dict.items():
+        for key, (missing_vars, var_indices, out_indices) in missing_vars_dict.items():
             if len(missing_vars) != 0:
                 warnings.warn(f'Some {key} nodes are missing: {missing_vars}, will try to add them into graph')
                 for name in missing_vars:
@@ -654,7 +654,7 @@ class CommonGraph(object):
                     tensor_idx += 1
                     tensors.append(tensor)
                     item_idx = var_indices.index(name)
-                    var_indices[item_idx] = tensor.index
+                    out_indices[item_idx] = tensor.index
 
         return tensors, buffers, input_idx, output_idx
 
