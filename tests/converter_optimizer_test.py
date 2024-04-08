@@ -1383,7 +1383,7 @@ class ConverterOptimizerTester(unittest.TestCase):
             tflite.BuiltinOperator.CONCATENATION,
         )
         self.assertEqual(tfl_model.Subgraphs(0).Operators(5).OutputsLength(), 1)
-    
+
     def test_fuse_transposeconv_relu(self):
         class TestModel(nn.Module):
             def __init__(self) -> None:
@@ -1394,7 +1394,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
             def forward(self, x):
                 y = self.act(self.transposeconv(x))
-                return  y
+                return y
 
         model = TestModel()
         model.eval()
@@ -1403,7 +1403,7 @@ class ConverterOptimizerTester(unittest.TestCase):
 
         converter = TFLiteConverter(model, dummy_input, model_path)
         converter.convert()
-        
+
         tfl_model = parse_model(model_path)
         self.assertEqual(tfl_model.OperatorCodesLength(), 1)
         self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.TRANSPOSE_CONV)

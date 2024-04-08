@@ -643,7 +643,10 @@ class CommonGraph(object):
         if not self.missing_outputs_as_constants:
             assert len(missing_outputs) == 0, f'Some output nodes are missing: {missing_outputs}'
 
-        missing_vars_dict = {'input': (missing_inputs, inputs, input_idx), 'output': (missing_outputs, outputs, output_idx)}
+        missing_vars_dict = {
+            'input': (missing_inputs, inputs, input_idx),
+            'output': (missing_outputs, outputs, output_idx),
+        }
 
         for key, (missing_vars, var_indices, out_indices) in missing_vars_dict.items():
             if len(missing_vars) != 0:
