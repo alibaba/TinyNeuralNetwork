@@ -58,6 +58,7 @@ class TFLiteConverter(object):
         hybrid_gen_single_op_models: bool = False,
         hybrid_config: typing.Optional[typing.Dict[str, bool]] = None,
         group_tensors: bool = False,
+        missing_outputs_as_constants: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -110,6 +111,7 @@ class TFLiteConverter(object):
             hybrid_gen_single_op_models: Generate both floating point and quantized version of the model for hybrid \
                 quantizable ops. Defaults to False
             group_tensors (bool): Group tensors to save space. Defaults to False
+            missing_outputs_as_constants (bool): View missing outputs as constants. Defaults to False
         """
 
         self.model = model
@@ -117,7 +119,7 @@ class TFLiteConverter(object):
         self.graph = None
         self.tensor_map = {}
         self.tensor_map_copies = {}
-        self.common_graph = CommonGraph()
+        self.common_graph = CommonGraph(missing_outputs_as_constants)
 
         if type(dummy_input) in (tuple, list):
             self.dummy_input = dummy_input
