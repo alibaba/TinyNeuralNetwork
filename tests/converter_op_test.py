@@ -81,6 +81,25 @@ def u8_to_s8(t):
 
 
 class ConverterOPTester(unittest.TestCase):
+    def test_missing_outputs_as_constants(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                y = x.relu()
+                return y, torch.zeros_like(x)
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(2, 10)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, missing_outputs_as_constants=True)
+        converter.convert()
+
+        dummy_output = model(dummy_input)
+        tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
+        assert_close(dummy_output, tfl_output)
+
     def test_sign(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
 
