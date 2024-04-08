@@ -119,7 +119,7 @@ class TFLiteConverter(object):
         self.graph = None
         self.tensor_map = {}
         self.tensor_map_copies = {}
-        self.common_graph = CommonGraph(missing_outputs_as_constants)
+        self.common_graph = CommonGraph()
 
         if type(dummy_input) in (tuple, list):
             self.dummy_input = dummy_input
@@ -166,6 +166,7 @@ class TFLiteConverter(object):
         self.hybrid_gen_single_op_models = hybrid_gen_single_op_models
         self.hybrid_config = hybrid_config
         self.group_tensors = group_tensors
+        self.missing_outputs_as_constants = missing_outputs_as_constants
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -525,6 +526,22 @@ class TFLiteConverter(object):
 
             versioner = OPVersioner(self.common_graph)
             versioner.process()
+
+            if self.missing_outputs_as_constants:
+                tensors = []
+                for output_name in self.common_graph.outputs:
+                    if output_name not in self.common_graph.tensor_map:
+                        tensors.append(
+                            Tensor(
+                                self.tensor_map[output_name],
+                                output_name,
+                                has_buffer=True,
+                                asymmetric=not self.strict_symmetric_check,
+                                q_type=self.q_type,
+                            )
+                        )
+                self.common_graph.add_nodes(tensors, ExtendedOperator.CONSTANT_NODE)
+                self.common_graph.add_outputs([t.name for t in tensors])
 
             self.common_graph.convert(self.tflite_path)
 
