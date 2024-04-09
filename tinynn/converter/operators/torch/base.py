@@ -677,6 +677,8 @@ def get_prop_from_node(node, prop, assert_type=None, return_type=False):
             v = getattr(node, vk)(prop)
         elif vk == 's':
             v = getattr(node, vk)(prop)
+        elif vk == 'g':
+            v = getattr(node, vk)(prop)
         elif vk == 't':
             v = getattr(node, vk)(prop)
             if v.dtype == torch.float64:

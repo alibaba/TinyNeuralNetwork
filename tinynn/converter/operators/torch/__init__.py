@@ -18,6 +18,8 @@ OPERATOR_CONVERTER_DICT: typing.Dict[str, OperatorConverter] = {
     "prim::If": PrimIfConverter,
     "aten::__getitem__": PrimGetItemConverter,
     "aten::len": PrimLenConverter,
+    "prim::PythonOp": PrimPythonOpConverter,
+    "prim::Return": PrimReturnConverter,
     # aten
     "aten::sign": AtenSignOperator,
     "aten::t": ATenTOperator,
