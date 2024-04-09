@@ -21,6 +21,7 @@ class OperatorConverter(ABC):
         self,
         node,
         tensor_map,
+        scope_name,
         asymmetric=True,
         q_type=np.uint8,
         hybrid_q_type=np.int8,
@@ -31,6 +32,7 @@ class OperatorConverter(ABC):
         separated_rnn_gate_calc=False,
         conv_transpose_with_bias=True,
     ) -> None:
+        self.scope_name = scope_name
         self.input_names = self.get_input_names(node)
         self.output_names = self.get_output_names(node)
         self.input_tensors = self.get_input_tensors(tensor_map)
@@ -53,11 +55,20 @@ class OperatorConverter(ABC):
     def parse(self, node, attrs, args, graph_converter):
         pass
 
+    def get_tensor_name(self, tensor_name, scope_name=None):
+        if scope_name is None:
+            scope_name = self.scope_name
+
+        if scope_name:
+            return f'{scope_name}_{tensor_name}'
+        else:
+            return tensor_name
+
     def get_input_names(self, node):
-        return [x.debugName() for x in list(node.inputs())]
+        return [self.get_tensor_name(x.debugName()) for x in list(node.inputs())]
 
     def get_output_names(self, node):
-        return [x.debugName() for x in list(node.outputs())]
+        return [self.get_tensor_name(x.debugName()) for x in list(node.outputs())]
 
     def get_input_tensors(self, tensor_map):
         input_tensors = []
