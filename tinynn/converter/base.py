@@ -389,6 +389,8 @@ class TFLiteConverter(object):
     def init_operations(self):
         log.debug('Initialize operators...')
         node_queue = collections.deque(self.graph.nodes())
+        scope_map = {}
+        current_scope = None
         while node_queue:
             node = node_queue.popleft()
 
@@ -399,6 +401,7 @@ class TFLiteConverter(object):
             converter = converter_type(
                 node,
                 self.tensor_map,
+                current_scope,
                 not self.strict_symmetric_check,
                 self.q_type,
                 self.hybrid_q_type,
@@ -429,7 +432,18 @@ class TFLiteConverter(object):
                     else:
                         converter_type = NoTrackOperator
                     converter = converter_type(
-                        node, self.tensor_map, not self.strict_symmetric_check, self.q_type, self.hybrid_q_type
+                        node,
+                        self.tensor_map,
+                        current_scope,
+                        not self.strict_symmetric_check,
+                        self.q_type,
+                        self.hybrid_q_type,
+                        self.map_bilstm_to_lstm,
+                        self.enable_mtk_ops,
+                        self.hybrid_asymmetric_inputs,
+                        self.unroll_rnn,
+                        self.separated_rnn_gate_calc,
+                        self.conv_transpose_with_bias,
                     )
             if k != 'prim::Constant':
                 log.debug(f'{k} {converter.input_names} -> {converter.output_names} {converter_type.__name__}')
@@ -450,6 +464,15 @@ class TFLiteConverter(object):
                 output_tensors.extend(converter.get_output_tensors())
             if len(new_nodes) > 0:
                 node_queue.extendleft(reversed(new_nodes))
+
+            if k == 'prim::PythonOp':
+                s = node.scopeName()
+                scope_map.setdefault(s, 0)
+                scope_map[s] += 1
+                current_scope = f'{s}_{scope_map[s]}'
+                converter.prepare_scope_tensors(node, attrs, args, self.common_graph, current_scope)
+            elif k == 'prim::Return':
+                current_scope = None
 
             assert len(output_tensors) == len(outputs)
             for t, name in zip(output_tensors, outputs):

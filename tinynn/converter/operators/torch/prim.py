@@ -163,3 +163,64 @@ class PrimConstantChunkConverter(PrimOperatorConverter):
                 )
             else:
                 graph_converter.add_operator(tfl.SplitOperator([dim_tensor, input_tensor], outputs, chunks))
+
+
+class PrimPythonOpConverter(PrimOperatorConverter):
+    def parse(self, node, attrs, args, graph_converter):
+        subgraph = attrs['Subgraph'][0]
+
+        param_node = subgraph.param_node()
+        return_node = subgraph.return_node()
+
+        self.output_tensors.append(node.pyobj()(*self.input_tensors, *node.scalar_args()))
+        self.output_nodes.append(param_node)
+        self.output_nodes.extend(subgraph.nodes())
+        self.output_nodes.append(return_node)
+
+    def prepare_scope_tensors(self, node, attrs, args, graph_converter, scope_name):
+        subgraph = attrs['Subgraph'][0]
+
+        # input tensors
+        param_node = subgraph.param_node()
+        input_tensors = [self.find_or_create_input(i, graph_converter) for i in range(len(self.input_tensors))]
+        subgraph_input_names = [self.get_tensor_name(x.debugName(), scope_name) for x in param_node.outputs()]
+
+        for name, t in zip(subgraph_input_names, input_tensors):
+            graph_converter.constant_mapping[name] = t
+
+        # output tensors
+        return_node = subgraph.return_node()
+        subgraph_output_names = [self.get_tensor_name(x.debugName(), scope_name) for x in return_node.inputs()]
+        output_tensors = self.to_tfl_tensors(self.output_names, self.output_tensors)
+
+        for name, t in zip(subgraph_output_names, output_tensors):
+            graph_converter.constant_mapping[name] = t
+
+
+class PrimReturnConverter(PrimOperatorConverter):
+    def parse(self, node, attrs, args, graph_converter):
+        for i, name in enumerate(self.input_names):
+            assert name in graph_converter.constant_mapping
+            if name in graph_converter.tensor_map:
+                input_tensor = self.find_or_create_input(i, graph_converter)
+                output_tensor = graph_converter.constant_mapping[name]
+
+                inputs = [input_tensor, self.create_attr_tensor(input_tensor.shape, name=f'{name}_return_attr')]
+                outputs = [output_tensor]
+
+                graph_converter.add_operator(tfl.ReshapeOperator(inputs, outputs, input_tensor.shape))
+
+
+class PrimParamConverter(PrimOperatorConverter):
+    def parse(self, node, attrs, args, graph_converter):
+        for i, name in enumerate(self.output_names):
+            assert name in graph_converter.constant_mapping
+            input_tensor = graph_converter.constant_mapping[name]
+            output_tensor = self.to_tfl_tensors([name], [input_tensor.tensor])[0]
+            self.output_tensors.append(torch.from_numpy(input_tensor.tensor))
+
+            if input_tensor.name in graph_converter.tensor_map:
+                inputs = [input_tensor, self.create_attr_tensor(input_tensor.shape, name=f'{name}_return_attr')]
+                outputs = [output_tensor]
+
+                graph_converter.add_operator(tfl.ReshapeOperator(inputs, outputs, input_tensor.shape))
