@@ -14,6 +14,9 @@ Operators that are implemented in Python
 | `prim::ListConstruct` |  |
 | `prim::ListUnpack` |  |
 | `prim::NumToTensor` |  |
+| `prim::Param` |  |
+| `prim::PythonOp` |  |
+| `prim::Return` |  |
 | `prim::TupleConstruct` |  |
 
 ## ATen Operators
