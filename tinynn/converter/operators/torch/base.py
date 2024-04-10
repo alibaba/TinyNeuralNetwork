@@ -31,6 +31,7 @@ class OperatorConverter(ABC):
         unroll_rnn=False,
         separated_rnn_gate_calc=False,
         conv_transpose_with_bias=True,
+        legacy_gelu=False,
     ) -> None:
         self.scope_name = scope_name
         self.input_names = self.get_input_names(node)
@@ -50,6 +51,7 @@ class OperatorConverter(ABC):
         self.unroll_rnn = unroll_rnn
         self.separated_rnn_gate_calc = separated_rnn_gate_calc
         self.conv_transpose_with_bias = conv_transpose_with_bias
+        self.legacy_gelu = legacy_gelu
 
     @abstractmethod
     def parse(self, node, attrs, args, graph_converter):
