@@ -113,6 +113,7 @@ class TFLiteConverter(object):
                 quantizable ops. Defaults to False
             group_tensors (bool): Group tensors to save space. Defaults to False
             missing_outputs_as_constants (bool): View missing outputs as constants. Defaults to False
+            legacy_gelu (bool): Fallback to the legacy behaviour for translating gelu. Defaults to False
         """
 
         self.model = model

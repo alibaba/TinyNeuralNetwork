@@ -2,7 +2,6 @@ import warnings
 
 import numpy as np
 import torch
-import warnings
 
 from tinynn.util.util import get_logger
 
@@ -2200,7 +2199,7 @@ class ATenSoftplusOperator(ATenSoftplusSchema):
         beta = self.input_tensors[1]
 
         assert beta == 1.0, "Only beta=1.0 is supported for aten::softplus"
-        warnings.warn('threshold is ignored when transforiming aten::softplus')
+        warnings.warn('threshold is ignored when transforming aten::softplus')
 
         ops = []
 
