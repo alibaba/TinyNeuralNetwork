@@ -210,6 +210,11 @@ class OPVersioner(object):
                 op.op.version = 2
             else:
                 op.op.version = 1
+        elif op.op.code == ExtendedOperator.GELU:
+            if str(op.inputs[0].dtype) in ('int8', 'uint8'):
+                op.op.version = 2
+            else:
+                op.op.version = 1
         elif op.op.code == ExtendedOperator.STRIDED_SLICE:
             if len(op.inputs[0].shape) > 4:
                 op.op.version = 4

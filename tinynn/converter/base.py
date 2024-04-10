@@ -59,6 +59,7 @@ class TFLiteConverter(object):
         hybrid_config: typing.Optional[typing.Dict[str, bool]] = None,
         group_tensors: bool = False,
         missing_outputs_as_constants: bool = False,
+        legacy_gelu: bool = False,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -167,6 +168,7 @@ class TFLiteConverter(object):
         self.hybrid_config = hybrid_config
         self.group_tensors = group_tensors
         self.missing_outputs_as_constants = missing_outputs_as_constants
+        self.legacy_gelu = legacy_gelu
 
         if quantize_target_type == 'uint8':
             self.q_type = np.uint8
@@ -411,6 +413,7 @@ class TFLiteConverter(object):
                 self.unroll_rnn,
                 self.separated_rnn_gate_calc,
                 self.conv_transpose_with_bias,
+                self.legacy_gelu,
             )
             # Don't track the operator if all the input nodes are not tracked unless it has custom implementation
             # (e.g prim::* ops)
@@ -444,6 +447,7 @@ class TFLiteConverter(object):
                         self.unroll_rnn,
                         self.separated_rnn_gate_calc,
                         self.conv_transpose_with_bias,
+                        self.legacy_gelu,
                     )
             if k != 'prim::Constant':
                 log.debug(f'{k} {converter.input_names} -> {converter.output_names} {converter_type.__name__}')
