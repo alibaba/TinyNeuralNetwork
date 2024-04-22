@@ -3404,7 +3404,7 @@ class ATenGeluOperator(ATenGeluSchema):
 
         input_tensor = self.find_or_create_input(0, graph_converter)
         output_tensor = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
-        
+
         approximate = "none"
         if 'approximate' in args:
             approximate = self.input_tensors[args['approximate']] or "none"
