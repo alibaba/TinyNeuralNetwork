@@ -2450,11 +2450,11 @@ class QATQuantizer(object):
                 graph.replace_node_module(node_bn1d, new_bn2d)
 
                 prev_tensor_shape = node_fc.prev_tensors[0].shape
-                prev_func = TraceFunction('torch.reshape').parse_args(
+                prev_func = TraceFunction('torch.reshape', prefix='rewritten_conv2d_bn2d_').parse_args(
                     node_fc.prev_tensors[0], [prev_tensor_shape[0], prev_tensor_shape[1], 1, 1]
                 )
                 next_tensor_shape = node_bn1d.next_tensors[0].shape
-                next_func = TraceFunction('torch.reshape').parse_args(
+                next_func = TraceFunction('torch.reshape', prefix='rewritten_conv2d_bn2d_').parse_args(
                     node_bn1d.next_tensors[0], [next_tensor_shape[0], next_tensor_shape[1]]
                 )
             # expand the tensor shape between fc new_conv2d and new_bn2d
@@ -2509,8 +2509,8 @@ class QATQuantizer(object):
                 with override_current_trace_graph(graph):
                     graph.replace_node_module(node, new_bn)
 
-                    prev_func = TraceFunction('torch.unsqueeze').parse_args(node.prev_tensors[0], 2)
-                    next_func = TraceFunction('torch.squeeze').parse_args(node.next_tensors[0], 2)
+                    prev_func = TraceFunction('torch.unsqueeze', prefix='rewritten_bn2d_').parse_args(node.prev_tensors[0], 2)
+                    next_func = TraceFunction('torch.squeeze', prefix='rewritten_bn2d_').parse_args(node.next_tensors[0], 2)
 
                 node.next_tensors[0].unsqueeze_(2)
 
