@@ -2509,8 +2509,12 @@ class QATQuantizer(object):
                 with override_current_trace_graph(graph):
                     graph.replace_node_module(node, new_bn)
 
-                    prev_func = TraceFunction('torch.unsqueeze', prefix='rewritten_bn2d_').parse_args(node.prev_tensors[0], 2)
-                    next_func = TraceFunction('torch.squeeze', prefix='rewritten_bn2d_').parse_args(node.next_tensors[0], 2)
+                    prev_func = TraceFunction('torch.unsqueeze', prefix='rewritten_bn2d_').parse_args(
+                        node.prev_tensors[0], 2
+                    )
+                    next_func = TraceFunction('torch.squeeze', prefix='rewritten_bn2d_').parse_args(
+                        node.next_tensors[0], 2
+                    )
 
                 node.next_tensors[0].unsqueeze_(2)
 
