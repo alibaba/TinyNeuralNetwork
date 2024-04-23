@@ -4187,15 +4187,25 @@ def fuse_transpose_perms_extended(seq: typing.Iterable[ig.Vertex]):
                 old_shape = node['op'].outputs[0].shape
 
             if old_shape != new_shape:
-                new_shape_padded = list(new_shape) + [None] * (len(old_shape) - len(new_shape))
-                next_perm = []
-                new_idx = 0
-                while new_idx < len(new_shape):
-                    for old, item in zip(old_shape, cur_perm):
-                        if old == new_shape_padded[new_idx] and item not in next_perm:
-                            next_perm.append(item)
-                            new_idx += 1
-                cur_perm = np.argsort(next_perm)
+                if len(old_shape) != len(new_shape):
+                    new_shape_padded = list(new_shape) + [None] * (len(old_shape) - len(new_shape))
+                    next_perm = []
+                    new_idx = 0
+                    while new_idx < len(new_shape):
+                        for old, item in zip(old_shape, cur_perm):
+                            if old == new_shape_padded[new_idx] and item not in next_perm:
+                                next_perm.append(item)
+                                new_idx += 1
+                    cur_perm = np.argsort(next_perm)
+                else:
+                    mapping = {}
+                    for i in range(len(new_shape)):
+                        mapping.setdefault(new_shape[i], [])
+                        mapping[new_shape[i]].append(i)
+                    next_perm = [0] * len(old_shape)
+                    for i in range(len(old_shape)):
+                        next_perm[i] = mapping[old_shape[i]].pop(0)
+                    cur_perm = cur_perm[next_perm]
 
     return cur_perm
 
