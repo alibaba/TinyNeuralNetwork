@@ -2937,7 +2937,7 @@ class QATQuantizer(object):
                     break
                 if cur_class in current_rules:
                     current_state, current_rules = current_rules[cur_class]
-                    log.debug('dict: ', current_rules, current_state)
+                    log.debug(f'dict: {current_rules}, {current_state}')
                     names.append(cur_name)
                     if current_state is True:
                         log.debug(f'update best: {names}')
@@ -2960,7 +2960,7 @@ class QATQuantizer(object):
 
         if len(final_names) > 0:
             final_names.reverse()
-            log.debug('final:', final_names)
+            log.debug(f'final: {final_names}')
             custom_data[0].append(final_names)
             for name in final_names:
                 custom_data[1].add(name)
