@@ -2449,11 +2449,9 @@ class QATQuantizer(object):
                 graph.replace_node_module(node_fc, new_conv2d)
                 graph.replace_node_module(node_bn1d, new_bn2d)
 
-                prev_tensor_shape = node_fc.prev_tensors[0].shape
                 prev_func = TraceFunction('torch.Tensor.__getitem__', prefix='rewritten_conv2d_bn2d_').parse_args(
                     node_fc.prev_tensors[0], (Ellipsis, None, None)
                 )
-                next_tensor_shape = node_bn1d.next_tensors[0].shape
                 next_func = TraceFunction('torch.flatten', prefix='rewritten_conv2d_bn2d_').parse_args(
                     node_bn1d.next_tensors[0], 1
                 )
