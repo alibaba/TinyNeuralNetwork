@@ -17,6 +17,11 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "macos-13", "windows-latest"]
         vers: [ {pt_ver: "1.6.0", tv_ver: "0.7.0"}, {pt_ver: "latest", tv_ver: "latest"} ]
+        include:
+          - os: macos-latest
+            vers: 
+              pt_ver: latest
+              tv_ver: latest
     defaults:
       run:
         shell: bash -l {0}
