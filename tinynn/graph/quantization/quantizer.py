@@ -2899,18 +2899,17 @@ class QATQuantizer(object):
         if current_rules is None:
             return False
 
-        if check_node_quantized:
-            if not node.quantized:
-                return False
-        else:
-            if self.layerwise_config.get(node.unique_name, layerwise_config_default) is False:
-                return False
-
         cur_node = node
         names = []
         final_names = []
         current_state = False
         while True:
+            if check_node_quantized:
+                if not cur_node.quantized:
+                    break
+            else:
+                if self.layerwise_config.get(cur_node.unique_name, layerwise_config_default) is False:
+                    break
             cur_module = cur_node.module
             cur_class = type(cur_module)
             if isinstance(cur_module, TraceFunction):
