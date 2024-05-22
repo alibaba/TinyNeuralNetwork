@@ -89,10 +89,10 @@ def equalize(weight_1, weight_2, group=1, threshold=0.5, s_min=1e-6, s_max=1e6):
         )
         + shape_2[1:],
     )
-    weight_2_re = torch.permute(weight_2_re, (2, 0, 1, 3, 4))
+    weight_2_re = weight_2_re.permute((2, 0, 1, 3, 4))
     weight_2_re = torch.reshape(weight_2_re, (weight_2_re.shape[0] * weight_2_re.shape[1], -1))
-    r1 = weight_1_re.abs().amax([1]).double()
-    r2 = weight_2_re.abs().amax([1]).double()
+    r1 = weight_1_re.abs().max(1).values.double()
+    r2 = weight_2_re.abs().max(1).values.double()
     s = r1 / torch.sqrt(r1 * r2)
 
     # ignore too small scale
