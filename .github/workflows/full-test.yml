@@ -36,7 +36,10 @@ jobs:
           swap-size-gb: 8
       - name: Allow large swap space
         if: matrix.os == 'macos-latest'
-        run: diskutil apfs eraseVolume VM -name VM -role V
+        run: |
+          sysctl -a | grep swap
+          df -h
+          diskutil apfs eraseVolume VM -name VM -role V
       - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
