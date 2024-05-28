@@ -96,7 +96,7 @@ def equalize(weight_1, weight_2, group=1, threshold=0.5, s_min=1e-6, s_max=1e6):
     s = r1 / torch.sqrt(r1 * r2)
 
     # ignore too small scale
-    s = torch.clip(s, s_min, s_max)
+    s = torch.clamp(s, s_min, s_max)
     # refuse to scale unnecessary layers pair
     s = torch.where((r1 + r2) < threshold, torch.ones_like(s), s)
 
