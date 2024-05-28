@@ -4344,6 +4344,11 @@ class ConverterOPTester(unittest.TestCase):
         "torch.Tensor.scatter_ cannot take scalar inputs",
     )
     @unittest.skipIf(
+        LooseVersion(torch.__version__) >= LooseVersion('1.7.0')
+        and LooseVersion(torch.__version__) < LooseVersion('1.8.0'),
+        "torch.Tensor.scatter_ with scalar inputs fails",
+    )
+    @unittest.skipIf(
         LooseVersion(torch.__version__) >= LooseVersion('1.12.0')
         and LooseVersion(torch.__version__) < LooseVersion('1.13.0'),
         "https://github.com/pytorch/pytorch/issues/80508",
@@ -4367,6 +4372,11 @@ class ConverterOPTester(unittest.TestCase):
     @unittest.skipIf(
         LooseVersion(torch.__version__) < LooseVersion('1.7.0'),
         "torch.Tensor.scatter_ cannot take scalar inputs",
+    )
+    @unittest.skipIf(
+        LooseVersion(torch.__version__) >= LooseVersion('1.7.0')
+        and LooseVersion(torch.__version__) < LooseVersion('1.8.0'),
+        "torch.Tensor.scatter_ with scalar inputs fails",
     )
     @unittest.skipIf(
         LooseVersion(torch.__version__) >= LooseVersion('1.12.0')
