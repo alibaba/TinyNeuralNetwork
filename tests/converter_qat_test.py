@@ -57,13 +57,14 @@ def get_tflite_out(model_path, inputs):
 # regnet: group convs
 # yolov4: 5-d slices
 # swin: roll
-# vit: native_multi_head_attention
+# vit, maxvit: native_multi_head_attention
 BLACKLIST = (
     'resnext.*',
     'Build_Model',
     'regnet.*',
     'swin.*',
     'vit.*',
+    'maxvit.*',
 )
 
 
