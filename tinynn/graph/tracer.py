@@ -1757,7 +1757,9 @@ def tracer_context():
     lock(False)
     module_constructor_traced.clear()
     module_constructor_lines.clear()
+    module_constructor_weakrefs.clear()
     original_values_for_tracked_objects.clear()
+    skip_modules.clear()
 
 
 @contextlib.contextmanager
