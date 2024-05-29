@@ -213,8 +213,9 @@ class GraphOptimizer(object):
             bn = seq[0]['op']
             conv = seq[1]['op']
 
-            skip = bn.inputs[0].quantization is not None
-
+            skip = bn.inputs[0].quantization is not None or (
+                conv.inputs[1].shape[1] == 1 and conv.inputs[1].shape[0] == conv.groups and conv.groups > 1
+            )
             return skip
 
         elinimate_sequences(
@@ -4201,7 +4202,6 @@ def fuse_bn_bias(eps, scale, var, mean, bn_b, activ_b):
 
 def fuse_rev_bn_weight(eps, scale, var, weight):
     shape = [1, -1] + [1] * (len(weight.shape) - 2)
-    reduced_dims = [i for i in range(len(weight.shape)) if i > 1]
 
     inv = 1 / np.sqrt(var + eps)
 
