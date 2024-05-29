@@ -1,5 +1,5 @@
---prefer-binary
-numpy>=1.18.5
+numpy>=1.18.5,<=1.24.4; python_version < '3.9'
+numpy>=1.18.5; python_version >= '3.9'
 PyYAML>=5.3.1
 ruamel.yaml>=0.16.12
 igraph>=0.9
