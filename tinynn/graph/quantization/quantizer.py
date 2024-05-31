@@ -3711,9 +3711,14 @@ class PostQuantizer(QATQuantizer):
 
                     return new_no_observer_set
 
-                if LooseVersion(torch.__version__) >= LooseVersion("1.9.0"):
+                if LooseVersion(torch.__version__) >= LooseVersion("1.10.0"):
                     orig_no_observer_set = sys.modules['torch.ao.quantization.quantize'].no_observer_set
                     sys.modules['torch.ao.quantization.quantize'].no_observer_set = patch_observer_set(
+                        orig_no_observer_set
+                    )
+                elif LooseVersion(torch.__version__) >= LooseVersion("1.9.0"):
+                    orig_no_observer_set = torch.ao.quantization.quantization_mappings.no_observer_set
+                    torch.ao.quantization.quantization_mappings.no_observer_set = patch_observer_set(
                         orig_no_observer_set
                     )
 
