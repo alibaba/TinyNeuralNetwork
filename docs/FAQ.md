@@ -225,7 +225,7 @@ You may also try out static quantization for LSTMs when you have PyTorch 1.13+. 
 #### What if my model runs slower when dynamic quantization is enabled?
 Please refer to [dynamic_with_selection.py](../examples/converter/dynamic_with_selection.py) for selective dynamic quantization.
 
-#### I need LSTMs with separated gate calculation when `unroll_rnn=True`.
+#### I need LSTM/GRUs with separated gate calculation when `unroll_rnn=True`.
 Please set `separated_rnn_gate_calc=True`.
 
 #### How to add state inputs and outputs for LSTMs/GRUs/RNNs with `unroll_rnn=True`?

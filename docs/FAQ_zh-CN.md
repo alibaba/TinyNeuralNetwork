@@ -225,7 +225,7 @@ Note: 这些状态变量都是二维的，维度为`[batch_size, hidden_size或�
 #### 我的模型开了动态量化变得更慢了？
 请参考 [dynamic_with_selection.py](../examples/converter/dynamic_with_selection.py) 选择性的开启动态量化。
 
-#### 在设置了`unroll_rnn=True`后，LSTM中多个门的计算被融合了。有没有办法分开？
+#### 在设置了`unroll_rnn=True`后，LSTM/GRU中多个门的计算被融合了。有没有办法分开？
 尝试设置`separated_rnn_gate_calc=True`。
 
 #### 在`unroll_rnn=True`的情况下，怎么为包含LSTM、RNN和GRU的网络添加状态输入输出?
