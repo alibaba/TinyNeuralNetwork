@@ -2951,7 +2951,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
-    
+
     def test_gru_unroll_unseparated(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
 
@@ -2999,7 +2999,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output, check_stride=False)
-    
+
     def test_gru_batch_first_unroll_unseparated(self):
         dummy_input = torch.randn(1, 9, 10, dtype=torch.float32)
 
@@ -3051,7 +3051,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(*dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
-    
+
     def test_gru_with_state_tensor_unroll_unseparated(self):
         dummy_input = [
             torch.randn(9, 1, 10, dtype=torch.float32),
@@ -3103,7 +3103,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
-    
+
     def test_gru_multi_layer_unroll_unseparated(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
 
@@ -3155,8 +3155,8 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(*dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
-    
-    def test_gru_multi_layer_with_state_tensor_unroll_separated(self):
+
+    def test_gru_multi_layer_with_state_tensor_unroll_unseparated(self):
         dummy_input = [
             torch.randn(9, 1, 10, dtype=torch.float32),
             torch.randn(2, 1, 20, dtype=torch.float32),
@@ -3405,7 +3405,7 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
-    
+
     def test_bigru_unroll_unseparated(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
 
@@ -3453,8 +3453,8 @@ class ConverterOPTester(unittest.TestCase):
         dummy_output = model(dummy_input)
         tfl_output = tfl_run_model(model_path, dummy_input, dummy_output)
         assert_close(dummy_output, tfl_output)
-    
-    def test_bigru_multi_layer_unroll_separated(self):
+
+    def test_bigru_multi_layer_unroll_unseparated(self):
         dummy_input = torch.randn(9, 1, 10, dtype=torch.float32)
 
         class Model(nn.Module):
