@@ -554,8 +554,7 @@ class ATenGruOperator(ATenGruSchema):
     ):
         assert is_train in (False, 0)
         self.unroll_rnn = True
-        self.separated_rnn_gate_calc = False
-
+        
         expected_num_params = 2 * num_layers
         params_step = 2
         if has_biases:
