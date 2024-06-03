@@ -706,7 +706,7 @@ class ATenGruOperator(ATenGruSchema):
                             )                            
                             
                             ops.append(tfl.FullyConnectedOperator([t, w_i, b_i], [input_mm]))                            
-                            ops.append(tfl.FullyConnectedOperator([t, w_h, b_h], [hidden_mm]))
+                            ops.append(tfl.FullyConnectedOperator([h, w_h, b_h], [hidden_mm]))
 
                             left_in = np.split(input_mm.tensor, 3, axis=1)
                             dim_tensor = self.create_attr_tensor(np.array([1], dtype='int32'))
