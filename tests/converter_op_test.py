@@ -4856,7 +4856,11 @@ class ConverterOPTester(unittest.TestCase):
             converter.convert()
 
             dummy_output = model(dummy_input)
-            tfl_output = tfl_run_model(model_path, dummy_input.permute(0, 2, 3, 1), dummy_output).permute(0, 3, 1, 2)
+            tfl_output = (
+                tfl_run_model(model_path, dummy_input.permute(0, 2, 3, 1), dummy_output)
+                .permute(0, 3, 1, 2)
+                .contiguous()
+            )
 
             def msg(*args, **kwargs):
                 return f'testing {type(func).__name__} failed: {args}'
