@@ -21,6 +21,8 @@ try:
 except ModuleNotFoundError:
     import ruamel.yaml as yaml
 
+NEW_YAML_FLAG = "error_deprecation" in getsource(yaml.load)
+
 log = get_logger(__name__)
 
 
@@ -136,7 +138,11 @@ class BasePruner(ABC):
         """Loads the configuration file and returns it as a dictionary"""
 
         with open(path, 'r') as f:
-            config = yaml.load(f, Loader=yaml.RoundTripLoader)
+            if NEW_YAML_FLAG:
+                yaml_ = yaml.YAML(typ='rt')
+                config = yaml_.load(f)
+            else:
+                config = yaml.load(f, Loader=yaml.RoundTripLoader)
         return config
 
     @conditional(lambda: not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0)
@@ -147,7 +153,12 @@ class BasePruner(ABC):
             config = self.config
 
         with open(path, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False, Dumper=yaml.RoundTripDumper)
+            if NEW_YAML_FLAG:
+                yaml_ = yaml.YAML(typ='rt')
+                yaml_.default_flow_style = False
+                yaml_.dump(config, f)
+            else:
+                yaml.dump(config, f, default_flow_style=False, Dumper=yaml.RoundTripDumper)
 
     def trace(self) -> TraceGraph:
         with torch.no_grad():
