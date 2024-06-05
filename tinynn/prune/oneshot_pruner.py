@@ -70,6 +70,9 @@ class OneShotChannelPruner(BasePruner):
 
         self.graph_modifier = modifier.GraphChannelModifier(self.graph, self.center_nodes, self.bn_compensation)
 
+        # TODO: 为了保持剪枝精度，目前暂时先将所有的常量参与的剪枝子图取消
+        self.exclude_ops.append('weight')
+
         for sub_graph in self.graph_modifier.sub_graphs.values():
             exclude = False
             for m in sub_graph.modifiers:

@@ -858,6 +858,15 @@ class Modifier(object):
                 raise e
 
         for tensor_o in self.next_tensors():
+            # Case [1, c0, c1] + [c0, c1](center_node) -> [1, c0, c1], to keep dim_change_o keep consistent.
+            if len(tensor_o.shape) > len(tensor.shape) and tensor_o.shape[0] == 1:
+                old_dim_change_i = dim_changes_i
+                omitted_dim_len = 1
+                dim_changes_i = [i + omitted_dim_len for i in dim_changes_i]
+                for dim_ in old_dim_change_i:
+                    tensor_constraint[dim_ + omitted_dim_len] = tensor_constraint[dim_]
+                    tensor_constraint.pop(dim_)
+
             self.dim_changes_info.update_o(center, tensor_o, dim_changes_i)
 
             for m in self.next_modifiers(tensor_o):
@@ -1146,9 +1155,9 @@ class PReLUChannelModifier(Modifier):
             bn.num_parameters = len(preserve_idx)
 
 
-class BatchNormChannelModifier(Modifier):
+class NormChannelModifier(Modifier):
     def __init__(self, node: TraceNode):
-        super(BatchNormChannelModifier, self).__init__(node)
+        super(NormChannelModifier, self).__init__(node)
         self.prunable = True
 
     def register_mask(self, modifiers, importance, sparsity):
@@ -1229,13 +1238,23 @@ class BatchNormChannelModifier(Modifier):
                             conv.bias = torch.nn.Parameter(conv.bias + bn_bias)
                 break
 
-            log.info(f'[BN] {self.unique_name()}: channel {bn.num_features} -> {len(preserve_idx)}')
+            if isinstance(bn, nn.BatchNorm1d) or isinstance(bn, nn.BatchNorm2d):
+                log.info(f'[BN] {self.unique_name()}: channel {bn.num_features} -> {len(preserve_idx)}')
+                bn.register_buffer('running_mean', bn.running_mean[preserve_idx])
+                bn.register_buffer('running_var', bn.running_var[preserve_idx])
+                bn.num_batches_tracked = bn.num_batches_tracked.zero_()
+                bn.num_features = len(preserve_idx)
+            elif isinstance(bn, nn.LayerNorm):
+                if len(bn.normalized_shape) == 1:
+                    log.info(f'[LN] {self.unique_name()}: channel {bn.normalized_shape} -> ({len(preserve_idx)},)')
+                    bn.normalized_shape = (len(preserve_idx),)
+                else:
+                    log.error("The Layer Normalization (LN) Modifier supports only one-dimensional normalized_shape.")
+            else:
+                log.error("Unsupported Norm Type")
+
             bn.weight = torch.nn.Parameter(bn.weight[preserve_idx])
             bn.bias = torch.nn.Parameter(bn.bias[preserve_idx])
-            bn.register_buffer('running_mean', bn.running_mean[preserve_idx])
-            bn.register_buffer('running_var', bn.running_var[preserve_idx])
-            bn.num_batches_tracked = bn.num_batches_tracked.zero_()
-            bn.num_features = len(preserve_idx)
 
 
 class ReIndexModifier(Modifier):
@@ -2190,7 +2209,7 @@ class RNNChannelModifier(Modifier):
             assert False
 
 
-class Conv2dChannelModifier(Modifier):
+class ConvChannelModifier(Modifier):
     def __init__(self, node: TraceNode):
         super().__init__(node)
         self.dim_n = 0
@@ -2416,7 +2435,7 @@ class Conv2dChannelModifier(Modifier):
                     m.dim_change_forward(center, self.next_tensors()[0], dim_changes_o, transform, None)
 
 
-class TransConvChannelModifier(Conv2dChannelModifier):
+class TransConvChannelModifier(ConvChannelModifier):
     def register_mask(self, modifiers, importance, sparsity):
         if self.dim_changes_info.pruned_idx_i:
             remove_idx = self.dim_changes_info.pruned_idx_i
@@ -2464,11 +2483,40 @@ class TransConvChannelModifier(Conv2dChannelModifier):
                 conv.bias = torch.nn.Parameter(conv.bias[preserve_idx])
 
 
+class ConstantModifier(LinearChannelModifier):
+    def __init__(self, node: TraceNode):
+        Modifier.__init__(self, node)
+        self.output_tensor = self.next_tensors()[0]
+        self.input_tensor = self.output_tensor
+        # Pruning operation occurs along the second dimension
+        self.dim_c = 1
+        self.prunable = True
+
+    def change_dimension(self) -> bool:
+        dim_changes_o = [self.dim_c]
+
+        fill_tensor_by_dim_changes(self.output_tensor, dim_changes_o)
+
+        tensor_constraint = self.dim_changes_info.update_o(
+            self, self.next_tensors()[0], dim_changes_o, update_constraint=True
+        )
+
+        for m in self.next_modifiers():
+            m.dim_change_forward(self, self.next_tensors()[0], dim_changes_o, None, tensor_constraint)
+
+        return True
+
+    def register_mask(self, modifiers, importance, sparsity):
+        Modifier.reset_mask(self)
+
+
 CHANNEL_MODIFIERS = {
-    nn.Conv2d: Conv2dChannelModifier,
+    nn.Conv1d: ConvChannelModifier,
+    nn.Conv2d: ConvChannelModifier,
     nn.Linear: LinearChannelModifier,
     nn.ConvTranspose2d: TransConvChannelModifier,
     nn.ConvTranspose1d: TransConvChannelModifier,
+    nn.AvgPool1d: PoolingModifier,
     nn.AvgPool2d: PoolingModifier,
     nn.AdaptiveAvgPool2d: PoolingModifier,
     nn.MaxPool2d: PoolingModifier,
@@ -2480,9 +2528,11 @@ CHANNEL_MODIFIERS = {
     nn.UpsamplingNearest2d: PoolingModifier,
     "interpolate": PoolingModifier,
     nn.PReLU: PReLUChannelModifier,
-    nn.BatchNorm2d: BatchNormChannelModifier,
-    nn.BatchNorm1d: BatchNormChannelModifier,
+    nn.BatchNorm2d: NormChannelModifier,
+    nn.BatchNorm1d: NormChannelModifier,
+    nn.LayerNorm: NormChannelModifier,
     'matmul': MatMulModifier,
+    'bmm': MatMulModifier,
     'cat': CatModifier,
     'view': ReshapeModifier,
     "flatten": ReIndexModifier,
@@ -2500,6 +2550,7 @@ CHANNEL_MODIFIERS = {
     nn.RNN: RNNChannelModifier,
     nn.GRU: RNNChannelModifier,
     nn.LSTM: RNNChannelModifier,
+    'weight': ConstantModifier,
 }
 
 
