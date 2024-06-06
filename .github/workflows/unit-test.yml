@@ -15,8 +15,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["windows-latest"]
-        vers: [ {pt_ver: "1.8.0", tv_ver: "0.9.0"}, {pt_ver: "1.9.0", tv_ver: "0.10.0"} ]
+        os: ["ubuntu-latest", "macos-13", "windows-latest"]
+        vers: [ {pt_ver: "1.6.0", tv_ver: "0.7.0"}, {pt_ver: "latest", tv_ver: "latest"} ]
+        include:
+          - os: macos-latest
+            vers: 
+              pt_ver: latest
+              tv_ver: latest
     defaults:
       run:
         shell: bash -l {0}
@@ -93,3 +98,37 @@ jobs:
           fi
           rm -rf out || true
           python tracer_test.py -v -k mobilenet
+  misc-check:
+    name: Misc checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: 3.8
+      - name: Install PyTorch
+        run: conda install pytorch torchvision cpuonly -c pytorch
+      - name: Install TinyNeuralNetwork
+        run: pip install .
+      - name: Check op matrix
+        run: |
+          python scripts/gen_op_docs.py
+          if [[ $(git diff --stat) != '' ]]; then
+            echo "OP matrix is not updated. Please run python scripts/gen_op_docs.py and update your commit"
+            echo "Differences:"
+            git --no-pager diff
+            exit 1
+          fi
+      - name: Check quantization support
+        run: |
+          python scripts/gen_quantized_docs.py
+          if [[ $(git diff --stat) != '' ]]; then
+            echo "Quantization support doc is not updated. Please run python scripts/gen_quantized_docs.py and update your commit"
+            echo "Differences:"
+            git --no-pager diff
+            exit 1
+          fi
