@@ -47,6 +47,9 @@ jobs:
          elif [ "$RUNNER_OS" == "Windows" ]; then
             if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
               conda install pytorch torchvision cpuonly pillow=6 -c pytorch
+            elif [[ "$TORCHVISION_VER" == "0.9."* || "$TORCHVISION_VER" == "0.10."* ]]; then
+              conda install pillow=6 -c conda-forge  
+              conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER cpuonly -c pytorch
             else
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER cpuonly pillow=6 -c pytorch
             fi
