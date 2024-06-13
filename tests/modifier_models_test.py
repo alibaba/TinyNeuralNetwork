@@ -1,5 +1,7 @@
 import unittest
 
+import gc
+
 import torch
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
 
@@ -57,6 +59,13 @@ class ModifierTester(unittest.TestCase):
             pruner.prune()
             model(dummy_input)
             print(f"test {model_name} over!\n")
+
+    def tearDown(self):
+        gc.collect()
+
+    @classmethod
+    def tearDownClass(cls):
+        gc.collect()
 
 
 if __name__ == '__main__':
