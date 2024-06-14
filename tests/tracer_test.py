@@ -4,7 +4,7 @@ import unittest
 import gc
 
 from tinynn.graph.tracer import trace, model_tracer
-from common_utils import collect_custom_models, collect_torchvision_models, prepare_inputs, IS_CI
+from common_utils import collect_custom_models, collect_torchvision_models, mark_forked, prepare_inputs, IS_CI
 
 
 BLACKLIST = (
@@ -40,6 +40,7 @@ class TestModelMeta(type):
 
     @classmethod
     def build_model_test(cls, model_class, eliminate_dead_graph):
+        @mark_forked
         def f(self):
             model_name = model_class.__name__
             model_file = model_name

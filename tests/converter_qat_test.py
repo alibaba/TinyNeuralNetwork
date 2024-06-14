@@ -11,7 +11,7 @@ import numpy as np
 from tinynn.converter import TFLiteConverter
 from tinynn.graph.tracer import model_tracer
 from tinynn.graph.quantization.quantizer import QATQuantizer
-from common_utils import IS_CI, collect_torchvision_models, prepare_inputs
+from common_utils import IS_CI, collect_torchvision_models, mark_forked, prepare_inputs
 
 
 HAS_TF = False
@@ -108,6 +108,7 @@ class TestModelMeta(type):
 
             return qat_model, inputs
 
+        @mark_forked
         def f(self):
             model_name = model_class.__name__
             model_file = model_name

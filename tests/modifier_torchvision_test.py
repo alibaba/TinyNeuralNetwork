@@ -12,7 +12,7 @@ from tinynn.graph.tracer import model_tracer
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
 from tinynn.util.util import import_from_path
 
-from common_utils import collect_torchvision_models, prepare_inputs, IS_CI
+from common_utils import collect_torchvision_models, mark_forked, prepare_inputs, IS_CI
 
 
 def transform_output(output):
@@ -53,6 +53,7 @@ class TestModelMeta(type):
 
     @classmethod
     def build_model_test(cls, model_class):
+        @mark_forked
         def f(self):
             model_name = model_class.__name__
 

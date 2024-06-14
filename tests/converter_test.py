@@ -9,7 +9,7 @@ import warnings
 import numpy as np
 
 from tinynn.converter import TFLiteConverter
-from common_utils import IS_CI, collect_custom_models, collect_torchvision_models, prepare_inputs
+from common_utils import IS_CI, collect_custom_models, collect_torchvision_models, mark_forked, prepare_inputs
 
 
 HAS_TF = False
@@ -88,6 +88,7 @@ class TestModelMeta(type):
 
     @classmethod
     def build_model_test(cls, model_class):
+        @mark_forked
         def f(self):
             model_name = model_class.__name__
             model_file = model_name
