@@ -80,9 +80,16 @@ jobs:
           else
             pip install black 'ruff<0.0.234' tensorflow pytest scipy interval
           fi
+          if [[ "$RUNNER_OS" == "macOS" && "$RUNNER_ARCH" == "ARM64" ]]; then
+            pip install pytest-forked
+          fi
       - name: Lint checks
         run: python -m ruff .
       - name: Run tests
         run: |
           source activate.sh
-          pytest tests -v
+          if [[ "$RUNNER_OS" == "macOS" && "$RUNNER_ARCH" == "ARM64" ]]; then
+            pytest tests --forked -v
+          else
+            pytest tests -v
+          fi
