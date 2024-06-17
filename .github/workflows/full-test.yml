@@ -89,7 +89,7 @@ jobs:
         run: |
           source activate.sh
           if [[ "$RUNNER_OS" == "macOS" && "$RUNNER_ARCH" == "ARM64" ]]; then
-            pytest tests --forked -v
+            python tests/test_run.py
           else
             pytest tests -v
           fi
