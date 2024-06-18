@@ -13,29 +13,27 @@ for file in test_files:
 # Function to run a test file
 def run_test(file):
     try:
-        result = subprocess.run(["pytest", "-v", file], check=True, capture_output=True, text=True)
-        print(result.stdout)
-        return None  # No error
-    except subprocess.CalledProcessError as e:
-        error_message = f"Tests failed in {file}\n{e.stdout}\n{e.stderr}"
-        return error_message  # Return the error message
+        subprocess.run(["pytest", "-v", file], check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 
 # Run all test files
 def main():
-    errors = []
+    error_flag = True
     for test_file in test_files:
         error = run_test(test_file)
-        if error:
-            errors.append(error)
+        error_flag = error_flag and error
 
-    if errors:
-        raise Exception("\n".join(errors))
+    return error_flag
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(e)
+    error_flag = True
+    for test_file in test_files:
+        error = run_test(test_file)
+        error_flag = error_flag and error
+
+    if error_flag:
         sys.exit(1)

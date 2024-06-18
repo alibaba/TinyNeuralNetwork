@@ -8,8 +8,6 @@ import torchvision
 import random
 import torch.nn.functional
 
-import gc
-
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
 from tinynn.util.util import import_from_path, get_logger
 
@@ -120,13 +118,6 @@ class ModifierForwardTester(unittest.TestCase):
     def test_densenet121(self):
         model = torchvision.models.densenet121(pretrained=False)
         speed_test(model, torch.randn((1, 3, 224, 224)))
-
-    def tearDown(self):
-        gc.collect()
-
-    @classmethod
-    def tearDownClass(cls):
-        gc.collect()
 
 
 if __name__ == '__main__':

@@ -9,10 +9,6 @@ try:
 except ImportError:
     models = None
 
-# try:
-#     import pytest
-# except ImportError:
-#     pytest = None
 
 IS_CI = os.getenv('CI', '') == 'true'
 
