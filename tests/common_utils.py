@@ -9,7 +9,6 @@ try:
 except ImportError:
     models = None
 
-
 IS_CI = os.getenv('CI', '') == 'true'
 
 
