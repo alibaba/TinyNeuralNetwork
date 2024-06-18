@@ -503,6 +503,58 @@ class GraphOptimizer(object):
         self.graph.graph.delete_vertices(remove_ids)
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
+    def remove_tile_before_binary_elementwise_ops(self):
+        # Find fusable ops
+        edges = self.graph.graph.es.select(functools.partial(is_tile_binary_op_edge, graph_converter=self.graph.graph))
+        filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target], x) for x in edges)
+
+        remove_ids = []
+        actions = []
+        binary_op_ids = set()
+        for tile, op_node, tensor in filtered_pairs:
+            tile_op = tile['op']
+            binary_op = op_node['op']
+
+            input_idx = None
+            for i in range(2):
+                try:
+                    _ = tile['outputs'].index(binary_op.inputs[i].name)
+                    input_idx = i
+                    break
+                except ValueError:
+                    pass
+
+            if input_idx is None:
+                continue
+
+            alter_input_idx = 1 - input_idx
+            try:
+                out_shape = np.broadcast_shapes(binary_op.inputs[alter_input_idx].shape, tile_op.inputs[0].shape)
+                if out_shape != binary_op.outputs[0].shape:
+                    continue
+            except ValueError:
+                continue
+
+            if op_node.index not in binary_op_ids:
+                binary_op_ids.add(op_node.index)
+            else:
+                continue
+
+            new_tensor = tile_op.inputs[0]
+
+            # Replace input tensors
+            actions.append((self.graph.replace_operator_input, (op_node, input_idx, new_tensor)))
+
+            # remove tile op
+            remove_ids.append(tile.index)
+
+        # Process actions
+        for func, args in actions:
+            func(*args)
+        # Delete tile nodes
+        self.graph.graph.delete_vertices(remove_ids)
+
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_conv2d_gather(self):
         # Find fusable ops
         edges = self.graph.graph.es.select(functools.partial(is_conv2d_gather_edge, graph_converter=self.graph.graph))
@@ -3449,6 +3501,9 @@ class GraphOptimizer(object):
         # Fuse reciprocal and sqrt
         self.fuse_reciprocal_sqrt()
 
+        # Remove additional tile nodes before elementwise ops
+        self.remove_tile_before_binary_elementwise_ops()
+
         # Fuse activation
         self.fuse_activation()
 
@@ -4107,6 +4162,23 @@ def is_reciprocal_sqrt_edge(edge: ig.Edge, graph_converter: ig.Graph):
     return (
         source_vertex['node_type'] == ExtendedOperator.SQRT
         and target_vertex['node_type'] == ExtendedOperator.DIV
+        and source_vertex.outdegree() == 1
+    )
+
+
+def is_tile_binary_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+
+    return (
+        source_vertex['node_type'] == ExtendedOperator.TILE
+        and target_vertex['node_type']
+        in (
+            ExtendedOperator.ADD,
+            ExtendedOperator.SUB,
+            ExtendedOperator.MUL,
+            ExtendedOperator.DIV,
+        )
         and source_vertex.outdegree() == 1
     )
 
