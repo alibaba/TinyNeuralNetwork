@@ -15,7 +15,7 @@ jobs:
         vers: [ {pt_ver: "1.6.0", tv_ver: "0.7.0"}, {pt_ver: "1.7.0", tv_ver: "0.8.1"}, {pt_ver: "1.8.0", tv_ver: "0.9.0"}, {pt_ver: "1.9.0", tv_ver: "0.10.0"}, {pt_ver: "1.10.0", tv_ver: "0.11.1"}, {pt_ver: "1.11.0", tv_ver: "0.12.0"}, {pt_ver: "1.12.0", tv_ver: "0.13.0"} ]
         include:
           - os: macos-latest
-            vers: 
+            vers:
               pt_ver: latest
               tv_ver: latest
     defaults:
@@ -54,7 +54,7 @@ jobs:
             if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
               conda install pytorch torchvision cpuonly pillow=6 -c pytorch
             elif [[ "$TORCHVISION_VER" == "0.9."* || "$TORCHVISION_VER" == "0.10."* ]]; then
-              conda install pillow=6 -c conda-forge  
+              conda install pillow=6 -c conda-forge
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER cpuonly -c pytorch
             else
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER cpuonly pillow=6 -c pytorch
@@ -83,4 +83,4 @@ jobs:
       - name: Run tests
         run: |
           source activate.sh
-          pytest tests -v
+          python tests/test_run.py
