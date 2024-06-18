@@ -3,13 +3,6 @@ import sys
 
 import glob
 
-# List of test files to run
-test_files = glob.glob('tests/*_test.py', recursive=True)
-
-print("Test files:")
-for file in test_files:
-    print(f" - {file}")
-
 # Function to run a test file
 def run_test(file):
     try:
@@ -19,21 +12,18 @@ def run_test(file):
         return False
 
 
-# Run all test files
-def main():
-    error_flag = True
-    for test_file in test_files:
-        error = run_test(test_file)
-        error_flag = error_flag and error
-
-    return error_flag
-
-
 if __name__ == "__main__":
-    error_flag = True
-    for test_file in test_files:
-        error = run_test(test_file)
-        error_flag = error_flag and error
+    # List of test files to run
+    test_files = glob.glob('tests/*_test.py', recursive=True)
 
-    if error_flag:
+    print("Test files:")
+    for file in test_files:
+        print(f" - {file}")
+
+    pass_flag = True
+    for test_file in test_files:
+        passed = run_test(test_file)
+        pass_flag = pass_flag and passed
+
+    if not pass_flag:
         sys.exit(1)
