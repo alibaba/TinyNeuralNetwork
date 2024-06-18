@@ -4,7 +4,11 @@ import sys
 import glob
 
 # List of test files to run
-test_files = glob.glob('**/*_test.py', recursive=True)
+test_files = glob.glob('tests/*_test.py', recursive=True)
+
+print("Test files:")
+for file in test_files:
+    print(f" - {file}")
 
 # Function to run a test file
 def run_test(file):

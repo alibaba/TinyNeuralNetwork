@@ -9,10 +9,10 @@ try:
 except ImportError:
     models = None
 
-try:
-    import pytest
-except ImportError:
-    pytest = None
+# try:
+#     import pytest
+# except ImportError:
+#     pytest = None
 
 IS_CI = os.getenv('CI', '') == 'true'
 
@@ -74,10 +74,3 @@ def prepare_inputs(model):
         t = torch.ones(shape)
         inputs.append(t)
     return inputs
-
-
-def mark_forked(f):
-    if pytest is not None:
-        return pytest.mark.forked(f)
-    else:
-        return f
