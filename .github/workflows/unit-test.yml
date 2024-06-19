@@ -1,12 +1,8 @@
 name: Unit tests
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  schedule:
+    - cron:  '00 19 * * *'
 
 jobs:
   unit-test:
