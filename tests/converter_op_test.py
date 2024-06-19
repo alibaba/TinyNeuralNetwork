@@ -4,9 +4,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-import tensorflow as tf
-
 from tinynn.converter import TFLiteConverter
+
+# import tensorflow as t\
+tf = None
 
 
 def assert_close(actual, expected, *args, **kwargs):
