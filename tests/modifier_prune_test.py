@@ -2,11 +2,11 @@ import os
 import random
 import unittest
 
-# from distutils.version import LooseVersion
-# from operator import add, mul, sub, truediv
-# from unittest.case import SkipTest
+from distutils.version import LooseVersion
+from operator import add, mul, sub, truediv
+from unittest.case import SkipTest
 
-# import numpy as np
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -30,6 +30,11 @@ from tinynn.prune.oneshot_pruner import OneShotChannelPruner
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 MODULE_INIT = True
+
+print(LooseVersion)
+print(add, mul, sub, truediv)
+print(SkipTest)
+print(np)
 
 
 def model_generate(model, dummy_input, name='test.tflite'):
