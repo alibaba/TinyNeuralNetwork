@@ -664,7 +664,7 @@ class OperatorConverter(ABC):
 
     def torch_tensor_from_scalar(self, ref_tensor: torch.Tensor, src_tensor: torch.Tensor):
         tgt_tensor = src_tensor
-        if type(src_tensor) != torch.Tensor:
+        if not isinstance(src_tensor, torch.Tensor):
             if ref_tensor.is_quantized:
                 tgt_tensor = torch.quantize_per_tensor(
                     torch.tensor([src_tensor], dtype=torch.float32),
