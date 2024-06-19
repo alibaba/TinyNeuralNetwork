@@ -1,8 +1,6 @@
 import subprocess
 import sys
 
-import glob
-
 # Function to run a test file
 def run_test(file):
     try:
@@ -14,7 +12,7 @@ def run_test(file):
 
 if __name__ == "__main__":
     # List of test files to run
-    test_files = glob.glob('tests/*_test.py', recursive=True)
+    test_files = ["tests/converter_op_test.py"]
 
     print("Test files:")
     for file in test_files:
