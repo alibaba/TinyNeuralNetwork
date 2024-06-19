@@ -16,8 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-latest"]
-        vers: [{pt_ver: "1.8.0", tv_ver: "0.9.0"} ]
+        os: ["macos-13"]
+        vers: [{pt_ver: "1.12.0", tv_ver: "0.13.0"} ]
     defaults:
       run:
         shell: bash -l {0}
@@ -83,4 +83,4 @@ jobs:
       - name: Run tests
         run: |
           source activate.sh
-          pytest tests/converter_op_test.py -v
+          pytest tests/modifier_prune_test.py -v
