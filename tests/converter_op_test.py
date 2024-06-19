@@ -1,13 +1,13 @@
 import unittest
 
 import numpy as np
+import tensorflow as tf
 import torch
 import torch.nn as nn
 
 from tinynn.converter import TFLiteConverter
 
-# import tensorflow as t\
-tf = None
+# import tensorflow as t
 
 
 def assert_close(actual, expected, *args, **kwargs):
