@@ -1,9 +1,10 @@
 import unittest
 
 import numpy as np
-import tensorflow as tf
 import torch
 import torch.nn as nn
+
+import tensorflow as tf
 
 from tinynn.converter import TFLiteConverter
 
