@@ -7,9 +7,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import tensorflow as tf
-
 from common_utils import IS_CI
+
+import tensorflow as tf
 
 from tinynn.converter import TFLiteConverter
 
