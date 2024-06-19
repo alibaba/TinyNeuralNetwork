@@ -1212,7 +1212,7 @@ class ATenSubOperator(ATenSubSchema):
 
         if type(other) in (int, float, bool):
             self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
-        elif type(other) != torch.Tensor:
+        elif not isinstance(other, torch.Tensor):
             assert False, "other should have type int, float, tensor in aten::sub(input, other)"
 
         self.elementwise_binary(tfl.SubOperator, graph_converter, True)
@@ -1230,7 +1230,7 @@ class ATenRsubOperator(ATenRsubSchema):
 
         if type(other) in (int, float, bool):
             self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
-        elif type(other) != torch.Tensor:
+        elif not isinstance(other, torch.Tensor):
             assert False, "other should have type int, float, tensor in aten::rsub(input, other)"
 
         # Swap the first two input tensors and their names
@@ -1268,7 +1268,7 @@ class ATenMulOperator(ATenMulSchema):
 
         if type(other) in (int, float):
             self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
-        elif type(other) != torch.Tensor:
+        elif not isinstance(other, torch.Tensor):
             assert False, "other should have type int, float, tensor in aten::mul(input, other)"
 
         self.elementwise_binary(tfl.MulOperator, graph_converter, True)
@@ -1338,7 +1338,7 @@ class ATenDivOperator(ATenDivSchema):
         other = self.input_tensors[1]
         if type(other) in (int, float):
             self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
-        elif type(other) != torch.Tensor:
+        elif not isinstance(other, torch.Tensor):
             assert False, "other should have type int, float, tensor in aten::div(input, other)"
 
         self.elementwise_binary(tfl.DivOperator, graph_converter, True)
@@ -1362,7 +1362,7 @@ class ATenPowOperator(ATenPowSchema):
             torch.int32,
         ), "Input should be tensors of type torch.float32 or torch.int32"
 
-        if type(self.input_tensors[1]) != torch.Tensor:
+        if not isinstance(self.input_tensors[1], torch.Tensor):
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
 
         self.elementwise_binary(tfl.PowOperator, graph_converter, True)
@@ -1738,7 +1738,7 @@ class ATenFloorDivideOperator(ATenFloorDivideSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        if type(self.input_tensors[1]) != torch.Tensor:
+        if not isinstance(self.input_tensors[1], torch.Tensor):
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
         elif self.input_tensors[1].dtype != self.input_tensors[0].dtype:
             other = self.find_or_create_input(1, graph_converter)
@@ -2028,7 +2028,7 @@ class ATenAddOperator(ATenAddSchema):
 
         if type(other) in (int, float, bool):
             self.input_tensors[1] = torch.tensor([other], dtype=self.input_tensors[0].dtype)
-        elif type(other) != torch.Tensor:
+        elif not isinstance(other, torch.Tensor):
             assert False, "other should have type int, float, tensor in aten::add(input, other)"
 
         self.elementwise_binary(tfl.AddOperator, graph_converter, True)
@@ -2269,7 +2269,7 @@ class ATenNeOperator(ATenNeSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        if type(self.input_tensors[1]) != torch.Tensor:
+        if not isinstance(self.input_tensors[1], torch.Tensor):
             self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.NotEqualOperator, graph_converter, True)
@@ -3636,7 +3636,7 @@ class ATenEqOperator(ATenEqSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        if type(self.input_tensors[1]) != torch.Tensor:
+        if not isinstance(self.input_tensors[1], torch.Tensor):
             self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.EqualOperator, graph_converter, True)
@@ -3910,7 +3910,7 @@ class ATenMaximumOperator(ATenMaximumSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        if type(self.input_tensors[1]) != torch.Tensor:
+        if not isinstance(self.input_tensors[1], torch.Tensor):
             self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.MaximumOperator, graph_converter, True)
@@ -3921,7 +3921,7 @@ class ATenMinimumOperator(ATenMinimumSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        if type(self.input_tensors[1]) != torch.Tensor:
+        if not isinstance(self.input_tensors[1], torch.Tensor):
             self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.MinimumOperator, graph_converter, True)
@@ -3932,7 +3932,7 @@ class ATenGtOperator(ATenGtSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        if type(self.input_tensors[1]) != torch.Tensor:
+        if not isinstance(self.input_tensors[1], torch.Tensor):
             self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.GreaterOperator, graph_converter, True)
@@ -3943,7 +3943,7 @@ class ATenLtOperator(ATenLtSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        if type(self.input_tensors[1]) != torch.Tensor:
+        if not isinstance(self.input_tensors[1], torch.Tensor):
             self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.LessOperator, graph_converter, True)
@@ -3954,7 +3954,7 @@ class ATenGeOperator(ATenGeSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        if type(self.input_tensors[1]) != torch.Tensor:
+        if not isinstance(self.input_tensors[1], torch.Tensor):
             self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.GreaterEqualOperator, graph_converter, np.True_)
@@ -3965,7 +3965,7 @@ class ATenLeOperator(ATenLeSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        if type(self.input_tensors[1]) != torch.Tensor:
+        if not isinstance(self.input_tensors[1], torch.Tensor):
             self.input_tensors[1] = self.torch_tensor_from_scalar(self.input_tensors[0], self.input_tensors[1])
 
         self.elementwise_binary(tfl.LessEqualOperator, graph_converter, True)
@@ -3976,7 +3976,7 @@ class ATenRemainderOperator(ATenRemainderSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        if type(self.input_tensors[1]) != torch.Tensor:
+        if not isinstance(self.input_tensors[1], torch.Tensor):
             self.input_tensors[1] = torch.tensor([self.input_tensors[1]], dtype=self.input_tensors[0].dtype)
 
         self.elementwise_binary(tfl.FloorModOperator, graph_converter, True)
@@ -3989,7 +3989,7 @@ class ATenWhereOperator(ATenWhereSchema):
         self.run(node)
         assert 'self' in args and 'other' in args, "aten::where(condition) is not supported"
 
-        if type(self.input_tensors[2]) != torch.Tensor:
+        if not isinstance(self.input_tensors[2], torch.Tensor):
             self.input_tensors[2] = torch.tensor([self.input_tensors[2]])
 
         ATenMaskedFillOperator.parse_common(self, graph_converter, input_idx=2, mask_idx=0, other_idx=1)
