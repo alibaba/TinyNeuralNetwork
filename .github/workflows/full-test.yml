@@ -83,4 +83,5 @@ jobs:
       - name: Run tests
         run: |
           source activate.sh
+          pytest tests/converter_optimizer_test.py -v
           pytest tests/converter_op_test.py -v
