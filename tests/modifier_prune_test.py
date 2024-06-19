@@ -2,13 +2,15 @@ import os
 import random
 import unittest
 
-from distutils.version import LooseVersion
-from operator import add, mul, sub, truediv
-from unittest.case import SkipTest
-
-import numpy as np
 import torch
 import torch.nn as nn
+
+from distutils.version import LooseVersion
+from operator import add, mul, sub, truediv
+
+# from unittest.case import SkipTest
+
+# import numpy as np
 
 # import torch.nn.functional as F
 
@@ -33,8 +35,6 @@ MODULE_INIT = True
 
 print(LooseVersion)
 print(add, mul, sub, truediv)
-print(SkipTest)
-print(np)
 
 
 def model_generate(model, dummy_input, name='test.tflite'):
