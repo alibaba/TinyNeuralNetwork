@@ -18,7 +18,6 @@ from tinynn.converter import TFLiteConverter
 
 from tinynn.graph import modifier
 from tinynn.graph.modifier import l2_norm, update_weight_metric
-from tinynn.graph.modifier import l2_norm
 
 from tinynn.graph.tracer import model_tracer, trace
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
@@ -28,10 +27,6 @@ from tinynn.util.util import import_from_path
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 MODULE_INIT = True
-
-print(LooseVersion)
-print(add, mul, sub, truediv)
-print(SkipTest, np)
 
 
 def model_generate(model, dummy_input, name='test.tflite'):

@@ -81,17 +81,6 @@ jobs:
       - name: Lint checks
         run: python -m ruff .
           # 添加 tmate 步骤
-      - name: Setup tmate session
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y tmate
-          tmate -S /tmp/tmate.sock new-session -d
-          tmate -S /tmp/tmate.sock wait tmate-ready
-          tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' > ssh.txt
-          tmate -S /tmp/tmate.sock display -p '#{tmate_web}' > web.txt
-          cat ssh.txt
-          cat web.txt
-        continue-on-error: true
       - name: Run tests
         run: |
           source activate.sh
