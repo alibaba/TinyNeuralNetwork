@@ -2,12 +2,13 @@ import unittest
 from distutils.version import LooseVersion
 
 import numpy as np
-import tensorflow as tf
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from common_utils import IS_CI
+
+import tensorflow as tf
 
 from tinynn.converter import TFLiteConverter
 

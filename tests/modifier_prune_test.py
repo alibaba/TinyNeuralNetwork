@@ -2,14 +2,15 @@ import os
 import random
 import unittest
 
-from distutils.version import LooseVersion
-from operator import add, mul, sub, truediv
-from unittest.case import SkipTest
-
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from common_utils import IS_CI
+
+from distutils.version import LooseVersion
+from operator import add, mul, sub, truediv
+from unittest.case import SkipTest
+import numpy as np
 
 from interval import Interval
 
@@ -20,7 +21,6 @@ from tinynn.graph.tracer import model_tracer, trace
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
 from tinynn.util.util import import_from_path
 
-from common_utils import IS_CI
 
 CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 MODULE_INIT = True
