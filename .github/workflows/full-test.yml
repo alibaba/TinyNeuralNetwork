@@ -4,7 +4,6 @@ on:
   schedule:
     - cron:  '00 19 * * *'
 
-
 jobs:
   unit-test:
     name: Full tests for ${{ matrix.os }}, PyTorch ${{ matrix.vers.pt_ver }}

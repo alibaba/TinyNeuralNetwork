@@ -15,13 +15,10 @@ import numpy as np
 from interval import Interval
 
 from tinynn.converter import TFLiteConverter
-
 from tinynn.graph import modifier
 from tinynn.graph.modifier import l2_norm, update_weight_metric
-
 from tinynn.graph.tracer import model_tracer, trace
 from tinynn.prune.oneshot_pruner import OneShotChannelPruner
-
 from tinynn.util.util import import_from_path
 
 
