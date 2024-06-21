@@ -82,4 +82,4 @@ jobs:
       - name: Run tests
         run: |
           source activate.sh
-          pytest tests/test_run.py
+          python tests/test_run.py
