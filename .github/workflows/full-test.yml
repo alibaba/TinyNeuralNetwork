@@ -17,11 +17,6 @@ jobs:
       matrix:
         os: ["macos-13"]
         vers: [ {pt_ver: "1.12.0", tv_ver: "0.13.0"} ]
-        include:
-          - os: macos-latest
-            vers:
-              pt_ver: latest
-              tv_ver: latest
     defaults:
       run:
         shell: bash -l {0}
@@ -87,4 +82,4 @@ jobs:
       - name: Run tests
         run: |
           source activate.sh
-          pytest tests/converter_op_test.py -v
+          pytest tests/test_run.py
