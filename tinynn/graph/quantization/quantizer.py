@@ -2559,7 +2559,7 @@ class QATQuantizer(object):
 
         skip_types = set(k[0] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) == 1)
         for module_cls, action in self.quantize_op_action.items():
-            if action in ['rewrite']:
+            if action in ('rewrite'):
                 skip_types.add(module_cls)
         if self.set_quantizable_op_stats:
             skip_types |= set(KNOWN_QSTATS.keys())
@@ -2569,7 +2569,7 @@ class QATQuantizer(object):
         # Add quant/dequant nodes for non-quantizable OPs
         disable_quantize_op_list = UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.copy()
         for module_cls, action in self.quantize_op_action.items():
-            if action in ['disable', 'rewrite']:
+            if action in ('disable', 'rewrite'):
                 disable_quantize_op_list[module_cls] = None
 
         def _is_not_quantizable(node, custom_data):

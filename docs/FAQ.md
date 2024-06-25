@@ -65,7 +65,7 @@ with model_tracer():
 
 Q: How to specify mixed quantization according to operator types?
 
-A: Configure the quantize_op_action parameter in the config during Quantizer initialization. You need to specify the actions for non-quantized operators: 'disable' means completely non-quantized, and 'rewrite' means not quantized but retaining the quantization parameters of the operator's inputs.
+A: Configure the quantize_op_action parameter in the config during Quantizer initialization. You need to specify the actions for non-quantized operators: 'disable' means completely non-quantized, and 'rewrite' means not quantized but retaining the quantization parameters of the operator's inputs and outputs.
 
 ```python
 # For a model containing LSTM op, perform mixed quantization while retaining the quantization parameters of its inputs, facilitating subsequent quantization directly in the converter.

@@ -65,7 +65,7 @@ with model_tracer():
 
 Q： 如何按照算子类型指定混合量化？
 
-A：在Quantizer初始化时配置config中的quantize_op_action参数，需要指定不量化的行为，'disable'表示完全不量化，'rewrite'表示不量化但是保留OP输入的量化参数。
+A：在Quantizer初始化时配置config中的quantize_op_action参数，需要指定不量化的行为，'disable'表示完全不量化，'rewrite'表示不量化但是保留OP输入输出的量化参数。
 ```python
 # 需要对含LSTM OP的模型进行混合量化，保留其输入的量化参数，方便后续直接在converter中进行量化。
 with model_tracer():
