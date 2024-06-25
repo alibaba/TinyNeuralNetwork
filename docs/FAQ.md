@@ -232,6 +232,7 @@ Note: These state variables are all two-dimensional with the shape of `[batch_si
 Usually, when the number of hidden layers is large enough (128+), the LSTM OP will be time-consuming in the TFLite backend. In this case, consider using dynamic range quantization to optimize its performance, see [dynamic.py](../examples/converter/dynamic.py).
 
 You may also try out static quantization for LSTMs when you have PyTorch 1.13+. But it may take much more effort to minimize the quantization error, and you probably need to perform per-layer inspection carefully.
+We also support int16 LSTM via the combination of static quantization and LSTM-only dynamic quantization. Please take a look at [ptq_with_dynamic_q_lstm.py](../examples/quantization/ptq_with_dynamic_q_lstm.py).
 
 #### What if my model runs slower when dynamic quantization is enabled?
 Please refer to [dynamic_with_selection.py](../examples/converter/dynamic_with_selection.py) for selective dynamic quantization.

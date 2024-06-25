@@ -33,6 +33,7 @@ def main_worker(args):
     # Provide a viable input for the model
     dummy_input = torch.rand((args.steps, args.batch_size, args.input_size))
 
+    # Please see 'ptq.py' for more details for using PostQuantizer.
     quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'quantize_op_action': {nn.LSTM: 'rewrite'}})
     ptq_model = quantizer.quantize()
 
@@ -57,16 +58,17 @@ def main_worker(args):
         converter = TFLiteConverter(
             ptq_model,
             dummy_input,
-            tflite_path='out/dynamic_quant_model.tflite',
-            # strict_symmetric_check=True,
+            tflite_path='out/ptq_with_dynamic_quant_lstm_model.tflite',
             quantize_target_type='int8',
             rewrite_quantizable=True,
-            # # Enable hybrid quantization
+            # Enable hybrid quantization
             hybrid_quantization_from_float=True,
-            # # Enable hybrid per-channel quantization (lower q-loss, but slower)
+            # Enable hybrid per-channel quantization (lower q-loss, but slower)
             hybrid_per_channel=False,
-            # # Use asymmetric inputs for hybrid quantization (probably lower q-loss, but a bit slower)
+            # Use asymmetric inputs for hybrid quantization (probably lower q-loss, but a bit slower)
             hybrid_asymmetric_inputs=False,
+            # Enable int16 hybrid lstm quantization
+            hybrid_int16_lstm=True,
         )
         converter.convert()
 
