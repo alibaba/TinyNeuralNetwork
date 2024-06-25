@@ -399,6 +399,7 @@ class QATQuantizer(object):
             'ignore_layerwise_config': False,
             'inplace': False,
             'override_qconfig_func': None,
+            'quantize_op_action': {},
         }
 
         if config is None:
@@ -2557,12 +2558,20 @@ class QATQuantizer(object):
             self.layerwise_config.yaml_add_eol_comment(f'type: {t}', n)
 
         skip_types = set(k[0] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) == 1)
+        for module_cls, action in self.quantize_op_action.items():
+            if action in ['rewrite']:
+                skip_types.add(module_cls)
         if self.set_quantizable_op_stats:
             skip_types |= set(KNOWN_QSTATS.keys())
         skip_types_prev = skip_types | set(k[-1] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) > 1)
         skip_types_next = skip_types | set(k[0] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) > 1)
 
         # Add quant/dequant nodes for non-quantizable OPs
+        disable_quantize_op_list = UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.copy()
+        for module_cls, action in self.quantize_op_action.items():
+            if action in ['disable', 'rewrite']:
+                disable_quantize_op_list[module_cls] = None
+
         def _is_not_quantizable(node, custom_data):
             cur_module = node.module
             cur_class = type(cur_module)
@@ -2578,7 +2587,7 @@ class QATQuantizer(object):
                     return False
                 if self.layerwise_config.get(node.unique_name, True) is False:
                     return True
-                supported_version = UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.get(cur_module.kind, torch.__version__)
+                supported_version = disable_quantize_op_list.get(cur_module.kind, torch.__version__)
                 return supported_version is None or LooseVersion(torch.__version__) < supported_version
             else:
                 if isinstance(cur_module, (torch_q.QuantStub, torch_q.DeQuantStub)):
@@ -2587,7 +2596,7 @@ class QATQuantizer(object):
                     return True
                 unsupported_types = tuple(
                     k
-                    for k, v in UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.items()
+                    for k, v in disable_quantize_op_list.items()
                     if type(k) != str
                     and k not in Q_MODULES_MAPPING
                     and (v is None or LooseVersion(torch.__version__) < v)
