@@ -33,7 +33,7 @@ def main_worker(args):
     # Provide a viable input for the model
     dummy_input = torch.rand((args.steps, args.batch_size, args.input_size))
 
-    quantizer = PostQuantizer(model, dummy_input, work_dir='out')
+    quantizer = PostQuantizer(model, dummy_input, work_dir='out', config={'quantize_op_action': {nn.LSTM: 'rewrite'}})
     ptq_model = quantizer.quantize()
 
     print(ptq_model)
