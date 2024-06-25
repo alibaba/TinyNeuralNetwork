@@ -52,6 +52,7 @@ class TFLiteConverter(object):
         conv_transpose_with_bias: bool = True,
         max_transpose_dims: int = -1,
         hybrid_conv: bool = True,
+        hybrid_int16_lstm: bool = False,
         unroll_rnn: bool = False,
         separated_rnn_gate_calc: bool = False,
         bypass_elementwise_passthrough_constraint: bool = False,
@@ -104,6 +105,7 @@ class TFLiteConverter(object):
             conv_transpose_with_bias (bool): ConvTranspose ops with bias. Defaults to True
             max_transpose_dims (int): Max dimensions for the `Transpose` op. Defaults to -1, which means unlimited
             hybrid_conv (bool): Enable hybrid quantization for Conv2d and DepthwiseConv2d. Defaults to True
+            hybrid_int16_lstm (bool): Enable hybrid int16 quantization for LSTM. Defaults to False
             unroll_rnn (bool): Unrolling LSTM (translate LSTM to seperate ops). Defaults to False
             separated_rnn_gate_calc (bool): Separated calculation for every gate in RNN. Effective only when \
                 `unroll_rnn=True`. Defaults to False
@@ -162,6 +164,7 @@ class TFLiteConverter(object):
         self.conv_transpose_with_bias = conv_transpose_with_bias
         self.max_transpose_dims = max_transpose_dims
         self.hybrid_conv = hybrid_conv
+        self.hybrid_int16_lstm = hybrid_int16_lstm
         self.unroll_rnn = unroll_rnn
         self.separated_rnn_gate_calc = separated_rnn_gate_calc
         self.bypass_elementwise_passthrough_constraint = bypass_elementwise_passthrough_constraint
@@ -529,6 +532,7 @@ class TFLiteConverter(object):
                 self.bypass_elementwise_passthrough_constraint,
                 self.group_tensors,
                 self.conv_transpose_with_bias,
+                self.hybrid_int16_lstm,
             )
             optimizer.optimize()
 
@@ -541,6 +545,7 @@ class TFLiteConverter(object):
                     self.hybrid_q_type,
                     self.hybrid_per_channel,
                     self.hybrid_conv,
+                    self.hybrid_int16_lstm,
                     self.hybrid_gen_single_op_models,
                     self.hybrid_config,
                 )

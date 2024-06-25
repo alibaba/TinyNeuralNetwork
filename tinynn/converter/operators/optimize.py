@@ -51,6 +51,7 @@ class GraphOptimizer(object):
         bypass_elementwise_passthrough_constraint: bool = False,
         group_tensors: bool = False,
         conv_transpose_with_bias: bool = True,
+        hybrid_int16_lstm: bool = False,
     ) -> None:
         self.graph = graph
         self.fuse_tensor_count = 0
@@ -67,6 +68,7 @@ class GraphOptimizer(object):
         self.bypass_elementwise_passthrough_constraint = bypass_elementwise_passthrough_constraint
         self.group_tensors = group_tensors
         self.conv_transpose_with_bias = conv_transpose_with_bias
+        self.hybrid_int16_lstm = hybrid_int16_lstm
 
     def create_attr_tensor(
         self, tensor: tfl.Tensor, name: str = None, quantization: typing.Optional[tfl.QuantizationParameters] = None
@@ -1499,7 +1501,9 @@ class GraphOptimizer(object):
     @class_conditional(lambda self: self.rewrite_quantizable)
     def elementwise_op_quantize_passthrough_pass(self):
         edges = self.graph.graph.es.select(
-            functools.partial(is_quantize_elementwise_op_edge, graph_converter=self.graph.graph)
+            functools.partial(
+                is_quantize_elementwise_op_edge, graph_converter=self.graph.graph, with_lstm=self.hybrid_int16_lstm
+            )
         )
         pairs = ((self.graph.graph.vs[edge.source], self.graph.graph.vs[edge.target]) for edge in edges)
         filtered_nodes = (k[0] if k[0]['node_type'] != ExtendedOperator.DEQUANTIZE else k[1] for k in pairs)
@@ -3707,17 +3711,17 @@ def is_multi_output_op_node(vertex: ig.Vertex, graph_converter: ig.Graph):
     return vertex['node_type'] >= 0 and len(vertex['outputs']) > 1 and vertex.outdegree() > 0
 
 
-def is_quantize_elementwise_op_edge(edge: ig.Edge, graph_converter: ig.Graph):
+def is_quantize_elementwise_op_edge(edge: ig.Edge, graph_converter: ig.Graph, with_lstm: bool):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
     return (
         (
             source_vertex['node_type'] == ExtendedOperator.DEQUANTIZE
-            and is_quantizable_rewrite_op(target_vertex['node_type'], target_vertex['op'])
+            and is_quantizable_rewrite_op(target_vertex['node_type'], target_vertex['op'], with_lstm)
         )
         or (
             target_vertex['node_type'] == ExtendedOperator.QUANTIZE
-            and is_quantizable_rewrite_op(source_vertex['node_type'], source_vertex['op'])
+            and is_quantizable_rewrite_op(source_vertex['node_type'], source_vertex['op'], with_lstm)
         )
     ) and target_vertex['op'].inputs[0].name in source_vertex['outputs']
 
@@ -3867,7 +3871,7 @@ def is_elementwise_unary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
     ) or is_elementwise_reduce_op(op_code, op)
 
 
-def is_quantizable_rewrite_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
+def is_quantizable_rewrite_op(op_code: ExtendedOperator, op: tfl.BaseOperator, with_lstm: bool):
     return op_code in (
         ExtendedOperator.BATCH_MATMUL,
         ExtendedOperator.SOFTMAX,
@@ -3878,7 +3882,7 @@ def is_quantizable_rewrite_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.RSQRT,
         ExtendedOperator.MAXIMUM,
         ExtendedOperator.MINIMUM,
-    )
+    ) or (with_lstm and op_code == ExtendedOperator.UNIDIRECTIONAL_SEQUENCE_LSTM)
 
 
 def is_elementwise_binary_op(op_code: ExtendedOperator, op: tfl.BaseOperator):

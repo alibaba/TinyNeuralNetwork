@@ -231,6 +231,7 @@ Note: 这些状态变量都是二维的，维度为`[batch_size, hidden_size或�
 通常情况下，当隐层数量较大时（如128及以上）LSTM的模型在TFLite中会比较耗时。这种情况下，可以考虑使用动态范围量化来优化其性能，参见[dynamic.py](../examples/converter/dynamic.py)。
 
 对于使用PyTorch 1.13+版本的用户，也可以尝试对LSTM进行静态量化。但是全量化LSTM通常是较为困难的，可能需要比较细致的按层量化误差分析。
+当然对于新版本TFLite中的Int16 LSTM，我们也进行了支持，可以参考[ptq_with_dynamic_q_lstm.py](../examples/quantization/ptq_with_dynamic_q_lstm.py)。
 
 #### 我的模型开了动态量化变得更慢了？
 请参考 [dynamic_with_selection.py](../examples/converter/dynamic_with_selection.py) 选择性的开启动态量化。
