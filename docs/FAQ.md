@@ -63,6 +63,17 @@ with model_tracer():
     qat_model = quantizer.quantize()
 ```
 
+Q: How to specify mixed quantization according to operator types?
+
+A: Configure the quantize_op_action parameter in the config during Quantizer initialization. You need to specify the actions for non-quantized operators: 'disable' means completely non-quantized, and 'rewrite' means not quantized but retaining the quantization parameters of the operator's inputs and outputs.
+
+```python
+# For a model containing LSTM op, perform mixed quantization while retaining the quantization parameters of its inputs, facilitating subsequent quantization directly in the converter.
+with model_tracer():
+    quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={ 'quantize_op_action': {nn.LSTM: 'rewrite'} })
+    qat_model = quantizer.quantize()
+```
+
 
 #### How to handle the case of inconsistent training and inference computation graphs?
 
