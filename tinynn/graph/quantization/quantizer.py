@@ -199,7 +199,7 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     'log': None,
     'std': None,
     'var': None,
-    nn.LSTM: '1.13.0',
+    nn.LSTM: None,
     nn.ConvTranspose2d: '1.7.0',
     nn.ConstantPad1d: '1.7.0',
     nn.ConstantPad2d: '1.7.0',
@@ -2563,6 +2563,7 @@ class QATQuantizer(object):
                 skip_types.add(module_cls)
         if self.set_quantizable_op_stats:
             skip_types |= set(KNOWN_QSTATS.keys())
+        skip_types = skip_types | set([nn.LSTM])
         skip_types_prev = skip_types | set(k[-1] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) > 1)
         skip_types_next = skip_types | set(k[0] for k in REWRITE_QUANTIZABLE_RULE_LIST if len(k) > 1)
 

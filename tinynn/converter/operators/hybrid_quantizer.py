@@ -19,6 +19,10 @@ WEIGHT_MAPPING = {
     ExtendedOperator.BIDIRECTIONAL_SEQUENCE_LSTM: [1, 2, 3, 4, 5, 6, 7, 8, 18, 19, 20, 21, 22, 23, 24, 25],
 }
 
+BIAS_MAPPING = {
+    ExtendedOperator.UNIDIRECTIONAL_SEQUENCE_LSTM: {1: 12, 2: 13, 3: 14, 4: 15},
+}
+
 
 class HybridQuantizer(object):
     graph: CommonGraph
@@ -40,6 +44,43 @@ class HybridQuantizer(object):
 
     def quantize(self):
         self.quantize_pass()
+        self.int16_lstm_pass()
+
+    def int16_lstm_pass(self):
+        filtered_nodes = self.graph.graph.vs.select(functools.partial(is_int16_quantizable_lstm_node))
+
+        actions = []
+        replaced_tensors = {}
+        for node in filtered_nodes:
+            if self.config.get(node['outputs'][0], True) is False:
+                continue
+
+            if node['node_type'] == ExtendedOperator.UNIDIRECTIONAL_SEQUENCE_LSTM:
+                lstm_input = node['op'].inputs[0]
+                bias_indices = BIAS_MAPPING.get(node['node_type'])
+                if lstm_input.dtype == np.int8:
+                    for weight_idx, bias_idx in bias_indices.items():
+                        bias_t = node['op'].inputs[bias_idx]
+                        weight_t = node['op'].inputs[weight_idx]
+                        name = bias_t.name
+                        new_name = f'{name}_hybrid_q'
+                        bias_a = np.frombuffer(bias_t.buffer.data, dtype='float32').reshape(bias_t.shape)
+                        bias = torch.from_numpy(bias_a.copy())
+
+                        bias_scale = weight_t.quantization.scale * lstm_input.quantization.scale
+                        new_bias = torch.round(bias.detach() / bias_scale).to(dtype=torch.int32)
+                        new_bias_t = tfl.Tensor(tfl.FakeQuantTensor(new_bias, bias_scale, 0), new_name)
+                        actions.append((self.graph.replace_operator_input, (node, bias_idx, new_bias_t)))
+                    node['op'].inputs[18].quantization = copy.deepcopy(node['op'].outputs[0].quantization)
+                    node['op'].inputs[18].tensor = node['op'].inputs[18].tensor.astype(np.int8)
+                    node['op'].inputs[18].dtype = node['op'].inputs[19].tensor.dtype
+                    node['op'].inputs[19].quantization = tfl.QuantizationParameters(0.00048828125, 0)
+                    node['op'].inputs[19].tensor = node['op'].inputs[19].tensor.astype(np.int16)
+                    node['op'].inputs[19].dtype = node['op'].inputs[19].tensor.dtype
+
+        for func, args in actions:
+            func(*args)
+
 
     def quantize_pass(self):
         filtered_nodes = self.graph.graph.vs.select(functools.partial(is_quantizable_node, with_conv=self.enable_conv))
@@ -115,6 +156,10 @@ def is_quantizable_node(vertex: ig.Vertex, with_conv: bool):
         )
     )
 
+def is_int16_quantizable_lstm_node(vertex: ig.Vertex):
+    return vertex['node_type'] in (
+        ExtendedOperator.UNIDIRECTIONAL_SEQUENCE_LSTM,
+    )
 
 def quantize(name, tensor, dtype, qscheme, axis=None, q_type=np.uint8):
     assert qscheme in (torch.per_tensor_symmetric, torch.per_channel_symmetric)

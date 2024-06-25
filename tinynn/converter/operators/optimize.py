@@ -3878,6 +3878,7 @@ def is_quantizable_rewrite_op(op_code: ExtendedOperator, op: tfl.BaseOperator):
         ExtendedOperator.RSQRT,
         ExtendedOperator.MAXIMUM,
         ExtendedOperator.MINIMUM,
+        ExtendedOperator.UNIDIRECTIONAL_SEQUENCE_LSTM,
     )
 
 
