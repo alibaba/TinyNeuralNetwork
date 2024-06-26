@@ -322,14 +322,17 @@ class CommonGraph(object):
         else:
             self.graph.delete_edges(remove_edges)
 
-    def append_operator_input(self, node: ig.Vertex, new_tensor: tfl.Tensor):
+    def append_operator_input(self, node: ig.Vertex, new_tensor: tfl.Tensor, as_intermediate: bool = False):
         """Add a new input tensor to a op node
 
         Args:
             node (ig.Vertex): An op node
             new_tensor (tfl.Tensor): The tensor to be added
         """
-        node['op'].inputs.append(new_tensor)
+        if as_intermediate:
+            node['op'].intermediates.append(new_tensor)
+        else:
+            node['op'].inputs.append(new_tensor)
         new_node = self.add_nodes([new_tensor])[0]
         edge = self.graph.add_edge(new_node, node, name=new_tensor.name, label=new_tensor.name)
         log.debug(f'NEW EDGE: {new_node["label"]} -> {node["label"]} {self.tensor_map[edge["name"]]}')
@@ -566,6 +569,7 @@ class CommonGraph(object):
             op.op.index = idx
             op.tfl_inputs_idx = [x.index for x in op.inputs]
             op.tfl_outputs_idx = [x.index for x in op.outputs]
+            op.tfl_intermediates_idx = [x.index for x in op.intermediates]
             result.append(op)
         return result
 
