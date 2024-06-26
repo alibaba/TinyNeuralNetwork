@@ -45,6 +45,7 @@ class OpCode(object):
 class BaseOperator(object):
     inputs: typing.List['Tensor']
     outputs: typing.List['Tensor']
+    intermediates: typing.List['Tensor']
     op: OpCode
     tfl_op: Offset
     tfl_inputs_idx: typing.Iterable[int]
@@ -54,22 +55,26 @@ class BaseOperator(object):
     def __init__(self, op: int, inputs: typing.List['Tensor'], outputs: typing.List['Tensor'], op_version: int = 1):
         self.inputs = inputs
         self.outputs = outputs
+        self.intermediates = []
         self.op = OpCode(op, op_version)
 
         self.tfl_op = 0
         self.tfl_inputs_idx = []
         self.tfl_outputs_idx = []
+        self.tfl_intermediates_idx = []
 
         self.extra_hints = {}
 
     def build(self, builder: flatbuffers.Builder) -> Offset:
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         self.tfl_op = tflite.OperatorEnd(builder)
 
         return self.tfl_op

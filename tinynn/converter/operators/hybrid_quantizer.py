@@ -101,6 +101,25 @@ class HybridQuantizer(object):
                         )
                         node['op'].inputs[cell_state_idx].dtype = node['op'].inputs[cell_state_idx].tensor.dtype
 
+                    # Add intermediates for int8x8_16 lstm
+                    name = node['op'].outputs[0].name
+                    input_to_input_intermediate = tfl.Tensor(np.zeros(0, dtype='float32'), f'{name}_intermediate_1')
+                    input_to_forget_intermediate = tfl.Tensor(np.zeros(0, dtype='float32'), f'{name}_intermediate_2')
+                    input_to_cell_intermediate = tfl.Tensor(np.zeros(0, dtype='float32'), f'{name}_intermediate_3')
+                    input_to_output_intermediate = tfl.Tensor(np.zeros(0, dtype='float32'), f'{name}_intermediate_4')
+                    effective_hidden_scale_intermediate = tfl.Tensor(
+                        tfl.FakeQuantTensor(np.zeros(0, dtype='int8'), node['op'].outputs[0].quantization.scale, 0),
+                        f'{name}_intermediate_5',
+                    )
+
+                    actions.append((self.graph.append_operator_input, (node, input_to_input_intermediate, True)))
+                    actions.append((self.graph.append_operator_input, (node, input_to_forget_intermediate, True)))
+                    actions.append((self.graph.append_operator_input, (node, input_to_cell_intermediate, True)))
+                    actions.append((self.graph.append_operator_input, (node, input_to_output_intermediate, True)))
+                    actions.append(
+                        (self.graph.append_operator_input, (node, effective_hidden_scale_intermediate, True))
+                    )
+
         for func, args in actions:
             func(*args)
 

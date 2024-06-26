@@ -20,11 +20,13 @@ class AddOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.AddOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -64,11 +66,13 @@ class AveragePool2dOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Pool2DOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -90,11 +94,13 @@ class ConcatenationOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ConcatenationOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -134,11 +140,13 @@ class Conv2dOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Conv2DOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -181,11 +189,13 @@ class DepthwiseConv2dOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.DepthwiseConv2DOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -205,11 +215,13 @@ class DepthToSpaceOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.DepthToSpaceOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -231,11 +243,13 @@ class DequantizeOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.DequantizeOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -279,11 +293,13 @@ class FullyConnectedOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.FullyConnectedOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -308,11 +324,13 @@ class L2NormalizationOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.L2NormOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -352,11 +370,13 @@ class L2Pool2dOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Pool2DOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -382,11 +402,13 @@ class LocalResponseNormalizationOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.LocalResponseNormalizationOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -411,11 +433,13 @@ class LshProjectionOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.LSHProjectionOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -452,11 +476,13 @@ class LstmOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.LSTMOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -496,11 +522,13 @@ class MaxPool2dOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Pool2DOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -520,11 +548,13 @@ class MulOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.MulOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -560,11 +590,13 @@ class ReshapeOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReshapeOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -586,11 +618,13 @@ class ResizeBilinearOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ResizeBilinearOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -618,11 +652,13 @@ class RnnOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.RNNOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -642,11 +678,13 @@ class SoftmaxOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SoftmaxOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -666,11 +704,13 @@ class SpaceToDepthOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SpaceToDepthOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -701,11 +741,13 @@ class SvdfOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SVDFOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -740,11 +782,13 @@ class ConcatEmbeddingsOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ConcatEmbeddingsOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -768,11 +812,13 @@ class SkipGramOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SkipGramOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -792,11 +838,13 @@ class CallOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.CallOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -812,6 +860,7 @@ class CustomOperator(BaseOperator):
     def build(self, builder: flatbuffers.Builder) -> Offset:
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         if self.custom_options is not None:
             custom_options = create_byte_array(builder, tflite.Operator.CustomOptions, self.custom_options)
@@ -820,6 +869,7 @@ class CustomOperator(BaseOperator):
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.NONE)
         tflite.OperatorAddBuiltinOptions(builder, 0)
 
@@ -844,11 +894,13 @@ class EmbeddingLookupSparseOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.EmbeddingLookupSparseOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -870,11 +922,13 @@ class PadOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.PadOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -905,11 +959,13 @@ class UnidirectionalSequenceRnnOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SequenceRNNOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -931,11 +987,13 @@ class GatherOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.GatherOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -957,11 +1015,13 @@ class BatchToSpaceNdOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.BatchToSpaceNDOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -983,11 +1043,13 @@ class SpaceToBatchNdOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SpaceToBatchNDOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1009,11 +1071,13 @@ class TransposeOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.TransposeOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1033,11 +1097,13 @@ class MeanOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReducerOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1061,11 +1127,13 @@ class SubOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SubOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1085,11 +1153,13 @@ class DivOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.DivOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1110,11 +1180,13 @@ class SqueezeOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SqueezeOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1154,11 +1226,13 @@ class UnidirectionalSequenceLstmOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.UnidirectionalSequenceLSTMOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1188,11 +1262,13 @@ class StridedSliceOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.StridedSliceOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1226,11 +1302,13 @@ class BidirectionalSequenceRnnOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.BidirectionalSequenceRNNOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1252,11 +1330,13 @@ class ExpOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ExpOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1278,11 +1358,13 @@ class TopkV2Operator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.TopKV2Options)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1302,11 +1384,13 @@ class SplitOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SplitOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1328,11 +1412,13 @@ class LogSoftmaxOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.LogSoftmaxOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1377,11 +1463,13 @@ class BidirectionalSequenceLstmOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.BidirectionalSequenceLSTMOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1405,11 +1493,13 @@ class CastOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.CastOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1436,11 +1526,13 @@ class MaximumOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.MaximumMinimumOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1460,11 +1552,13 @@ class ArgMaxOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ArgMaxOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1486,11 +1580,13 @@ class MinimumOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.MaximumMinimumOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1512,11 +1608,13 @@ class LessOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.LessOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1538,11 +1636,13 @@ class NegOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.NegOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1564,11 +1664,13 @@ class Padv2Operator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.PadV2Options)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1590,11 +1692,13 @@ class GreaterOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.GreaterOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1616,11 +1720,13 @@ class GreaterEqualOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.GreaterEqualOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1642,11 +1748,13 @@ class LessEqualOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.LessEqualOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1668,11 +1776,13 @@ class SelectOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SelectOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1694,11 +1804,13 @@ class SliceOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SliceOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1737,11 +1849,13 @@ class TransposeConvOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.TransposeConvOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1761,11 +1875,13 @@ class SparseToDenseOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SparseToDenseOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1787,11 +1903,13 @@ class TileOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.TileOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1813,11 +1931,13 @@ class ExpandDimsOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ExpandDimsOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1839,11 +1959,13 @@ class EqualOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.EqualOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1865,11 +1987,13 @@ class NotEqualOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.NotEqualOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1894,11 +2018,13 @@ class SumOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReducerOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1928,11 +2054,13 @@ class ShapeOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ShapeOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1954,11 +2082,13 @@ class PowOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.PowOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -1978,11 +2108,13 @@ class ArgMinOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ArgMinOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2008,11 +2140,13 @@ class FakeQuantOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.FakeQuantOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2032,11 +2166,13 @@ class ReduceProdOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReducerOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2056,11 +2192,13 @@ class ReduceMaxOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReducerOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2082,11 +2220,13 @@ class PackOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.PackOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2108,11 +2248,13 @@ class LogicalOrOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.LogicalOrOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2132,11 +2274,13 @@ class OneHotOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.OneHotOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2158,11 +2302,13 @@ class LogicalAndOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.LogicalAndOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2184,11 +2330,13 @@ class LogicalNotOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.LogicalNotOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2210,11 +2358,13 @@ class UnpackOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.UnpackOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2234,11 +2384,13 @@ class ReduceMinOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReducerOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2260,11 +2412,13 @@ class FloorDivOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.FloorDivOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2284,11 +2438,13 @@ class ReduceAnyOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReducerOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2310,11 +2466,13 @@ class SquareOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SquareOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2336,11 +2494,13 @@ class ZerosLikeOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ZerosLikeOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2362,11 +2522,13 @@ class FillOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.FillOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2388,11 +2550,13 @@ class FloorModOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.FloorModOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2414,11 +2578,13 @@ class RangeOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.RangeOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2440,11 +2606,13 @@ class ResizeNearestNeighborOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ResizeNearestNeighborOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2464,11 +2632,13 @@ class LeakyReluOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.LeakyReluOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2490,11 +2660,13 @@ class SquaredDifferenceOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SquaredDifferenceOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2514,11 +2686,13 @@ class MirrorPadOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.MirrorPadOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2540,11 +2714,13 @@ class AbsOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.AbsOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2564,11 +2740,13 @@ class SplitVOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SplitVOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2588,11 +2766,13 @@ class UniqueOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.UniqueOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2619,11 +2799,13 @@ class ReverseV2Operator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReverseV2Options)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2645,11 +2827,13 @@ class AddNOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.AddNOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2671,11 +2855,13 @@ class GatherNdOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.GatherNdOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2697,11 +2883,13 @@ class CosOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.CosOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2723,11 +2911,13 @@ class WhereOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.WhereOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2749,11 +2939,13 @@ class RankOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.RankOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2780,11 +2972,13 @@ class ReverseSequenceOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReverseSequenceOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2806,11 +3000,13 @@ class MatrixDiagOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.MatrixDiagOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2832,11 +3028,13 @@ class QuantizeOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.QuantizeOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2858,11 +3056,13 @@ class MatrixSetDiagOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.MatrixSetDiagOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2889,11 +3089,13 @@ class HardSwishOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.HardSwishOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2915,11 +3117,13 @@ class IfOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.IfOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2941,11 +3145,13 @@ class WhileOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.WhileOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2967,11 +3173,13 @@ class NonMaxSuppressionV4Operator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.NonMaxSuppressionV4Options)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -2993,11 +3201,13 @@ class NonMaxSuppressionV5Operator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.NonMaxSuppressionV5Options)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3019,11 +3229,13 @@ class ScatterNdOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ScatterNdOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3045,11 +3257,13 @@ class SelectV2Operator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SelectV2Options)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3071,11 +3285,13 @@ class DensifyOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.DensifyOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3097,11 +3313,13 @@ class SegmentSumOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SegmentSumOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3125,11 +3343,13 @@ class BatchMatmulOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.BatchMatMulOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3156,11 +3376,13 @@ class CumsumOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.CumsumOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3180,11 +3402,13 @@ class CallOnceOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.CallOnceOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3206,11 +3430,13 @@ class BroadcastToOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.BroadcastToOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3232,11 +3458,13 @@ class Rfft2dOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Rfft2dOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3282,11 +3510,13 @@ class Conv3dOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Conv3DOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3327,11 +3557,13 @@ class HashtableOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.HashtableOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3353,11 +3585,13 @@ class HashtableFindOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.HashtableFindOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3379,11 +3613,13 @@ class HashtableImportOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.HashtableImportOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3405,11 +3641,13 @@ class HashtableSizeOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.HashtableSizeOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3429,11 +3667,13 @@ class ReduceAllOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReducerOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3479,11 +3719,13 @@ class Conv3dTransposeOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.Conv3DOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3507,11 +3749,13 @@ class VarHandleOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.VarHandleOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3533,11 +3777,13 @@ class ReadVariableOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ReadVariableOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3559,11 +3805,13 @@ class AssignVariableOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.AssignVariableOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3590,11 +3838,13 @@ class RandomStandardNormalOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.RandomOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3615,11 +3865,13 @@ class BucketizeOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.BucketizeOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3641,11 +3893,13 @@ class RandomUniformOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.RandomOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3667,11 +3921,13 @@ class MultinomialOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.RandomOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3691,11 +3947,13 @@ class GeluOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.GeluOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3717,11 +3975,13 @@ class DynamicUpdateSliceOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.DynamicUpdateSliceOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3748,11 +4008,13 @@ class UnsortedSegmentProdOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.UnsortedSegmentProdOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3774,11 +4036,13 @@ class UnsortedSegmentMaxOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.UnsortedSegmentMaxOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3800,11 +4064,13 @@ class UnsortedSegmentSumOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.UnsortedSegmentSumOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3826,11 +4092,13 @@ class Atan2Operator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.ATan2Options)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3852,11 +4120,13 @@ class UnsortedSegmentMinOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.UnsortedSegmentMinOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
@@ -3878,11 +4148,13 @@ class SignOperator(BaseOperator):
 
         tfl_inputs_idx = create_numpy_array(builder, tflite.Operator.Inputs, self.tfl_inputs_idx)
         tfl_outputs_idx = create_numpy_array(builder, tflite.Operator.Outputs, self.tfl_outputs_idx)
+        tfl_intermediates_idx = create_numpy_array(builder, tflite.Operator.Intermediates, self.tfl_intermediates_idx)
 
         tflite.OperatorStart(builder)
         tflite.OperatorAddOpcodeIndex(builder, self.op.index)
         tflite.OperatorAddInputs(builder, tfl_inputs_idx)
         tflite.OperatorAddOutputs(builder, tfl_outputs_idx)
+        tflite.OperatorAddIntermediates(builder, tfl_intermediates_idx)
         tflite.OperatorAddBuiltinOptionsType(builder, tflite.BuiltinOptions.SignOptions)
         tflite.OperatorAddBuiltinOptions(builder, options)
         self.tfl_op = tflite.OperatorEnd(builder)
