@@ -27,6 +27,67 @@ class SimpleLSTM(nn.Module):
         return out
 
 
+def _quantize_lstm_weight(model: nn.LSTM, asym=False, eps=torch.tensor([1e-6])):
+    '''Quantize the weights of LSTM individually to align with TFLite's implementation.'''
+
+    def fake_quantize(weight, asym=False, bit=8, eps=torch.tensor([1e-6])):
+        assert bit == 8
+        if weight.numel() == 0:
+            return weight
+        quant_min, quant_max = -127, 127
+        device = weight.device
+        weight_shape = list(weight.size())
+        weight_parts = weight.split(weight_shape[0] // 4, dim=0)
+        weight_quant_parts = []
+        for i in range(4):
+            min_val, max_val = torch.aminmax(weight_parts[i])
+            zero_point = torch.zeros(min_val.size(), dtype=torch.int64, device=device)
+            if not asym:
+                max_val_pos = torch.max(-min_val, max_val)
+                scale = max_val_pos / (float(quant_max - quant_min) / 2)
+                scale = torch.max(scale, eps)
+            else:
+                scale = (max_val - min_val) / float(quant_max - quant_min)
+                scale = torch.max(scale, eps)
+                zero_point = quant_min - torch.round(min_val / scale).to(torch.int)
+                zero_point = torch.clamp(zero_point, quant_min, quant_max)
+
+            # do fake quantize
+            weight_quant_parts.append(
+                torch.fake_quantize_per_tensor_affine(weight_parts[i], scale, zero_point, quant_min, quant_max)
+            )
+        weight_quant = torch.cat(weight_quant_parts)
+        return weight_quant
+
+    weight_ih_l0_quant = fake_quantize(model.weight_ih_l0, asym=asym, bit=8, eps=eps)
+    weight_hh_l0_quant = fake_quantize(model.weight_hh_l0, asym=asym, bit=8, eps=eps)
+    setattr(model, 'weight_ih_l0_og', model.weight_ih_l0.clone())
+    setattr(model, 'weight_hh_l0_og', model.weight_hh_l0.clone())
+    model.weight_ih_l0.data.copy_(weight_ih_l0_quant)
+    model.weight_hh_l0.data.copy_(weight_hh_l0_quant)
+
+
+def _reset_lstm_weight(model: nn.LSTM):
+    model.weight_ih_l0.data.copy_(model.weight_ih_l0_og)
+    model.weight_hh_l0.data.copy_(model.weight_hh_l0_og)
+    delattr(model, 'weight_ih_l0_og')
+    delattr(model, 'weight_hh_l0_og')
+
+
+def quantize_weight_align_tflite(model):
+    with torch.no_grad():
+        for name, module in model.named_modules():
+            if isinstance(module, nn.LSTM):
+                _quantize_lstm_weight(module)
+
+
+def reset_lstm_weight(model):
+    with torch.no_grad():
+        for name, module in model.named_modules():
+            if isinstance(module, nn.LSTM):
+                _reset_lstm_weight(module)
+
+
 def main_worker(args):
     model = SimpleLSTM(args.input_size, args.hidden_size, args.num_layers, args.num_classes)
 
@@ -39,8 +100,14 @@ def main_worker(args):
 
     print(ptq_model)
 
+    # quantize the lstm's weight before calibrating.
+    quantize_weight_align_tflite(ptq_model)
+
     for _ in range(5):
         ptq_model(torch.rand_like(dummy_input))
+
+    # reset the lstm's weight.
+    reset_lstm_weight(ptq_model)
 
     with torch.no_grad():
         ptq_model.eval()
