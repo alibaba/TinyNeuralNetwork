@@ -2664,6 +2664,43 @@ class TraceGraph(object):
                         next_node.module.replace_tensor_name(old_unique_name, new_unique_name)
                         next_node.module.update_args_string()
 
+    def insert_new_after(
+        self,
+        node,
+        module_or_func,
+        prev_tensors: typing.List[torch.Tensor],
+        prev_indices: typing.List[torch.Tensor],
+        next_tensors: typing.Optional[typing.List[torch.Tensor]] = None,
+        before_node: typing.Optional[TraceNode] = None,
+    ):
+        assert type(module_or_func) != TraceNode
+        new_node = TraceNode(module_or_func, cur_graph=self)
+
+        if next_tensors is None:
+            next_tensors = [t.clone() for t in prev_tensors]
+
+        for new_t, new_i in zip(next_tensors, prev_indices):
+            self.tensor_pre_node_dict[id(new_t)] = new_node.unique_name
+            if new_i is not None:
+                self.tensor_pre_index_dict[id(new_t)] = new_i
+
+        new_node.prev_tensors.extend(prev_tensors)
+        new_node.next_tensors.extend(next_tensors)
+
+        new_node.prev_indices.extend(prev_indices)
+        new_node.prev_nodes.append(node)
+
+        node.next_nodes.append(new_node)
+
+        if before_node is not None:
+            idx = self.forward_nodes.index(before_node)
+            self.forward_nodes.insert(idx, new_node)
+        else:
+            self.forward_nodes.append(new_node)
+        self.nodes_map[new_node.unique_name] = new_node
+
+        return new_node
+
     def insert_between(
         self,
         prev_node: TraceNode,

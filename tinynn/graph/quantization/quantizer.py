@@ -2572,6 +2572,59 @@ class QATQuantizer(object):
             if action in ('disable', 'rewrite'):
                 disable_quantize_op_list[module_cls] = None
 
+        def _is_rewritable_lstm_node(node, custom_data):
+            cur_module = node.module
+            cur_class = type(cur_module)
+            return cur_class == nn.LSTM
+
+        if self.quantize_op_action.get(nn.LSTM, 'enable') == 'rewrite':
+            rewritable_lstm_nodes = graph.filter_forward_nodes(_is_rewritable_lstm_node)
+            fake_dequant_cls = torch_q.DeQuantStub
+            for idx, node in enumerate(rewritable_lstm_nodes):
+                cell_state = node.next_tensors[1][1]
+
+                fake_dequant = fake_dequant_cls()
+
+                fake_dequant_name = f'fake_dequant_rewrite_{idx}'
+
+                graph.module_unique_name_dict[id(fake_dequant)] = fake_dequant_name
+                graph.module_original_name_dict[id(fake_dequant)] = fake_dequant_name
+
+                module_constructor_lines[id(fake_dequant)] = f'{qualified_name(fake_dequant_cls)}()'
+
+                new_node = graph.insert_new_after(
+                    node, fake_dequant, [cell_state], [[1, 1]], before_node=node.next_nodes[0]
+                )
+
+                with override_current_trace_graph(graph):
+                    size_func = TraceFunction(
+                        'torch.Tensor.size', is_class=True, prefix='fake_dequant_rewrite_'
+                    ).parse_args(new_node.next_tensors[0], -1)
+
+                size_node = graph.insert_new_after(
+                    new_node,
+                    size_func,
+                    [new_node.next_tensors[0]],
+                    [None],
+                    next_tensors=[torch.tensor(new_node.next_tensors[0].size(-1))],
+                    before_node=node.next_nodes[0],
+                )
+                size_len = len(node.next_tensors[0].shape)
+
+                with override_current_trace_graph(graph):
+                    expand_func = TraceFunction(
+                        'torch.Tensor.expand', is_class=True, prefix='fake_dequant_rewrite_'
+                    ).parse_args(node.next_tensors[0], *((-1,) * (size_len - 1)), size_node.next_tensors[0])
+
+                graph.insert_between(
+                    node, node.next_nodes[0], expand_func, tensor_ptrs=[id(node.next_tensors[0])], move_idx=True
+                )
+                expand_node = graph.nodes_map[expand_func.unique_name]
+                size_node.next_nodes.append(expand_node)
+                expand_node.prev_nodes.append(node)
+                expand_node.prev_tensors.append(size_node.next_tensors[0])
+                expand_node.prev_indices.append(None)
+
         def _is_not_quantizable(node, custom_data):
             cur_module = node.module
             cur_class = type(cur_module)
