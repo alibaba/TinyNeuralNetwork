@@ -772,6 +772,16 @@ class TrackQParamsOperator(OperatorConverter):
         graph_converter.q_mapping[self.output_names[0]] = t
 
 
+class TrackRevQParamsOperator(OperatorConverter):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+
+        t = self.to_tfl_tensors(self.output_names, self.output_tensors)[0]
+        graph_converter.rev_q_mapping[self.input_names[0]] = t
+
+
 class TrackConstantOperator(OperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)

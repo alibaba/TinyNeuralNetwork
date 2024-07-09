@@ -430,6 +430,7 @@ class ATenLstmOperator(ATenLstmSchema):
                     pack_op.extra_hints['warn_on_unused'] = False
                     ops.append(pack_op)
         else:
+            ops[-1].extra_hints['cell_output'] = self.output_names[-1]
             common_names = set(self.output_names[1:]) & set(graph_converter.outputs)
             assert len(common_names) == 0, (
                 f"Please remove the LSTM state outputs ({common_names}) from the model. Alternatively, you can try"

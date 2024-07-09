@@ -36,6 +36,7 @@ class CommonGraph(object):
         self.output_transpose = None
         self.node_op_counter = 0
         self.q_mapping = {}
+        self.rev_q_mapping = {}
         self.transform_store = {}
         self.constant_mapping = {}
 

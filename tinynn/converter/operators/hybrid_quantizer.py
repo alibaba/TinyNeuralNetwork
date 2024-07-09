@@ -95,7 +95,10 @@ class HybridQuantizer(object):
 
                     cell_state_indices = CELL_STATE_MAPPING.get(node['node_type'])
                     for cell_state_idx in cell_state_indices:
-                        node['op'].inputs[cell_state_idx].quantization = tfl.QuantizationParameters(1 / 32768, 0)
+                        q_cell_output = self.graph.rev_q_mapping[node['op'].extra_hints['cell_output']].quantization
+                        q_cell_max = q_cell_output.scale * (127 - q_cell_output.zero_point)
+                        cell_pot = np.pow(2, np.maximum(np.ceil(np.log2(q_cell_max)), 0)).item()
+                        node['op'].inputs[cell_state_idx].quantization = tfl.QuantizationParameters(cell_pot / 32768, 0)
                         node['op'].inputs[cell_state_idx].tensor = (
                             node['op'].inputs[cell_state_idx].tensor.astype(np.int16)
                         )
