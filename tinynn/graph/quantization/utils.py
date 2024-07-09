@@ -83,3 +83,66 @@ def clamp_with_fusion_(x: torch.Tensor, min_val: float, max_val: float) -> torch
     if not x.is_quantized:
         return torch.clamp_(x, min_val, max_val)
     return x
+
+
+def fake_quantize(tensor, asym, eps, quant_max, quant_min):
+    min_val, max_val = torch.aminmax(tensor)
+    device = tensor.device
+    zero_point = torch.zeros(min_val.size(), dtype=torch.int64, device=device)
+    if not asym:
+        max_val_pos = torch.max(-min_val, max_val)
+        scale = max_val_pos / (float(quant_max - quant_min) / 2)
+        scale = torch.max(scale, eps)
+    else:
+        scale = (max_val - min_val) / float(quant_max - quant_min)
+        scale = torch.max(scale, eps)
+        zero_point = quant_min - torch.round(min_val / scale).to(torch.int)
+        zero_point = torch.clamp(zero_point, quant_min, quant_max)
+    # do fake quantize
+    return torch.fake_quantize_per_tensor_affine(tensor, scale, zero_point, quant_min, quant_max)
+
+
+def lstm_weight_fake_quantize(model: torch.nn.LSTM, asym=False, bit=8, eps=torch.tensor([1e-6])):
+    '''Quantize the weights of LSTM individually to align with TFLite's implementation.'''
+
+    def _lstm_weight_fake_quantize(weight, asym=False, bit=8, eps=torch.tensor([1e-6])):
+        assert bit == 8
+        if weight.numel() == 0:
+            return weight
+        quant_min, quant_max = -127, 127
+        weight_shape = list(weight.size())
+        weight_parts = weight.split(weight_shape[0] // 4, dim=0)
+        weight_quant_parts = []
+        for i in range(4):
+            weight_quant_parts.append(
+                fake_quantize(weight_parts[i], asym=asym, eps=eps, quant_min=quant_min, quant_max=quant_max)
+            )
+        weight_quant = torch.cat(weight_quant_parts)
+        return weight_quant
+
+    for weight_name in ['weight_ih_l0', 'weight_hh_l0']:
+        quantized_weight = _lstm_weight_fake_quantize(getattr(model, weight_name), asym=asym, bit=bit, eps=eps)
+        setattr(model, f'{weight_name}_og', getattr(model, weight_name).clone())
+        getattr(model, weight_name).data.copy_(quantized_weight)
+
+
+def quantize_lstm_weight_align_tflite(model):
+    with torch.no_grad():
+        for name, module in model.named_modules():
+            if isinstance(module, torch.nn.LSTM):
+                lstm_weight_fake_quantize(module)
+
+
+def _reset_lstm_weight(model: torch.nn.LSTM):
+    for weight_name in ['weight_ih_l0', 'weight_hh_l0']:
+        original_weight_name = f'{weight_name}_og'
+        if hasattr(model, original_weight_name):
+            getattr(model, weight_name).data.copy_(getattr(model, original_weight_name))
+            delattr(model, original_weight_name)
+
+
+def reset_lstm_weight(model):
+    with torch.no_grad():
+        for name, module in model.named_modules():
+            if isinstance(module, torch.nn.LSTM):
+                _reset_lstm_weight(module)

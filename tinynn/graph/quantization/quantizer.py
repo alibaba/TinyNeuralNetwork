@@ -56,6 +56,7 @@ from tinynn.graph.tracer import (
 )
 from tinynn.util.train_util import get_logger, get_module_device
 from tinynn.util.util import import_from_path
+from tinynn.graph.quantization.utils import quantize_lstm_weight_align_tflite, reset_lstm_weight
 
 from . import fused_modules as fm
 
@@ -1141,6 +1142,9 @@ class QATQuantizer(object):
                 for next_n in n.next_nodes:
                     idx = next_n.prev_nodes.index(n)
                     q.put((next_n, q_mod, state, idx))
+
+        if self.quantize_op_action.get(nn.LSTM, None) and self.backend == 'qnnpack':
+            quantize_lstm_weight_align_tflite(graph.module)
 
         return graph.module
 
@@ -3149,6 +3153,8 @@ class QATQuantizer(object):
             nn.Module: The QAT/PTQ-converted model. When the backend is set to `pytorch`, it is used for validation \
                 in PyTorch only.
         """
+        if self.quantize_op_action.get(nn.LSTM, None) and self.backend == 'qnnpack':
+            reset_lstm_weight(q_model)
 
         for acp, post_acp, dq_name, q_name, activ_name, activ_type in self.extra_qparams_mappings:
             if backend != 'pytorch' and activ_type in ('relu', 'relu6', torch.nn.ReLU, torch.nn.ReLU6):
@@ -3767,6 +3773,9 @@ class PostQuantizer(QATQuantizer):
 
         if self.quantized_op_stats is not None:
             self.prepare_quantized_ops_pass(graph)
+
+        if self.quantize_op_action.get(nn.LSTM, None) and self.backend == 'qnnpack':
+            quantize_lstm_weight_align_tflite(graph.module)
 
         return graph.module
 
