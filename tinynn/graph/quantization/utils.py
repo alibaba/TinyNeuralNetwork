@@ -83,3 +83,20 @@ def clamp_with_fusion_(x: torch.Tensor, min_val: float, max_val: float) -> torch
     if not x.is_quantized:
         return torch.clamp_(x, min_val, max_val)
     return x
+
+
+def fake_quantize(tensor, asym, eps, quant_max, quant_min):
+    min_val, max_val = torch.aminmax(tensor)
+    device = tensor.device
+    zero_point = torch.zeros(min_val.size(), dtype=torch.int64, device=device)
+    if not asym:
+        max_val_pos = torch.max(-min_val, max_val)
+        scale = max_val_pos / (float(quant_max - quant_min) / 2)
+        scale = torch.max(scale, torch.tensor(eps))
+    else:
+        scale = (max_val - min_val) / float(quant_max - quant_min)
+        scale = torch.max(scale, torch.tensor(eps))
+        zero_point = quant_min - torch.round(min_val / scale).to(torch.int)
+        zero_point = torch.clamp(zero_point, quant_min, quant_max)
+    # do fake quantize
+    return torch.fake_quantize_per_tensor_affine(tensor, scale, zero_point, quant_min, quant_max)

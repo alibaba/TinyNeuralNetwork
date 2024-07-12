@@ -56,6 +56,7 @@ from tinynn.graph.tracer import (
 )
 from tinynn.util.train_util import get_logger, get_module_device
 from tinynn.util.util import import_from_path
+from tinynn.graph.quantization.utils import fake_quantize
 
 from . import fused_modules as fm
 
@@ -375,6 +376,8 @@ class QATQuantizer(object):
         self.layerwise_default = True
         if config is not None and 'layerwise_config' in config:
             self.layerwise_config.update(config['layerwise_config'])
+
+        self.lstm_origin_weight_dict = {}
 
     def parse_config(self, config: typing.Optional[dict]):
         default_values = {
@@ -1141,6 +1144,9 @@ class QATQuantizer(object):
                 for next_n in n.next_nodes:
                     idx = next_n.prev_nodes.index(n)
                     q.put((next_n, q_mod, state, idx))
+
+        if self.quantize_op_action.get(nn.LSTM, None) and self.backend == 'qnnpack':
+            self.fake_quantize_lstm_weights()
 
         return graph.module
 
@@ -3202,6 +3208,8 @@ class QATQuantizer(object):
             nn.Module: The QAT/PTQ-converted model. When the backend is set to `pytorch`, it is used for validation \
                 in PyTorch only.
         """
+        if self.quantize_op_action.get(nn.LSTM, None) and self.backend == 'qnnpack':
+            self.restore_lstm_weights(q_model)
 
         for acp, post_acp, dq_name, q_name, activ_name, activ_type in self.extra_qparams_mappings:
             if backend != 'pytorch' and activ_type in ('relu', 'relu6', torch.nn.ReLU, torch.nn.ReLU6):
@@ -3503,6 +3511,38 @@ class QATQuantizer(object):
         for n, m in q_model.named_modules():
             if n.endswith('.weight_fake_quant'):
                 hooks.append(m.register_forward_pre_hook(freeze_fake_quantize_hook))
+
+    def fake_quantize_lstm_weights(self, asym=False, eps=1e-6):
+        def _lstm_weight_fake_quantize(weight, asym=False, eps=1e-6):
+            if weight.numel() == 0:
+                return weight
+            quant_min, quant_max = -127, 127
+            weight_parts = torch.chunk(weight, 4)
+            weight_quant_parts = []
+            for i in range(4):
+                weight_quant_parts.append(
+                    fake_quantize(weight_parts[i], asym=asym, eps=eps, quant_min=quant_min, quant_max=quant_max)
+                )
+            weight_quant = torch.cat(weight_quant_parts)
+            return weight_quant
+
+        with torch.no_grad():
+            for name, module in self.model.named_modules():
+                if isinstance(module, torch.nn.LSTM):
+                    for weight_name in ['weight_ih_l0', 'weight_hh_l0']:
+                        quantized_weight = _lstm_weight_fake_quantize(getattr(module, weight_name), asym=asym, eps=eps)
+                        self.lstm_origin_weight_dict[f"{name}.{weight_name}"] = getattr(module, weight_name).clone()
+                        getattr(module, weight_name).data.copy_(quantized_weight)
+
+    def restore_lstm_weights(self, model):
+        with torch.no_grad():
+            for name, module in model.named_modules():
+                if isinstance(module, torch.nn.LSTM):
+                    for weight_name in ['weight_ih_l0', 'weight_hh_l0']:
+                        full_weight_name = f"{name}.{weight_name}"
+                        if full_weight_name in self.lstm_origin_weight_dict:
+                            getattr(module, weight_name).data.copy_(self.lstm_origin_weight_dict[full_weight_name])
+        self.lstm_origin_weight_dict.clear()
 
 
 class BF16Quantizer(QATQuantizer):
@@ -3820,6 +3860,9 @@ class PostQuantizer(QATQuantizer):
 
         if self.quantized_op_stats is not None:
             self.prepare_quantized_ops_pass(graph)
+
+        if self.quantize_op_action.get(nn.LSTM, None) and self.backend == 'qnnpack':
+            self.fake_quantize_lstm_weights()
 
         return graph.module
 
