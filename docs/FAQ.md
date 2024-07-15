@@ -231,6 +231,7 @@ export_name = 'test_model'
 export_converter_files(model, dummy_input, export_dir, export_name)
 ````
 Executing this code, you'll get two files in the specified directory, including the TorchScript model (.pt) and the input and output description files (.json). These two files can be shared with developers for debugging.
+We also support int16 LSTM via the combination of static quantization and LSTM-only dynamic quantization. Please take a look at [ptq_with_dynamic_q_lstm.py](../examples/quantization/ptq_with_dynamic_q_lstm.py).
 
 #### Why is the input/output tensor shape different from the one in the original model?
 Generally, for a vision model, the memory layout of the input data used by PyTorch is NCHW, and on the embedded device side, the layout of the supported image data is usually NHWC. Therefore, the 4-dimensional input and output is transformed by default. If you do not need this behaviour, you can add the parameter `nchw_transpose=False` (or `input_transpose=False` and `output_transpose=False`) when defining TFLiteConverter.
