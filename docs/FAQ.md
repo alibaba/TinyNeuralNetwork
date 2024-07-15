@@ -231,7 +231,6 @@ export_name = 'test_model'
 export_converter_files(model, dummy_input, export_dir, export_name)
 ````
 Executing this code, you'll get two files in the specified directory, including the TorchScript model (.pt) and the input and output description files (.json). These two files can be shared with developers for debugging.
-We also support int16 LSTM via the combination of static quantization and LSTM-only dynamic quantization. Please take a look at [ptq_with_dynamic_q_lstm.py](../examples/quantization/ptq_with_dynamic_q_lstm.py).
 
 #### Why is the input/output tensor shape different from the one in the original model?
 Generally, for a vision model, the memory layout of the input data used by PyTorch is NCHW, and on the embedded device side, the layout of the supported image data is usually NHWC. Therefore, the 4-dimensional input and output is transformed by default. If you do not need this behaviour, you can add the parameter `nchw_transpose=False` (or `input_transpose=False` and `output_transpose=False`) when defining TFLiteConverter.
@@ -272,6 +271,7 @@ Note: These state variables are all two-dimensional with the shape of `[batch_si
 Usually, when the number of hidden layers is large enough (128+), the LSTM OP will be time-consuming in the TFLite backend. In this case, consider using dynamic range quantization to optimize its performance, see [dynamic.py](../examples/converter/dynamic.py).
 
 You may also try out static quantization for LSTMs when you have PyTorch 1.13+. But it may take much more effort to minimize the quantization error, and you probably need to perform per-layer inspection carefully.
+We also support int16 LSTM via the combination of static quantization and LSTM-only dynamic quantization. Please take a look at [ptq_with_dynamic_q_lstm.py](../examples/quantization/ptq_with_dynamic_q_lstm.py).
 
 #### What if my model runs slower when dynamic quantization is enabled?
 Please refer to [dynamic_with_selection.py](../examples/converter/dynamic_with_selection.py) for selective dynamic quantization.
