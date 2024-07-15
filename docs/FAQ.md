@@ -75,6 +75,45 @@ with model_tracer():
 ```
 
 
+#### How to set a more flexible Qconfig?
+Q: How to set different quantization configurations, such as specifying different quantization observers for different layers?
+
+A: Configure the `override_qconfig_func` parameter in the config during `Quantizer` initialization. This requires the user to define a function that modifies the Qconfig for the corresponding Op. Below is an example to set MinMaxObservers based on different module name or module type. More `FakeQuantize` and `Observer` implementations can be selected from the official `torch.quantization` library, or you can [customize your own implementations](../tinynn/graph/quantization/fake_quantize.py).
+
+module_name can be obtained from the generated traced model definition in out/Qxx.py.
+
+```python
+import torch
+from torch.quantization import FakeQuantize, MinMaxObserver
+form torch.ao.nn.intrinsic import ConvBnReLU2d
+def set_MinMaxObserver(name, module):
+   # Set the corresponding weight and activation observers to MinMaxObserver based on model_name and module_type.
+   if name in ['model_0_0', 'model_0_1'] or isinstance(module, ConvBnReLU2d):
+        weight_fq = FakeQuantize.with_args(
+            observer=MinMaxObserver,
+            quant_min=-128,
+            quant_max=127,
+            dtype=torch.qint8,
+            qscheme=torch.per_tensor_symmetric,
+            reduce_range=False,
+        )
+        act_fq = FakeQuantize.with_args(
+            observer=MinMaxObserver,
+            quant_min=0,
+            quant_max=255,
+            dtype=torch.quint8,
+            reduce_range=False,
+        )
+        qconfig_new = torch.quantization.QConfig(act_fq, weight_fq)
+        return qconfig_new
+```
+```python
+with model_tracer():
+    quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'override_qconfig_func': set_MinMaxObserver})
+    qat_model = quantizer.quantize()
+```
+
+
 #### How to handle the case of inconsistent training and inference computation graphs?
 
 Q: Models may have some extra logic in the training phase that are not needed in inference, such as the model below (which is also a common scenario in real world OCR and face recognition).

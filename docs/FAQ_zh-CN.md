@@ -73,6 +73,44 @@ with model_tracer():
     qat_model = quantizer.quantize()
 ```
 
+#### 如何配置更加灵活的Qconfig？
+Q: 如何在设置不同的量化配置，例如为不同的层指定不同的量化Observer？
+
+A: 在`Quantizer`初始化时配置config中的`override_qconfig_func`参数，自定义一个函数用于修改对应算子的Qconfig，以下是按照不同的module name或module type设定MinMaxObserver的方式。更多的`FakeQuantize`和`Observer`可以从`torch.quantization`官方实现中进行选取，或者[自定义相关实现](../tinynn/graph/quantization/fake_quantize.py)。
+
+module_name 可以从生成的out/Qxx.py模型定义中获知。
+
+```python
+import torch
+from torch.quantization import FakeQuantize, MinMaxObserver
+form torch.ao.nn.intrinsic import ConvBnReLU2d
+def set_ptq_fake_quantize_1(name, module):
+   # 按照model_name和module_type 将对应weight和激活值的OBserver设置为MinMaxObserver。
+   if name in ['model_0_0', 'model_0_1'] or isinstance(module, ConvBnReLU2d):
+        weight_fq = FakeQuantize.with_args(
+            observer=MinMaxObserver,
+            quant_min=-128,
+            quant_max=127,
+            dtype=torch.qint8,
+            qscheme=torch.per_tensor_symmetric,
+            reduce_range=False,
+        )
+        act_fq = FakeQuantize.with_args(
+            observer=MinMaxObserver,
+            quant_min=0,
+            quant_max=255,
+            dtype=torch.quint8,
+            reduce_range=False,
+        )
+        qconfig_new = torch.quantization.QConfig(act_fq, weight_fq)
+        return qconfig_new
+```
+```python
+with model_tracer():
+    quantizer = QATQuantizer(model, dummy_input, work_dir='out', config={'override_qconfig_func': set_MinMaxObserver})
+    qat_model = quantizer.quantize()
+```
+
 
 #### 如何处理训练和推理计算图不一致的情况？
 
