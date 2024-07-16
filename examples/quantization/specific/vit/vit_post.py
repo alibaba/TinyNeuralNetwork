@@ -69,6 +69,7 @@ def ptq_vit(args):
             work_dir='out',
             config={
                 'override_qconfig_func': set_ptq_fake_quantize,
+                'extra_tracer_opts': {'eliminate_dead_graph': True},
             },
         )
         quantizer.quantize()
@@ -104,6 +105,7 @@ def ptq_vit(args):
                 'override_qconfig_func': set_ptq_fake_quantize,
                 "force_overwrite": True,
                 'set_quantizable_op_stats': True,
+                'extra_tracer_opts': {'eliminate_dead_graph': True},
             },
         )
         ptq_model = quantizer.quantize()
