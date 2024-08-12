@@ -1958,12 +1958,12 @@ class GraphOptimizer(object):
             elif node['node_type'] == ExtendedOperator.SPLIT_V:
                 old_dim = op.inputs[2].tensor
                 new_dim = np.where(inv_perm_arr == old_dim)[0][0]
-                new_dim_tensor = self.create_attr_tensor(np.array([new_dim], dtype='int32'))
+                new_dim_tensor = self.create_attr_tensor(np.array(new_dim, dtype='int32'))
                 actions.append((self.graph.replace_operator_input, (node, 2, new_dim_tensor, True)))
             elif node['node_type'] == ExtendedOperator.SPLIT:
                 old_dim = op.inputs[0].tensor
                 new_dim = np.where(inv_perm_arr == old_dim)[0][0]
-                new_dim_tensor = self.create_attr_tensor(np.array([new_dim], dtype='int32'))
+                new_dim_tensor = self.create_attr_tensor(np.array(new_dim, dtype='int32'))
                 actions.append((self.graph.replace_operator_input, (node, 0, new_dim_tensor, True)))
             elif node['node_type'] in (
                 ExtendedOperator.PAD,
@@ -2318,11 +2318,11 @@ class GraphOptimizer(object):
                 op.axis = new_axis
             elif node['node_type'] == ExtendedOperator.SPLIT_V:
                 new_dim = prev_shape.index(-1)
-                new_dim_tensor = self.create_attr_tensor(np.array([new_dim], dtype='int32'))
+                new_dim_tensor = self.create_attr_tensor(np.array(new_dim, dtype='int32'))
                 actions.append((self.graph.replace_operator_input, (node, 2, new_dim_tensor, True)))
             elif node['node_type'] == ExtendedOperator.SPLIT:
                 new_dim = prev_shape.index(-1)
-                new_dim_tensor = self.create_attr_tensor(np.array([new_dim], dtype='int32'))
+                new_dim_tensor = self.create_attr_tensor(np.array(new_dim, dtype='int32'))
                 actions.append((self.graph.replace_operator_input, (node, 0, new_dim_tensor, True)))
             elif node['node_type'] in (ExtendedOperator.PAD, ExtendedOperator.PADV2, ExtendedOperator.MIRROR_PAD):
                 old_pad = op.inputs[1].tensor
@@ -2716,7 +2716,7 @@ class GraphOptimizer(object):
             else:
                 biases = [None] * num_chunks
 
-            dim_tensor = self.create_attr_tensor(np.array([3], dtype='int32'))
+            dim_tensor = self.create_attr_tensor(np.array(3, dtype='int32'))
             ops.append(tfl.SplitOperator([dim_tensor, input_tensor], input_tensors, num_chunks))
 
             for it, ot, w, b in zip(input_tensors, output_tensors, weights, biases):
@@ -2815,7 +2815,7 @@ class GraphOptimizer(object):
             new_os = output_shape_tensor.tensor.copy()
             new_os[3] = num_weight_channel
             new_ost = self.create_attr_tensor(new_os)
-            dim_tensor = self.create_attr_tensor(np.array([3], dtype='int32'))
+            dim_tensor = self.create_attr_tensor(np.array(3, dtype='int32'))
             ops.append(tfl.SplitOperator([dim_tensor, input_tensor], input_tensors, num_chunks))
 
             for it, ot, w, b in zip(input_tensors, output_tensors, weights, biases):
@@ -4193,9 +4193,9 @@ def op_input_dims(op: tfl.BaseOperator):
     if isinstance(op, (tfl.ConcatenationOperator, tfl.GatherOperator, tfl.PackOperator, tfl.UnpackOperator)):
         dim_indices = op.axis
     elif isinstance(op, tfl.SplitOperator):
-        dim_indices = op.inputs[0].tensor[0]
+        dim_indices = op.inputs[0].tensor.item()
     elif isinstance(op, tfl.SplitVOperator):
-        dim_indices = op.inputs[2].tensor[0]
+        dim_indices = op.inputs[2].tensor.item()
     elif isinstance(op, (tfl.PadOperator, tfl.Padv2Operator, tfl.MirrorPadOperator)):
         pads = np.sum(op.inputs[1].tensor, axis=-1)
         nonzero_idx = np.nonzero(pads)[0]

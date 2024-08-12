@@ -152,7 +152,7 @@ class PrimConstantChunkConverter(PrimOperatorConverter):
                 chunks = dim_size
 
             input_tensor = self.find_or_create_input(0, graph_converter)
-            dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
+            dim_tensor = self.create_attr_tensor(np.array(dim, dtype='int32'))
 
             if dim_size % chunks != 0:
                 size_splits = np.array([t.size(dim) for t in self.output_tensors], dtype='int32')

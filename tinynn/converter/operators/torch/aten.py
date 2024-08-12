@@ -274,7 +274,7 @@ class ATenLstmOperator(ATenLstmSchema):
 
                         if not self.separated_rnn_gate_calc:
                             gate_outs = [self.create_transform_tensor(t) for t in np.split(add_out.tensor, 4, 1)]
-                            split_dim_tensor = self.create_attr_tensor(np.array([1], dtype='int32'))
+                            split_dim_tensor = self.create_attr_tensor(np.array(1, dtype='int32'))
                             ops.append(tfl.SplitOperator([split_dim_tensor, add_out], gate_outs, 4))
 
                         gate_i = self.create_transform_tensor(
@@ -709,7 +709,7 @@ class ATenGruOperator(ATenGruSchema):
                             ops.append(tfl.FullyConnectedOperator([h, w_h, b_h], [hidden_mm]))
 
                             left_in = np.split(input_mm.tensor, 3, axis=1)
-                            dim_tensor = self.create_attr_tensor(np.array([1], dtype='int32'))
+                            dim_tensor = self.create_attr_tensor(np.array(1, dtype='int32'))
                             splited_left_in = [self.create_transform_tensor(t) for t in left_in]
 
                             ops.append(tfl.SplitOperator([dim_tensor, input_mm], splited_left_in, 3))
@@ -2459,7 +2459,7 @@ class ATenGroupNormOperator(ATenGroupNormSchema):
         else:
             axis = tuple(range(1, dims))
             axis_tensor = self.create_attr_tensor(np.array(axis, dtype='int32'))
-            split_dim_tensor = self.create_attr_tensor(np.array([1], dtype='int32'))
+            split_dim_tensor = self.create_attr_tensor(np.array(1, dtype='int32'))
             inputs = [self.create_transform_tensor(t) for t in np.split(inp.tensor, n_groups, axis=1)]
             ops.append(tfl.SplitOperator([split_dim_tensor, inp], inputs, n_groups))
 
@@ -2982,7 +2982,7 @@ class ATenSplitOperator(ATenSplitSchema):
         if dim < 0:
             dim += len(self.input_tensors[0].shape)
 
-        dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
+        dim_tensor = self.create_attr_tensor(np.array(dim, dtype='int32'))
         size_splits = np.array([t.size(dim) for t in self.output_tensors[0]], dtype='int32')
         chunks = len(size_splits)
         split_tensor = self.create_attr_tensor(size_splits)
@@ -3024,7 +3024,7 @@ class ATenChunkOperator(ATenChunkSchema):
             chunks = dim_size
 
         input_tensor = self.find_or_create_input(0, graph_converter)
-        dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
+        dim_tensor = self.create_attr_tensor(np.array(dim, dtype='int32'))
 
         output_names = [f'{self.output_names[0]}:{i}' for i in range(len(self.output_tensors[0]))]
         graph_converter.add_iterable_pair(self.output_names, output_names, 'input')
@@ -3783,7 +3783,7 @@ class ATenGluOperator(ATenGluSchema):
         ops = []
 
         mid_arrs = np.split(input_tensor.tensor, 2, axis=dim)
-        dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
+        dim_tensor = self.create_attr_tensor(np.array(dim, dtype='int32'))
         mid_tensors = [self.create_transform_tensor(t) for t in mid_arrs]
         ops.append(tfl.SplitOperator([dim_tensor, input_tensor], mid_tensors, 2))
 
@@ -4119,7 +4119,7 @@ class ATenRollOperator(ATenRollSchema):
             actual_shift = shift % dim_size
             if actual_shift != 0:
                 split_sizes = self.create_attr_tensor(np.array([dim_size - actual_shift, actual_shift], dtype='int32'))
-                dim_tensor = self.create_attr_tensor(np.array([dim], dtype='int32'))
+                dim_tensor = self.create_attr_tensor(np.array(dim, dtype='int32'))
                 chunks = 2
 
                 splitted = [
