@@ -2587,6 +2587,9 @@ class QATQuantizer(object):
             rewritable_lstm_nodes = graph.filter_forward_nodes(_is_rewritable_lstm_node)
             fake_dequant_cls = torch_q.DeQuantStub
             for idx, node in enumerate(rewritable_lstm_nodes):
+                assert node.module.num_layers == 1, "Quantization rewrite for multi-layer LSTM is not yet supported"
+                assert not node.module.bidirectional, "Quantization rewrite for bidirectional LSTM is not yet supported"
+
                 cell_state = node.next_tensors[1][1]
 
                 fake_dequant = fake_dequant_cls()
@@ -2616,6 +2619,21 @@ class QATQuantizer(object):
                     before_node=node.next_nodes[0],
                 )
                 size_len = len(node.next_tensors[0].shape)
+
+                if node.module.bidirectional:
+                    with override_current_trace_graph(graph):
+                        size_func = TraceFunction(
+                            'torch.Tensor.__mul__', is_class=True, prefix='fake_dequant_rewrite_'
+                        ).parse_args(size_node.next_tensors[0], 2)
+
+                        size_node = graph.insert_new_after(
+                            size_node,
+                            size_func,
+                            [size_node.next_tensors[0]],
+                            [None],
+                            next_tensors=[size_node.next_tensors[0] * 2],
+                            before_node=node.next_nodes[0],
+                        )
 
                 with override_current_trace_graph(graph):
                     expand_func = TraceFunction(

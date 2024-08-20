@@ -13,10 +13,11 @@ from tinynn.converter import TFLiteConverter
 
 
 class SimpleLSTM(nn.Module):
-    def __init__(self, in_dim, out_dim, layers, num_classes):
+    def __init__(self, in_dim, out_dim, layers, num_classes, bidirectional):
         super(SimpleLSTM, self).__init__()
-        self.lstm = torch.nn.LSTM(in_dim, out_dim, layers)
-        self.fc = torch.nn.Linear(out_dim, num_classes)
+        num_directions = 2 if bidirectional else 1
+        self.lstm = torch.nn.LSTM(in_dim, out_dim, layers, bidirectional=bidirectional)
+        self.fc = torch.nn.Linear(out_dim * num_directions, num_classes)
         self.relu = torch.nn.ReLU()
 
     def forward(self, inputs):
@@ -27,7 +28,7 @@ class SimpleLSTM(nn.Module):
 
 
 def main_worker(args):
-    model = SimpleLSTM(args.input_size, args.hidden_size, args.num_layers, args.num_classes)
+    model = SimpleLSTM(args.input_size, args.hidden_size, args.num_layers, args.num_classes, args.bidirectional)
 
     # Provide a viable input for the model
     dummy_input = torch.rand((args.steps, args.batch_size, args.input_size))
@@ -53,6 +54,8 @@ def main_worker(args):
             hybrid_asymmetric_inputs=True,
             # Enable hybrid per-channel quantization for `Conv2d` and `DepthwiseConv2d`
             hybrid_conv=True,
+            # Enable rewrite for BidirectionLSTMs to UnidirectionalLSTMs
+            map_bilstm_to_lstm=False,
         )
         converter.convert()
 
@@ -65,6 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--input-size', type=int, default=128)
     parser.add_argument('--num-layers', type=int, default=1)
     parser.add_argument('--num-classes', type=int, default=10)
+    parser.add_argument('--bidirectional', action='store_true')
 
     args = parser.parse_args()
     main_worker(args)

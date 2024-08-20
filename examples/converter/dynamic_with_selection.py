@@ -20,10 +20,11 @@ from tinynn.converter.utils.tflite import parse_model
 
 
 class SimpleLSTM(nn.Module):
-    def __init__(self, in_dim, out_dim, layers, num_classes):
+    def __init__(self, in_dim, out_dim, layers, num_classes, bidirectional):
         super(SimpleLSTM, self).__init__()
-        self.lstm = torch.nn.LSTM(in_dim, out_dim, layers)
-        self.fc = torch.nn.Linear(out_dim, num_classes)
+        num_directions = 2 if bidirectional else 1
+        self.lstm = torch.nn.LSTM(in_dim, out_dim, layers, bidirectional=bidirectional)
+        self.fc = torch.nn.Linear(out_dim * num_directions, num_classes)
         self.relu = torch.nn.ReLU()
 
     def forward(self, inputs):
@@ -76,7 +77,7 @@ def benchmark_model_adb(path):
 
 
 def main_worker(args):
-    model = SimpleLSTM(args.input_size, args.hidden_size, args.num_layers, args.num_classes)
+    model = SimpleLSTM(args.input_size, args.hidden_size, args.num_layers, args.num_classes, args.bidirectional)
 
     # Provide a viable input for the model
     dummy_input = torch.rand((args.steps, args.batch_size, args.input_size))
@@ -106,6 +107,8 @@ def main_worker(args):
             hybrid_conv=True,
             # Generate single op models for hybrid quantizable ops
             hybrid_gen_single_op_models=True,
+            # Enable rewrite for BidirectionLSTMs to UnidirectionalLSTMs
+            map_bilstm_to_lstm=False,
         )
 
         converter.convert()
@@ -162,6 +165,8 @@ def main_worker(args):
             hybrid_conv=converter.hybrid_conv,
             # Hybrid configurations
             hybrid_config=hybrid_config,
+            # Enable rewrite for BidirectionLSTMs to UnidirectionalLSTMs
+            map_bilstm_to_lstm=False,
         )
 
         converter.convert()
