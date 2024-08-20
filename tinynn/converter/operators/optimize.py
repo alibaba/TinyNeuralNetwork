@@ -928,12 +928,18 @@ class GraphOptimizer(object):
                 if tensor.quantization is None:
                     t_idx = (tensor.buffer.data, tensor.dtype, tensor.shape)
                 else:
+                    scale = tensor.quantization.scale
+                    zero_point = tensor.quantization.zero_point
+                    if isinstance(scale, list):
+                        scale = tuple(scale)
+                    if isinstance(zero_point, list):
+                        zero_point = tuple(zero_point)
                     t_idx = (
                         tensor.buffer.data,
                         tensor.dtype,
                         tensor.shape,
-                        tensor.quantization.scale,
-                        tensor.quantization.zero_point,
+                        scale,
+                        zero_point,
                         tensor.quantization.dim,
                     )
 
