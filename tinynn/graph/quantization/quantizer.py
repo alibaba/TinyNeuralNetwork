@@ -2041,6 +2041,7 @@ class QATQuantizer(object):
                 else:
                     arg_str = f'{max}'
             elif kind == 'clamp_with_fusion':
+                node.module.is_class = False
                 node.module.kind = kind
                 node.module.func_type = node.module.func_type.replace('clamp', kind)
                 node.module.full_name = f'tinynn.graph.quantization.utils.{node.module.func_type}'
