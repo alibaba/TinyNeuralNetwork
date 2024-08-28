@@ -2516,6 +2516,36 @@ class ConverterOptimizerQuantizedTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
 
+    def test_gather_conv2d(self):
+        class TestModel(nn.Module):
+            def __init__(self, with_bias=False):
+                super(TestModel, self).__init__()
+                self.block = nn.Sequential(
+                    nn.PixelUnshuffle(2),
+                    nn.Conv2d(8, 4, 3, 1, 1, bias=with_bias),
+                )
+
+            def forward(self, x):
+                return self.block(x)
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 2, 512, 512)
+        model_path = get_model_path()
+
+        nchw_transpose = False
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=nchw_transpose)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 4)
+        self.assertEqual(tfl_model.OperatorCodes(1).DeprecatedBuiltinCode(), tflite.BuiltinOperator.SPACE_TO_DEPTH)
+        self.assertEqual(tfl_model.OperatorCodes(2).DeprecatedBuiltinCode(), tflite.BuiltinOperator.CONV_2D)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+
     def test_lower_transpose_dim_pass(self):
         class TestModel(nn.Module):
             def forward(self, x):
