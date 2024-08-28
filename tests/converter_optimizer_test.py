@@ -1,4 +1,5 @@
 import unittest
+from distutils.version import LooseVersion
 
 import torch
 import torch.nn as nn
@@ -2516,6 +2517,10 @@ class ConverterOptimizerQuantizedTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
         self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
 
+    @unittest.skipIf(
+        LooseVersion(torch.__version__) < LooseVersion('1.8.0'),
+        "PixelUnshuffle is introduced in PyTorch 1.8.0",
+    )
     def test_gather_conv2d(self):
         class TestModel(nn.Module):
             def __init__(self, with_bias=False):
