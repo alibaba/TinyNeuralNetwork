@@ -2594,6 +2594,32 @@ class ConverterOptimizerQuantizedTester(unittest.TestCase):
         self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 3)
         self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
 
+    def test_consecutive_gather(self):
+        class TestModel(nn.Module):
+            def forward(self, x):
+                x = x.relu()
+                x = x[..., [2, 1, 0]]
+                x = x[..., [2, 1, 0]]
+                return x
+
+        model = TestModel()
+        model.eval()
+
+        dummy_input = torch.randn(1, 2, 3)
+        model_path = get_model_path()
+
+        converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
+        converter.convert()
+
+        tfl_model = parse_model(model_path)
+        self.assertEqual(tfl_model.OperatorCodesLength(), 1)
+        self.assertEqual(tfl_model.OperatorCodes(0).DeprecatedBuiltinCode(), tflite.BuiltinOperator.RELU)
+        self.assertEqual(tfl_model.SubgraphsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).InputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OutputsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).OperatorsLength(), 1)
+        self.assertEqual(tfl_model.Subgraphs(0).Operators(0).OutputsLength(), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

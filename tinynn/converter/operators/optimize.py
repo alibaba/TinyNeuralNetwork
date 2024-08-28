@@ -745,6 +745,54 @@ class GraphOptimizer(object):
         elinimate_sequences(self.graph, filtered_pairs, _remove_first_pred, _remove_first_action)
 
     @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
+    def fuse_simple_gather_pass(self):
+        edges = self.graph.graph.es.select(functools.partial(is_gather_fusable_edge, graph_converter=self.graph.graph))
+        filtered_pairs = [[self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]] for x in edges]
+
+        # Try to fuse the edges
+        filtered_pairs = fuse_connected_edges(filtered_pairs)
+
+        def _remove_first_pred(seq):
+            new_perm = fuse_transpose_perms(seq)
+
+            hints = set()
+            for node in seq:
+                if 'direction' in node['op'].extra_hints:
+                    hints.add(node['op'].extra_hints['direction'])
+
+            if len(hints) == 1:
+                hint = next(iter(hints))
+            else:
+                hint = None
+
+            remove_first = np.array_equal(new_perm, np.sort(new_perm))
+            return remove_first, (new_perm, hint)
+
+        def _remove_first_action(first_node, last_node, custom_data):
+            # Set fused perm to the first transpose node
+            new_perm, hint = custom_data
+            if hint is None:
+                if 'direction' in first_node['op'].extra_hints:
+                    del first_node['op'].extra_hints['direction']
+            else:
+                first_node['op'].extra_hints['direction'] = hint
+            new_perm_tensor = self.create_attr_tensor(new_perm)
+            action = (self.graph.replace_operator_input, (first_node, 1, new_perm_tensor))
+            return [action]
+
+        def _skip_pred(seq):
+            for node in seq:
+                op = node['op']
+                idx_tensor = op.inputs[1]
+                if idx_tensor.buffer is None:
+                    return True
+                if len(idx_tensor.shape) > 1:
+                    return True
+            return False
+
+        elinimate_sequences(self.graph, filtered_pairs, _remove_first_pred, _remove_first_action, skip_pred=_skip_pred)
+
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
     def fuse_dequant_quant_pass(self, q_first):
         edges = self.graph.graph.es.select(
             functools.partial(is_dequant_quant_fusable_edge, graph_converter=self.graph.graph, q_first=q_first)
@@ -3422,6 +3470,7 @@ class GraphOptimizer(object):
         self.fuse_simple_reshape_pass()
         self.branch_transpose_expand_pass()
         self.fuse_simple_transpose_pass()
+        self.fuse_simple_gather_pass()
         for branch in (False, True):
             self.remove_noop_pass(branch)
         self.fuse_wrapped_reshape_within_transpose_pass()
@@ -4042,6 +4091,18 @@ def is_transpose_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
     )
 
 
+def is_gather_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+    return (
+        source_vertex['node_type'] == ExtendedOperator.GATHER
+        and source_vertex.outdegree() == 1
+        and target_vertex['node_type'] == ExtendedOperator.GATHER
+        and target_vertex.outdegree() >= 1
+        and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+    )
+
+
 def is_reshape_branch_edge(edge: ig.Edge, graph_converter: ig.Graph):
     source_vertex = graph_converter.vs[edge.source]
     target_vertex = graph_converter.vs[edge.target]
@@ -4342,7 +4403,7 @@ def fuse_slices(seq: typing.Iterable[ig.Vertex]):
 def fuse_transpose_perms(seq: typing.Iterable[ig.Vertex]):
     cur_perm = None
     for node in seq:
-        assert node['node_type'] == ExtendedOperator.TRANSPOSE
+        assert node['node_type'] in (ExtendedOperator.TRANSPOSE, ExtendedOperator.GATHER)
         next_perm = node['op'].inputs[1].tensor
         if cur_perm is None:
             cur_perm = next_perm
