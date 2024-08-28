@@ -4100,6 +4100,8 @@ def is_gather_fusable_edge(edge: ig.Edge, graph_converter: ig.Graph):
         and target_vertex['node_type'] == ExtendedOperator.GATHER
         and target_vertex.outdegree() >= 1
         and source_vertex['outputs'][0] == target_vertex['op'].inputs[0].name
+        and source_vertex['op'].axis == target_vertex['op'].axis
+        and source_vertex['op'].batchDims == target_vertex['op'].batchDims
     )
 
 
