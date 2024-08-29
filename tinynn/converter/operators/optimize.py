@@ -614,6 +614,46 @@ class GraphOptimizer(object):
         # Delete activation nodes
         self.graph.graph.delete_vertices(remove_ids)
 
+    @class_conditional(lambda self: self.level >= GraphOptimizer.COMMON_OPTIMIZE)
+    def fuse_gather_conv2d(self):
+        # Find fusable ops
+        edges = self.graph.graph.es.select(functools.partial(is_gather_conv2d_edge, graph_converter=self.graph.graph))
+        filtered_pairs = ((self.graph.graph.vs[x.source], self.graph.graph.vs[x.target]) for x in edges)
+
+        def _remove_last_pred(seq):
+            gather = seq[0]
+            conv = seq[1]
+            return False, (gather, conv)
+
+        def _remove_last_action(first_node, last_node, custom_data):
+            gather, conv = custom_data
+
+            actions = []
+
+            indx = np.argsort(gather['op'].inputs[1].tensor)
+            w = conv['op'].inputs[1].tensor.copy()
+            w_quant_param = conv['op'].inputs[1].quantization
+            new_w = np.take(w, indx, axis=3)
+            if w_quant_param is not None and isinstance(w_quant_param.scale, list) and w_quant_param.dim == 3:
+                new_w_scale = np.take(w_quant_param.scale, indx, axis=0)
+                new_w_zeros = np.take(w_quant_param.zero_point, indx, axis=0)
+                w_quant_param.scale = new_w_scale
+                w_quant_param.zero_point = new_w_zeros
+            new_w = self.create_attr_tensor(new_w, quantization=w_quant_param)
+            actions.append((self.graph.replace_operator_input, (conv, 1, new_w)))
+            return actions
+
+        elinimate_sequences(
+            self.graph,
+            filtered_pairs,
+            True,
+            None,
+            _remove_last_pred,
+            _remove_last_action,
+            False,
+            force_forward_input=True,
+        )
+
     @class_conditional(lambda self: self.tflite_micro_rewrite)
     def split_requantize(self):
         vertices = self.graph.graph.vs.select(functools.partial(is_requantize_node, graph_converter=self.graph.graph))
@@ -3576,6 +3616,8 @@ class GraphOptimizer(object):
         self.fuse_same_padding()
         self.fuse_same_padding_slicing()
 
+        self.fuse_gather_conv2d()
+
         # Group conv & deconv
         self.group_conv_rewrite_pass()
         self.group_deconv_rewrite_pass()
@@ -4225,6 +4267,20 @@ def is_conv2d_gather_edge(edge: ig.Edge, graph_converter: ig.Graph):
         and target_vertex['op'].inputs[1].buffer is not None
         and target_vertex['op'].axis == 3
         and source_vertex['op'].inputs[1].tensor.shape[0] == target_vertex['op'].inputs[1].tensor.shape[0]
+    )
+
+
+def is_gather_conv2d_edge(edge: ig.Edge, graph_converter: ig.Graph):
+    source_vertex = graph_converter.vs[edge.source]
+    target_vertex = graph_converter.vs[edge.target]
+
+    return (
+        source_vertex['node_type'] == ExtendedOperator.GATHER
+        and target_vertex['node_type'] == ExtendedOperator.CONV_2D
+        and source_vertex.outdegree() == 1
+        and source_vertex['op'].inputs[1].buffer is not None
+        and source_vertex['op'].axis == 3
+        and source_vertex['op'].inputs[1].tensor.shape[0] == target_vertex['op'].inputs[1].tensor.shape[3]
     )
 
 
