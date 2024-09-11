@@ -200,6 +200,7 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     'log': None,
     'std': None,
     'var': None,
+    'norm': None,
     nn.LSTM: '1.13.0',
     nn.ConvTranspose2d: '1.7.0',
     nn.ConstantPad1d: '1.7.0',
@@ -260,6 +261,10 @@ if hasattr(nn, 'SiLU'):
     UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.update({nn.SiLU: None})
     Q_MODULES_MAPPING.update({nn.SiLU: QSiLU})
     FUNCTIONAL_MODULE_MAPPING.update({'silu': nn.SiLU})
+
+if hasattr(nn, 'RMSNorm'):
+    UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.update({nn.RMSNorm: None})
+    FUNCTIONAL_MODULE_MAPPING.update({'rms_norm': nn.RMSNorm})
 
 # Processed QAT fuse rules
 processed_qat_rules = {}
