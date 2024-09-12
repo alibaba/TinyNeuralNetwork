@@ -22,6 +22,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `log_softmax` | / |
 | `matmul` | / |
 | `mm` | / |
+| `norm` | / |
 | `pad` | 1.7.0 |
 | `pow` | / |
 | `prelu` | / |
@@ -46,6 +47,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `torch.nn.LayerNorm` | / |
 | `torch.nn.LogSoftmax` | / |
 | `torch.nn.PReLU` | / |
+| `torch.nn.RMSNorm` | / |
 | `torch.nn.RNN` | / |
 | `torch.nn.SiLU` | / |
 | `torch.nn.Softmax` | / |

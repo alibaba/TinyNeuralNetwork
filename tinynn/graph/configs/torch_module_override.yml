@@ -65,6 +65,7 @@ torch.nn:
 - FractionalMaxPool3d
 - LPPool1d
 - LPPool2d
+- LPPool3d
 - LocalResponseNorm
 - BatchNorm1d
 - BatchNorm2d
@@ -74,8 +75,10 @@ torch.nn:
 - InstanceNorm3d
 - LayerNorm
 - GroupNorm
+- RMSNorm
 - SyncBatchNorm
 - Dropout
+- Dropout1d
 - Dropout2d
 - Dropout3d
 - AlphaDropout
@@ -110,7 +113,9 @@ torch.nn:
 - AdaptiveAvgPool2d
 - AdaptiveAvgPool3d
 - TripletMarginLoss
+- ZeroPad1d
 - ZeroPad2d
+- ZeroPad3d
 - ConstantPad1d
 - ConstantPad2d
 - ConstantPad3d
@@ -141,6 +146,9 @@ torch.nn:
 - Mish
 - TripletMarginWithDistanceLoss
 - ChannelShuffle
+- CircularPad1d
+- CircularPad2d
+- CircularPad3d
 - UninitializedParameter
 - UninitializedBuffer
 torch.quantization:
@@ -149,7 +157,13 @@ torch.quantization:
 - QuantWrapper
 torchvision.ops:
 - DeformConv2d
+- DropBlock2d
+- DropBlock3d
+- Conv2dNormActivation
+- Conv3dNormActivation
 - FrozenBatchNorm2d
+- MLP
+- Permute
 - MultiScaleRoIAlign
 - PSRoIAlign
 - PSRoIPool
