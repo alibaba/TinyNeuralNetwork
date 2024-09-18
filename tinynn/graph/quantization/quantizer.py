@@ -264,7 +264,6 @@ if hasattr(nn, 'SiLU'):
 
 if hasattr(nn, 'RMSNorm'):
     UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.update({nn.RMSNorm: None})
-    FUNCTIONAL_MODULE_MAPPING.update({'rms_norm': nn.RMSNorm})
 
 # Processed QAT fuse rules
 processed_qat_rules = {}
