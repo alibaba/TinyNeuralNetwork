@@ -330,7 +330,7 @@ from onnx2pytorch import ConvertModel
 ```py
 # Import import_patcher from TinyNN
 from tinynn.graph.tracer import import_patcher
-# Apply import_patcher during module  for onnx2torch
+# Apply import_patcher during module import for onnx2torch
 with import_patcher():
     from onnx2torch import convert
 
