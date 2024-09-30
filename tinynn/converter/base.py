@@ -214,7 +214,8 @@ class TFLiteConverter(object):
         elif hybrid_quantize_weight_type == 'int8':
             self.hybrid_q_type = np.int8
         elif hybrid_quantize_weight_type == 'int16':
-            raise AttributeError('Hybrid kernels supports int8 and uint8 only')
+            if self.hybrid:
+                raise AttributeError('Hybrid kernels supports int8 and uint8 only')
 
         if dump_config_path and not dump_jit_model_path:
             raise AssertionError("when dump_config_path is set, dump_jit_model_path is required to be set")
