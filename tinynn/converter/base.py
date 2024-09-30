@@ -214,6 +214,7 @@ class TFLiteConverter(object):
         elif hybrid_quantize_weight_type == 'int8':
             self.hybrid_q_type = np.int8
         elif hybrid_quantize_weight_type == 'int16':
+            self.hybrid_q_type = np.int16
             if self.hybrid:
                 raise AttributeError('Hybrid kernels supports int8 and uint8 only')
 
