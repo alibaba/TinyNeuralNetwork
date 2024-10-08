@@ -6,6 +6,9 @@ import numpy as np
 import torch
 
 from ...schemas.tflite import schema_generated as tflite
+from tinynn.util.util import get_logger
+
+log = get_logger(__name__)
 
 Offset = int
 
@@ -201,12 +204,13 @@ class Tensor(object):
                 else:
                     if not asymmetric:
                         sym_u8_offset = 128
-                        assert tensor.q_zero_point() == sym_u8_offset, (
-                            "As for symmetric quantization, the zero point of the u8 tensors should be"
-                            f" {sym_u8_offset}, but got {tensor.q_zero_point()}. This could happen if you didn't train"
-                            " the model after QAT preparation, or the OP is not supported in symmetric quantization"
-                            " (e.g. sigmoid)"
-                        )
+                        if tensor.q_zero_point() != sym_u8_offset:
+                            log.warning(
+                                "As for symmetric quantization, the zero point of the u8 tensors should be"
+                                f" {sym_u8_offset}, but got {tensor.q_zero_point()}. This could happen if you didn't"
+                                " train the model after QAT preparation, or the OP is not supported in symmetric"
+                                " quantization (e.g. sigmoid)"
+                            )
                     else:
                         sym_u8_offset = tensor.q_zero_point()
                     scale = tensor.q_scale()
