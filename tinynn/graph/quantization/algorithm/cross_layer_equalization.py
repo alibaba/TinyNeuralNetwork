@@ -19,7 +19,7 @@ from tinynn.util.util import import_from_path
 
 log = get_logger(__name__)
 
-cls_support_type = (torch.nn.Conv2d, torch.nn.Conv1d)
+cls_support_type = (torch.nn.Conv2d, torch.nn.Conv1d, torch.nn.Linear)
 cls_scalable_type = (torch.nn.ReLU, torch.nn.LeakyReLU, torch.nn.PReLU, torch.nn.Identity)
 
 
@@ -89,7 +89,10 @@ def equalize(weight_1, weight_2, group=1, threshold=0.5, s_min=1e-6, s_max=1e6):
         )
         + shape_2[1:],
     )
-    weight_2_re = weight_2_re.permute((2, 0, 1, 3, 4))
+    num_dims = weight_2_re.dim()
+    assert num_dims >= 3, f"weight_2_re shape dim={num_dims}, <3"
+    new_order = [2, 0, 1] + list(range(3, num_dims))
+    weight_2_re = weight_2_re.permute(new_order)
     weight_2_re = torch.reshape(weight_2_re, (weight_2_re.shape[0] * weight_2_re.shape[1], -1))
     r1 = weight_1_re.abs().max(1).values.double()
     r2 = weight_2_re.abs().max(1).values.double()
@@ -107,7 +110,12 @@ def _weight_equal_helper(cls, threshold=0.5):
     layer_pair = [m for n, m in cls]
     if len(layer_pair) == 2:
         conv_0, conv_1 = layer_pair
-        weight1, bias1, weight2, groups = conv_0.weight, conv_0.bias, conv_1.weight, conv_1.groups
+        weight1, bias1, weight2, groups = (
+            conv_0.weight,
+            conv_0.bias,
+            conv_1.weight,
+            conv_1.groups if hasattr(conv_1, 'groups') else 1,
+        )
         s = equalize(weight1, weight2, group=groups, threshold=threshold)
         weight_1 = weight1 / s.reshape([-1] + ([1] * (weight1.ndim - 1)))
         weight_2 = torch.reshape(weight2, (groups, weight2.shape[0] // groups) + weight2.shape[1:])
@@ -150,7 +158,7 @@ def equalize_model(model: nn.Module, dummy_input, threshold=0.5, iters=2) -> Tup
             stat_we = model.state_dict()
             for k, v in stat_we.items():
                 p, mod = cur_graph.get_submodule_with_parent_from_name(k)
-                if isinstance(mod, torch.nn.Conv2d):
+                if isinstance(mod, cls_support_type):
                     if k.endswith('.weight'):
                         after_max = p.abs().max()
                     elif k.endswith('.bias'):

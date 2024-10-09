@@ -56,3 +56,28 @@ class TestCrossLayerEqualization(unittest.TestCase):
         cle_model = cross_layer_equalize(model, dummy_input, torch.device('cpu'), hba_flag=False)
         cle_output = cle_model(dummy_input)
         torch.testing.assert_allclose(origin_output, cle_output)
+
+    def test_cle_linear(self):
+        class TestModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.fc0 = nn.Linear(3, 8)
+                self.fc1 = nn.Linear(8, 16)
+                self.fc2 = nn.Linear(16, 32)
+
+            def forward(self, x):
+                fc0 = self.fc0(x)
+                fc1 = self.fc1(fc0)
+                fc2 = self.fc2(fc1)
+                return fc2
+
+        torch.manual_seed(10)
+
+        dummy_input = torch.randn(1, 3)
+        model = TestModel()
+        model.eval()
+
+        origin_output = model(dummy_input)
+        cle_model = cross_layer_equalize(model, dummy_input, torch.device('cpu'), hba_flag=False)
+        cle_output = cle_model(dummy_input)
+        torch.testing.assert_allclose(origin_output, cle_output)
