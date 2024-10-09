@@ -29,7 +29,7 @@ def main_worker(args):
         # For per-tensor quantization, if there are many outliers in the weight, CLE can significantly improve the
         # quantization accuracy
         if args.cle:
-            cross_layer_equalize(model, dummy_input, get_device())
+            model = cross_layer_equalize(model, dummy_input, get_device())
 
         # TinyNeuralNetwork provides a PostQuantizer class that may rewrite the graph for and perform model fusion for
         # quantization. The model returned by the `quantize` function is ready for quantization calibration.
