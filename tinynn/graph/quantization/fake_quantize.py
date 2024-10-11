@@ -125,6 +125,7 @@ def set_ptq_fake_quantize(name, module):
         observer=torch.quantization.MinMaxObserver,
         quant_min=0,
         quant_max=255,
+        qscheme=torch.per_tensor_symmetric,
         dtype=torch.quint8,
         reduce_range=False,
     )
