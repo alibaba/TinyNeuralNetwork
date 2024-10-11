@@ -235,6 +235,20 @@ class QuantizedLinearOperator(QuantizedLinearSchema):
         bias = state[0][1]
 
         weight_tensor = self.create_attr_tensor(weight)
+        # find fp_weight from graph_converter.temp_store
+        fp_name = ''
+        for module_name in graph_converter.temp_store.keys():
+            for relation_v in graph_converter.relations.values():
+                if module_name in relation_v:
+                    fp_name = module_name
+        fp_weight = graph_converter.temp_store[fp_name]
+        scale = float(fp_weight.abs().max() / 32767)
+        int16_weight = torch.quantize_per_tensor(fp_weight, scale, 0, torch.qint32)
+        weight_tensor.quantization.scale = scale
+        weight_tensor.tensor = torch.int_repr(int16_weight.detach()).numpy().astype(np.int16)
+        weight_tensor.dtype = weight_tensor.tensor.dtype
+        weight_tensor.buffer = tfl.Buffer(weight_tensor.tensor.tobytes())
+
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
         output_tensor = outputs[0]
 

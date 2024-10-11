@@ -1440,7 +1440,9 @@ class QATQuantizer(object):
         """Rescales activations with provided quant_min and quant_max"""
         for n, m in self.model.named_modules():
             if '.weight_fake_quant' in n:
-                continue
+                quant_min = -32768
+                quant_max = 32767
+                # continue
 
             if isinstance(m, torch.quantization.FakeQuantize):
                 observer = getattr(m, 'activation_post_process', None)

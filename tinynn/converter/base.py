@@ -61,6 +61,7 @@ class TFLiteConverter(object):
         group_tensors: bool = False,
         missing_outputs_as_constants: bool = False,
         legacy_gelu: bool = False,
+        fp_weight_dict: dict = None,
     ) -> None:
         """ The TFLiteConverter class
 
@@ -124,6 +125,7 @@ class TFLiteConverter(object):
         self.tensor_map = {}
         self.tensor_map_copies = {}
         self.common_graph = CommonGraph()
+        self.common_graph.temp_store = fp_weight_dict
 
         if type(dummy_input) in (tuple, list):
             self.dummy_input = dummy_input
