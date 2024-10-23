@@ -5,7 +5,7 @@ TinyNeuralNetwork是一个高效、易用的深度学习模型压缩框架。它
 
 ## 安装
 
-python >= 3.9, pytorch >= 1.8
+python >= 3.9, pytorch >= 1.10
 
 ```shell
 # 安装TinyNeuralNetwork软件包
