@@ -69,7 +69,7 @@ jobs:
           TORCHVISION_VER: ${{ matrix.vers.tv_ver }}
         run: pip install black==22.3.0 ruff tensorflow pytest scipy interval
       - name: Lint checks
-        run: python -m ruff .
+        run: python -m ruff check .
       - name: Run tests
         run: |
           source activate.sh
