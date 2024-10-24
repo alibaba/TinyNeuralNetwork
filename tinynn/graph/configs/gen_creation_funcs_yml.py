@@ -17,7 +17,7 @@ for k in torch.__dict__:
     if k in block_list:
         continue
     c = getattr(torch, k)
-    if inspect.isclass(c) and k.endswith('Tensor') and c.__bases__[0] == object:
+    if inspect.isclass(c) and k.endswith('Tensor') and c.__bases__[0] is object:
         print(k)
         final_dict['torch'].append(k)
     elif inspect.isbuiltin(c):

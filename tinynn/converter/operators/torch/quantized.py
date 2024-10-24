@@ -153,7 +153,7 @@ class QuantizedCatOperator(QuantizedCatSchema):
         self.run(node)
 
         dim = self.input_tensors[1]
-        assert type(dim) == int
+        assert type(dim) is int
 
         if dim < 0:
             dim += self.input_tensors[0][0].ndim

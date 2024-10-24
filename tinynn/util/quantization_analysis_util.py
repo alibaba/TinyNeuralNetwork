@@ -122,7 +122,7 @@ def layer_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine'
 
         device = get_module_device(model)
 
-        if type(dummy_input) == torch.Tensor:
+        if type(dummy_input) is torch.Tensor:
             actual_input = [dummy_input]
         elif isinstance(dummy_input, (tuple, list)):
             actual_input = list(dummy_input)
@@ -132,7 +132,7 @@ def layer_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine'
 
         for i in range(len(actual_input)):
             dummy_input = actual_input[i]
-            if type(dummy_input) == torch.Tensor:
+            if type(dummy_input) is torch.Tensor:
                 if dummy_input.device != device:
                     actual_input[i] = dummy_input.to(device)
 
@@ -223,7 +223,7 @@ def graph_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine'
 
         device = get_module_device(model)
 
-        if type(dummy_input) == torch.Tensor:
+        if type(dummy_input) is torch.Tensor:
             actual_input = [dummy_input]
         elif isinstance(dummy_input, (tuple, list)):
             actual_input = list(dummy_input)
@@ -233,7 +233,7 @@ def graph_error_analysis(q_model: nn.Module, dummy_input, metric: str = 'cosine'
 
         for i in range(len(actual_input)):
             dummy_input = actual_input[i]
-            if type(dummy_input) == torch.Tensor:
+            if type(dummy_input) is torch.Tensor:
                 if dummy_input.device != device:
                     actual_input[i] = dummy_input.to(device)
 

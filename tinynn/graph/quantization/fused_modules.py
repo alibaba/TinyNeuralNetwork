@@ -13,7 +13,7 @@ _FusedModule = getattr(nni, '_FusedModule', nn.Sequential)
 class ConvTransposeBn2d(_FusedModule):
     def __init__(self, conv, bn):
         assert (
-            type(conv) == nn.ConvTranspose2d and type(bn) == nn.BatchNorm2d
+            type(conv) is nn.ConvTranspose2d and type(bn) is nn.BatchNorm2d
         ), 'Incorrect types for input modules{}{}'.format(type(conv), type(bn))
         super(ConvTransposeBn2d, self).__init__(conv, bn)
 

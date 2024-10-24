@@ -11,6 +11,6 @@ repos:
     -   id: black
         exclude: ^tinynn/converter/schemas
 -   repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.150
+    rev: v0.7.0
     hooks:
     -   id: ruff

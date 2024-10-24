@@ -190,7 +190,7 @@ class OperatorConverter(ABC):
         tfl_tensors = []
         if has_buffers is None:
             has_buffers = [None] * len(tensors)
-        elif type(has_buffers) == bool:
+        elif type(has_buffers) is bool:
             has_buffers = [has_buffers] * len(tensors)
         assert len(names) == len(tensors) == len(has_buffers)
         for n, t, b in zip(names, tensors, has_buffers):
@@ -491,7 +491,7 @@ class OperatorConverter(ABC):
             input_size = [input_tensor.shape[2], input_tensor.shape[3]]
 
             if not all((i + 2 * p - k) % s == 0 for i, p, k, s in zip(input_size, padding, kernel_size, stride)):
-                assert type(ops[1]) == tfl.MaxPool2dOperator, 'ceil_mode=True for AvgPool not supported'
+                assert type(ops[1]) is tfl.MaxPool2dOperator, 'ceil_mode=True for AvgPool not supported'
                 fill_nan = True
                 ceil_pad = get_pool_ceil_padding(input_tensor, kernel_size, stride, padding)
                 ceil_pad = list(np.add(ceil_pad, padding))
@@ -503,7 +503,7 @@ class OperatorConverter(ABC):
             pad_input = ops[pad_op_index - 1].outputs[0]
 
             inputs = [pad_input, pad_tensor]
-            if type(ops[1]) == tfl.MaxPool2dOperator:
+            if type(ops[1]) is tfl.MaxPool2dOperator:
                 constant_tensor = self.get_minimum_constant(pad_input)
                 inputs.append(constant_tensor)
                 pad_array = np.pad(pad_input.tensor, pad, constant_values=constant_tensor.tensor[0])

@@ -1314,7 +1314,7 @@ class SplitModifier(ReIndexModifier):
         args_parsed = self.node.module.args_parsed_origin
 
         if len(args_parsed) > 1:
-            if type(args_parsed[1]) == list:
+            if type(args_parsed[1]) is list:
                 ch = [int(i) for i in args_parsed[1]]
                 ch_new = []
 
@@ -2556,7 +2556,7 @@ CHANNEL_MODIFIERS = {
 
 def create_channel_modifier(n):
     for key in CHANNEL_MODIFIERS.keys():
-        if type(key) == str:
+        if type(key) is str:
             if n.kind() == key:
                 return CHANNEL_MODIFIERS[key](n)
         elif isinstance(n.module, key):
@@ -2611,7 +2611,7 @@ class SubGraph(object):
         ignored_bn = set()
 
         for leaf in self.leaf:
-            if type(leaf.module()) != nn.BatchNorm2d:
+            if type(leaf.module()) is not nn.BatchNorm2d:
                 continue
 
             while True:
@@ -2621,7 +2621,7 @@ class SubGraph(object):
                     break
 
                 if leaf in self.leaf:
-                    if type(leaf.module()) != nn.BatchNorm2d:
+                    if type(leaf.module()) is not nn.BatchNorm2d:
                         continue
 
                     ignored_bn.add(leaf)
@@ -2629,7 +2629,7 @@ class SubGraph(object):
         for leaf in self.leaf:
             if leaf in ignored_bn:
                 continue
-            if type(leaf.module()) != nn.BatchNorm2d:
+            if type(leaf.module()) is not nn.BatchNorm2d:
                 continue
 
             is_real_leaf = True

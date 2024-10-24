@@ -39,9 +39,9 @@ def get_submodule_with_parent_from_name(model, module_name):
 
     for ns in module_name_parts:
         last_obj = cur_obj
-        if type(cur_obj) == nn.ModuleList:
+        if type(cur_obj) is nn.ModuleList:
             cur_obj = cur_obj[int(ns)]
-        elif type(cur_obj) == nn.ModuleDict:
+        elif type(cur_obj) is nn.ModuleDict:
             cur_obj = cur_obj[ns]
         else:
             cur_obj = getattr(cur_obj, ns)

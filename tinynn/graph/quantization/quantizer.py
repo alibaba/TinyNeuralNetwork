@@ -584,7 +584,7 @@ class QATQuantizer(object):
                 log.debug(f"[QUANTIZED]{node.unique_name}:{quantized}")
 
             for i, n in enumerate(node.next_nodes):
-                if type(n.module) == TraceFunction:
+                if type(n.module) is TraceFunction:
                     if n.kind() in ('shape', 'size', 'dtype', 'device'):
                         continue
                     if n.kind() == 'expand_as' and i > 0:
@@ -647,7 +647,7 @@ class QATQuantizer(object):
                 'ConvTranspose2d',
             )
             if is_known_mod and n.module.full_name == 'weight' and prev_node.quantized:
-                if next_node.type() == torch_q.QuantStub:
+                if next_node.type() is torch_q.QuantStub:
                     mod = nn.Sequential(torch_q.DeQuantStub(), torch_q.QuantStub())
                     orig_mod = next_node.module
                     next_node.module = mod
@@ -1130,11 +1130,11 @@ class QATQuantizer(object):
                             q_mod = new_mod[-1]
                         elif isinstance(new_mod, torch_q.DeQuantStub):
                             q_mod = new_mod
-                        elif type(new_mod) != nn.Identity:
+                        elif type(new_mod) is not nn.Identity:
                             state = True
                     else:
                         is_prev_float_functional = (
-                            len(n.prev_nodes) > 1 and n.prev_nodes[0].type() == torch.nn.quantized.FloatFunctional
+                            len(n.prev_nodes) > 1 and n.prev_nodes[0].type() is torch.nn.quantized.FloatFunctional
                         )
                         if is_prev_float_functional:
                             q_mod = getattr(n.prev_nodes[0].module, n.kind())
@@ -1294,7 +1294,7 @@ class QATQuantizer(object):
                         new_fq_count = 2
                 else:
                     is_prev_float_functional = (
-                        len(n.prev_nodes) > 1 and n.prev_nodes[0].type() == torch.nn.quantized.FloatFunctional
+                        len(n.prev_nodes) > 1 and n.prev_nodes[0].type() is torch.nn.quantized.FloatFunctional
                     )
                     if n.type() == 'cat':
                         mode = 'both'
@@ -1528,7 +1528,7 @@ class QATQuantizer(object):
                 break
 
         for n in graph.other_init_nodes:
-            if n.type() == nnq.FloatFunctional:
+            if n.type() is nnq.FloatFunctional:
                 graph_quantized = True
                 break
 
@@ -1934,7 +1934,7 @@ class QATQuantizer(object):
                 q.put(node.prev_nodes[0])
                 while not q.empty():
                     n = q.get()
-                    if type(n.module) == TraceFunction:
+                    if type(n.module) is TraceFunction:
                         prev_aliases = n.module.get_aliases()
                         if prev_aliases is not None:
                             for pa in reversed(prev_aliases):
@@ -2109,7 +2109,7 @@ class QATQuantizer(object):
                 if not fuse:
                     return False
 
-                if type(next_node.module) == TraceFunction:
+                if type(next_node.module) is TraceFunction:
                     inplace = next_node.module.func_type == 'relu_' or 'True' in next_node.module.args_string
                 else:
                     inplace = getattr(next_node.module, 'inplace', False)
@@ -2128,7 +2128,7 @@ class QATQuantizer(object):
                             if last_order > node.forward_order:
                                 fuse = False
                                 break
-                            if type(n.module) == TraceFunction and n.module.get_aliases():
+                            if type(n.module) is TraceFunction and n.module.get_aliases():
                                 q.put(n.prev_nodes[0])
                             elif getattr(n.module, 'inplace', False):
                                 q.put(n.prev_nodes[0])
@@ -2143,10 +2143,10 @@ class QATQuantizer(object):
             func_type = kind
             is_class = False
             nodes_to_fuse = [node, next_node]
-            while next_node.type() == nn.Identity:
+            while next_node.type() is nn.Identity:
                 next_node = next_node.next_nodes[0]
                 nodes_to_fuse.append(next_node)
-            if type(next_node.module) == TraceFunction:
+            if type(next_node.module) is TraceFunction:
                 inplace = next_node.module.func_type == 'relu_' or 'True' in next_node.module.args_string
             else:
                 inplace = next_node.module.inplace
@@ -2199,10 +2199,10 @@ class QATQuantizer(object):
             elif node.module.kind == 'prelu':
                 weight_t = node.prev_tensors[1]
                 weight_node = node.prev_nodes[1]
-                if weight_node.type() == torch_q.QuantStub:
+                if weight_node.type() is torch_q.QuantStub:
                     weight_node = weight_node.prev_nodes[0]
 
-                if weight_node.type() != ConstantNode or not weight_node.module.is_parameter:
+                if weight_node.type() is not ConstantNode or not weight_node.module.is_parameter:
                     log.warning('Rewrite for F.prelu(x, buffer) to nn.PReLU is skipped as it changes the semantics')
                     continue
 
@@ -2427,7 +2427,7 @@ class QATQuantizer(object):
             mod_fc = node_fc.module
             mod_bn = node_bn1d.module
 
-            assert type(mod_fc) == nn.Linear and type(mod_bn) == nn.BatchNorm1d, "the rewrite struct is\'t [fc-bn1d]"
+            assert type(mod_fc) is nn.Linear and type(mod_bn) is nn.BatchNorm1d, "the rewrite struct is\'t [fc-bn1d]"
 
             if len(node_fc.prev_tensors[0].shape) != 2:
                 log.debug('the [fc-bn]\'s input dimension != 2')
@@ -2498,7 +2498,7 @@ class QATQuantizer(object):
         batch_norm_1d_nodes = graph.filter_forward_nodes(_is_batch_norm_1d)
         for idx, node in enumerate(batch_norm_1d_nodes):
             mod = node.module
-            if type(mod) == nn.BatchNorm1d:
+            if type(mod) is nn.BatchNorm1d:
                 new_bn = torch.nn.BatchNorm2d(
                     mod.num_features,
                     mod.eps,
@@ -2679,7 +2679,7 @@ class QATQuantizer(object):
                 unsupported_types = tuple(
                     k
                     for k, v in disable_quantize_op_list.items()
-                    if type(k) != str
+                    if type(k) is not str
                     and k not in Q_MODULES_MAPPING
                     and (v is None or LooseVersion(torch.__version__) < v)
                 )
@@ -2695,7 +2695,7 @@ class QATQuantizer(object):
             next_nodes = {n.unique_name: n for n in node.next_nodes}.values()
             for inner_idx, next_node in enumerate(next_nodes):
                 prev_tensor_ptrs = []
-                if type(next_node.module) == TraceFunction and next_node.module.is_property:
+                if type(next_node.module) is TraceFunction and next_node.module.is_property:
                     continue
 
                 for pt in next_node.prev_tensors:
@@ -3096,7 +3096,7 @@ class QATQuantizer(object):
 
         device = get_module_device(model)
 
-        if type(dummy_input) == torch.Tensor:
+        if type(dummy_input) is torch.Tensor:
             actual_input = [dummy_input]
         elif isinstance(dummy_input, (tuple, list)):
             actual_input = list(dummy_input)
@@ -3106,7 +3106,7 @@ class QATQuantizer(object):
 
         for i in range(len(actual_input)):
             dummy_input = actual_input[i]
-            if type(dummy_input) == torch.Tensor:
+            if type(dummy_input) is torch.Tensor:
                 if dummy_input.device != device:
                     actual_input[i] = dummy_input.to(device)
 
@@ -4037,7 +4037,7 @@ class DeQuantizer(object):
                 break
 
         for n in graph.other_init_nodes:
-            if n.type() == nnq.FloatFunctional:
+            if n.type() is nnq.FloatFunctional:
                 graph_quantized = True
                 break
 
@@ -4062,7 +4062,7 @@ class DeQuantizer(object):
                 return (
                     cur_module.kind == 'add_relu'
                     and len(node.prev_nodes) > 1
-                    and node.prev_nodes[0].type() == nnq.FloatFunctional
+                    and node.prev_nodes[0].type() is nnq.FloatFunctional
                 )
 
         # Split FloatFunctional.add_relu to FloatFunctional.add and torch.relu
@@ -4088,7 +4088,7 @@ class DeQuantizer(object):
                 return (
                     cur_module.kind in ('add_scalar', 'mul_scalar')
                     and len(node.prev_nodes) > 1
-                    and node.prev_nodes[0].type() == nnq.FloatFunctional
+                    and node.prev_nodes[0].type() is nnq.FloatFunctional
                 )
 
         add_mul_scalar_nodes = graph.filter_forward_nodes(_is_add_mul_scalar_node)
@@ -4107,7 +4107,7 @@ class DeQuantizer(object):
                 return (
                     cur_module.kind in ('add', 'mul', 'cat')
                     and len(node.prev_nodes) > 1
-                    and node.prev_nodes[0].type() == nnq.FloatFunctional
+                    and node.prev_nodes[0].type() is nnq.FloatFunctional
                 )
 
         add_mul_cat_nodes = graph.filter_forward_nodes(_is_add_mul_cat_node)
@@ -4128,7 +4128,7 @@ class DeQuantizer(object):
         names = [n.unique_name for n in graph.other_init_nodes]
         for name in names:
             n = graph.nodes_map[name]
-            if n.type() == nnq.FloatFunctional:
+            if n.type() is nnq.FloatFunctional:
                 graph.other_init_nodes.remove(n)
                 del graph.nodes_map[n.unique_name]
 
