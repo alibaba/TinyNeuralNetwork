@@ -132,7 +132,7 @@ if LooseVersion(torch.__version__) >= '1.13.0':
 
         @classmethod
         def from_float(cls, other):
-            assert type(other) == cls._FLOAT_MODULE
+            assert type(other) is cls._FLOAT_MODULE
             assert hasattr(other, 'qconfig'), "The float module must have 'qconfig'"
             observed = cls.from_params(other.weight_ih, other.weight_hh, other.bias_ih, other.bias_hh)
             observed.qconfig = other.qconfig

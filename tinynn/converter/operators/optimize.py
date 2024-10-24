@@ -4661,7 +4661,7 @@ def elinimate_sequences(
         first_node = seq[0]
         last_node = seq[-1]
 
-        if type(skip_pred) == bool:
+        if type(skip_pred) is bool:
             skip = skip_pred
         elif skip_pred is not None:
             skip = skip_pred(seq)
@@ -4669,13 +4669,13 @@ def elinimate_sequences(
         if skip:
             continue
 
-        if type(remove_first_pred) == bool:
+        if type(remove_first_pred) is bool:
             remove_first = remove_first_pred
             custom_data = None
         elif remove_first_pred is not None:
             remove_first, custom_data = remove_first_pred(seq)
 
-        if type(remove_last_pred) == bool:
+        if type(remove_last_pred) is bool:
             remove_last = remove_last_pred
             custom_data_last = None
         elif remove_last_pred is not None:

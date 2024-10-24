@@ -1561,7 +1561,7 @@ class ATenStackOperator(ATenStackSchema):
         self.run(node)
 
         dim = self.input_tensors[1]
-        assert type(dim) == int
+        assert type(dim) is int
 
         if dim < 0:
             dim += self.input_tensors[0][0].ndim + 1
@@ -1619,7 +1619,7 @@ class ATenCatOperator(ATenCatSchema):
         self.run(node)
 
         dim = self.input_tensors[1]
-        assert type(dim) == int
+        assert type(dim) is int
 
         if dim < 0:
             dim += self.input_tensors[0][0].ndim
@@ -2067,8 +2067,8 @@ class ATenSelectOperator(ATenSelectSchema):
         input_tensor = self.find_or_create_input(0, graph_converter)
         dim, index = self.input_tensors[1:]
 
-        assert type(dim) == int
-        assert type(index) == int
+        assert type(dim) is int
+        assert type(index) is int
 
         if dim < 0:
             dim += input_tensor.tensor.ndim
@@ -2166,11 +2166,11 @@ class ATenClampOperator(ATenClampSchema):
         self.parse_common(node, attrs, args, graph_converter)
 
     def parse_common(self, node, attrs, args, graph_converter):
-        if type(self) == ATenClampOperator:
+        if type(self) is ATenClampOperator:
             min_value, max_value = self.input_tensors[1:]
-        elif type(self) == ATenClampMinOperator:
+        elif type(self) is ATenClampMinOperator:
             min_value, max_value = self.input_tensors[1], None
-        elif type(self) == ATenClampMaxOperator:
+        elif type(self) is ATenClampMaxOperator:
             min_value, max_value = None, self.input_tensors[1]
 
         has_min = min_value is not None
@@ -3808,7 +3808,7 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
     def parse_common(self, graph_converter, input_idx=0, mask_idx=1, other_idx=2, out_idx=0):
         for i in (input_idx, other_idx):
             t = self.input_tensors[i]
-            if type(t) == torch.Tensor:
+            if type(t) is torch.Tensor:
                 if t.dtype == torch.float64:
                     self.input_tensors[i] = t.to(dtype=torch.float32)
                 elif t.dtype == torch.int64:
@@ -3826,7 +3826,7 @@ class ATenMaskedFillOperator(ATenMaskedFillSchema):
         input_tensor, mask_tensor = [self.find_or_create_input(i, graph_converter) for i in (input_idx, mask_idx)]
 
         ops = []
-        if type(other) == torch.Tensor:
+        if type(other) is torch.Tensor:
             other_t = self.find_or_create_input(other_idx, graph_converter)
             if out.dtype != other.dtype:
                 casted = other.clone().to(dtype=out.dtype)

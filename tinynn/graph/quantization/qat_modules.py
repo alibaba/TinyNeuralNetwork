@@ -95,12 +95,12 @@ class Conv1d(nn.Conv1d):
         Args: `mod` a float module, either produced by torch.quantization utilities
         or directly from user
         """
-        assert type(mod) == cls._FLOAT_MODULE, (
+        assert type(mod) is cls._FLOAT_MODULE, (
             'qat.' + cls.__name__ + '.from_float only works for ' + cls._FLOAT_MODULE.__name__
         )
         assert hasattr(mod, 'qconfig'), 'Input float module must have qconfig defined'
         assert mod.qconfig, 'Input float module must have a valid qconfig'
-        if type(mod) == ConvReLU1d:
+        if type(mod) is ConvReLU1d:
             mod = mod[0]
         qconfig = mod.qconfig
         qat_conv = cls(
@@ -224,7 +224,7 @@ class ConvTranspose1d(nn.ConvTranspose1d):
         Args: `mod` a float module, either produced by torch.quantization utilities
         or directly from user
         """
-        assert type(mod) == cls._FLOAT_MODULE, (
+        assert type(mod) is cls._FLOAT_MODULE, (
             'qat.' + cls.__name__ + '.from_float only works for ' + cls._FLOAT_MODULE.__name__
         )
         assert hasattr(mod, 'qconfig'), 'Input float module must have qconfig defined'
@@ -335,7 +335,7 @@ class ConvTranspose2d(nn.ConvTranspose2d):
         Args: `mod` a float module, either produced by torch.quantization utilities
         or directly from user
         """
-        assert type(mod) == cls._FLOAT_MODULE, (
+        assert type(mod) is cls._FLOAT_MODULE, (
             'qat.' + cls.__name__ + '.from_float only works for ' + cls._FLOAT_MODULE.__name__
         )
         assert hasattr(mod, 'qconfig'), 'Input float module must have qconfig defined'
@@ -566,7 +566,7 @@ class _ConvTransposeBnNd(nn.modules.conv._ConvTransposeNd, fm._FusedModule):
         """
         # The ignore is because _FLOAT_MODULE is a TypeVar here where the bound
         # has no __name__ (code is fine though)
-        assert type(mod) == cls._FLOAT_MODULE, (
+        assert type(mod) is cls._FLOAT_MODULE, (
             'qat.' + cls.__name__ + '.from_float only works for ' + cls._FLOAT_MODULE.__name__
         )  # type: ignore[attr-defined]
         assert hasattr(mod, 'qconfig'), 'Input float module must have qconfig defined'

@@ -75,7 +75,7 @@ exclude = [
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-target-version = "py36"
+target-version = "py39"
 
 [tool.ruff.per-file-ignores]
 "tinynn/converter/schemas/torch/*.py" = ["E501"]
@@ -86,6 +86,7 @@ target-version = "py36"
 "examples/*.py" = ["E402"]
 "__init__.py" = ["F401", "F403"]
 "tests/import_test.py" = ["F401"]
+"tutorials/quantization/basic.ipynb" = ["F811", "F401"]
 
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.

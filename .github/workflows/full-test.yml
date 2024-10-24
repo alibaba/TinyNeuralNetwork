@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "macos-13", "windows-latest"]
-        vers: [ {pt_ver: "1.6.0", tv_ver: "0.7.0"}, {pt_ver: "1.7.0", tv_ver: "0.8.1"}, {pt_ver: "1.8.0", tv_ver: "0.9.0"}, {pt_ver: "1.9.0", tv_ver: "0.10.0"}, {pt_ver: "1.10.0", tv_ver: "0.11.1"}, {pt_ver: "1.11.0", tv_ver: "0.12.0"}, {pt_ver: "1.12.0", tv_ver: "0.13.0"} ]
+        vers: [ {pt_ver: "1.10.0", tv_ver: "0.11.1"}, {pt_ver: "1.11.0", tv_ver: "0.12.0"}, {pt_ver: "1.12.0", tv_ver: "0.13.0"} ]
         include:
           - os: macos-latest
             vers:
@@ -36,7 +36,7 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: 3.8
+          python-version: 3.9
       - name: Install PyTorch
         env:
           PYTORCH_VER: ${{ matrix.vers.pt_ver }}
@@ -45,19 +45,14 @@ jobs:
          if [ "$RUNNER_OS" == "macOS" ]; then
             if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
               conda install pytorch::pytorch torchvision -c pytorch
-            elif [[ "$TORCHVISION_VER" == "0.9."* || "$TORCHVISION_VER" == "0.10."* ]]; then
-              conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER pillow=6 -c pytorch
             else
               conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER -c pytorch
             fi
          elif [ "$RUNNER_OS" == "Windows" ]; then
             if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
-              conda install pytorch torchvision cpuonly pillow=6 -c pytorch
-            elif [[ "$TORCHVISION_VER" == "0.9."* || "$TORCHVISION_VER" == "0.10."* ]]; then
-              conda install pillow=6 -c conda-forge
-              conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER cpuonly -c pytorch
+              conda install pytorch torchvision cpuonly pillow=8 -c pytorch
             else
-              conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER cpuonly pillow=6 -c pytorch
+              conda install pytorch=$PYTORCH_VER torchvision=$TORCHVISION_VER cpuonly pillow=8 -c pytorch
             fi
          else
             if [[ "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
@@ -72,14 +67,9 @@ jobs:
         env:
           PYTORCH_VER: ${{ matrix.vers.pt_ver }}
           TORCHVISION_VER: ${{ matrix.vers.tv_ver }}
-        run: |
-          if [[ "$RUNNER_OS" == "Linux" && "$TORCHVISION_VER" == "latest" && "$PYTORCH_VER" == "latest" ]]; then
-            pip install black 'ruff<0.0.234' 'tensorflow<2.12' pytest scipy interval
-          else
-            pip install black 'ruff<0.0.234' tensorflow pytest scipy interval
-          fi
+        run: pip install black==22.3.0 ruff tensorflow pytest scipy interval
       - name: Lint checks
-        run: python -m ruff .
+        run: python -m ruff check .
       - name: Run tests
         run: |
           source activate.sh

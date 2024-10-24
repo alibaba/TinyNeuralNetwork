@@ -565,7 +565,7 @@ class ConverterOPTester(unittest.TestCase):
 
             def model(x):
                 res = func(x, dim=1)
-                return res if type(res) == torch.Tensor else res[0]
+                return res if type(res) is torch.Tensor else res[0]
 
             model_path = get_model_path()
             converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)
@@ -599,7 +599,7 @@ class ConverterOPTester(unittest.TestCase):
 
             def model(x):
                 res = func(x, dim=1, keepdim=True)
-                return res if type(res) == torch.Tensor else res[0]
+                return res if type(res) is torch.Tensor else res[0]
 
             model_path = get_model_path()
             converter = TFLiteConverter(model, dummy_input, model_path, nchw_transpose=False)

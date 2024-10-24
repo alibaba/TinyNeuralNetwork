@@ -71,17 +71,17 @@ def generate_converter_config(
              the size of the list should be the same of that of the inputs
     """
     if type(input_transpose) in (tuple, list):
-        if len(input_transpose) != len(inputs) or not all((type(x) == bool for x in input_transpose)):
+        if len(input_transpose) != len(inputs) or not all((type(x) is bool for x in input_transpose)):
             raise AssertionError('input transpose should either be boolean or list of booleans')
-    elif type(input_transpose) == bool or input_transpose is None:
+    elif type(input_transpose) is bool or input_transpose is None:
         input_transpose = [input_transpose] * len(inputs)
     else:
         raise AssertionError('input transpose should either be boolean or list of booleans')
 
     if type(output_transpose) in (tuple, list):
-        if len(output_transpose) != len(outputs) or not all((type(x) == bool for x in output_transpose)):
+        if len(output_transpose) != len(outputs) or not all((type(x) is bool for x in output_transpose)):
             raise AssertionError('output transpose should either be boolean or list of booleans')
-    elif type(output_transpose) == bool or output_transpose is None:
+    elif type(output_transpose) is bool or output_transpose is None:
         output_transpose = [output_transpose] * len(inputs)
     else:
         raise AssertionError('output transpose should either be boolean or list of booleans')
