@@ -2949,9 +2949,9 @@ class QATQuantizer(object):
                     if node.prev_indices[i] is None:
                         new_indices.append(i)
                     elif isinstance(node.prev_indices[i], (tuple, list)):
-                        new_indices.push(node.prev_indices[i] + [i])
+                        new_indices.append(node.prev_indices[i] + [i])
                     else:
-                        new_indices.push([node.prev_indices[i], i])
+                        new_indices.append([node.prev_indices[i], i])
                 with override_current_trace_graph(graph):
                     trace_func = TraceFunction('torch.broadcast_tensors', False, prefix='fuse_').parse_args(
                         node.prev_tensors[0], node.prev_tensors[1]
