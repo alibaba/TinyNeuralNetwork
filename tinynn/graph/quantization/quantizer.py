@@ -23,7 +23,7 @@ from tinynn.graph.quantization.fake_quantize import (
     FakeQuantizeBFloat16,
     FakeQuantizeTFLite,
 )
-from tinynn.graph.quantization.modules import QGLU, QPReLU, QSiLU
+from tinynn.graph.quantization.modules import QGLU, QHardsigmoid, QPReLU, QSiLU
 from tinynn.graph.quantization.observer import (
     HistogramObserverKL,
     MinMaxObserver,
@@ -223,6 +223,7 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
 Q_MODULES_MAPPING = {
     nn.PReLU: QPReLU,
     nn.GLU: QGLU,
+    nn.Hardsigmoid: QHardsigmoid,
 }
 
 FUNCTIONAL_MODULE_MAPPING = {
