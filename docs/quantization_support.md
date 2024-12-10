@@ -70,6 +70,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `softmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
 | `sum` | For TFLiteConverter, set `rewrite_quantizable=True` |
 | `torch.nn.GLU` | No action needed |
+| `torch.nn.Hardsigmoid` | No action needed |
 | `torch.nn.LogSoftmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
 | `torch.nn.PReLU` | No action needed |
 | `torch.nn.SiLU` | No action needed |
