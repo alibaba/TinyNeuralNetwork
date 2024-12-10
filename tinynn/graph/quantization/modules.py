@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.quantized as nnq
+import torch.quantization as torch_q
 
 
 class QPReLU(nn.Module):
@@ -70,3 +71,21 @@ class QGLU(nn.Module):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         slices = torch.chunk(input, 2, self.dim)
         return self.f_mul.mul(slices[0], self.sigmoid(slices[1]))
+
+
+class QHardsigmoid(nn.Module):
+    def __init__(self, hardsigmoid: nn.Hardsigmoid) -> None:
+        super().__init__()
+
+        self.f_mul = nnq.FloatFunctional()
+        self.f_add = nnq.FloatFunctional()
+        self.q = torch_q.QuantStub()
+        self.dq = torch_q.DeQuantStub()
+        self.act_hs = nn.Hardsigmoid()
+        self.act_r = nn.ReLU6()
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        x1 = self.f_add.add_scalar(input, 3.0)
+        x2 = self.act_r(x1)
+        x3 = self.q(self.dq(x2))
+        return self.f_mul.mul_scalar(x3, 1 / 6)
