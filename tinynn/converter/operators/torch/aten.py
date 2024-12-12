@@ -1386,16 +1386,16 @@ class ATenMaxPool2dOperator(ATenMaxPool2dSchema):
 
         assert dilation_h == dilation_w == 1, "Only dilation == 1 is supported"
 
-        add_padop = not (
+        add_pad_op = not (
             stride_h == stride_w == 1 and pad_h == kernel_h // 2 and pad_w == kernel_w // 2 and not ceil_mode
         )
         padding = tfl_schema.Padding.SAME
-        if add_padop:
+        if add_pad_op:
             padding = tfl_schema.Padding.VALID
 
         maxpool_op = tfl.MaxPool2dOperator(inputs, outputs, padding, stride_w, stride_h, kernel_w, kernel_h)
         ops = self.wrap_ops_with_nhwc_nchw_transposes([maxpool_op])
-        if add_padop:
+        if add_pad_op:
             self.handle_padding(pad_h, pad_w, 1, ops, ceil_mode)
 
         for op in ops:
