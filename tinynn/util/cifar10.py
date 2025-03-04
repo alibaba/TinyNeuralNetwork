@@ -219,9 +219,9 @@ def train_one_epoch_distill(model, context: DLContext):
         head = (mask.float() * margin).sum(-1)
         tail = ((~mask).float() * margin).sum(-1)
 
-        distil_loss = (head * f_kl + tail * r_kl) / (head + tail)
+        distill_loss = (head * f_kl + tail * r_kl) / (head + tail)
 
-        distil_loss = distil_loss.view(-1).mean() * T * T
+        distill_loss = distill_loss.view(-1).mean() * T * T
 
         avg_origin_losses.update(origin_loss * (1 - A))
         loss = origin_loss * (1 - A) + distill_loss * A
