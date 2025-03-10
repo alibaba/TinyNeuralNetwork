@@ -86,7 +86,9 @@ class PTQFakeQuantize(torch.quantization.FakeQuantize):
             self.activation_post_process(X.detach())
 
         if self.fake_quant_enabled[0] == 1:
-            if self.scale == 1 and self.zero_point == 0:
+            if (self.scale == 1 and self.zero_point == 0) or (
+                float(self.scale * (self.quant_max - self.quant_min + 1)) == 256
+            ):
                 _scale, _zero_point = self.calculate_qparams()
                 _scale, _zero_point = _scale.to(self.scale.device), _zero_point.to(self.zero_point.device)
                 if self.scale.shape != _scale.shape:

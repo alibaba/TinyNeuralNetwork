@@ -216,8 +216,8 @@ class Tensor(object):
                     scale = tensor.q_scale()
                     self.tensor = (self.tensor.astype(np.int32) - 128).astype(np.int8)
                     if q_type == np.int16:
-                        scale = scale * 255 / 65535
-                        self.tensor = np.round(self.tensor.astype(np.float32) / 255 * 65535).astype(np.int16)
+                        scale = scale * 256 / 65536
+                        self.tensor = np.round(self.tensor.astype(np.float32) / 256 * 65536).astype(np.int16)
                     self.quantization = QuantizationParameters(scale, sym_u8_offset - 128)
             elif tensor.dtype == torch.qint8:
                 self.tensor = torch.int_repr(tensor.detach()).numpy()

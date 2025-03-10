@@ -1443,15 +1443,20 @@ class QATQuantizer(object):
             if '.weight_fake_quant' in n:
                 continue
 
+            if isinstance(m, torch.nn.Sigmoid) and quant_min == 0 and quant_max == 65535:
+                m.activation_post_process.scale = m.activation_post_process.scale * 2
+                m.activation_post_process.zero_point = torch.zeros_like(m.activation_post_process.zero_point) + 32768
+                log.info(f"Rescale {n}(sigmoid mod) quant param to [1/32768, 0] to align TFLite.")
+
             if isinstance(m, torch.quantization.FakeQuantize):
                 observer = getattr(m, 'activation_post_process', None)
                 if observer is not None:
-                    old_quant_range = m.quant_max - m.quant_min
+                    old_quant_range = m.quant_max - m.quant_min + 1
                     m.quant_min = quant_min
                     m.quant_max = quant_max
-                    new_quant_range = m.quant_max - m.quant_min
-                    m.scale = m.scale * new_quant_range / old_quant_range
-                    zero_point = (new_quant_range + 1) // 2
+                    new_quant_range = m.quant_max - m.quant_min + 1
+                    m.scale = m.scale * old_quant_range / new_quant_range
+                    zero_point = new_quant_range // 2 if m.zero_point != 0 else 0
                     m.zero_point = torch.zeros_like(m.zero_point) + zero_point
                     observer.quant_min = quant_min
                     observer.quant_max = quant_max
