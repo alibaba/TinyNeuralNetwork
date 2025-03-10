@@ -2062,6 +2062,15 @@ class ATenSigmoidOperator(ATenSigmoidSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+
+        if self.q_type == np.int16:
+            self.output_tensors[0] = torch.quantize_per_tensor(
+                self.output_tensors[0].dequantize(),
+                self.output_tensors[0].q_scale() * 2,
+                0,
+                self.output_tensors[0].dtype,
+            )
+
         self.elementwise_unary(tfl.LogisticOperator, graph_converter)
 
 
