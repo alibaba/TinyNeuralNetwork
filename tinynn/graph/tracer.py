@@ -1933,6 +1933,8 @@ class TraceGraph(object):
         for n, m in self.module.named_modules():
             n = n.replace(".", "_")
             n = n.replace("-", "_")
+            n = n.replace("/", "_")
+            n = n.replace(";", "_")
             n = 'module_' + n if n.isnumeric() else n
             self.module_unique_name_dict[id(m)] = n
 
@@ -1942,12 +1944,16 @@ class TraceGraph(object):
         for n, p in self.module.named_parameters():
             n = n.replace(".", "_")
             n = n.replace("-", "_")
+            n = n.replace("/", "_")
+            n = n.replace(";", "_")
             n = 'param_' + n if n.isnumeric() else n
             self.parameter_unique_name_dict[id(p)] = n
 
         for n, b in self.module.named_buffers():
             n = n.replace(".", "_")
             n = n.replace("-", "_")
+            n = n.replace("/", "_")
+            n = n.replace(";", "_")
             n = 'buffer_' + n if n.isnumeric() else n
             self.parameter_unique_name_dict[id(b)] = n
 
