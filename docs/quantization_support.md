@@ -27,6 +27,7 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `pow` | / |
 | `prelu` | / |
 | `reciprocal` | / |
+| `rsqrt` | / |
 | `silu` | / |
 | `sin` | / |
 | `softmax` | / |
@@ -71,8 +72,10 @@ Quantized OPs that are natively not supported by PyTorch (and possibly TFLite). 
 | `sum` | For TFLiteConverter, set `rewrite_quantizable=True` |
 | `torch.nn.GLU` | No action needed |
 | `torch.nn.Hardsigmoid` | No action needed |
+| `torch.nn.LayerNorm` | No action needed |
 | `torch.nn.LogSoftmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
 | `torch.nn.PReLU` | No action needed |
+| `torch.nn.RMSNorm` | No action needed |
 | `torch.nn.SiLU` | No action needed |
 | `torch.nn.Softmax` | For QATQuantizer/PostQuantizer, set `config={"set_quantizable_op_stats": True}`<br>For TFLiteConverter, set `rewrite_quantizable=True` |
 | `truediv` | For TFLiteConverter, set `rewrite_quantizable=True` |

@@ -23,7 +23,7 @@ from tinynn.graph.quantization.fake_quantize import (
     FakeQuantizeBFloat16,
     FakeQuantizeTFLite,
 )
-from tinynn.graph.quantization.modules import QGLU, QHardsigmoid, QPReLU, QSiLU
+from tinynn.graph.quantization.modules import QGLU, QHardsigmoid, QPReLU, QSiLU, QLayerNorm, QRMSNorm
 from tinynn.graph.quantization.observer import (
     HistogramObserverKL,
     MinMaxObserver,
@@ -174,6 +174,7 @@ UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST = {
     'pow': None,
     'truediv': None,
     'sqrt': None,
+    'rsqrt': None,
     'atan2': None,
     'atan': None,
     'sin': None,
@@ -263,8 +264,11 @@ if hasattr(nn, 'SiLU'):
     Q_MODULES_MAPPING.update({nn.SiLU: QSiLU})
     FUNCTIONAL_MODULE_MAPPING.update({'silu': nn.SiLU})
 
+if hasattr(nn, 'LayerNorm'):
+    Q_MODULES_MAPPING.update({nn.LayerNorm: QLayerNorm})
+
 if hasattr(nn, 'RMSNorm'):
-    UNSUPPORTED_PYTORCH_QUANTIZATION_OP_LIST.update({nn.RMSNorm: None})
+    Q_MODULES_MAPPING.update({nn.RMSNorm: QRMSNorm})
 
 # Processed QAT fuse rules
 processed_qat_rules = {}

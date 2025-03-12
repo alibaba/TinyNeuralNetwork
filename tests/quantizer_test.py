@@ -380,6 +380,7 @@ class QuantizerTester(unittest.TestCase):
                 return self.norm(y[0])
 
         model = Model()
+        torch.nn.init.uniform_(model.norm.bias, -0.1, 0.1)
         inputs = torch.randn(1, 3, 224, 224)
 
         check_quantize_rewrite(model, inputs)
