@@ -89,3 +89,86 @@ class QHardsigmoid(nn.Module):
         x2 = self.act_r(x1)
         x3 = self.q(self.dq(x2))
         return self.f_mul.mul_scalar(x3, 1 / 6)
+
+
+class QLayerNorm(nn.Module):
+    def __init__(self, layernorm: nn.LayerNorm) -> None:
+        super().__init__()
+        self.mean_dims = tuple(range(-len(layernorm.normalized_shape), 0))
+        self.weight = torch.nn.Parameter(layernorm.weight.data.detach().clone())
+        self.bias = torch.nn.Parameter(layernorm.bias.data.detach().clone())
+        self.eps = layernorm.eps
+
+        self.q_rsqrt = torch_q.QuantStub()
+        self.q_weight = torch_q.QuantStub()
+        self.q_bias = torch_q.QuantStub()
+        self.dq_rsqrt = torch_q.DeQuantStub()
+
+        self.f_neg = nnq.FloatFunctional()
+        self.f_add_0 = nnq.FloatFunctional()
+        self.f_mul_0 = nnq.FloatFunctional()
+        self.f_add_1 = nnq.FloatFunctional()
+        self.f_mul_1 = nnq.FloatFunctional()
+        self.f_mul_2 = nnq.FloatFunctional()
+        self.f_add_2 = nnq.FloatFunctional()
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        # LayerNorm(input) = (input - mean(input)) * rsqrt(mean(( input - mean(input) )**20) + eps ) * alpha + beta
+        # Currently, we completely split LayerNorm and independently count the quantization parameters
+        # of the intermediate activation value, which may lead to a decrease in quantization accuracy.
+
+        mean = input.mean(self.mean_dims, keepdim=True)
+        diff = self.f_add_0.add(input, self.f_neg.mul_scalar(mean, -1.0).expand_as(input))
+        squarer_difference = self.f_mul_0.mul(diff, diff)
+        var = squarer_difference.mean(self.mean_dims, keepdim=True)
+        var_eps = self.f_add_1.add_scalar(var, self.eps)
+
+        fdq_var_eps = self.dq_rsqrt(var_eps)
+        std_inverse = torch.rsqrt(fdq_var_eps)
+        q_std_inverse = self.q_rsqrt(std_inverse)
+
+        weight_fq = self.q_weight(self.weight)
+        bias_fq = self.q_bias(self.bias)
+        norm = self.f_mul_1.mul(diff, q_std_inverse)
+        weight_fq_expand = weight_fq.expand_as(norm)
+        norm_alpha = self.f_mul_2.mul(norm, weight_fq_expand)
+        bias_fq_expand = bias_fq.expand_as(norm_alpha)
+        return self.f_add_2.add(norm_alpha, bias_fq_expand)
+
+
+class QRMSNorm(nn.Module):
+    def __init__(self, rmsnorm: 'nn.RMSNorm') -> None:
+        super().__init__()
+        self.mean_dims = tuple(range(-len(rmsnorm.normalized_shape), 0))
+        self.weight = torch.nn.Parameter(rmsnorm.weight.data.detach().clone())
+        self.eps = rmsnorm.eps
+
+        self.q_rsqrt = torch_q.QuantStub()
+        self.q_weight = torch_q.QuantStub()
+        self.dq_rsqrt = torch_q.DeQuantStub()
+
+        self.f_add_0 = nnq.FloatFunctional()
+        self.f_mul_0 = nnq.FloatFunctional()
+        self.f_mul_1 = nnq.FloatFunctional()
+        self.f_mul_2 = nnq.FloatFunctional()
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        # RMSNorm(input) = (input) * rsqrt(mean(input**2)) + eps ) * alpha + beta
+
+        squard_input = self.f_mul_0.mul(input, input)
+        if self.eps is None:
+            rms_pre = squard_input.mean(self.mean_dims, keepdim=True)
+        else:
+            rms_pre = self.f_add_0.add_scalar(
+                squard_input.mean(self.mean_dims, keepdim=True),
+                self.eps,
+            )
+
+        fdq_rms_pre = self.dq_rsqrt(rms_pre)
+        rms_inverse = torch.rsqrt(fdq_rms_pre)
+        q_rms = self.q_rsqrt(rms_inverse)
+
+        weight_fq = self.q_weight(self.weight)
+        norm = self.f_mul_1.mul(input, q_rms)
+        weight_fq_expand = weight_fq.expand_as(norm)
+        return self.f_mul_2.mul(norm, weight_fq_expand)

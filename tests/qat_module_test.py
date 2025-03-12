@@ -1,8 +1,9 @@
 import unittest
+import random
 
 import torch
 import torch.nn as nn
-from tinynn.graph.quantization.modules import QGLU, QPReLU, QSiLU
+from tinynn.graph.quantization.modules import QGLU, QPReLU, QSiLU, QLayerNorm, QRMSNorm
 
 
 class QATModuleTester(unittest.TestCase):
@@ -80,6 +81,55 @@ class QATModuleTester(unittest.TestCase):
             quant_outp = quant(inp)
 
             if not torch.allclose(orig_outp, quant_outp):
+                print('original:')
+                print(orig_outp)
+                print('quanted:')
+                print(quant_outp)
+
+                print('diff (min, max):', torch.max(quant_outp - orig_outp), torch.min(quant_outp - orig_outp))
+
+                self.assertTrue(False)
+
+    def test_layer_norm(self):
+        for i in range(100):
+            normalized_shape = tuple(random.randint(10, 100) for _ in range(random.randint(1, 3)))
+            non_normalized_shape = tuple(random.randint(1, 100) for _ in range(random.randint(1, 2)))
+
+            orig = nn.LayerNorm(normalized_shape)
+            quant = QLayerNorm(orig)
+
+            inp = torch.randn((*non_normalized_shape, *normalized_shape))
+
+            orig_outp = orig(inp)
+            quant_outp = quant(inp)
+
+            if not torch.allclose(orig_outp, quant_outp, atol=1e-6):
+                print(normalized_shape, non_normalized_shape)
+                print('original:')
+                print(orig_outp)
+                print('quanted:')
+                print(quant_outp)
+
+                print('diff (min, max):', torch.max(quant_outp - orig_outp), torch.min(quant_outp - orig_outp))
+
+                self.assertTrue(False)
+
+    @unittest.skipIf(not hasattr(torch.nn, 'RMSNorm'), 'RMSNorm is not supported')
+    def test_rms_norm(self):
+        for i in range(100):
+            normalized_shape = tuple(random.randint(10, 100) for _ in range(random.randint(1, 3)))
+            non_normalized_shape = tuple(random.randint(1, 100) for _ in range(random.randint(1, 2)))
+
+            orig = nn.RMSNorm(normalized_shape)
+            quant = QRMSNorm(orig)
+
+            inp = torch.randn((*non_normalized_shape, *normalized_shape))
+
+            orig_outp = orig(inp)
+            quant_outp = quant(inp)
+
+            if not torch.allclose(orig_outp, quant_outp, atol=1e-6):
+                print(normalized_shape, non_normalized_shape)
                 print('original:')
                 print(orig_outp)
                 print('quanted:')
