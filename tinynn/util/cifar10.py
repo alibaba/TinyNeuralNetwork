@@ -237,6 +237,7 @@ def train_one_epoch_distill(model, context: DLContext):
 
         avg_data_time.update(time.time() - batch_end)
         image = image.to(device=context.device)
+        context.optimizer.zero_grad()
 
         if context.grad_scaler:
             with autocast():
