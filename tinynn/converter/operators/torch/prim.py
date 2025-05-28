@@ -67,6 +67,7 @@ class PrimListUnpackConverter(PrimOperatorConverter):
 class PrimGetAttrConverter(PrimOperatorConverter):
     def parse(self, node, attrs, args, graph_converter):
         name, name_type = attrs.get('name', (None, None))
+        graph_converter.relations[self.output_names[0]] = self.input_names[0]
         if name is not None and name_type == 's':
             v = getattr(self.input_tensors[0], name)
             self.output_tensors.append(v)
