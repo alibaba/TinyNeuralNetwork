@@ -18,7 +18,16 @@ class QuantizedMulScalarOperator(QuantizedMulScalarSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
 
+        is_neg = False
+        if self.input_tensors[1] in (-1, -1.0):
+            self.input_tensors[1] *= -1
+            is_neg = True
+
         self.run(node)
+
+        if is_neg:
+            self.input_tensors[1] *= -1
+
         QuantizedMulOperator.parse_common(self, node, attrs, args, graph_converter)
 
 
