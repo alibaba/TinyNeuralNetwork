@@ -201,11 +201,27 @@ def train_one_epoch_distill(model, context: DLContext):
             label = label.to(device=context.device)
             origin_loss = context.criterion(output, label)
 
-        distill_loss = (
-            F.kl_div(F.log_softmax(output / T, dim=1), F.softmax(label_teacher / T, dim=1), reduction='batchmean')
-            * T
-            * T
-        )
+        teacher_probs = F.softmax(label_teacher / T, dim=-1)
+        student_probs = F.softmax(output / T, dim=-1)
+
+        f_kl = F.kl_div(F.log_softmax(output / T, dim=1), teacher_probs, reduction='none')
+        r_kl = F.kl_div(F.log_softmax(label_teacher / T, dim=1), student_probs, reduction='none')
+
+        sorted_teacher_probs, sorted_idx = teacher_probs.sort(dim=-1, descending=True)
+        sorted_student_probs = student_probs.gather(dim=-1, index=sorted_idx)
+
+        thres = 0.5
+
+        mask = torch.roll(sorted_teacher_probs.cumsum(-1) < thres, 1, -1)
+        mask[..., 0] = True
+        margin = (sorted_teacher_probs - sorted_student_probs).abs()
+
+        head = (mask.float() * margin).sum(-1)
+        tail = ((~mask).float() * margin).sum(-1)
+
+        distill_loss = (head * f_kl + tail * r_kl) / (head + tail)
+
+        distill_loss = distill_loss.view(-1).mean() * T * T
 
         avg_origin_losses.update(origin_loss * (1 - A))
         loss = origin_loss * (1 - A) + distill_loss * A
