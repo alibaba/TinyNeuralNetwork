@@ -2537,6 +2537,7 @@ CHANNEL_MODIFIERS = {
     'view': ReshapeModifier,
     "flatten": ReIndexModifier,
     "squeeze": ReIndexModifier,
+    'unsqueeze': ReIndexModifier,
     nn.Flatten: ReIndexModifier,
     'reshape': ReshapeModifier,
     'transpose': ReIndexModifier,
