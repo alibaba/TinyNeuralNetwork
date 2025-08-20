@@ -499,10 +499,10 @@ class TraceFunction(object):
                 if self.is_property:
                     expr = f'{tensor_names[0]}.{self.func_type}'
                 elif self.func_type == '__getitem__':
-                    args = self.args_string_no_self
+                    args = self.args_template_no_self
                     if not args.startswith('[') and not args.endswith(']'):
                         args = f'[{args}]'
-                    expr = f'{tensor_names[0]}{args}'
+                    expr = f'{{}}{args}'.format(*tensor_names)
                 else:
                     full_template = f'{{}}.{self.func_type}({self.args_template_no_self})'
                     expr = full_template.format(*tensor_names)
@@ -591,7 +591,7 @@ class TraceFunction(object):
                     new_arg.append('{}')
                 elif type(a) in (str, torch.device):
                     new_arg.append(_escape_arg(f"\'{a}\'"))
-                elif type(a) in (int, bool, torch.dtype):
+                elif type(a) in (int, bool, torch.dtype, torch.memory_format):
                     new_arg.append(str(a))
                 elif type(a) is float:
                     str_arg = str(a)
