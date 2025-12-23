@@ -26,8 +26,10 @@ Operators that are implemented in Python
 | `aten::__or__` |  |
 | `aten::_convolution` |  |
 | `aten::abs` |  |
-| `aten::adaptive_avg_pool2d` | Only 4D input is supported |
-| `aten::adaptive_max_pool2d` | Only 4D input is supported |
+| `aten::adaptive_avg_pool1d` |  |
+| `aten::adaptive_avg_pool2d` |  |
+| `aten::adaptive_max_pool1d` |  |
+| `aten::adaptive_max_pool2d` |  |
 | `aten::add` | Only alpha == 1 is supported |
 | `aten::add_` | Only alpha == 1 is supported |
 | `aten::addbmm` | batch1 and batch2 must be 3-D tensors each containing the same number of matrices |
@@ -37,7 +39,8 @@ Operators that are implemented in Python
 | `aten::argmax` | aten::argmax(tensor) is not supported |
 | `aten::argmin` | aten::argmin(tensor) is not supported |
 | `aten::atan2` |  |
-| `aten::avg_pool2d` | Only divisor_override == kernel_h == kernel_w is supported |
+| `aten::avg_pool1d` |  |
+| `aten::avg_pool2d` |  |
 | `aten::baddbmm` | batch1 and batch2 must be 3-D tensors each containing the same number of matrices |
 | `aten::batch_norm` | Running mean and variance should not be None for aten::batch_norm. Otherwise, use LayerNorm instead. |
 | `aten::bitwise_and` |  |
@@ -115,7 +118,8 @@ Operators that are implemented in Python
 | `aten::masked_fill_` |  |
 | `aten::matmul` |  |
 | `aten::max` |  |
-| `aten::max_pool2d` | Only dilation == 1 is supported |
+| `aten::max_pool1d` |  |
+| `aten::max_pool2d` |  |
 | `aten::maximum` |  |
 | `aten::mean` |  |
 | `aten::meshgrid` | aten::meshgrid for dynamic tensors is not supported |
