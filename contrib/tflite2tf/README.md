@@ -15,6 +15,7 @@ A utility for model conversion between TFLite and Tensorflow SavedModel.
 - TRANSPOSE_CONV
 - SLICE
 - RELU
+- TRANSPOSE
 
 ### Usage
 ```py
