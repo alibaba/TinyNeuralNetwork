@@ -384,6 +384,39 @@ class OperatorConverter(ABC):
 
         return [dequant_op] + ops + [quant_op]
 
+    def wrap_ops_with_1d_2d_reshapes(
+        self, ops: typing.List[tfl.BaseOperator], input_idx: int = 0, output_idx: int = 0
+    ) -> typing.List[tfl.BaseOperator]:
+        orig_input = ops[0].inputs[input_idx]
+        orig_output = ops[-1].outputs[output_idx]
+
+        input_shape_arr = list(orig_input.tensor.shape) + [1]
+        output_shape_arr = list(orig_output.tensor.shape) + [1]
+
+        input_shape = np.array(input_shape_arr, dtype='int32')
+        output_shape = np.array(orig_output.tensor.shape, dtype='int32')
+
+        input_shape_tensor = self.create_attr_tensor(input_shape)
+        output_shape_tensor = self.create_attr_tensor(output_shape)
+
+        new_input = self.create_transform_tensor(
+            orig_input.tensor.reshape(input_shape), quantization=orig_input.quantization
+        )
+        new_output = self.create_transform_tensor(
+            orig_output.tensor.reshape(output_shape_arr), quantization=orig_output.quantization
+        )
+
+        input_reshape_op = tfl.ReshapeOperator([orig_input, input_shape_tensor], [new_input], input_shape)
+        output_reshape_op = tfl.ReshapeOperator([new_output, output_shape_tensor], [orig_output], output_shape)
+
+        input_reshape_op.extra_hints['direction'] = 'up'
+        output_reshape_op.extra_hints['direction'] = 'down'
+
+        ops[0].inputs[input_idx] = new_input
+        ops[-1].outputs[output_idx] = new_output
+
+        return [input_reshape_op] + ops + [output_reshape_op]
+
     def wrap_ops_with_2d_3d_reshapes(
         self, ops: typing.List[tfl.BaseOperator], input_idx: int = 0, output_idx: int = 0
     ) -> typing.List[tfl.BaseOperator]:

@@ -1006,21 +1006,42 @@ class ATenUpsampleBilinear2dOperator(ATenUpsampleBilinear2dSchema):
             graph_converter.add_operator(op)
 
 
+class ATenAvgPool1dOperator(ATenAvgPool1dSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenAvgPool2dOperator.parse_common(self, node, attrs, args, graph_converter)
+
+
 class ATenAvgPool2dOperator(ATenAvgPool2dSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+        self.parse_common(node, attrs, args, graph_converter)
 
+    def parse_common(self, node, attrs, args, graph_converter):
         inputs = [self.find_or_create_input(0, graph_converter)]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
-        kernel_h, kernel_w = self.input_tensors[1]
-        stride_h, stride_w = self.input_tensors[2] or (kernel_h, kernel_w)
-        padding_h, padding_w = self.input_tensors[3]
+        if isinstance(self, ATenAvgPool1dOperator):
+            print(self.input_tensors[2])
+            kernel_h, kernel_w = self.input_tensors[1][0], 1
+            if self.input_tensors[2]:
+                stride_h, stride_w = self.input_tensors[2][0], 1
+            else:
+                stride_h, stride_w = kernel_h, 1
+            padding_h, padding_w = self.input_tensors[3][0], 0
+            divisor_override = None
+        else:
+            kernel_h, kernel_w = self.input_tensors[1]
+            stride_h, stride_w = self.input_tensors[2] or (kernel_h, kernel_w)
+            padding_h, padding_w = self.input_tensors[3]
+            divisor_override = self.input_tensors[6]
+
         ceil_mode = self.input_tensors[4] in (True, 1)
         count_include_pad = self.input_tensors[5] in (True, 1)
-        divisor_override = self.input_tensors[6]
 
         assert (
             divisor_override is None or divisor_override == kernel_h == kernel_w
@@ -1029,7 +1050,18 @@ class ATenAvgPool2dOperator(ATenAvgPool2dSchema):
         padding = tfl_schema.Padding.VALID
 
         avgpool_op = tfl.AveragePool2dOperator(inputs, outputs, padding, stride_w, stride_h, kernel_w, kernel_h)
-        ops = self.wrap_ops_with_nhwc_nchw_transposes([avgpool_op])
+        pre_ops = []
+        ops = [avgpool_op]
+        post_ops = []
+        offset = 0
+        if isinstance(self, ATenAvgPool1dOperator):
+            ops = self.wrap_ops_with_1d_2d_reshapes(ops)
+            pre_ops = ops[:1]
+            post_ops = ops[2:]
+            ops = ops[1:2]
+            offset = -1
+        ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
+        ops = pre_ops + ops + post_ops
         self.handle_padding(padding_h, padding_w, 1, ops, ceil_mode)
 
         if not count_include_pad:
@@ -1045,12 +1077,20 @@ class ATenAvgPool2dOperator(ATenAvgPool2dSchema):
             mask_t = self.create_attr_tensor(mask_permuted)
             before_mask = outputs[0].tensor / mask_permuted
             before_mask_t = self.create_transform_tensor(before_mask)
-            actual_out = ops[-2].outputs[0]
-            ops[-2].outputs[0] = before_mask_t
-            ops.insert(-1, tfl.MulOperator([before_mask_t, mask_t], [actual_out]))
+            actual_out = ops[offset - 2].outputs[0]
+            ops[offset - 2].outputs[0] = before_mask_t
+            ops.insert(offset - 1, tfl.MulOperator([before_mask_t, mask_t], [actual_out]))
 
         for op in ops:
             graph_converter.add_operator(op)
+
+
+class ATenAdaptiveAvgPool1dOperator(ATenAdaptiveAvgPool1dSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenAdaptiveAvgPool2dOperator.parse_common(self, node, attrs, args, graph_converter)
 
 
 class ATenAdaptiveAvgPool2dOperator(ATenAdaptiveAvgPool2dSchema):
@@ -1058,14 +1098,23 @@ class ATenAdaptiveAvgPool2dOperator(ATenAdaptiveAvgPool2dSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        input_tensor = self.find_or_create_input(0, graph_converter)
-        output_h, output_w = self.input_tensors[1]
+        self.parse_common(node, attrs, args, graph_converter)
 
-        dim_h, dim_w = input_tensor.shape[2:]
+    def parse_common(self, node, attrs, args, graph_converter):
+        input_tensor = self.find_or_create_input(0, graph_converter)
+
+        if isinstance(self, ATenAdaptiveAvgPool1dOperator):
+            output_h, output_w = self.input_tensors[1][0], 1
+            dim_h, dim_w = input_tensor.shape[2], 1
+        else:
+            output_h, output_w = self.input_tensors[1]
+            dim_h, dim_w = input_tensor.shape[2:]
+
         assert (
             dim_h % output_h == 0 and dim_w % output_w == 0
         ), f'not supported: input dim: [{dim_h}, {dim_w}], output size: [{output_h}, {output_w}]'
-        assert input_tensor.tensor.ndim == 4, 'Only 4D input is supported'
+
+        assert input_tensor.tensor.ndim in (3, 4), 'Only 3/4D input is supported'
 
         ops = []
 
@@ -1085,10 +1134,26 @@ class ATenAdaptiveAvgPool2dOperator(ATenAdaptiveAvgPool2dSchema):
 
             ops.append(tfl.AveragePool2dOperator(inputs, outputs, padding, stride_w, stride_h, kernel_w, kernel_h))
 
+        pre_ops = []
+        post_ops = []
+        if isinstance(self, ATenAdaptiveAvgPool1dOperator):
+            ops = self.wrap_ops_with_1d_2d_reshapes(ops)
+            pre_ops = ops[:1]
+            post_ops = ops[2:]
+            ops = ops[1:2]
         ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
+        ops = pre_ops + ops + post_ops
 
         for op in ops:
             graph_converter.add_operator(op)
+
+
+class ATenAdaptiveMaxPool1dOperator(ATenAdaptiveMaxPool1dSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenAdaptiveMaxPool2dOperator.parse_common(self, node, attrs, args, graph_converter)
 
 
 class ATenAdaptiveMaxPool2dOperator(ATenAdaptiveMaxPool2dSchema):
@@ -1096,14 +1161,22 @@ class ATenAdaptiveMaxPool2dOperator(ATenAdaptiveMaxPool2dSchema):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
-        input_tensor = self.find_or_create_input(0, graph_converter)
-        output_h, output_w = self.input_tensors[1]
+        self.parse_common(node, attrs, args, graph_converter)
 
-        dim_h, dim_w = input_tensor.shape[2:]
+    def parse_common(self, node, attrs, args, graph_converter):
+        input_tensor = self.find_or_create_input(0, graph_converter)
+
+        if isinstance(self, ATenAdaptiveMaxPool1dOperator):
+            output_h, output_w = self.input_tensors[1][0], 1
+            dim_h, dim_w = input_tensor.shape[2], 1
+        else:
+            output_h, output_w = self.input_tensors[1]
+            dim_h, dim_w = input_tensor.shape[2:]
+
         assert (
             dim_h % output_h == 0 and dim_w % output_w == 0
         ), f'not supported: input dim: [{dim_h}, {dim_w}], output size: [{output_h}, {output_w}]'
-        assert input_tensor.tensor.ndim == 4, 'Only 4D input is supported'
+        assert input_tensor.tensor.ndim in (3, 4), 'Only 3/4D input is supported'
 
         ops = []
 
@@ -1129,7 +1202,15 @@ class ATenAdaptiveMaxPool2dOperator(ATenAdaptiveMaxPool2dSchema):
 
             ops.append(tfl.MaxPool2dOperator(inputs, outputs, padding, stride_w, stride_h, kernel_w, kernel_h))
 
+        pre_ops = []
+        post_ops = []
+        if isinstance(self, ATenAdaptiveMaxPool1dOperator):
+            ops = self.wrap_ops_with_1d_2d_reshapes(ops)
+            pre_ops = ops[:1]
+            post_ops = ops[2:]
+            ops = ops[1:2]
         ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
+        ops = pre_ops + ops + post_ops
 
         for op in ops:
             graph_converter.add_operator(op)
@@ -1369,19 +1450,39 @@ class ATenPowOperator(ATenPowSchema):
         self.elementwise_binary(tfl.PowOperator, graph_converter, True)
 
 
+class ATenMaxPool1dOperator(ATenMaxPool1dSchema):
+    def parse(self, node, attrs, args, graph_converter):
+        super().parse(node, attrs, args, graph_converter)
+
+        self.run(node)
+        ATenMaxPool2dOperator.parse_common(self, node, attrs, args, graph_converter)
+
+
 class ATenMaxPool2dOperator(ATenMaxPool2dSchema):
     def parse(self, node, attrs, args, graph_converter):
         super().parse(node, attrs, args, graph_converter)
 
         self.run(node)
+        self.parse_common(node, attrs, args, graph_converter)
 
+    def parse_common(self, node, attrs, args, graph_converter):
         inputs = [self.find_or_create_input(0, graph_converter)]
         outputs = self.to_tfl_tensors(self.output_names, self.output_tensors)
 
-        kernel_h, kernel_w = self.input_tensors[1]
-        stride_h, stride_w = self.input_tensors[2] or (kernel_h, kernel_w)
-        pad_h, pad_w = self.input_tensors[3]
-        dilation_h, dilation_w = self.input_tensors[4]
+        if isinstance(self, ATenMaxPool1dOperator):
+            kernel_h, kernel_w = self.input_tensors[1][0], 1
+            if self.input_tensors[2]:
+                stride_h, stride_w = self.input_tensors[2][0], 1
+            else:
+                stride_h, stride_w = kernel_h, 1
+            pad_h, pad_w = self.input_tensors[3][0], 0
+            dilation_h, dilation_w = self.input_tensors[4][0], 1
+        else:
+            kernel_h, kernel_w = self.input_tensors[1]
+            stride_h, stride_w = self.input_tensors[2] or (kernel_h, kernel_w)
+            pad_h, pad_w = self.input_tensors[3]
+            dilation_h, dilation_w = self.input_tensors[4]
+
         ceil_mode = self.input_tensors[5]
 
         assert dilation_h == dilation_w == 1, "Only dilation == 1 is supported"
@@ -1394,7 +1495,16 @@ class ATenMaxPool2dOperator(ATenMaxPool2dSchema):
             padding = tfl_schema.Padding.VALID
 
         maxpool_op = tfl.MaxPool2dOperator(inputs, outputs, padding, stride_w, stride_h, kernel_w, kernel_h)
-        ops = self.wrap_ops_with_nhwc_nchw_transposes([maxpool_op])
+        pre_ops = []
+        ops = [maxpool_op]
+        post_ops = []
+        if isinstance(self, ATenMaxPool1dOperator):
+            ops = self.wrap_ops_with_1d_2d_reshapes(ops)
+            pre_ops = ops[:1]
+            post_ops = ops[2:]
+            ops = ops[1:2]
+        ops = self.wrap_ops_with_nhwc_nchw_transposes(ops)
+        ops = pre_ops + ops + post_ops
         if add_pad_op:
             self.handle_padding(pad_h, pad_w, 1, ops, ceil_mode)
 
