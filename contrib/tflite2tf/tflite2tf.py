@@ -56,6 +56,14 @@ def parse_reshape(op: tflite.Operator, transform_tensors: typing.Set[int]):
     return line
 
 
+def parse_transpose(op: tflite.Operator, transform_tensors: typing.Set[int]):
+    line = (
+        f'{output_name(op, 0, transform_tensors)} = tf.transpose({input_name(op, 0, transform_tensors)},'
+        f' {input_name(op, 1, transform_tensors)})'
+    )
+    return line
+
+
 def parse_resize(op: tflite.Operator, transform_tensors: typing.Set[int]):
     line = (
         f'{output_name(op, 0, transform_tensors)} = tf.image.resize({input_name(op, 0, transform_tensors)},'
@@ -214,6 +222,7 @@ OP_PARSER_DICT = {
     'TRANSPOSE_CONV': parse_transposeconv2d,
     'SLICE': parse_slice,
     'RELU': parse_relu,
+    'TRANSPOSE': parse_transpose,
 }
 
 # Header for the generated script
