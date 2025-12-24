@@ -25,7 +25,7 @@ jobs:
       - name: Install PyTorch
         run: conda install pytorch torchvision -c pytorch
       - name: Install TinyNeuralNetwork
-        run: python setup.py install
+        run: pip install .
       - name: Basic imports
         run: |
           cd tests
